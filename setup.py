@@ -17,7 +17,7 @@ setup(
     author_email = 'hilbert@stsci.edu',
     keywords = ['astronomy'],
     classifiers = ['Programming Language :: Python'],
-    packages = find_packages(exclude=["examples"]),
+    packages = find_packages(exclude=["examples","catalogs"]),
     install_requires = [],
     include_package_data = True
     )
