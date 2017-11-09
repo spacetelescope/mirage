@@ -24,32 +24,32 @@ from . import read_fits
 # Allowed instruments
 inst_list = ['nircam']
 
-class DarkPrep:
+class DarkPrep():
 
     def __init__(self):
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = imp.find_module('dark_prep')[1]
 
-        # URL from which to download darks if they
-        # are not present locally
-        #self.dark_url = "http://dw.stsci.edu/temp/"
-        #self.dark_url = "https://hz3c.stsci.edu"
-        
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'NIRCAM_SIM_DATA'
         self.datadir = os.environ.get(self.env_var)
         if self.datadir is None:
-            print(("WARNING: {} environment variable is not set."
-                   .format(self.env_var)))
-            print("This must be set to the base directory")
-            print("containing the darks, cosmic ray, PSF, etc")
-            print("input files needed for the simulation.")
-            print("This should be set correctly if you installed")
-            print("the nircam_sim_data conda package.")
-            sys.exit()
+            localpath = '/ifs/jwst/wit/nircam/nircam_simulator_data'
+            local = os.path.exists(localpath)
+            if local:
+                self.datadir = localpath
+            else:
+                print(("WARNING: {} environment variable is not set."
+                       .format(self.env_var)))
+                print("This must be set to the base directory")
+                print("containing the darks, cosmic ray, PSF, etc")
+                print("input files needed for the simulation.")
+                print("This should be set correctly if you installed")
+                print("the nircam_sim_data conda package.")
+                sys.exit()
 
 
     def prepare(self):

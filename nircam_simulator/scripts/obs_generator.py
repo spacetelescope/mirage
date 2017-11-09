@@ -47,14 +47,19 @@ class Observation():
         self.env_var = 'NIRCAM_SIM_DATA'
         self.datadir = os.environ.get(self.env_var)
         if self.datadir is None:
-            print(("WARNING: {} environment variable is not set."
-                   .format(self.env_var)))
-            print("This must be set to the base directory")
-            print("containing the darks, cosmic ray, PSF, etc")
-            print("input files needed for the simulation.")
-            print("This should be set correctly if you installed")
-            print("the nircam_sim_data conda package.")
-            sys.exit()
+            localpath = '/ifs/jwst/wit/nircam/nircam_simulator_data'
+            local = os.path.exists(localpath)
+            if local:
+                self.datadir = localpath
+            else:
+                print(("WARNING: {} environment variable is not set."
+                       .format(self.env_var)))
+                print("This must be set to the base directory")
+                print("containing the darks, cosmic ray, PSF, etc")
+                print("input files needed for the simulation.")
+                print("This should be set correctly if you installed")
+                print("the nircam_sim_data conda package.")
+                sys.exit()
 
 
     def create(self):
@@ -356,12 +361,6 @@ class Observation():
         # Expand all input paths to be full paths
         # This is to allow for easier Condor-ization of
         # many runs
-
-        print("WARNING:******************************************")
-        print("We are paying attention to a bunch of inputs here")
-        print("that are not acutally used.")
-        print("WARNING:******************************************")
-        
         pathdict = {'Reffiles':['dark','linearized_darkfile',
                                 'superbias',
                                 'subarray_defs','readpattdefs',

@@ -45,14 +45,19 @@ class Catalog_seed():
         self.env_var = 'NIRCAM_SIM_DATA'
         self.datadir = os.environ.get(self.env_var)
         if self.datadir is None:
-            print(("WARNING: {} environment variable is not set."
-                   .format(self.env_var)))
-            print("This must be set to the base directory")
-            print("containing the darks, cosmic ray, PSF, etc")
-            print("input files needed for the simulation.")
-            print("This should be set correctly if you installed")
-            print("the nircam_sim_data conda package.")
-            sys.exit()
+            localpath = '/ifs/jwst/wit/nircam/nircam_simulator_data'
+            local = os.path.exists(localpath)
+            if local:
+                self.datadir = localpath
+            else:
+                print(("WARNING: {} environment variable is not set."
+                       .format(self.env_var)))
+                print("This must be set to the base directory")
+                print("containing the darks, cosmic ray, PSF, etc")
+                print("input files needed for the simulation.")
+                print("This should be set correctly if you installed")
+                print("the nircam_sim_data conda package.")
+                sys.exit()
             
         #if a grism signal rate image is requested, expand
         #the width and height of the signal rate image by this 
@@ -136,7 +141,7 @@ class Catalog_seed():
         self.saveSeedImage()
 
         # Return info in a tuple
-        return (self.seedimage, self.seed_segmap, self.seedinfo)
+        #return (self.seedimage, self.seed_segmap, self.seedinfo)
 
     
     def saveSeedImage(self):
@@ -166,7 +171,7 @@ class Catalog_seed():
             g,yd,xd = arrayshape
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             
-        seedName = os.path.join(self.basename + '_' + self.params['Readout']['filter'] + '_seed_image.fits')
+        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout']['filter'] + '_seed_image.fits')
         xcent_fov = xd / 2
         ycent_fov = yd / 2
         kw = {}
@@ -190,8 +195,8 @@ class Catalog_seed():
         kw['NOMYEND'] = self.nominal_dims[1] + self.coord_adjust['yoffset'] 
         kw['GRISMPAD'] = self.grism_direct_factor
         self.seedinfo = kw
-        self.saveSingleFits(self.seedimage,seedName,key_dict=kw,image2=self.seed_segmap,image2type='SEGMAP')
-        print("Seed image and segmentation map saved as {}".format(seedName))
+        self.saveSingleFits(self.seedimage,self.seed_file,key_dict=kw,image2=self.seed_segmap,image2type='SEGMAP')
+        print("Seed image and segmentation map saved as {}".format(self.seed_file))
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
