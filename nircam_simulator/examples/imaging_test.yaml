@@ -98,12 +98,12 @@ Output:
   unsigned: True   #Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
   dmsOrient: True    #Output in DMS orientation (vs. fitswriter orientation).
   program_number: 42424    #Program Number
-  title: Supernovae and Black Holes at the Epoch of Reionization   #Program title
-  PI_Name: Lifan Wang  #Proposal PI Name
+  title: Black Holes at the Restaurant at the End of the Universe   #Program title
+  PI_Name: D. Adams  #Proposal PI Name
   Proposal_category: GO  #Proposal category
   Science_category: Cosmology  #Science category
   observation_number: '002'    #Observation Number
-  observation_label: NEP #2    #User-generated observation Label
+  observation_label: Obs1    #User-generated observation Label
   visit_number: '024'    #Visit Number
   visit_group: '01'    #Visit Group
   visit_id: '42424024002'    #Visit ID
