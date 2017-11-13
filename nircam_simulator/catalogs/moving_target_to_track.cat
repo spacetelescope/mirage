@@ -1,0 +1,13 @@
+# 
+# abmag 
+# x and y can be pixel values, or RA and Dec strings or floats. To differentiate, put 'pixels' in the top line if the inputs are pixel values.
+# radius can also be in units of pixels or arcseconds. Put 'radius_pixels' at top of file to specify radii in pixels.
+# position angle is given in degrees counterclockwise. A value of 0 will align the semimajor axis with the x axis of the detector.
+#An object value containing 'point' will be interpreted as a point source. 
+#Anything containing 'sersic' will create a 2D sersic profile.
+# Any other value will be interpreted as an extended source.
+#x_or_RA_velocity is the proper motion of the target in units of arcsec (or pixels) per year
+#Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per year
+#if the units are pixels per year, include 'velocity pixels' in line 2 above.
+object x_or_RA y_or_Dec x_or_RA_velocity  y_or_Dec_velocity magnitude
+pointSource  53.101 -27.801  2103840. 0.0 17.

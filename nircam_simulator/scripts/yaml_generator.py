@@ -77,7 +77,7 @@ July 2017 - V0: Initial version. Bryan Hilbert
 '''
 
 import sys, os
-import imp
+import pkg_resources
 from glob import glob
 from copy import deepcopy
 import argparse
@@ -131,7 +131,7 @@ class SimInput:
         self.simdata_output_dir = './'
         
         # Prepare to find files listed as 'config'
-        self.modpath = imp.find_module('nircam_simulator')[1]
+        self.modpath = pkg_resources.resource_filename('nircam_simulator','')
         self.configfiles = {}
         self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
         self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
