@@ -1,0 +1,11 @@
+include nircam_simulator/config/NIRCam_subarray_definitions.list
+include nircam_simulator/config/NIRCam_zeropoints.list
+include nircam_simulator/config/__init__.py
+include nircam_simulator/config/dq_init.cfg
+include nircam_simulator/config/linearity.cfg
+include nircam_simulator/config/nircam_filter_pupil_pairings.list
+include nircam_simulator/config/nircam_read_pattern_definitions.list
+include nircam_simulator/config/refpix.cfg
+include nircam_simulator/config/saturation.cfg
+include nircam_simulator/config/superbias.cfg
+include nircam_simulator/config/xtalk20150303g0.errorcut.txt

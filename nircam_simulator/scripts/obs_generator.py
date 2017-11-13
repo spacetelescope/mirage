@@ -6,7 +6,7 @@ Add cosmic rays, poisson noise, etc.
 '''
 
 import sys, os
-import imp
+import pkg_resources
 import random
 import copy
 from math import radians
@@ -39,8 +39,8 @@ class Observation():
         
         # Locate the module files, so that we know where to look
         # for config subdirectory
-        self.modpath = imp.find_module('nircam_simulator')[1]
-        
+        self.modpath = pkg_resources.resource_filename('nircam_simulator','')
+
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
