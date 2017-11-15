@@ -41,6 +41,7 @@ class DarkPrep():
             local = os.path.exists(localpath)
             if local:
                 self.datadir = localpath
+                os.environ['NIRCAM_SIM_DATA'] = localpath
             else:
                 print(("WARNING: {} environment variable is not set."
                        .format(self.env_var)))

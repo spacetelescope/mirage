@@ -49,6 +49,7 @@ class Catalog_seed():
             local = os.path.exists(localpath)
             if local:
                 self.datadir = localpath
+                os.environ['NIRCAM_SIM_DATA'] = localpath
             else:
                 print(("WARNING: {} environment variable is not set."
                        .format(self.env_var)))
@@ -66,11 +67,13 @@ class Catalog_seed():
         #in order to calculate contamination.
         self.grism_direct_factor = np.sqrt(2.)
 
-        #self.coord_adjust contains the factor by which the nominal output array size
-        #needs to be increased (used for TSO and WFSS modes), as well as the coordinate
-        #offset between the nominal output array coordinates, and those of the expanded 
-        #array. These are needed mostly for WFSS observations, where the nominal output  
-        #array will not sit centered in the expanded output image.
+        # self.coord_adjust contains the factor by which the
+        # nominal output array size needs to be increased
+        # (used for WFSS mode), as well as the coordinate
+        # offset between the nominal output array coordinates,
+        # and those of the expanded array. These are needed
+        # mostly for WFSS observations, where the nominal output  
+        # array will not sit centered in the expanded output image.
         self.coord_adjust = {'x':1.,'xoffset':0.,'y':1.,'yoffset':0.}
 
         # NIRCam rough noise values. Used to make educated guesses when
@@ -2728,4 +2731,4 @@ if __name__ == '__main__':
     seed = Catalog_seed()
     parser = seed.add_options(usage = usagestring)
     args = parser.parse_args(namespace=seed)
-    seed.run()
+    seed.make_seed()
