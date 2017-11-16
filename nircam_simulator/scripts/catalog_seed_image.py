@@ -13,6 +13,7 @@ import pkg_resources
 import scipy.signal as s1
 import numpy as np
 import math
+from photutils import detect_threshold, detect_sources
 from astropy.io import fits, ascii
 from astropy.table import Table
 from astropy.modeling.models import Sersic2D
@@ -81,6 +82,11 @@ class Catalog_seed():
         self.single_ron = 6. #e-/read
         self.grism_background = 0.25 #e-/sec
 
+        # keep track of the maximum index number of sources
+        # in the various catalogs. We don't want to end up
+        # with multiple sources having the same index numbers
+        self.maxindex = 0
+
         
     def make_seed(self):
         # Read in input parameters and quality check
@@ -95,10 +101,10 @@ class Catalog_seed():
         self.getSubarrayBounds()
         self.instrument_specific_dicts(self.params['Inst']['instrument'].lower())
         
-        #If the output is a TSO ramp, use the slew rate and angle (and whether a grism
-        #direct image is requested) to determine how much larger than nominal the
-        #signal rate image should be
-        if self.params['Inst']['mode'] == 'moving_target' or self.params['Output']['grism_source_image']:
+        # If the output is a direct image to be dispersed, expand the size
+        # of the nominal FOV so the disperser can account for sources just
+        # outside whose traces will fall into the FOV
+        if self.params['Output']['grism_source_image']:
             self.calcCoordAdjust()
 
         #image dimensions
@@ -119,17 +125,21 @@ class Catalog_seed():
         # the detector
         if self.params['Inst']['mode'].lower() == 'moving_target':
             print('Creating signal ramp of synthetic inputs')
-            print("need to adjust moving target work for multiple integrations! everything above has been modified")
+            print(("need to adjust moving target work for multiple "
+                   "integrations! everything above has been modified"))
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
             outapp = '_nonsidereal_target'
 
+            print('min and max out of non_sidereal_seed; {},{}'.format(np.min(self.seed_segmap),np.max(self.seed_segmap)))
+
+            
         #if moving targets are requested (KBOs, asteroids, etc, NOT moving_target mode
         #where the telescope slews), then create a RAPID integration which 
         #includes those targets
         mov_targs_ramps = []
         if (self.runStep['movingTargets'] | self.runStep['movingTargetsSersic'] | self.runStep['movingTargetsExtended']):
             print('Creating signal ramp of sources that are moving with respect to telescope tracking.')
-            trailed_ramp = self.make_trailed_ramp()
+            trailed_ramp, trailed_segmap = self.make_trailed_ramp()
             outapp += '_trailed_sources'
 
             # Now we need to expand frameimage into a ramp
@@ -139,7 +149,8 @@ class Catalog_seed():
                 self.seedimage = self.combineSimulatedDataSources('countrate',self.seedimage,trailed_ramp)
             else:
                 self.seedimage = self.combineSimulatedDataSources('ramp',self.seedimage,trailed_ramp)
-                
+            self.seed_segmap += trailed_segmap
+
         # Save the combined static+moving targets ramp
         self.saveSeedImage()
 
@@ -284,7 +295,8 @@ class Catalog_seed():
         # Create a ramp for objects that are trailing through
         # the field of view during the integration
         mov_targs_ramps = []
-
+        mov_targs_segmap = None
+        
         if self.params['Inst']['mode'].lower() != 'moving_target':
             tracking = False
             ra_vel = None
@@ -298,21 +310,30 @@ class Catalog_seed():
         
         if self.runStep['movingTargets']:
             #print('Starting moving targets for point sources!')
-            mov_targs_ptsrc = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],'pointSource',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_vel)
+            mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],'pointSource',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_vel)
             mov_targs_ramps.append(mov_targs_ptsrc)
+            mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
         #moving target using a sersic object
         if self.runStep['movingTargetsSersic']:
             #print("Moving targets, sersic!")
-            mov_targs_sersic = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],'galaxies',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_val)
+            mov_targs_sersic, mt_galaxy_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],'galaxies',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_val)
             mov_targs_ramps.append(mov_targs_sersic)
+            if mov_targs_segmap is None:
+                mov_targs_segmap = np.copy(mt_galaxy_segmap)
+            else:
+                mov_targs_segmap += mt_galaxy_segmap
 
         #moving target using an extended object
         if self.runStep['movingTargetsExtended']:
             #print("Extended moving targets!!!")
-            mov_targs_ext = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],'extended',MT_tracking=tracking,ra_vel=tracking_ra_vel,dec_vel=tracking_dec_val)
+            mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],'extended',MT_tracking=tracking,ra_vel=tracking_ra_vel,dec_vel=tracking_dec_val)
             mov_targs_ramps.append(mov_targs_ext)
-
+            if mov_targs_segmap is None:
+                mov_targs_segmap = np.copy(mt_ext_segmap)
+            else:
+                mov_targs_segmap += mt_ext_segmap
+            
         mov_targs_integration = None
         if self.runStep['movingTargets'] or self.runStep['movingTargetsSersic'] or self.runStep['movingTargetsExtended']:
             #Combine the ramps of the moving targets if there is more than one type
@@ -320,7 +341,7 @@ class Catalog_seed():
             if len(mov_targs_ramps) > 1:
                 for i in range(1,len(mov_targs_ramps)):
                     mov_targs_integration += mov_targs_ramps[0]
-        return mov_targs_integration
+        return mov_targs_integration, mov_targs_segmap
 
             
     def calcFrameTime(self):
@@ -361,6 +382,9 @@ class Catalog_seed():
         # These will be stationary in the fov 
         nonsidereal_countrate,nonsidereal_segmap,self.ra_vel,self.dec_vel,vel_flag = self.nonsidereal_CRImage(self.params['simSignals']['movingTargetToTrack'])
 
+        print('nonsidereal_crimage segmap max and min:',np.max(nonsidereal_segmap),np.min(nonsidereal_segmap))
+
+        
         # Expand into a RAPID ramp and convert from signal rate to signals
         ns_yd,ns_xd = nonsidereal_countrate.shape
         totframes = self.params['Readout']['ngroup'] * (self.params['Readout']['nframe']+self.params['Readout']['nskip'])
@@ -374,33 +398,48 @@ class Catalog_seed():
         #in the other input files, and treat them as targets which will move across
         #the field of view during the exposure.
         mtt_data_list = []
+        mtt_data_segmap = None
         #mtt_zero_list = [] 
 
         if self.runStep['pointsource']:
             # Now ptsrc is a list, which we need to get into movingTargetInputs...
-            mtt_ptsrc = self.movingTargetInputs(self.params['simSignals']['pointsource'],'pointSource',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
-            #mtt_ptsrc_zero = mtt_ptsrc[0,:,:]
+            mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],'pointSource',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
             mtt_data_list.append(mtt_ptsrc)
-            #mtt_zero_list.append(mtt_ptsrc_zero)
+            if mtt_data_segmap is None:
+                mtt_data_segmap = np.copy(mtt_ptsrc_segmap)
+            else:
+                mtt_data_segmap += mtt_ptsrc_segmap
             print("Done with creating moving targets from {}".format(self.params['simSignals']['pointsource']))
+            print("Min and max values of ptsrc segmap: {},{}".format(np.min(mtt_ptsrc_segmap),np.max(mtt_ptsrc_segmap)))
 
         if self.runStep['galaxies']:
-            mtt_galaxies = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],'galaxies',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
-
+            mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],'galaxies',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
             mtt_data_list.append(mtt_galaxies)
+            if mtt_data_segmap is None:
+                mtt_data_segmap = np.copy(mtt_galaxies_segmap)
+            else:
+                mtt_data_segmap += mtt_galaxies_segmap
             print("Done with creating moving targets from {}".format(self.params['simSignals']['galaxyListFile']))
+            print("Min and max values of galaxy segmap: {},{}".format(np.min(mtt_galaxies_segmap),np.max(mtt_galaxies_segmap)))
 
         if self.runStep['extendedsource']:
-            mtt_ext = self.movingTargetInputs(self.params['simSignals']['extended'],'extended',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
-                
+            mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'],'extended',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
             mtt_data_list.append(mtt_ext)
+            if mtt_data_segmap is None:
+                mtt_data_segmap = np.copy(mtt_ext_segmap)
+            else:
+                mtt_data_segmap += mtt_ext_segmap
+            print("Min and max values of extended segmap: {},{}".format(np.min(mtt_ext_segmap),np.max(mtt_ext_segmap)))
 
+                
         # Add in the other objects which are not being tracked on 
         # (i.e. the sidereal targets)
         if len(mtt_data_list) > 0:
             for i in range(len(mtt_data_list)):
                 non_sidereal_ramp += mtt_data_list[i]
                 #non_sidereal_zero += mtt_zero_list[i]
+        if mtt_data_segmap is not None:
+            nonsidereal_segmap += mtt_data_segmap
         return non_sidereal_ramp, nonsidereal_segmap
 
     
@@ -440,7 +479,6 @@ class Catalog_seed():
 
         
     def movingTargetInputs(self,file,input_type,MT_tracking=False,tracking_ra_vel=None,tracking_dec_vel=None,trackingPixVelFlag=False):
-
         # Read in listfile of moving targets and perform needed calculations to get inputs
         # for moving_targets.py
 
@@ -448,6 +486,22 @@ class Catalog_seed():
             
         # Read input file - should be able to use for all modes
         mtlist,pixelFlag,pixvelflag,magsys = self.readMTFile(file)
+
+        # If the input catalog has an index column
+        # use that, otherwise add one
+        if 'index' in mtlist.colnames:
+            indexes = mtlist['index']
+        else:
+            indexes = np.arange(1,len(mtlist['x_or_RA'])+1)
+        # Make sure there is no 0th object
+        if np.min(indexes) == 0:
+            indexes += 1
+        # Make sure the index numbers don't overlap with any
+        # sources already present. Increment the maxindex
+        # value.
+        if np.min(indexes) <= self.maxindex:
+            indexes += self.maxindex
+        self.maxindex = np.max(indexes)
         
         if MT_tracking == True:
             # Here, we are tracking a non-sidereal target.
@@ -483,7 +537,6 @@ class Catalog_seed():
         #create a matrix that can be used to translate between V2,V3 and RA,Dec
         #for any pixel.
         #v2,v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        #attitude_matrix = rotations.attitude(self.refpix_pos['v2'],self.refpix_pos['v3'],self.ra,self.dec,self.params['Telescope']["rotation"])
         attitude_matrix = self.getAttitudeMatrix()
         
         #exposure times for all frames
@@ -495,9 +548,16 @@ class Catalog_seed():
         newdimsx = np.int(dims[1] * self.coord_adjust['x'])
         newdimsy = np.int(dims[0] * self.coord_adjust['y'])
 
+        # Set up seed integration
         mt_integration = np.zeros((len(frameexptimes)-1,newdimsy,newdimsx))
 
-        for entry in mtlist:
+        # Corresponding (2D) segmentation map
+        moving_segmap = segmap.SegMap()
+        moving_segmap.xdim = newdimsx
+        moving_segmap.ydim = newdimsy
+        moving_segmap.initialize_map()
+        
+        for index,entry in zip(indexes,mtlist):
 
             #for each object, calculate x,y or ra,dec of initial position
             pixelx,pixely,ra,dec,ra_str,dec_str = self.getPositions(entry['x_or_RA'],entry['y_or_Dec'],attitude_matrix,coord_transform,pixelFlag)
@@ -509,10 +569,6 @@ class Catalog_seed():
                 #so divide velocities by 3600^2.
                 ra_frames = ra + (entry['x_or_RA_velocity']/3600./3600.) * frameexptimes
                 dec_frames = dec + (entry['y_or_Dec_velocity']/3600./3600.) * frameexptimes
-
-                #print('RA,Dec velocities per sec are: {},{}'.format(entry['x_or_RA_velocity']/3600.,entry['y_or_Dec_velocity']/3600.))
-                #print('RA frames {}'.format(ra_frames))
-                #print('Dec frames {}'.format(dec_frames))
 
                 x_frames = []
                 y_frames = []
@@ -530,16 +586,18 @@ class Catalog_seed():
                 x_frames = pixelx + (entry['x_or_RA_velocity']/3600.) * frameexptimes
                 y_frames = pixely + (entry['y_or_Dec_velocity']/3600.) * frameexptimes
                       
-                      
             #If the target never falls on the detector, then move on to the next target
             xfdiffs = np.fabs(x_frames - (newdimsx/2))
             yfdiffs = np.fabs(y_frames - (newdimsy/2))
             if np.min(xfdiffs) > (newdimsx/2) or np.min(yfdiffs) > (newdimsy/2):
                 continue
 
-            #So now we have xinit,yinit, a list of x,y positions for each frame, and the frametime.
-            #subsample factor can be hardwired for now. outx and outy are also known. So all we need is the stamp
-            #image, then we can call moving_targets.py and feed it these things, which contain all the info needed
+            # So now we have xinit,yinit, a list of x,y positions for
+            # each frame, and the frametime.
+            # Subsample factor can be hardwired for now. outx and outy
+            # are also known. So all we need is the stamp image, then
+            # we can call moving_targets.py and feed it these things,
+            # which contain all the info needed
 
             if input_type == 'pointSource':
                 stamp = self.centerpsf
@@ -575,17 +633,28 @@ class Catalog_seed():
             mt = moving_targets.MovingTarget()
             mt.subsampx = 3
             mt.subsampy = 3
-            mt_integration += mt.create(stamp,x_frames,y_frames,self.frametime,newdimsx,newdimsy)
+            mt_source = mt.create(stamp,x_frames,y_frames,self.frametime,newdimsx,newdimsy)
+            mt_integration += mt_source
 
-        #save the moving target input integration
-        #if self.params['Output']['save_intermediates']:
-        #    h0 = fits.PrimaryHDU(mt_integration)
-        #    hl = fits.HDUList([h0])
-        #    mtoutname = self.params['Output']['file'][0:-5] + '_movingTargetIntegration.fits'
-        #    hl.writeto(mtoutname,overwrite=True)
-        #    print("Integration showing only moving targets saved to {}".format(mtoutname))
+            noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
+            if self.params['Inst']['mode'].lower() == 'wfss':
+                noiseval += self.grism_background
 
-        return mt_integration
+            if input_type in ['pointSource','galaxies']:
+
+                #if input_type == 'galaxies':
+                #    print(mt_source.shape)
+                #    h0=fits.PrimaryHDU(mt_source)
+                #    hl = fits.HDUList([h0])
+                #    hl.writeto('test_galaxy.fits',overwrite=True)
+                #    stop
+                moving_segmap.add_object_noise(mt_source[-1,:,:],0,0,index,noiseval)
+            else:
+                indseg = self.seg_from_photutils(mt_source[-1,:,:],index,noiseval)
+                moving_segmap.segmap += indseg
+            print('movingTargetInputs, index {}, min,max segmap {},{}'.format(index,np.min(moving_segmap.segmap),np.max(moving_segmap.segmap)))
+                
+        return mt_integration, moving_segmap.segmap
 
     
     def getPositions(self,inx,iny,matrix,transform,pixelflag):
@@ -628,7 +697,6 @@ class Catalog_seed():
         return pixelx,pixely,ra,dec,ra_str,dec_str
 
 
-    
     def nonsidereal_CRImage(self,file):
         # Create countrate image of non-sidereal sources
         # that are being tracked.
@@ -670,8 +738,10 @@ class Catalog_seed():
             else:
                 meta1 = ''
             meta2 = magsys
-            meta3 = 'Point sources with non-sidereal tracking. File produced by ramp_simulator.py'
-            meta4 = 'from run using non-sidereal moving target list {}.'.format(self.params['simSignals']['movingTargetToTrack'])
+            meta3 = ('Point sources with non-sidereal tracking. '
+                     'File produced by ramp_simulator.py')
+            meta4 = ('from run using non-sidereal moving target '
+                     'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             ptsrc.meta['comments'] = [meta0,meta1,meta2,meta3,meta4]
             ptsrc.write(os.path.join(self.params['Output']['directory'],'temp_non_sidereal_point_sources.list'),format='ascii',overwrite=True)
             
@@ -691,8 +761,10 @@ class Catalog_seed():
             else:
                 meta1 = ''
             meta2 = magsys
-            meta3 = 'Galaxies (2d sersic profiles) with non-sidereal tracking. File produced by ramp_simulator.py'
-            meta4 = 'from run using non-sidereal moving target list {}.'.format(self.params['simSignals']['movingTargetToTrack'])
+            meta3 = ('Galaxies (2d sersic profiles) with non-sidereal '
+                     'tracking. File produced by ramp_simulator.py')
+            meta4 = ('from run using non-sidereal moving target '
+                     'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             galaxies.meta['comments'] = [meta0,meta1,meta2,meta3,meta4]
             galaxies.write(os.path.join(self.params['Output']['directory'],'temp_non_sidereal_sersic_sources.list'),format='ascii',overwrite=True)
             
@@ -825,14 +897,14 @@ class Catalog_seed():
             # Check segmentation map values. If the index numbers overlap
             # between point sources and galaxies, then bump up the values
             # in the galaxy list, and tell the user
-            mingalseg = np.min(galaxy_segmap > 0)
-            maxseg = np.max(segmentation_map)
-            if mingalseg < maxseg:
-                diff = np.int(maxseg - mingalseg)
-                print("WARNING: index numbers in {} overlap".format(self.params['simSignals']['galaxyListFile']))
-                print("with those from {}".format(self.params['simSignals']['pointsource']))
-                print("Adding {} to the galaxy object indexes.".format(diff+1))
-                galaxy_segmap[galaxy_segmap > 0] += (diff+1)
+            #mingalseg = np.min(galaxy_segmap > 0)
+            #maxseg = np.max(segmentation_map)
+            #if mingalseg < maxseg:
+            #    diff = np.int(maxseg - mingalseg)
+            #    print("WARNING: index numbers in {} overlap".format(self.params['simSignals']['galaxyListFile']))
+            #    print("with those from {}".format(self.params['simSignals']['pointsource']))
+            #    print("Adding {} to the galaxy object indexes.".format(diff+1))
+            #    galaxy_segmap[galaxy_segmap > 0] += (diff+1)
             # Add galaxy segmentation map to the master copy
             segmentation_map += galaxy_segmap
                 
@@ -851,8 +923,6 @@ class Catalog_seed():
 
         #read in extended signal image and add the image to the overall image
         if self.runStep['extendedsource'] == True:
-            #print("Reading in extended image from {} and adding to the simulated data rate image.".format(self.params['simSignals']['extended']))
-
             extlist,extstamps = self.getExtendedSourceList(self.params['simSignals']['extended'])
 
             #translate the extended source list into an image
@@ -861,14 +931,14 @@ class Catalog_seed():
             # Check segmentation map values. If the index numbers overlap
             # between master copy and extended sources, then bump up the values
             # in the extended source list, and tell the user
-            minextseg = np.min(ext_segmap > 0)
-            maxseg = np.max(segmentation_map)
-            if minextseg < maxseg:
-                diff = maxseg - minextseg
-                print("WARNING: index numbers in {} overlap".format(self.params['simSignals']['extended']))
-                print("with those from previously added sources.")
-                print("Adding {} to the extended object indexes.".format(diff+1))
-                ext_segmap[ext_segmap > 0] += (diff+1)
+            #minextseg = np.min(ext_segmap > 0)
+            #maxseg = np.max(segmentation_map)
+            #if minextseg < maxseg:
+            #    diff = maxseg - minextseg
+            #    print("WARNING: index numbers in {} overlap".format(self.params['simSignals']['extended']))
+            #    print("with those from previously added sources.")
+            #    print("Adding {} to the extended object indexes.".format(diff+1))
+            #    ext_segmap[ext_segmap > 0] += (diff+1)
             # Add galaxy segmentation map to the master copy
             segmentation_map += ext_segmap
 
@@ -974,7 +1044,6 @@ class Catalog_seed():
             numstr = 'zero'
         psflibfiles = glob.glob(self.params['simSignals']['psfpath'] +'*')
 
-
         #If a PSF library is specified, then just get the dimensions from one of the files
         if self.params['simSignals']['psfpath'] != None:
             h = fits.open(psflibfiles[0])
@@ -991,7 +1060,6 @@ class Catalog_seed():
             print("the output. PSFs will be generated by WebbPSF on the fly")
             print("Not yet implemented.")
             sys.exit()
-
 
         pointSourceList = Table(names=('index','pixelx','pixely','RA','Dec','RA_degrees','Dec_degrees','magnitude','countrate_e/s','counts_per_frame_e'),dtype=('i','f','f','S14','S14','f','f','f','f','f'))
         
@@ -1016,8 +1084,18 @@ class Catalog_seed():
             indexes = lines['index']
         else:
             print('No point source catalog index numbers. Adding to output: {}.'.format(psfile))
-            indexes = np.arange(len(lines['x_or_RA']))
-            
+            indexes = np.arange(1,len(lines['x_or_RA'])+1)
+        # Make sure there is no 0th object
+        if np.min(indexes) == 0:
+            indexes += 1
+        # Make sure the index numbers don't overlap with any
+        # sources already present. Increment the maxindex
+        # value.
+        if np.min(indexes) <= self.maxindex:
+            indexes += self.maxindex
+        self.maxindex = np.max(indexes)
+        print("after point sources, max index is {}".format(self.maxindex))
+        
         dtor = math.radians(1.)
         nx = (self.subarray_bounds[2] - self.subarray_bounds[0]) + 1
         ny = (self.subarray_bounds[3] - self.subarray_bounds[1]) + 1
@@ -1049,14 +1127,13 @@ class Catalog_seed():
         #will only partially fall on the subarray
         #pixel coords here can still be negative and kept if the grism image is being made
 
-        #First, coord limits for just the subarray
+        # First, coord limits for just the subarray
         miny = 0
         maxy = self.subarray_bounds[3] - self.subarray_bounds[1] 
         minx = 0
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0] 
-        #print('before adjusting for grism, min/max x {} {}, min/max y {} {}'.format(minx,maxx,miny,maxy))
         
-        #Expand the limits if a grism direct image is being made
+        # Expand the limits if a grism direct image is being made
         if self.params['Output']['grism_source_image'] == True:
             extrapixy = np.int((maxy+1)/2 * (self.coord_adjust['y'] - 1.))
             miny -= extrapixy
@@ -1065,25 +1142,26 @@ class Catalog_seed():
             minx -= extrapixx
             maxx += extrapixx
 
-        #Now, expand the dimensions again to include point sources that fall only partially on the 
-        #subarray
+        # Now, expand the dimensions again to include point
+        # sources that fall only partially on the subarray
         miny -= edgey
         maxy += edgey
         minx -= edgex
         maxx += edgex
 
-        #Write out the RA and Dec of the field center to the output file
-        #Also write out column headers to prepare for source list
+        # Write out the RA and Dec of the field center to the output file
+        # Also write out column headers to prepare for source list
         pslist.write("# Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra,self.dec,self.params['Telescope']['rotation'],nx,ny))
         pslist.write('#\n')
         pslist.write("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n")
 
 
-        #Loop over input lines in the source list 
+        # Loop over input lines in the source list 
         for index,values in zip(indexes,lines):
             #try:
-            #line below (if 1>0) used to keep the block of code below at correct indent for the try: above
-            #the try: is commented out for code testing.
+            #line below (if 1>0) used to keep the block
+            # of code below at correct indent for the try: above
+            # the try: is commented out for code testing.
             if 1>0:
                 try:
                     entry0 = float(values['x_or_RA'])
@@ -1191,7 +1269,6 @@ class Catalog_seed():
     
     def makePointSourceImage(self,pointSources):
         dims = np.array(self.nominal_dims)
-        #dims = np.array(self.dark.data[0,0,:,:].shape)
 
         #offset that needs to be applied to the x,y positions of the
         #source list to account for case where we make a point
@@ -1589,7 +1666,7 @@ class Catalog_seed():
         filteredList = Table(names=('index','pixelx','pixely','RA','Dec','RA_degrees','Dec_degrees','V2','V3','radius','ellipticity','pos_angle','sersic_index','magnitude','countrate_e/s','counts_per_frame_e'),dtype=('i','f','f','S14','S14','f','f','f','f','f','f','f','f','f','f','f'))
 
         #each entry in galaxylist is:
-        #x_or_RA  y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude
+        #index x_or_RA  y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude
         #remember that x/y are interpreted as coordinates in the output subarray
         #NOT full frame coordinates. This is the same as the point source list coords
 
@@ -1602,7 +1679,6 @@ class Catalog_seed():
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0] 
         ny = self.subarray_bounds[3] - self.subarray_bounds[1]
         nx = self.subarray_bounds[2] - self.subarray_bounds[0]
-        #print('before adjusting for grism, min/max x {} {}, min/max y {} {}'.format(minx,maxx,miny,maxy))
         
         #Expand the limits if a grism direct image is being made
         if self.params['Output']['grism_source_image'] == True:
@@ -1636,9 +1712,18 @@ class Catalog_seed():
         if 'index' in galaxylist.colnames:
             indexes = galaxylist['indexes']
         else:
-            indexes = np.arange(len(galaxylist['radius']))
+            indexes = np.arange(1,len(galaxylist['radius'])+1)
+        # Make sure there is no 0th object
+        if np.min(indexes) == 0:
+            indexes += 1
+        # Increment the index numbers so that these
+        # sources don't overlap with any others already
+        # in place
+        if np.min(indexes) <= self.maxindex:
+            indexes += self.maxindex
+        self.maxindex = np.max(indexes)
+        print("after galaxies, max index is {}".format(self.maxindex))
 
-        
         #Loop over galaxy sources
         for index,source in zip(indexes,galaxylist):
 
@@ -1802,7 +1887,6 @@ class Catalog_seed():
         else:
             print("Galaxy list input radii assumed to be in units of arcsec.") 
 
-
         #Extract and save only the entries which will land (fully or partially) on the
         #aperture of the output
         galaxylist = self.filterGalaxyList(glist,pixflag,radflag,magsys)
@@ -1931,7 +2015,7 @@ class Catalog_seed():
         extSourceList = Table(names=('index','pixelx','pixely','RA','Dec','RA_degrees','Dec_degrees','magnitude','countrate_e/s','counts_per_frame_e'),dtype=('i','f','f','S14','S14','f','f','f','f','f'))
 
         try:
-            lines,pixelflag,magsys = self.readPointSourceFile(filename)
+            lines, pixelflag, magsys = self.readPointSourceFile(filename)
             if pixelflag:
                 print("Extended source list input positions assumed to be in units of pixels.")
             else:
@@ -1980,16 +2064,23 @@ class Catalog_seed():
         # Add an index column if not present
         if 'index' in lines.colnames:
             pass
-            #print('Using point source catalog index numbers')
-            #indexes = lines['index']
         else:
             print('No extended object catalog index numbers. Adding to output: {}.'.format(eoutcat))
-            indexes = np.arange(len(lines['filename']))
+            indexes = np.arange(1, len(lines['filename']) + 1)
             lines['index'] = indexes
-        
+        # Make sure there is no 0th source
+        if np.min(indexes) == 0:
+            indexes += 1
+        # Make sure the index numbers don't overlap with
+        # sources that are already added
+        if np.min(indexes) <= self.maxindex:
+            indexes += self.maxindex
+        self.maxindex = np.max(indexes)
+        print("after extended sources, max index is {}".format(self.maxindex))
+
         #Loop over input lines in the source list 
         all_stamps = []
-        for values in lines:
+        for indexnum,values in zip(indexes,lines):
             #try:
             #line below (if 1>0) used to keep the block of code below at correct indent for the try: above
             #the try: is commented out for code testing.
@@ -2034,8 +2125,7 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra,dec,ra_str,dec_str = self.XYToRADec(pixelx,pixely,attitude_matrix,coord_transform)
-                            
+                    ra,dec,ra_str,dec_str = self.XYToRADec(pixelx,pixely,attitude_matrix,coord_transform)                      
 
                 #Get the input magnitude 
                 try:
@@ -2056,7 +2146,6 @@ class Catalog_seed():
                     print("WARNING, extended source image {} is not 2D! Not sure how to proceed. Quitting.".format(values['filename']))
                     sys.exit()
       
-
                 #Define the min and max source locations (in pixels) that fall onto the subarray
                 #Inlude the effects of a requested grism_direct image, and also keep sources that
                 #will only partially fall on the subarray
@@ -2088,7 +2177,7 @@ class Catalog_seed():
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
                             
                     #set up an entry for the output table
-                    entry = [values['index'],pixelx,pixely,ra_str,dec_str,ra,dec,mag]
+                    entry = [indexnum,pixelx,pixely,ra_str,dec_str,ra,dec,mag]
 
                     #save the stamp image after normalizing to a total signal of 1.
                     # and convolving with PSF if requested
@@ -2149,9 +2238,9 @@ class Catalog_seed():
                     #add the good point source, including location and counts, to the pointSourceList
                     #self.pointSourceList.append(entry)
                     extSourceList.add_row(entry)
-
+                    
                     #write out positions, distances, and counts to the output file
-                    eslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (values['index'],ra_str,dec_str,ra,dec,pixelx,pixely,magwrite,countrate,framecounts))
+                    eslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (indexnum,ra_str,dec_str,ra,dec,pixelx,pixely,magwrite,countrate,framecounts))
                 #except:
                 #    print("ERROR: bad point source line %s. Skipping." % (line))
         print("Number of extended sources found within the requested aperture: {}".format(len(extSourceList)))
@@ -2248,12 +2337,21 @@ class Catalog_seed():
             noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
             if self.params['Inst']['mode'].lower() == 'wfss':
                 noiseval += self.grism_background
-            segmentation.add_object_noise(stamp[l1:l2,k1:k2]*counts,j1,i1,entry['index'],noiseval)
-
-            
+            #segmentation.add_object_noise(stamp[l1:l2,k1:k2]*counts,j1,i1,entry['index'],noiseval)
+            indseg = self.seg_from_photutils(stamp[l1:l2,k1:k2]*counts,entry['index'],noiseval)
+            segmentation.segmap[j1:j2,i1:i2] += indseg
         return extimage, segmentation.segmap
 
 
+    def seg_from_photutils(self,image,number,noise):
+        # Create a segmentation map for the input image
+        # using photutils. In this case, the input noise
+        # represents the single frame noise for the appropriate
+        # observing mode
+        map = detect_sources(image,noise*3.,8).data + number
+        return map
+    
+            
     def makeFilterTable(self):
         #Create the table that contains the possible filter list, quantum yields, and countrates for a
         #star with vega magnitude of 15 in each filter. Do this by reading in phot_file
