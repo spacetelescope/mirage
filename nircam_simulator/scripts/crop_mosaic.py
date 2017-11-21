@@ -18,6 +18,7 @@ class Extraction():
         self.center_dec = 0.0
         self.channel = 'short'
         self.outfile = None
+        self.buffer = 300 #pixels
         self.nrc_scale = {'short':0.031,
                           'long':0.063}
 
@@ -42,11 +43,18 @@ class Extraction():
 
         # define size of region to extract
         outscale_x = self.nrc_scale[self.channel.lower()]
+        xlen, ylen = self.dimensions
+
+        # Add buffer
+        xlen += self.buffer
+        ylen += self.buffer
         
         # This assumes full frame!!! Need some buffer to account for distortion
-        nominal_size = 2897. + 300. #300 pixel buffer
-        self.nx = np.absolute(np.int(nominal_size * outscale_x / self.mosaic_scale_x))
-        self.ny = np.absolute(np.int(nominal_size * outscale_x / self.mosaic_scale_y))
+        #nominal_size = 2897. + 300. #300 pixel buffer
+        #self.nx = np.absolute(np.int(nominal_size * outscale_x / self.mosaic_scale_x))
+        #self.ny = np.absolute(np.int(nominal_size * outscale_x / self.mosaic_scale_y))
+        self.nx = np.absolute(np.int(xlen * outscale_x / self.mosaic_scale_x))
+        self.ny = np.absolute(np.int(ylen * outscale_x / self.mosaic_scale_y))
 
         # Need to calculate what pixel in the mosaic corresponds to the
         # RA, Dec of the center of the cutout (center_ra,center_dec)
@@ -67,7 +75,7 @@ class Extraction():
         ny_over_2 = np.int(self.ny / 2)
         nx_over_2 = np.int(self.nx / 2)
         print("Coords of center of cropped area",intcenterx,intcentery)
-        print("X-min, Y-max coords:",intcenterx-nx_over_2,intcenterx+nx_over_2)
+        print("X-min, X-max coords:",intcenterx-nx_over_2,intcenterx+nx_over_2)
         print("Y-min, Y-max coords:",intcentery-ny_over_2,intcentery+ny_over_2)
         
         crop = mosaic[0].data[intcentery-ny_over_2:intcentery+ny_over_2,intcenterx-nx_over_2:intcenterx+nx_over_2]
@@ -174,6 +182,8 @@ class Extraction():
         parser.add_argument("center_dec",help="Dec at the center of the extracted area",type=np.float)
         parser.add_argument("--channel",help="NIRCam channel the extracted data are meant to simulate (short, long)",default='short')
         parser.add_argument("--outfile",help="Name of output fits file containing extracted image",default=None)
+        parser.add_argument("--dimensions",help="Tuple of (x size, y size) of cropped image")
+        parser.add_argument("--buffer",help="Width of buffer (in NIRCam pixels) to add around area to be cropped.",default=300)
         return parser
 
 if __name__ == '__main__':

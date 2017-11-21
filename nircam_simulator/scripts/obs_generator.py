@@ -1109,22 +1109,22 @@ class Observation():
 
         outModel[0].header['TARGNAME'] = 'UNKNOWN'
 
-        outModel[0].header['WCSAXES'] = 2
-        outModel[0].header['CRVAL1'] = self.ra
-        outModel[0].header['CRVAL2'] = self.dec
-        outModel[0].header['CRPIX1'] = self.refpix_pos['x']+1. 
-        outModel[0].header['CRPIX2'] = self.refpix_pos['y']+1.
-        outModel[0].header['CTYPE1'] = 'RA---TAN'
-        outModel[0].header['CTYPE2'] = 'DEC--TAN'
-        outModel[0].header['CUNIT1'] = 'deg' 
-        outModel[0].header['CUNIT2'] = 'deg'
-        outModel[0].header['V2_REF'] = self.v2_ref
-        outModel[0].header['V3_REF'] = self.v3_ref
-        outModel[0].header['VPARITY'] = self.parity
-        outModel[0].header['V3I_YANG'] = self.v3yang
-        outModel[0].header['CDELT1'] = self.xsciscale / 3600.
-        outModel[0].header['CDELT2'] = self.ysciscale / 3600.
-        outModel[0].header['ROLL_REF'] = self.local_roll
+        outModel[1].header['WCSAXES'] = 2
+        outModel[1].header['CRVAL1'] = self.ra
+        outModel[1].header['CRVAL2'] = self.dec
+        outModel[1].header['CRPIX1'] = self.refpix_pos['x']+1. 
+        outModel[1].header['CRPIX2'] = self.refpix_pos['y']+1.
+        outModel[1].header['CTYPE1'] = 'RA---TAN'
+        outModel[1].header['CTYPE2'] = 'DEC--TAN'
+        outModel[1].header['CUNIT1'] = 'deg' 
+        outModel[1].header['CUNIT2'] = 'deg'
+        outModel[1].header['V2_REF'] = self.v2_ref
+        outModel[1].header['V3_REF'] = self.v3_ref
+        outModel[1].header['VPARITY'] = self.parity
+        outModel[1].header['V3I_YANG'] = self.v3yang
+        outModel[1].header['CDELT1'] = self.xsciscale / 3600.
+        outModel[1].header['CDELT2'] = self.ysciscale / 3600.
+        outModel[1].header['ROLL_REF'] = self.local_roll
         
         outModel[0].header['TARG_RA'] = self.ra #not correct
         outModel[0].header['TARG_DEC'] = self.dec #not correct

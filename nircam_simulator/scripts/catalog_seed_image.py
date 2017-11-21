@@ -33,6 +33,8 @@ inst_abbrev = {'nircam':'NRC'}
 pixelScale = {'nircam':{'sw':0.031,'lw':0.063}}
 full_array_size = {'nircam':2048}
 allowedOutputFormats = ['DMS']
+wfe_options = [0,115,123,136,155,'predected','requirements']
+wfegroup_options = np.arange(10)
 
 class Catalog_seed():
     def __init__(self):
@@ -128,10 +130,7 @@ class Catalog_seed():
             print(("need to adjust moving target work for multiple "
                    "integrations! everything above has been modified"))
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
-            outapp = '_nonsidereal_target'
-
-            print('min and max out of non_sidereal_seed; {},{}'.format(np.min(self.seed_segmap),np.max(self.seed_segmap)))
-
+            outapp = '_nonsidereal_target'            
             
         #if moving targets are requested (KBOs, asteroids, etc, NOT moving_target mode
         #where the telescope slews), then create a RAPID integration which 
@@ -312,6 +311,19 @@ class Catalog_seed():
             #print('Starting moving targets for point sources!')
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],'pointSource',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_vel)
             mov_targs_ramps.append(mov_targs_ptsrc)
+            print("Moving target segmap, min,max {},{}".format(np.min(mt_ptsrc_segmap),np.max(mt_ptsrc_segmap)))
+
+
+            print('min and max out of non_sidereal_seed; {},{}'.format(np.min(self.seed_segmap),np.max(self.seed_segmap)))
+            hh0=fits.PrimaryHDU(self.seed_segmap)
+            hh1 = fits.ImageHDU(mt_ptsrc_segmap)
+            hhl = fits.HDUList([hh0,hh1])
+            hhl.writeto('junk.fits')
+            
+
+
+
+            
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
         #moving target using a sersic object
@@ -951,6 +963,15 @@ class Catalog_seed():
                 hlist.writeto(extImageName,overwrite=True)
                 print("Extended object image and segmap saved as {}".format(extImageName))
 
+
+            #h0 = fits.PrimaryHDU(ptsrc_segmap)
+            #h1 = fits.ImageHDU(galaxy_segmap)
+            #h2 = fits.ImageHDU(ext_segmap)
+            #hl = fits.HDUList([h0,h1,h2])
+            #hl.writeto('segmaps.fits')
+            #stop
+
+                
             #convolution now done inside makeextendedsourceimage
             #if requested, convolve the stamp images with the NIRCam PSF
             #if self.params['simSignals']['PSFConvolveExtended']:
@@ -1293,6 +1314,8 @@ class Catalog_seed():
         seg.initialize_map()
         
         #Loop over the entries in the point source list
+        interval = self.params['simSignals']['psfpixfrac']
+        numperpix = int(1./interval)
         for entry in pointSources:
             #adjust x,y position if the grism output image is requested
             xpos = entry['pixelx'] + deltax
@@ -1307,10 +1330,9 @@ class Catalog_seed():
             xfract = abs(xpos-xoff)
             yfract = abs(ypos-yoff)
 
-            #Now we need to determine the proper PSF file to read in from the library
-            #This depends on the sub-pixel offsets above
-            interval = self.params['simSignals']['psfpixfrac']
-            numperpix = int(1./interval)
+            # Now we need to determine the proper PSF 
+            # file to read in from the library
+            # This depends on the sub-pixel offsets above
             a = round(interval * int(numperpix*xfract + 0.5) - 0.5,1)
             b = round(interval * int(numperpix*yfract + 0.5) - 0.5,1)
 
@@ -1346,12 +1368,6 @@ class Catalog_seed():
                         print("PSF file {}".format(psffn))
                         print("not found.")
                         sys.exit()
-                        #psffn = os.path.join(self.psf_url,psffn)
-                        #hh = fits.open(psffn,cache=False)
-                        ## Save a local copy so that it won't have
-                        ## to be downloaded again
-                        #hh.writeto(psffn)
-                        #webbpsfimage = hh[0].data
                 except:
                     print("ERROR: Could not load PSF file {} from library".format(psffn))
                     sys.exit()
@@ -1412,7 +1428,7 @@ class Catalog_seed():
                 #print(entry)
                 #sys.exit()
                 pass
-                
+
         return psfimage,seg.segmap
     
 
@@ -2088,7 +2104,6 @@ class Catalog_seed():
                 try:
                     entry0 = float(values['x_or_RA'])
                     entry1 = float(values['y_or_Dec'])
-                    print(entry0,entry1,pixelflag)
                     if not pixelflag:
                         ra_str,dec_str = self.makePos(entry0,entry1)
                         ra = entry0
@@ -2461,7 +2476,8 @@ class Catalog_seed():
         #Get the photflambda and photfnu values that go with
         #the filter
         module = self.params['Readout']['array_name'][3]
-            
+        detctor = self.params['Readout']['array_name'][3:5]
+    
         if self.params['Readout']['pupil'][0] == 'F':
             usephot = 'pupil'
         else:
@@ -2489,19 +2505,27 @@ class Catalog_seed():
                 self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+'/'
 
             wfe = self.params['simSignals']['psfwfe']
+            if wfe not in wfe_options:
+                print("WARNING: invalid wavefront error (psfwfe) input: {}".format(wfe))
             wfegroup = self.params['simSignals']['psfwfegroup']
+            if wfegroup not in wfegroup_options:
+                print("WARNING: invalid wavefront group (psfwfegroup) value: {}".format(wfegroup))
             basename = self.params['simSignals']['psfbasename'] + '_'
             if wfe == 0:
                 psfname=basename+self.params['simSignals'][usefilt].lower()+'_zero'
                 self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+self.params['simSignals'][usefilt].lower()+'/zero/'
             else:
-                if wfe in [115,123,136,155] and wfegroup > -1 and wfegroup < 10:
-                    psfname=basename+self.params['Readout'][usefilt].lower()+"_"+str(wfe)+"_"+str(wfegroup)
-                    self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+self.params['Readout'][usefilt].lower()+'/'+str(wfe)+'/'
-                else:
-                    print("WARNING: wfe value of {} not allowed. Library does not exist.".format(wfe))
-                    sys.exit()
-                self.psfname = self.params['simSignals']['psfpath'] + psfname
+                psfname=basename+self.params['Readout'][usefilt].lower()+"_"+str(wfe)+"_"+str(wfegroup)
+                #psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector, 'psfxpos', 'psfypos',self.params['Readout'][usefilt].lower(), str(wfe), str(wfegroup))
+                #psfname = psfname.replace('psfxpos','1024')
+                #psfname = psfname.replace('psfypos','1024')
+                #pathaddition = "{}/{}/{}".format(detector,self.params['Readout'][usefilt].lower(),str(wfe))
+                #self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'],pathaddition)
+                print("")
+                print("uncomment lines above once the updated PSF library is in place")
+                print("")
+                self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+self.params['Readout'][usefilt].lower()+'/'+str(wfe)+'/'
+                self.psfname = os.path.join(self.params['simSignals']['psfpath'],psfname)
 
         else:
             #case where psfPath is None. In this case, create a PSF on the fly to use
