@@ -38,7 +38,8 @@ class ImgSim():
         # Create seed image
         cat = catalog_seed_image.Catalog_seed()
         cat.paramfile = self.paramfile
-        seedimage, segmap, seedinfo = cat.make_seed()
+        # seedimage, segmap, seedinfo = cat.make_seed()
+        cat.make_seed()
 
         # Create observation generator object
         obs = obs_generator.Observation()

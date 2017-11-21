@@ -1,0 +1,29 @@
+# Compiled source #
+###################
+*.pyc
+
+
+# Package Stuff #
+#################
+build/*
+dist/*
+nircam_simulator.egg-info/*
+
+# Lists and images #
+######################
+*.list
+*.fits
+*.yaml
+*.csv
+
+# Other #
+#########
+.ipynb_checkpoints/*
+nircam_simulator/examples/.ipynb_checkpoints/*
+nircam_simulator/OTECommissioning/*
+*.aptx
+
+# Files #
+#########
+nircam_simulator/ClassMaps.txt
+nircam_simulator/examples/*.ipynb
