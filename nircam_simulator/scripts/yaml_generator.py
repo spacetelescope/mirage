@@ -844,7 +844,7 @@ class SimInput:
             self.saturation_list[det] = [d for d in satfiles if 'NRC'+det in d][0]
 
             ipcfiles = glob(os.path.join(ipc_dir,'*fits'))
-            self.ipc_list[det] = [d for d in satfiles if 'NRC'+det in d][0]
+            self.ipc_list[det] = [d for d in ipcfiles if 'NRC'+det in d][0]
 
             distfiles = glob(os.path.join(dist_dir,'*asdf'))
             self.astrometric_list[det] = [d for d in distfiles if 'NRC'+det in d][0]
