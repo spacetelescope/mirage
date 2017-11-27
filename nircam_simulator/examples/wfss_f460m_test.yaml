@@ -52,10 +52,10 @@ cosmicRay:
 
 simSignals:
   pointsource: /ifs/jwst/wit/nircam/hilbert/python_repos/nircam_simulator/nircam_simulator/catalogs/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: /ifs/jwst/wit/nircam/nircam_simulator_data/psf_data/        #Path to PSF library
+  psfpath: /ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library/ #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
-  psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
-  psfwfe: 123                               #PSF WFE value (0,115,123,132,136,150,155)
+  psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
+  psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
   psfwfegroup: 0                             #WFE realization group (0 to 9)
   galaxyListFile: /ifs/jwst/wit/nircam/hilbert/python_repos/nircam_simulator/nircam_simulator/catalogs/seed_im_from_catalog_test_galaxies_catalog.list
   extended: None          #Extended emission count rate image file name

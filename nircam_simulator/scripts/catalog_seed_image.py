@@ -33,8 +33,9 @@ inst_abbrev = {'nircam':'NRC'}
 pixelScale = {'nircam':{'sw':0.031,'lw':0.063}}
 full_array_size = {'nircam':2048}
 allowedOutputFormats = ['DMS']
-wfe_options = [0,115,123,136,155,'predected','requirements']
-wfegroup_options = np.arange(10)
+#wfe_options = [0,115,123,136,155]
+wfe_options = ['predicted','requirements']
+wfegroup_options = np.arange(5)
 
 class Catalog_seed():
     def __init__(self):
@@ -311,19 +312,7 @@ class Catalog_seed():
             #print('Starting moving targets for point sources!')
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],'pointSource',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_vel)
             mov_targs_ramps.append(mov_targs_ptsrc)
-            print("Moving target segmap, min,max {},{}".format(np.min(mt_ptsrc_segmap),np.max(mt_ptsrc_segmap)))
-
-
-            print('min and max out of non_sidereal_seed; {},{}'.format(np.min(self.seed_segmap),np.max(self.seed_segmap)))
-            hh0=fits.PrimaryHDU(self.seed_segmap)
-            hh1 = fits.ImageHDU(mt_ptsrc_segmap)
-            hhl = fits.HDUList([hh0,hh1])
-            hhl.writeto('junk.fits')
-            
-
-
-
-            
+            #print("Moving target segmap, min,max {},{}".format(np.min(mt_ptsrc_segmap),np.max(mt_ptsrc_segmap)))
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
         #moving target using a sersic object
@@ -1063,7 +1052,8 @@ class Catalog_seed():
             numstr = str(self.params['simSignals']['psfwfe'])
         else:
             numstr = 'zero'
-        psflibfiles = glob.glob(self.params['simSignals']['psfpath'] +'*')
+        #psflibfiles = glob.glob(self.params['simSignals']['psfpath'] +'*')
+        psflibfiles = glob.glob(os.path.join(self.params['simSignals']['psfpath'],'*.fits'))
 
         #If a PSF library is specified, then just get the dimensions from one of the files
         if self.params['simSignals']['psfpath'] != None:
@@ -1333,18 +1323,25 @@ class Catalog_seed():
             # Now we need to determine the proper PSF 
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-            a = round(interval * int(numperpix*xfract + 0.5) - 0.5,1)
-            b = round(interval * int(numperpix*yfract + 0.5) - 0.5,1)
+            #a = round(interval * int(numperpix*xfract + 0.5) - 0.5,1)
+            #b = round(interval * int(numperpix*yfract + 0.5) - 0.5,1)
+            a = round(interval * int(numperpix*xfract + 0.5) - 0.5,2)
+            b = round(interval * int(numperpix*yfract + 0.5) - 0.5,2)
 
             if a < 0:
+                astr = str(a)[0:5]
+            else:
                 astr = str(a)[0:4]
-            else:
-                astr = str(a)[0:3]
             if b < 0:
-                bstr = str(b)[0:4]
+                bstr = str(b)[0:5]
             else:
-                bstr = str(b)[0:3]
+                bstr = str(b)[0:4]
 
+            if ((a != 0) & (astr[-1] == '0')):
+                astr = astr[0:-1]
+            if ((b != 0) & (bstr[-1] == '0')):
+                bstr = bstr[0:-1]
+                
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr
@@ -2476,7 +2473,7 @@ class Catalog_seed():
         #Get the photflambda and photfnu values that go with
         #the filter
         module = self.params['Readout']['array_name'][3]
-        detctor = self.params['Readout']['array_name'][3:5]
+        detector = self.params['Readout']['array_name'][3:5]
     
         if self.params['Readout']['pupil'][0] == 'F':
             usephot = 'pupil'
@@ -2507,26 +2504,26 @@ class Catalog_seed():
             wfe = self.params['simSignals']['psfwfe']
             if wfe not in wfe_options:
                 print("WARNING: invalid wavefront error (psfwfe) input: {}".format(wfe))
+                print("psfwfe must be one of: {}".format(wfe_options))
+                sys.exit()
             wfegroup = self.params['simSignals']['psfwfegroup']
             if wfegroup not in wfegroup_options:
                 print("WARNING: invalid wavefront group (psfwfegroup) value: {}".format(wfegroup))
+                print("psfwfegroup must be one of: {}".format(wfegroup_options))
+                sys.exit()
             basename = self.params['simSignals']['psfbasename'] + '_'
             if wfe == 0:
                 psfname=basename+self.params['simSignals'][usefilt].lower()+'_zero'
                 self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+self.params['simSignals'][usefilt].lower()+'/zero/'
             else:
-                psfname=basename+self.params['Readout'][usefilt].lower()+"_"+str(wfe)+"_"+str(wfegroup)
-                #psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector, 'psfxpos', 'psfypos',self.params['Readout'][usefilt].lower(), str(wfe), str(wfegroup))
-                #psfname = psfname.replace('psfxpos','1024')
-                #psfname = psfname.replace('psfypos','1024')
-                #pathaddition = "{}/{}/{}".format(detector,self.params['Readout'][usefilt].lower(),str(wfe))
-                #self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'],pathaddition)
-                print("")
-                print("uncomment lines above once the updated PSF library is in place")
-                print("")
-                self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+self.params['Readout'][usefilt].lower()+'/'+str(wfe)+'/'
+                #psfname=basename+self.params['Readout'][usefilt].lower()+"_"+str(wfe)+"_"+str(wfegroup)
+                psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector, 'psfxpos', 'psfypos',self.params['Readout'][usefilt].lower(), str(wfe), str(wfegroup))
+                psfname = psfname.replace('psfxpos','1024')
+                psfname = psfname.replace('psfypos','1024')
+                pathaddition = "{}/{}/{}".format(detector,self.params['Readout'][usefilt].lower(),str(wfe))
+                self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'],pathaddition)
+                #self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath']+self.params['Readout'][usefilt].lower()+'/'+str(wfe)+'/'
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'],psfname)
-
         else:
             #case where psfPath is None. In this case, create a PSF on the fly to use
             #for adding sources

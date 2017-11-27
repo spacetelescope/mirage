@@ -129,6 +129,11 @@ class SimInput:
         self.use_JWST_pipeline = True
         self.use_linearized_darks = False
         self.simdata_output_dir = './'
+        self.psfpath = '/ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library'
+        self.psfbasename = 'nircam'
+        self.psfpixfrac = 0.25
+        self.psfwfe = 'predicted'
+        self.psfwfegroup = 0
         
         # Prepare to find files listed as 'config'
         self.modpath = pkg_resources.resource_filename('nircam_simulator','')
@@ -725,11 +730,11 @@ class SimInput:
             f.write('\n')
             f.write('simSignals:\n')
             f.write('  pointsource: {}   #File containing a list of point sources to add (x,y locations and magnitudes)\n'.format(input['{}_ptsrc'.format(catkey)]))   #'point_source']))
-            f.write('  psfpath: /ifs/jwst/wit/witserv/data4/nrc/hilbert/simulated_data/psf_files/        #Path to PSF library\n')
-            f.write('  psfbasename: nircam                        #Basename of the files in the psf library\n')
-            f.write('  psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n')
-            f.write('  psfwfe: 123                               #PSF WFE value (0,115,123,132,136,150,155)\n')
-            f.write('  psfwfegroup: 0                             #WFE realization group (0 to 9)\n')
+            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
+            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
+            f.write('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac))
+            f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
+            f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
             f.write('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies to simulate\n'.format(input['{}_galcat'.format(catkey)]))   #'galaxyListFile']))
             f.write('  extended: {}          #Extended emission count rate image file name\n'.format(input['{}_ext'.format(catkey)]))     #'extended']))
             f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(input['{}_extscl'.format(catkey)]))
@@ -880,6 +885,13 @@ class SimInput:
         parser.add_argument("--use_JWST_pipeline",help='True/False',action='store_true')
         parser.add_argument("--use_linearized_darks",help='True/False',action='store_true')
         parser.add_argument("--simdata_output_dir",help='Output directory for simulated exposure files',default='./')
+        parser.add_argument("--psfpath",help='Directory containing PSF library',
+                            default='/ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library')
+        parser.add_argument("--psfbasename",help="Basename of the files in the PSF library",default='nircam')
+        parser.add_argument("--psfpixfrac",help="Subpixel centering resolution of files in PSF library",default=0.25)
+        parser.add_argument("--psfwfe",help="Wavefront error value to use for PSFs",default='predicted')
+        parser.add_argument("--psfwfegroup",help="Realization index number for PSF files",default=0)
+                    
         return parser
     
 
