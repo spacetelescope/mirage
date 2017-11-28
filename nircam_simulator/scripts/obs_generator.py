@@ -83,7 +83,8 @@ class Observation():
             print('Reading in dark file')
             self.linDark = self.readDarkFile(self.linDark)
             
-        # Finally, collect information about the detector, which will be needed for astrometry later
+        # Finally, collect information about the detector,
+        # which will be needed for astrometry later
         self.detector = self.linDark.header['DETECTOR']
         self.instrument = self.linDark.header['INSTRUME']
         self.fastaxis = self.linDark.header['FASTAXIS']
@@ -1308,8 +1309,9 @@ class Observation():
             nonlin[cof,:,:] = tmp
 
         # Crop to appropriate subarray
-        if "FULL" not in self.params['Readout']['array_name']:
-            nonlin = self.crop_to_subarray(nonlin)
+        # This is done in readCalFile
+        #if "FULL" not in self.params['Readout']['array_name']:
+        #    nonlin = self.crop_to_subarray(nonlin)
             
         return nonlin
     
@@ -2081,11 +2083,6 @@ class Observation():
     def readGainMap(self):
         # Read in the gain map. This will be used to
         # translate signals from e/s to ADU/sec
-        print('Is this necessary? flux calibration goes from')
-        print('magnitudes to adu/sec. Of course that doesnt account')
-        print('at all for varying gain across the detector...')
-        print('Cosmic rays from the library are in units of e/sec.')
-
         if self.runStep['gain']:
             self.gainim,self.gainhead = self.readCalFile(self.params['Reffiles']['gain'])
             #set any NaN's to 1.0
@@ -2162,7 +2159,8 @@ class Observation():
         # be collected using 4 amps. Subarray data will always be 1 amp,
         # except for the grism subarrays which span the entire width of
         # the detector. Those can be read out using 1 or 4 amps.
-        self.setNumAmps()
+        # THIS IS NOW DONE IN GETSUBARRAYBOUNDS
+        #self.setNumAmps()
 
         # Make sure that the requested number of groups is less than or
         # equal to the maximum allowed. 
@@ -2357,52 +2355,61 @@ class Observation():
                            self.params['Readout']['nframe'],
                            self.params['Readout']['nskip'])))
         else:
+            # If the read pattern is not present in the definition file
+            # then quit.
+            print(("WARNING: the {} readout pattern is not defined in {}."
+                   .format(self.params['Readout']['readpatt'],
+                           self.params['Reffiles']['readpattdefs'])))
+            print("Quitting.")
+            sys.exit()
+
+            
             # If read pattern is not present in the definition file but
             # the nframe/nskip combo is, then reset 
             # readpatt to the appropriate value from the definition file
-            readpatt_nframe = self.readpatterns['nframe'].data
-            readpatt_nskip = self.readpatterns['nskip'].data
-            readpatt_name = self.readpatterns['name'].data
-            if self.params['Readout']['nframe'] in readpatt_nframe:
-                nfmtch = self.params['Readout']['nframe'] == readpatt_nframe
-                nskip_subset = readpatt_nskip[nfmtch]
-                name_subset = readpatt_name[nfmtch]
-                if self.params['Readout']['nskip'] in nskip_subset:
-                    finalmtch = self.params['Readout']['nskip'] == nskip_subset
-                    finalname = name_subset[finalmtch][0]
-                    print(("CAUTION: requested readout pattern {} not recognized."
-                           .format(self.params['Readout']['readpatt'])))
-                    print(("but the requested nframe/nskip combination ({},{}), "
-                           "matches those values for".
-                           format(self.params['Readout']['nframe'],
-                                  self.params['Readout']['nskip'])))
-                    print(("the {} readout pattern, as listed in {}."
-                          .format(finalname,self.params['Reffiles']['readpattdefs'])))
-                    print('Continuing on using that as the readout pattern.')
-                    self.params['Readout']['readpatt'] = finalname
-                else:
-                    # Case where readpatt is not recognized, nframe is present
-                    # in the definition file, but nskip is not
-                    print(('Unrecognized readout pattern {}, and the input '
-                           'nframe/nskip combination {},{} does not'
-                           .format(self.params['Readout']['readpatt'],
-                                   self.params['Readout']['nframe'],
-                                   self.params['Readout']['nskip'])))
-                    print(('match any present in {}. This is not a valid NIRCam '
-                          'readout pattern. Quitting.'
-                          .format(self.params['Reffiles']['readpattdefs'])))
-                    sys.exit()
-            else:
-                # Case where readpatt and nframe are not recognized
-                print(('Unrecognized readout pattern {}, and the input '
-                       'nframe/nskip combination {},{} does not'
-                       .format(self.params['Readout']['readpatt'],
-                               self.params['Readout']['nframe'],
-                               self.params['Readout']['nskip'])))     
-                print(('match any present in {}. This is not a valid NIRCam '
-                       'readout pattern. Quitting.'
-                       .format(self.params['Reffiles']['readpattdefs'])))
-                sys.exit()
+            #readpatt_nframe = self.readpatterns['nframe'].data
+            #readpatt_nskip = self.readpatterns['nskip'].data
+            #readpatt_name = self.readpatterns['name'].data
+            #if self.params['Readout']['nframe'] in readpatt_nframe:
+            #    nfmtch = self.params['Readout']['nframe'] == readpatt_nframe
+            #    nskip_subset = readpatt_nskip[nfmtch]
+            #    name_subset = readpatt_name[nfmtch]
+            #    if self.params['Readout']['nskip'] in nskip_subset:
+            #        finalmtch = self.params['Readout']['nskip'] == nskip_subset
+            #        finalname = name_subset[finalmtch][0]
+            #        print(("CAUTION: requested readout pattern {} not recognized."
+            #               .format(self.params['Readout']['readpatt'])))
+            #        print(("but the requested nframe/nskip combination ({},{}), "
+            #               "matches those values for".
+            #               format(self.params['Readout']['nframe'],
+            #                      self.params['Readout']['nskip'])))
+            #        print(("the {} readout pattern, as listed in {}."
+            #              .format(finalname,self.params['Reffiles']['readpattdefs'])))
+            #        print('Continuing on using that as the readout pattern.')
+            #        self.params['Readout']['readpatt'] = finalname
+            #    else:
+            #        # Case where readpatt is not recognized, nframe is present
+            #        # in the definition file, but nskip is not
+            #        print(('Unrecognized readout pattern {}, and the input '
+            #               'nframe/nskip combination {},{} does not'
+            #               .format(self.params['Readout']['readpatt'],
+            #                       self.params['Readout']['nframe'],
+            #                       self.params['Readout']['nskip'])))
+            #        print(('match any present in {}. This is not a valid NIRCam '
+            #              'readout pattern. Quitting.'
+            #              .format(self.params['Reffiles']['readpattdefs'])))
+            #        sys.exit()
+            #else:
+            #    # Case where readpatt and nframe are not recognized
+            #    print(('Unrecognized readout pattern {}, and the input '
+            #           'nframe/nskip combination {},{} does not'
+            #           .format(self.params['Readout']['readpatt'],
+            #                   self.params['Readout']['nframe'],
+            #                   self.params['Readout']['nskip'])))     
+            #    print(('match any present in {}. This is not a valid NIRCam '
+            #           'readout pattern. Quitting.'
+            #           .format(self.params['Reffiles']['readpattdefs'])))
+            #    sys.exit()
 
 
     def setNumAmps(self):
@@ -2411,11 +2418,13 @@ class Observation():
         # generally use 1 amp, except for the grism-related
         # subarrays that span the entire width
         # of the detector. For those, trust that the user input is what they want.
+        amps = 4
         if "FULL" in self.params['Readout']['array_name'].upper():
-            self.params['Readout']['namp'] = 4
+            amps = 4
         else:
             if self.subarray_bounds[2]-self.subarray_bounds[0] != 2047:
-                self.params['Readout']['namp'] = 1
+                amps = 1
+        self.params['Readout']['namp'] = amps
 
                   
     def checkParamVal(self,value,typ,vmin,vmax,default):

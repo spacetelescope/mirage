@@ -224,7 +224,7 @@ class Catalog_seed():
                                 'saturation','gain','pixelflat',
                                 'illumflat','astrometric','distortion_coeffs','ipc',
                                 'crosstalk','occult','pixelAreaMap',
-                                'flux_cal'],
+                                'flux_cal','readpattdefs'],
                     'simSignals':['pointsource','psfpath','galaxyListFile','extended',
                                   'movingTargetList','movingTargetSersic',
                                   'movingTargetExtended','movingTargetToTrack'],
@@ -232,7 +232,8 @@ class Catalog_seed():
 
         config_files = {'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list',
                         'Reffiles-flux_cal':'NIRCam_zeropoints.list',
-                        'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'}
+                        'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt',
+                        'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'}
         
         for key1 in pathdict:
             for key2 in pathdict[key1]:
@@ -860,7 +861,7 @@ class Catalog_seed():
         maskimage[4:self.ffsize-4,4:self.ffsize-4] = 1.
         
         #crop the mask to match the requested output array
-        if self.params['Readout']['array_name'] != "FULL":
+        if "FULL" not in self.params['Readout']['array_name']:
             maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3]+1,self.subarray_bounds[0]:self.subarray_bounds[2]+1]
 
         #POINT SOURCES
@@ -2420,15 +2421,14 @@ class Catalog_seed():
             print("WARNING: unrecognized mode {} for {}. Must be one of: {}".format(self.params['Inst']['mode'],self.params['Inst']['instrument'],possibleModes))
             sys.exit()
 
-        #check the number of amps. Full frame data will always be collected using 4 amps. 
-        #Subarray data will always be 1 amp, except for the grism subarrays which span the
-        #entire width of the detector. Those can be read out using 1 or 4 amps.
-        
+        # Set nframe and nskip according to the values in the
+        # readout pattern definition file
+        self.read_pattern_check()
 
-        #Make sure that the requested number of groups is less than or equal to the maximum
-        #allowed. If you're continuing on with an unknown readout pattern (not recommended)
-        #then assume a max of 10 groups.
-        #For science operations, ngroup is going to be limited to 10 for all readout patterns
+        #Make sure that the requested number of groups is
+        #less than or equal to the maximum allowed.
+        #For full frame science operations, ngroup is going
+        #to be limited to 10 for all readout patterns
         #except for the DEEP patterns, which can go to 20.
         #match = self.readpatterns['name'] == self.params['Readout']['readpatt'].upper()
         #if sum(match) == 1:
@@ -2566,7 +2566,10 @@ class Catalog_seed():
             #angular distance from the reference pixel
             ap_name = self.params['Readout']['array_name']
 
-            self.x_sci2idl,self.y_sci2idl,self.v2_ref,self.v3_ref,self.parity,self.v3yang,self.xsciscale,self.ysciscale,self.v3scixang = self.getDistortionCoefficients(distortionTable,'science','ideal',ap_name)
+            self.x_sci2idl,self.y_sci2idl,self.v2_ref,self.v3_ref,\
+                self.parity,self.v3yang,self.xsciscale,self.ysciscale,\
+                self.v3scixang = self.getDistortionCoefficients(distortionTable,
+                                                                'science','ideal',ap_name)
             
             #Generate the coordinate transform for V2,V3 to 'ideal'
             siaf = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1)
@@ -2579,9 +2582,10 @@ class Catalog_seed():
             siaf_row = siaf[match]
 
 
-            #self.v2v32idlx, self.v2v32idly = read_siaf_table.get_siaf_v2v3_transform(self.params['Reffiles']['distortion_coeffs'],ap_name,to_system='ideal')
-            self.v2v32idlx, self.v2v32idly = read_siaf_table.get_siaf_v2v3_transform(siaf_row,ap_name,to_system='ideal')
-
+            self.v2v32idlx, self.v2v32idly = read_siaf_table.\
+                                             get_siaf_v2v3_transform(siaf_row,
+                                                                     ap_name,
+                                                                     to_system='ideal')
             
         #convert the input RA and Dec of the pointing position into floats
         #check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -2589,18 +2593,21 @@ class Catalog_seed():
             self.ra = float(self.params['Telescope']['ra'])
             self.dec = float(self.params['Telescope']['dec'])
         except:
-            self.ra,self.dec=self.parseRADec(self.params['Telescope']['ra'],self.params['Telescope']['dec'])
+            self.ra,self.dec=self.parseRADec(self.params['Telescope']['ra'],
+                                             self.params['Telescope']['dec'])
 
-        if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or self.ra is None or self.dec is None:
+        if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or \
+           self.ra is None or self.dec is None:
             print("WARNING: bad requested RA and Dec {} {}".format(self.ra,self.dec))
             sys.exit()
 
         #make sure the rotation angle is a float
         try:
-            self.params['Telescope']["rotation"]=float(self.params['Telescope']["rotation"])
+            self.params['Telescope']["rotation"] = float(self.params['Telescope']["rotation"])
         except:
-            print("ERROR: bad rotation value {}, setting to zero.".format(self.params['Telescope']["rotation"]))
-            self.params['Telescope']["rotation"]=0.
+            print(("ERROR: bad rotation value {}, setting to zero."
+                   .format(self.params['Telescope']["rotation"])))
+            self.params['Telescope']["rotation"] = 0.
 
 
         #check that the various scaling factors are floats and within a reasonable range
@@ -2665,6 +2672,37 @@ class Catalog_seed():
             return True
 
         
+    def read_pattern_check(self):
+        # Check the readout pattern that's entered and set nframe and nskip 
+        # accordingly
+        self.params['Readout']['readpatt'] = self.params['Readout']['readpatt'].upper()
+
+        # Read in readout pattern definition file 
+        # and make sure the possible readout patterns are in upper case
+        self.readpatterns = ascii.read(self.params['Reffiles']['readpattdefs'])
+        self.readpatterns['name'] = [s.upper() for s in self.readpatterns['name']]
+
+        # If the requested readout pattern is in the table of options,
+        # then adopt the appropriate nframe and nskip
+        if self.params['Readout']['readpatt'] in self.readpatterns['name']:
+            mtch = self.params['Readout']['readpatt'] == self.readpatterns['name']
+            self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
+            self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
+            print(('Requested readout pattern {} is valid. '
+                  'Using the nframe = {} and nskip = {}'
+                   .format(self.params['Readout']['readpatt'],
+                           self.params['Readout']['nframe'],
+                           self.params['Readout']['nskip'])))
+        else:
+            # If the read pattern is not present in the definition file
+            # then quit.
+            print(("WARNING: the {} readout pattern is not defined in {}."
+                   .format(self.params['Readout']['readpatt'],
+                           self.params['Reffiles']['readpattdefs'])))
+            print("Quitting.")
+            sys.exit()
+
+
     def filecheck(self):
         # Make sure the requested input files exist
         # For reference files, assume first that they are located in
@@ -2778,17 +2816,24 @@ class Catalog_seed():
             if namps != 0:
                 self.params['Readout']['namp'] = namps
             else:
-                if ((self.params['Readout']['namp'] == 1) or (self.params['Readout']['namp'] == 4)):
-                    print("CAUTION: Aperture {} can be used with either a 1-amp".format(self.subdict['AperName'].data[mtch][0]))
+                if ((self.params['Readout']['namp'] == 1) or
+                    (self.params['Readout']['namp'] == 4)):
+                    print(("CAUTION: Aperture {} can be used with either "
+                           "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
                     print("or a 4-amp readout. The difference is a factor of 4 in")
-                    print("readout time. You have requested {} amps.".format(self.params['Readout']['namp']))
+                    print(("readout time. You have requested {} amps."
+                           .format(self.params['Readout']['namp'])))
                 else:
-                    print("WARNING: {} requires the number of amps to be 1 or 4. You have requested {}.".format(self.params['Readout']['array_name'],self.params['Readout']['namp']))
+                    print(("WARNING: {} requires the number of amps "
+                           "to be 1 or 4. You have requested {}."
+                           .format(self.params['Readout']['array_name'],
+                                   self.params['Readout']['namp'])))
                     sys.exit()
-
-
         else:
-            print("WARNING: subarray name {} not found in the subarray dictionary {}.".format(self.params['Readout']['array_name'],self.params['Reffiles']['subarray_defs']))
+            print(("WARNING: subarray name {} not found in the "
+                   "subarray dictionary {}."
+                   .format(self.params['Readout']['array_name'],
+                           self.params['Reffiles']['subarray_defs'])))
             sys.exit()
 
 
