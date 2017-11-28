@@ -865,45 +865,19 @@ class DarkPrep():
             mtch = self.params['Readout']['readpatt'] == self.readpatterns['name']
             self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
             self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
-            print(('Requested readout pattern {}.'
-                  .format(self.params['Readout']['readpatt'])))
-            print(('Using the nframe and nskip values from the '
-                   'definition file:'))
-            print('{}'.format(self.params['Reffiles']['readpattdefs']))
-            print(('nframe = {} and nskip = {}.'
-                   .format(self.params['Readout']['nframe'],
+            print(('Requested readout pattern {} is valid. '
+                  'Using the nframe = {} and nskip = {}'
+                   .format(self.params['Readout']['readpatt'],
+                           self.params['Readout']['nframe'],
                            self.params['Readout']['nskip'])))
         else:
-            #if readpatt is not present in the definition file but the nframe/nskip combo is, then reset 
-            #readpatt to the appropriate value from the definition file
-            readpatt_nframe = self.readpatterns['nframe'].data
-            readpatt_nskip = self.readpatterns['nskip'].data
-            readpatt_name = self.readpatterns['name'].data
-            if self.params['Readout']['nframe'] in readpatt_nframe:
-                nfmtch = self.params['Readout']['nframe'] == readpatt_nframe
-                nskip_subset = readpatt_nskip[nfmtch]
-                name_subset = readpatt_name[nfmtch]
-                if self.params['Readout']['nskip'] in nskip_subset:
-                    finalmtch = self.params['Readout']['nskip'] == nskip_subset
-                    finalname = name_subset[finalmtch][0]
-                    print("CAUTION: requested readout pattern {} not recognized.".format(self.params['Readout']['readpatt']))
-                    print('but the requested nframe/nskip combination ({},{}), matches those values for'.format(self.params['Readout']['nframe'],self.params['Readout']['nskip']))
-                    print("the {} readout pattern, as listed in {}.".format(finalname,self.params['Reffiles']['readpattdefs']))
-                    print('Continuing on using that as the readout pattern.')
-                    self.params['Readout']['readpatt'] = finalname
-                else:
-                    #case where readpatt is not recognized, nframe is present in the definition file, but the nframe/nskip combination is not
-                    print('Unrecognized readout pattern {}, and the input nframe/nskip combination {},{} does not'.format(self.params['Readout']['readpatt'],self.params['Readout']['nframe'],self.params['Readout']['nskip']))
-                    print('match any present in {}. Continuing simulation with the input nframe/nskip, and'.format(self.params['Reffiles']['readpattdefs']))
-                    print("setting the readout pattern to 'ANY' in order to allow the output file to be saved via RampModel without error.")
-                    self.params['readpatt'] = 'ANY'
-            else:
-                #case where readpatt is not recognized, and nframe is not present in the definition file
-                print('Unrecognized readout pattern {}, and the input nframe/nskip combination {},{} does not'.format(self.params['Readout']['readpatt'],self.params['Readout']['nframe'],self.params['Readout']['nskip']))
-                print('match any present in {}. '.format(self.params['Reffiles']['readpattdefs']))
-                print('Continuing simulation with the input nframe/nskip values, and')
-                print("setting the readout pattern to 'ANY' in order to allow the output file to be saved via RampModel without error.")
-                self.params['readpatt'] = 'ANY'
+            # If the read pattern is not present in the definition file
+            # then quit.
+            print(("WARNING: the {} readout pattern is not defined in {}."
+                   .format(self.params['Readout']['readpatt'],
+                           self.params['Reffiles']['readpattdefs'])))
+            print("Quitting.")
+            sys.exit()
 
 
     def checkRunStep(self,filename):

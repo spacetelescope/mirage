@@ -4,14 +4,10 @@ Inst:
   use_JWST_pipeline: False   #Use pipeline in data transformations
 
 Readout:
-  readpatt: RAPID        #Readout pattern (RAPID, BRIGHT2, etc) overrides nframe,nskip unless it is not recognized
-  nframe: 1        #Number of frames per group
-  nskip: 0         #Number of skipped frames between groups
+  readpatt: RAPID        #Readout pattern (RAPID, BRIGHT2, etc)
   ngroup: 7              #Number of groups in integration
   nint: 1          #Number of integrations per exposure
-  namp: 4         #Number of amplifiers used in readout (4 for full frame, 1 for subarray)
-  array_name: NRCB5_FULL    #Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below
-  subarray_bounds: 0, 0, 159, 159          #Coords of subarray corners. (xstart, ystart, xend, yend) Over-ridden by array_name above. Currently not used. Could be used if output saved in raw format
+  array_name: NRCB5_FULL    #Name of array (FULL, SUB160, SUB64P, etc) 
   filter: F250M       #Filter of simulated data (F090W, F322W2, etc)
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
