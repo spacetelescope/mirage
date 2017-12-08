@@ -94,9 +94,12 @@ class WFSSSim():
         # the direct images
         dmode = 'mod{}_{}'.format(self.module,self.direction)
         loc = os.path.join(self.datadir,"GRISM_NIRCAM/")
-        disp_seed = Grism_seed(imseeds,self.crossing_filter,dmode,loc)
+        background_file = ("{}_{}_back.fits"
+                           .format(self.crossing_filter,dmode))
+        disp_seed = Grism_seed(imseeds,self.crossing_filter,
+                               dmode,config_path=loc)
         disp_seed.observation()
-        disp_seed.finalize()
+        disp_seed.finalize(Back = background_file)
         
         # Prepare dark current exposure if
         # needed.
