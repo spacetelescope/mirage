@@ -258,7 +258,7 @@ class Observation():
                     self.saveDMS(raw_outramp,raw_zeroframe,rawrampfile,mod='1b')
                 else:
                     self.savefits(raw_outramp,raw_zeroframe,rawrampfile,mod='1b')
-                stp.add_wcs(rawrampfile)
+                stp.add_wcs(rawrampfile,roll=self.params['Telescope']['rotation'])
                 print("Final raw exposure saved to")
                 print("{}".format(rawrampfile))
             else:
@@ -1797,10 +1797,16 @@ class Observation():
             # Hold the averaged group signal
             accumimage = np.zeros((yd,xd))#,dtype=np.int32)
 
-            # Loop over frames within each group if necessary
-            for j in range(framesPerGroup):
+            # Group 0: the initial nskip frames don't exist,
+            # so adjust indexes accordingly
+            rstart = 0
+            if i == 0:
+                rstart = self.params['Readout']['nskip']
+                
+            # Loop over frames within each group if necessary                
+            for j in range(rstart,framesPerGroup):
                 # Frame index number in input data
-                frameindex = (i * framesPerGroup) + j
+                frameindex = (i * framesPerGroup) + j - self.params['Readout']['nskip']
 
                 # Signal only since previous frame
                 if ndim == 3:
@@ -2350,7 +2356,7 @@ class Observation():
             self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
             self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
             print(('Requested readout pattern {} is valid. '
-                  'Using the nframe = {} and nskip = {}'
+                  'Using nframe = {} and nskip = {}'
                    .format(self.params['Readout']['readpatt'],
                            self.params['Readout']['nframe'],
                            self.params['Readout']['nskip'])))

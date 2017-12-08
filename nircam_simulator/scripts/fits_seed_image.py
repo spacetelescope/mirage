@@ -61,7 +61,7 @@ From here, there are two ways to call fits_seed_image.py
               and dec, then the center of the cropped image
               will remain at the center of the blotted image.
 
-   blog_pav3 - 
+   blot_pav3 - 
               Position angle of the blotted image. 
 
    subarray_defs - 
