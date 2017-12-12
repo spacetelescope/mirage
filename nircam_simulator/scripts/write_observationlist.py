@@ -19,8 +19,7 @@ def write_yaml(xml_file, pointing_file, yaml_file, pointsource_catalog):
 
     # Read in filters from XML file
     xml_read = apt_inputs.AptInput()
-    xml_read.input_xml = xml_file
-    xml_table = xml_read.read_imaging_xml(xml_read.input_xml)
+    xml_table = xml_read.read_xml(xml_file)
 
     sw_filters = xml_table['ShortFilter']
     lw_filters = xml_table['LongFilter']

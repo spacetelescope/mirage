@@ -1061,7 +1061,9 @@ class Observation():
         #    self.dark = self.dark[0:3]
 
         #EXPTYPE OPTIONS
-        exptype = {'imaging':'NRC_IMAGE', 'moving_target':'NRC_TSIMAGE', 'wfss':'NRC_GRISM', 'tso_wfss':'NRC_TSGRISM', 'coron':'NRC_CORON'}
+        exptype = {'nircamimaging': 'NRC_IMAGE', 'nircamengineeringimaging': 'NRC_IMAGE',
+                   'moving_target': 'NRC_TSIMAGE', 'wfsccommissioning': 'NRC_IMAGE',
+                   'nircamwfss': 'NRC_GRISM', 'tso_wfss': 'NRC_TSGRISM', 'coron': 'NRC_CORON'}
         try:
             outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['mode'].lower()]
         except:
@@ -1235,7 +1237,7 @@ class Observation():
         outModel.writeto(filename, overwrite=True)
 
         print("Final output integration saved to {}".format(filename))
-        return
+        return filename
 
 
     def populate_group_table(self, starttime, grouptime, ramptime, numint, numgroup, ny, nx):
@@ -2139,7 +2141,8 @@ class Observation():
             self.params['Output']['file'] += '.fits'
 
         # check mode:
-        possibleModes = ['imaging', 'wfss', 'moving_target']
+        possibleModes = ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
+                         'nircamwfss', 'wfsccommissioning']
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
             pass

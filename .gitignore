@@ -27,3 +27,4 @@ nircam_simulator/OTECommissioning/*
 #########
 nircam_simulator/ClassMaps.txt
 nircam_simulator/examples/*.ipynb
+nircam_simulator/scripts/apt_inputs_OLD.py
