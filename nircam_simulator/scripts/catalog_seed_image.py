@@ -224,7 +224,7 @@ class Catalog_seed():
                                 'saturation','gain','pixelflat',
                                 'illumflat','astrometric','distortion_coeffs','ipc',
                                 'crosstalk','occult','pixelAreaMap',
-                                'flux_cal','readpattdefs'],
+                                'flux_cal','readpattdefs','filter_throughput'],
                     'simSignals':['pointsource','psfpath','galaxyListFile','extended',
                                   'movingTargetList','movingTargetSersic',
                                   'movingTargetExtended','movingTargetToTrack'],
@@ -233,7 +233,8 @@ class Catalog_seed():
         config_files = {'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list',
                         'Reffiles-flux_cal':'NIRCam_zeropoints.list',
                         'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt',
-                        'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'}
+                        'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list',
+                        'Reffiles-filter_throughput':'placeholder.txt'}
         
         for key1 in pathdict:
             for key2 in pathdict[key1]:
@@ -2474,16 +2475,7 @@ class Catalog_seed():
         #the filter
         module = self.params['Readout']['array_name'][3]
         detector = self.params['Readout']['array_name'][3:5]
-    
-        if self.params['Readout']['pupil'][0] == 'F':
-            usephot = 'pupil'
-        else:
-            usephot = 'filter'
-        mtch = ((self.zps['Filter'] == self.params['Readout'][usephot]) & (self.zps['Module'] == module))
-        self.photflam = self.zps['PHOTFLAM'][mtch][0]
-        self.photfnu = self.zps['PHOTFNU'][mtch][0]
-        self.pivot = self.zps['Pivot_wave'][mtch][0]
-        
+
         #make sure the requested filter is allowed. For imaging, all filters are allowed.
         #In the future, other modes will be more restrictive
         if self.params['Readout']['pupil'][0].upper() == 'F':
@@ -2493,7 +2485,16 @@ class Catalog_seed():
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
             print("WARNING: requested filter {} is not in the list of possible filters.".format(self.params['Readout'][usefilt]))
             sys.exit()
-
+        
+        #if self.params['Readout']['pupil'][0].upper() == 'F':
+        #    usephot = 'pupil'
+        #else:
+        #    usephot = 'filter'
+        mtch = ((self.zps['Filter'] == self.params['Readout'][usefilt]) & (self.zps['Module'] == module))
+        self.photflam = self.zps['PHOTFLAM'][mtch][0]
+        self.photfnu = self.zps['PHOTFNU'][mtch][0]
+        self.pivot = self.zps['Pivot_wave'][mtch][0]
+        
         #PSF: generate the name of the PSF file to use
         #if the psf path has been left blank or set to 'None'
         #then assume the user does not want to add point sources
@@ -2581,7 +2582,6 @@ class Catalog_seed():
 
             siaf_row = siaf[match]
 
-
             self.v2v32idlx, self.v2v32idly = read_siaf_table.\
                                              get_siaf_v2v3_transform(siaf_row,
                                                                      ap_name,
@@ -2609,7 +2609,38 @@ class Catalog_seed():
                    .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
 
-
+        # Set the background value if the high/medium/low settings
+        # are used
+        bkgdrate_options = ['high','medium','low']
+        
+        try:
+            self.params['simSignals']['bkgdrate'] = float(self.params['simSignals']['bkgdrate'])
+        except:
+            if self.params['simSignals']['bkgdrate'].lower() in bkgdrate_options:
+                print(("Calculating background rate using jwst_background "
+                       "based on {} level".format(self.params['simSignals']['bkgdrate'])))
+                # Find the appropriate filter throughput file
+                if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
+                    filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
+                                   .format(self.params['Readout'][usefilt].upper(),module.lower()))
+                    filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
+                    filter_file = os.path.join(filt_dir,filter_file)
+                else:
+                    filter_file = self.params['Reffiles']['filter_throughput']
+                print(("Using {} filter throughput file for background calculation."
+                       .format(filter_file)))
+                self.params['simSignals']['bkgdrate'] = \
+                                self.calculate_background(self.ra,
+                                                          self.dec,
+                                                          filter_file,
+                                                          level=self.params['simSignals']['bkgdrate'].lower())
+                print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
+            else:
+                print(("WARNING: unrecognized background rate value. "
+                       "Must be either a number or one of: {}"
+                       .format(bkgdrate_options)))
+                sys.exit()
+                
         #check that the various scaling factors are floats and within a reasonable range
         #self.params['cosmicRay']['scale'] = self.checkParamVal(self.params['cosmicRay']['scale'],'cosmicRay',0,100,1)
         self.params['simSignals']['extendedscale'] = self.checkParamVal(self.params['simSignals']['extendedscale'],'extendedEmission',0,10000,1)
@@ -2855,6 +2886,84 @@ class Catalog_seed():
             self.pixscale = [pixelScale[instrument][channel],pixelScale[instrument][channel]]
         else:
             self.pixscale = [pixelScale[instrument],pixelScale[instrument]]
+
+
+    def read_filter_throughput(self,file):
+        '''Read in the ascii file containing the filter
+        throughput curve'''
+        tab = ascii.read(file)
+        return tab['Wavelength_microns'].data, tab['Throughput'].data
+
+    
+    def calculate_background(self,ra,dec,ffile,level='medium'):
+        '''Use the JWST background calculator to come up with
+        an appropriate background level for the observation.
+        Options for level include low, medium, high'''
+        from jwst_backgrounds import jbt
+        from astropy import units as u
+        from astropy.units.equivalencies import si,cgs
+
+        # Read in filter throughput file
+        filt_wav, filt_thru = self.read_filter_throughput(ffile)
+
+        # Get background information
+        # Any wavelength will return the 2D array that includes
+        # all wavelengths, so just use a dummy value of 2.5 microns
+        bg = jbt.background(ra,dec,2.5) 
+
+        # Now we need to loop over each day (in the background)
+        # info, convolve the background curve with the filter
+        # throughput curve, and then integrate. THEN, we can
+        # calculate the low/medium/high values.
+        bsigs = np.zeros(len(bg.bkg_data['total_bg'][:,0]))
+        for i in range(len(bg.bkg_data['total_bg'][:,0])):
+            back_wave = bg.bkg_data['wave_array']
+            back_sig = bg.bkg_data['total_bg'][i,:]
+
+            # Interpolate background to match filter wavelength grid
+            bkgd_interp = np.interp(filt_wav,back_wave,back_sig)
+
+            # Combine
+            filt_bkgd = bkgd_interp * filt_thru
+
+            # Integrate
+            bsigs[i] = np.trapz(filt_bkgd,x=filt_wav)
+
+        # Now sort and determine the low/medium/high levels
+        x = np.sort(bsigs)
+        y = np.arange(1, len(x)+1) / len(x)
+
+        if level.lower() == 'low':
+            perc = 0.1
+        elif level.lower() == 'medium':
+            perc = 0.5
+        elif level.lower() == 'high':
+            perc = 0.9
+        else:
+            print("Unrecognized background level string")
+            sys.exit()
+
+        # Interpolate to the requested level
+        bval = np.interp(perc,y,x) * u.MJy / u.steradian
+
+        # Convert from MJy/str to ADU/sec
+        # then divide by area of pixel
+        flambda = cgs.erg / si.angstrom / si.cm ** 2 / si.s
+        #fnu = cgs.erg / si.Hz / si.cm ** 2 / si.s
+        photflam = self.photflam * flambda
+        #photnu = self.photfnu * fnu
+        pivot = self.pivot * u.micron
+        mjy = photflam.to(u.MJy, u.spectral_density(pivot))
+
+        # Divide by pixel area in steradians to get
+        # MJy/str per ADU/s
+        pixel_area = self.xsciscale * u.arcsec * self.ysciscale * u.arcsec
+        mjy_str = mjy / pixel_area.to(u.steradian)
+
+        # Convert the background signal from MJy/str
+        # to ADU/sec
+        bval /= mjy_str
+        return bval.value
 
             
     def saveSingleFits(self,image,name,key_dict=None,image2=None,image2type=None):
