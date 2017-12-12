@@ -32,7 +32,8 @@ Reffiles:                                 #Set to None or leave blank if you wis
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
-  
+  filter_throughput: config #File containing filter throughput curve
+
 nonlin:
   limit: 60000.0                           #Upper singal limit to which nonlinearity is applied (ADU)
   accuracy: 0.000001                        #Non-linearity accuracy threshold
@@ -67,7 +68,7 @@ simSignals:
   zodiscale:  1.0                            #Zodi scaling factor
   scattered:  None                          #Scattered light count rate image file
   scatteredscale: 1.0                        #Scattered light scaling factor
-  bkgdrate: 0.0                         #Constant background count rate (electrons/sec/pixel)
+  bkgdrate: medium                         #Constant background count rate. Number (ADU/sec/pixel) or 'high','medium','low' similar to what is used in the ETC
   poissonseed: 2012872553                  #Random number generator seed for Poisson simulation)
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
