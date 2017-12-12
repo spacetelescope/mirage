@@ -28,7 +28,8 @@ from . import moving_targets
 from . import segmentation_map as segmap
 
 inst_list = ['nircam']
-modes = {'nircam':['imaging', 'moving_target', 'wfss']}
+modes = {'nircam': ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
+                    'nircamwfss', 'wfsccommissioning']}
 inst_abbrev = {'nircam':'NRC'}
 pixelScale = {'nircam':{'sw':0.031, 'lw':0.063}}
 full_array_size = {'nircam':2048}
@@ -2311,7 +2312,7 @@ class Catalog_seed():
             print("WARNING: {} instrument not implemented within ramp simulator")
             sys.exit()
 
-        # Check entred mode:
+        # Check entered mode:
         possibleModes = modes[self.params['Inst']['instrument'].lower()]
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
@@ -2435,8 +2436,6 @@ class Catalog_seed():
                     sum1=sum1+self.psfimage[i, j]
             self.psfimage=self.psfimage/sum1
             self.psfname = None
-
-        print('~ ~ ~PSF file: ', self.psfname)
 
         # Read in the 'central' PSF file. This is the file that
         # has the PSF centered on the pixel. This will be used
