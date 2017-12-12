@@ -1,7 +1,7 @@
 # Generate observation list files based on default values and APT output files
 from nircam_simulator.scripts import apt_inputs
 
-def write_yaml(xml_file, pointing_file, yaml_file, pointsource_catalog):
+def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=None):
     # Define "default" values (probably should be changed eventually)
     date = '2019-07-04'
     PAV3 = '0.'
@@ -42,7 +42,7 @@ def write_yaml(xml_file, pointing_file, yaml_file, pointsource_catalog):
         "  PAV3: {}\n".format(PAV3),
         "  SW:\n",
         "    Filter: {}\n".format(sw_filters[i_obs]),
-        "    PointSourceCatalog: {}\n".format(pointsource_catalog),
+        "    PointSourceCatalog: {}\n".format(ps_cat_sw),
         "    GalaxyCatalog: {}\n".format(GalaxyCatalog),
         "    ExtendedCatalog: {}\n".format(ExtendedCatalog),
         "    ExtendedScale: {}\n".format(ExtendedScale),
@@ -55,7 +55,7 @@ def write_yaml(xml_file, pointing_file, yaml_file, pointsource_catalog):
         "    BackgroundRate: {}\n".format(BackgroundRate_sw),
         "  LW:\n",
         "    Filter: {}\n".format(lw_filters[i_obs]),
-        "    PointSourceCatalog: {}\n".format(pointsource_catalog),
+        "    PointSourceCatalog: {}\n".format(ps_cat_lw),
         "    GalaxyCatalog: {}\n".format(GalaxyCatalog),
         "    ExtendedCatalog: {}\n".format(ExtendedCatalog),
         "    ExtendedScale: {}\n".format(ExtendedScale),
@@ -71,7 +71,8 @@ def write_yaml(xml_file, pointing_file, yaml_file, pointsource_catalog):
     for line in write:
         f.write(line)
     f.close()
-    print('Successfully wrote {} observations to {}'.format(num_obs, yaml_file))
+    print('\nSuccessfully wrote {} observations to {}'.format(num_obs, yaml_file))
+
 
 if __name__ == '__main__':
     xml_file = '../OTECommissioning/OTE01/OTE01-1134.xml'
