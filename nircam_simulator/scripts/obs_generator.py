@@ -147,10 +147,10 @@ class Observation():
         # Mask any reference pixels
         if self.params['Output']['grism_source_image'] == False:
             simexp,simzero = self.maskRefPix(simexp,simzero)
-        
+
         # Add the simulated source ramp to the dark ramp
-        lin_outramp,lin_zeroframe = self.addSyntheticToDark(simexp,self.linDark,syn_zeroframe=simzero)
-        
+        lin_outramp,lin_zeroframe,lin_sbAndRefpix = self.addSyntheticToDark(simexp,self.linDark,syn_zeroframe=simzero)
+
         # Add other detector effects (IPC/Crosstalk/PAM)
         lin_outramp = self.add_detector_effects(lin_outramp)
         lin_zeroframe = self.add_detector_effects(np.expand_dims(lin_zeroframe,axis=1))[:,0,:,:]
@@ -238,6 +238,9 @@ class Observation():
                                                       accuracy = self.params['nonlin']['accuracy'],
                                                       save_accuracy_map = savefile,
                                                       accuracy_file = ofile)
+
+                print("after unlinearizing: {}".format(raw_outramp[0,:,1000,1000]))
+
                 raw_zeroframe = unlinearize.unlinearize(lin_zeroframe,nonlincoeffs,self.satmap,
                                                         lin_satmap,
                                                         maxiter = self.params['nonlin']['maxiter'],
@@ -245,7 +248,14 @@ class Observation():
                                                         save_accuracy_map = False)
 
                 # Add the superbias and reference pixel signal back in
-                raw_outramp = self.add_sbAndRefPix(raw_outramp,self.linDark.sbAndRefpix)
+                #raw_outramp = self.add_sbAndRefPix(raw_outramp,self.linDark.sbAndRefpix)
+                raw_outramp = self.add_sbAndRefPix(raw_outramp,lin_sbAndRefpix)
+
+                print("after adding sb and refpix back in: {}".format(raw_outramp[0,:,1000,1000]))
+                print("sb and refpix signal: {}".format(self.linDark.sbAndRefpix[0,:,1000,1000]))
+                print("NEED TO rearrange linDark.sbAndRefpix for readpatt, just like was done for the dark itself")
+                      
+                      
                 raw_zeroframe = self.add_sbAndRefPix(raw_zeroframe,self.linDark.zero_sbAndRefpix)
 
                 # Make sure all signals are < 65535
@@ -1429,6 +1439,9 @@ class Observation():
         if ((syn_zeroframe is not None) & (dark.zeroframe is not None)):
             zeroframe = dark.zeroframe + syn_zeroframe
             
+        # To hold reordered superbias + refpix signals from the dark
+        reorder_sbandref = np.zeros_like(synthetic)
+
         # We have already guaranteed that either the readpatterns match
         # or the dark is RAPID, so no need to worry about checking for 
         # other cases here.
@@ -1437,6 +1450,7 @@ class Observation():
                          self.params['Readout']['nframe']
             frames = np.arange(0,self.params['Readout']['nframe'])
             accumimage = np.zeros_like(synthetic[0,:,:],dtype=np.int32)
+            sbaccumimage = np.zeros_like(synthetic[0,:,:],dtype=np.int32)
 
             # Loop over integrations
             for integ in range(self.params['Readout']['nint']):
@@ -1450,16 +1464,19 @@ class Observation():
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:
-                        accumimage = np.mean(dark.data[0,frames,:,:],axis=0)
-                        
+                        accumimage = np.mean(dark.data[integ,frames,:,:],axis=0)
+                        sbaccumimage = np.mean(dark.sbAndRefpix[integ,frames,:,:],axis=0)
+
                         # If no averaging needs to be done
                     else:
-                        accumimage = dark.data[0,frames[0],:,:]
-
+                        accumimage = dark.data[integ,frames[0],:,:]
+                        sbaccumimage = dark.sbAndRefpix[integ,frames[0],:,:]
+                        
                     # Now add the averaged dark frame to the synthetic data,
                     # which has already been placed into the correct readout pattern
-                    synthetic[i,:,:] += accumimage
-                
+                    synthetic[integ,i,:,:] += accumimage
+                    reorder_sbandref[integ,i,:,:] = sbaccumimage
+                    
                     # Increment the frame indexes
                     frames = frames + deltaframe
 
@@ -1470,6 +1487,7 @@ class Observation():
             # the dark current groups.
             synthetic = synthetic + dark.data[:,0:self.params['Readout']['ngroup'],:,:]
             print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
+            reorder_sbandref = dark.sbAndRefpix
         # Case below should be caught within inputChecks()
         #else:
         #    print("WARNING: Unable to convert input dark with a readout pattern")
@@ -1478,8 +1496,10 @@ class Observation():
         #    print("The readout pattern of the dark must be RAPID or match")
         #    print("the requested output readout pattern.")
         #    sys.exit()
+
+        print("After adding dark current: {}".format(synthetic[0,:,1000,1000]))
             
-        return synthetic,zeroframe
+        return synthetic,zeroframe,reorder_sbandref
 
 
     def maskRefPix(self,ramp,zero):
@@ -1520,6 +1540,8 @@ class Observation():
 
         if self.runStep['pixelAreaMap']:
             ramp = self.addPAM(ramp)
+
+        print("After detector effects: {}".format(ramp[0,:,1000,1000]))
 
         return ramp
 
@@ -1820,7 +1842,7 @@ class Observation():
                 # Create the frame by adding the delta signal
                 # and poisson noise associated with the delta signal
                 # to the previous frame
-                framesignal = previoussignal + poissonsignal + deltaframe
+                framesignal = previoussignal + poissonsignal 
                 
                 # Add cosmic rays
                 if self.runStep['cosmicray']:
