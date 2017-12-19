@@ -239,8 +239,6 @@ class Observation():
                                                       save_accuracy_map = savefile,
                                                       accuracy_file = ofile)
 
-                print("after unlinearizing: {}".format(raw_outramp[0,:,1000,1000]))
-
                 raw_zeroframe = unlinearize.unlinearize(lin_zeroframe,nonlincoeffs,self.satmap,
                                                         lin_satmap,
                                                         maxiter = self.params['nonlin']['maxiter'],
@@ -250,12 +248,6 @@ class Observation():
                 # Add the superbias and reference pixel signal back in
                 #raw_outramp = self.add_sbAndRefPix(raw_outramp,self.linDark.sbAndRefpix)
                 raw_outramp = self.add_sbAndRefPix(raw_outramp,lin_sbAndRefpix)
-
-                print("after adding sb and refpix back in: {}".format(raw_outramp[0,:,1000,1000]))
-                print("sb and refpix signal: {}".format(self.linDark.sbAndRefpix[0,:,1000,1000]))
-                print("NEED TO rearrange linDark.sbAndRefpix for readpatt, just like was done for the dark itself")
-                      
-                      
                 raw_zeroframe = self.add_sbAndRefPix(raw_zeroframe,self.linDark.zero_sbAndRefpix)
 
                 # Make sure all signals are < 65535
@@ -1497,8 +1489,6 @@ class Observation():
         #    print("the requested output readout pattern.")
         #    sys.exit()
 
-        print("After adding dark current: {}".format(synthetic[0,:,1000,1000]))
-            
         return synthetic,zeroframe,reorder_sbandref
 
 
@@ -1540,8 +1530,6 @@ class Observation():
 
         if self.runStep['pixelAreaMap']:
             ramp = self.addPAM(ramp)
-
-        print("After detector effects: {}".format(ramp[0,:,1000,1000]))
 
         return ramp
 

@@ -643,7 +643,8 @@ class DarkPrep():
             
             # Loop over integrations
             for integ in range(self.params['Readout']['nint']):
-                frames = np.arange(self.params['Readout']['nskip'],framesPerGroup)
+                #frames = np.arange(self.params['Readout']['nskip'],framesPerGroup)
+                frames = np.arange(0,self.params['Readout']['nframe'])
                 
                 # Loop over groups
                 for i in range(self.params['Readout']['ngroup']):
