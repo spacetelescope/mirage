@@ -224,14 +224,19 @@ class AptInput:
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
         # Find all observations (but use only those that use NIRCam or are WFSC)
-        obs_results = tree.findall('//' + apt + 'Observation')
+        observation_data = tree.find(apt + 'DataRequests')
+        obs_results = observation_data.findall('.//' + apt + 'Observation')
+
         observations = []
-        for o in obs_results:
+        i_observations = []
+        obs_indices = range(len(obs_results))
+        for o, i_obs in zip(obs_results, obs_indices):
             if o.find(apt + 'Instrument').text in ['NIRCAM', 'WFSC']:
                 observations.append(o)
+                i_observations.append(i_obs)
 
         # Get parameters out!
-        for i, obs in enumerate(observations):
+        for i_obs, obs in zip(i_observations, observations):
 
             # Determine what template is used for the observation
             template = obs.find(apt + 'Template')[0]
@@ -531,7 +536,7 @@ class AptInput:
             else:
                 label = '({})'.format(label)
 
-            print("Found {} mosaic tile(s) for observation {} {}".format(n_tiles, i + 1, label))
+            print("Found {} mosaic tile(s) for observation {} {}".format(n_tiles, i_obs + 1, label))
 
         return APTObservationParams
 
@@ -667,11 +672,21 @@ class AptInput:
                         else:
                             obslabel = line[2:paren-1]
                             obslabel = obslabel.strip()
+                        if (' (' in obslabel) and (')' in obslabel):
+                            obslabel = re.split(r' \(|\)', obslabel)[0]
+
+                        if 'FGS' in obslabel:
+                            skip = True
+                        else:
+                            skip = False
+
                     if line[0:2] == '**':
                         v = elements[2]
                         obsnum, visitnum = v.split(':')
                         obsnum = str(obsnum).zfill(3)
                         visitnum = str(visitnum).zfill(3)
+                        if skip == True:
+                            print('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
                         # skip the line at the beginning of each
@@ -683,6 +698,9 @@ class AptInput:
                         #
                         # Also, skip non-NIRCam lines. Check for NRC in aperture name
                         if ((np.int(elements[1]) > 0) & ('NRC' in elements[4])):
+                            if skip:
+                                act_counter += 1
+                                continue
                             act = self.base36encode(act_counter)
                             activity_id.append(act)
                             observation_label.append(obslabel)
@@ -852,8 +870,10 @@ class AptInput:
             self.obstab = yaml.load(infile)
 
         onames = []
+        onums = []
         for key1 in self.obstab:
             onames.append(self.obstab[key1]['Name'])
+            onums.append(key1)
         onames = np.array(onames)
 
         obs_start = []
@@ -906,7 +926,8 @@ class AptInput:
                 sys.exit()
             else:
                 # print('Matching {} from xml with {} from observation listfile'.format(obs, onames[match[0]]))
-                obslist = self.obstab['Observation{}'.format(match[0] + 1)]
+                # obslist = self.obstab['Observation{}'.format(match[0] + 1)]
+                obslist = self.obstab[onums[match[0]]]
                 obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
                 obs_pav3.append(obslist['PAV3'])
                 obs_sw_ptsrc.append(obslist['SW']['PointSourceCatalog'])
