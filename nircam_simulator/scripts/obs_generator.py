@@ -2278,7 +2278,7 @@ class Observation():
         #The file above can be off by ~20 pixels in the corners of the array. This file will give
         #exact answers
         if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
-            distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1)
+            distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1,format='csv')
         else:
             print(("WARNING: Input distortion coefficients file {} "
                    "does not exist."
