@@ -3,7 +3,7 @@
 '''
 Module for preparing a given dark current exposure for
 integration with a ramp of simulated sources created
-using (e.g.) catalog_seed_image.py. This is part of the 
+using (e.g.) catalog_seed_image.py. This is part of the
 refactored ramp_simulator.py
 
 For the moment, just keep the same yaml input file
@@ -62,9 +62,10 @@ class DarkPrep():
         self.fullPaths()
 
         # Base name for output files
+        base_name = self.params['Output']['file'].split('/')[-1]
         self.basename = os.path.join(self.params['Output']['directory'],
-                                     self.params['Output']['file'][0:-5])
-        
+                                     base_name[0:-5])
+
         # Check the entered read pattern info
         self.readPatternCheck()
 
@@ -103,7 +104,7 @@ class DarkPrep():
         print('DARK has been reordered to {} to match the input readpattern of {}'.format(self.dark.data.shape,self.dark.header['READPATT']))
 
         # If a raw dark was read in, create linearized version
-        # here using the SSB pipeline. Better to do this 
+        # here using the SSB pipeline. Better to do this
         # on the full dark before cropping, so that reference
         # pixels can be used in the processing.
         if ((self.params['Inst']['use_JWST_pipeline']) & (self.runStep['linearized_darkfile'] == False)):
@@ -121,7 +122,7 @@ class DarkPrep():
             if self.params['Readout']['readpatt'].upper() == 'RAPID':
                 print("Output is rapid, grabbing zero frame from linearized dark")
                 self.zeroModel = read_fits.Read_fits()
-                self.zeroModel.data = self.linDark.data[:,0,:,:] 
+                self.zeroModel.data = self.linDark.data[:,0,:,:]
                 self.zeroModel.sbAndRefpix = self.linDark.sbAndRefpix[:,0,:,:]
             elif ((self.params['Readout']['readpatt'].upper() != 'RAPID') & (self.dark.zeroframe is not None)):
                 print("Now we need to linearize the zeroframe because the")
@@ -158,7 +159,7 @@ class DarkPrep():
             self.zeroModel = read_fits.Read_fits()
             self.zeroModel.data = self.dark.zeroframe
             self.zeroModel.sbAndRefpix = sbzeroframe
-            
+
             # Crop the linearized dark to the requested
             # subarray size
             # THIS WILL CROP self.dark AS WELL SINCE
@@ -174,7 +175,7 @@ class DarkPrep():
             print("or supply a linearized dark.")
             print("Cannot yet skip the pipeline and provide a raw dark.")
             sys.exit()
-                
+
         #save the linearized dark for testing
 	#if self.params['Output']['save_intermediates']:
         h0 = fits.PrimaryHDU()
@@ -194,13 +195,13 @@ class DarkPrep():
         h0.header['INSTRUME'] = self.instrument
         h0.header['SLOWAXIS'] = self.slowaxis
         h0.header['FASTAXIS'] = self.fastaxis
-        
+
         hl=fits.HDUList([h0,h1,h2,h3,h4])
         objname = self.basename + '_linear_dark_prep_object.fits'
         objname = os.path.join(self.params['Output']['directory'],objname)
         hl.writeto(objname,overwrite=True)
         print('Linearized dark frame plus superbias and reference')
-        print(('pixel signals, as well as zeroframe, saved to {}.'
+        print(('pixel signals, as well as zeroframe, saved to {}. '
 	       'This can be used as input to the observation '
 	       'generator.'
 	       .format(objname)))
@@ -217,7 +218,7 @@ class DarkPrep():
         self.prepDark.sbAndRefpix = self.linDark.sbAndRefpix
         self.prepDark.zero_sbAndRefpix = self.zeroModel.sbAndRefpix
         self.prepDark.header = self.linDark.header
-        
+
 
     def expand_env_var(self):
         # Replace the environment variable name in any inputs
@@ -254,7 +255,7 @@ class DarkPrep():
         #for inp in ilist:
         #    self.input_check(inp)
 
-        
+
     def ref_check(self,rele):
         # Check for the existence of the input reference file
         # Assume first that the file is in the directory tree
@@ -271,7 +272,7 @@ class DarkPrep():
                 print(("input file! Not present in {}"
                        .format(rfile)))
                 sys.exit()
-                    
+
 
     def path_check(self,p):
         # Check for the existence of the input path.
@@ -289,7 +290,7 @@ class DarkPrep():
             print("specified by the {} environment variable.".format(self.env_var))
             sys.exit()
 
-            
+
     def input_check(self,inparam):
         # Check for the existence of the input file. In
         # this case we do not check the directory tree
@@ -339,7 +340,7 @@ class DarkPrep():
                         ,'newRamp-superbias_configfile':'superbias.cfg'
                         ,'newRamp-refpix_configfile':'refpix.cfg'
                         ,'newRamp-linear_configfile':'linearity.cfg'}
-        
+
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none','config']:
@@ -350,7 +351,7 @@ class DarkPrep():
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath,key1,key2))
 
-                    
+
     def getBaseDark(self):
         # Read in the dark current ramp that will serve as the
         # base for the simulated ramp
@@ -372,7 +373,7 @@ class DarkPrep():
                 print("{} not found.".format(self.params['Reffiles']['dark']))
                 print("And unable to download. Quitting.")
                 sys.exit()
-                               
+
         self.dark = read_fits.Read_fits()
         self.dark.file = self.params['Reffiles']['dark']
 
@@ -387,7 +388,7 @@ class DarkPrep():
                 self.dark.__delattr__('extra_fits')
             except:
                 pass
-                
+
         else:
             self.dark.read_astropy()
 
@@ -403,14 +404,14 @@ class DarkPrep():
         #If the inputs are signed integers, change to unsigned.
         if self.dark.data.min() < 0.:
             self.dark.data += 32768
-            
+
         #If the input is any readout pattern other than RAPID, then
         #make sure that the output readout patten matches. Only RAPID
         #can be averaged and transformed into another readout pattern
         if self.dark.header['READPATT'] != 'RAPID':
             if self.params['Readout']['readpatt'].upper() != self.dark.header['READPATT']:
-                print("WARNING: cannot transform input {}".format(self.dark.header['READPATT'])) 
-                print('integration into output {} integration.'.format(self.dark.header['READPATT'],self.params['Readout']['readpatt'])) 
+                print("WARNING: cannot transform input {}".format(self.dark.header['READPATT']))
+                print('integration into output {} integration.'.format(self.dark.header['READPATT'],self.params['Readout']['readpatt']))
                 print("Only RAPID inputs can be translated to a different readout pattern")
                 sys.exit()
         else:
@@ -421,7 +422,7 @@ class DarkPrep():
         self.instrument = self.dark.header['INSTRUME']
         self.fastaxis = self.dark.header['FASTAXIS']
         self.slowaxis = self.dark.header['SLOWAXIS']
-                    
+
 
     def readLinearDark(self):
         #Read in the linearized version of the dark current ramp
@@ -444,7 +445,7 @@ class DarkPrep():
     def linearizeDark(self,darkobj):
         #Beginning with the input dark current ramp, run the dq_init, saturation, superbias
         #subtraction, refpix and nonlin pipeline steps in order to produce a linearized
-        #version of the ramp. This will be used when combining the dark ramp with the 
+        #version of the ramp. This will be used when combining the dark ramp with the
         #simulated signal ramp.
         from jwst.dq_init import DQInitStep
         from jwst.saturation import SaturationStep
@@ -461,10 +462,10 @@ class DarkPrep():
 
         print('Creating a linearized version of the dark current input ramp')
         print('using JWST calibration pipeline.')
-        
+
         #Run the DQ_Init step
         linDark = DQInitStep.call(dark,config_file=self.params['newRamp']['dq_configfile'])
-        
+
         #If the saturation map is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['saturation_lin_limit']:
             linDark = SaturationStep.call(linDark,config_file=self.params['newRamp']['sat_configfile'],override_saturation=self.params['Reffiles']['saturation'])
@@ -489,8 +490,9 @@ class DarkPrep():
         # Linearity correction - save the output so that you won't need to
         # re-run the pipeline when using the same dark current file in the
         # future. Use the linearity coefficient file if provided
-        linearoutfile = self.params['Output']['file'][0:-5] + '_linearized_dark_current_ramp.fits'
-        linearoutfile = os.path.join(self.params['Output']['directory'],linearoutfile)
+        base_name = self.params['Output']['file'].split('/')[-1]
+        linearoutfile = base_name[0:-5] + '_linearized_dark_current_ramp.fits'
+        linearoutfile = os.path.join(self.params['Output']['directory'], linearoutfile)
         if self.runStep['linearity']:
             linDark = LinearityStep.call(linDark,config_file=self.params['newRamp']['linear_configfile'],override_linearity=self.params['Reffiles']['linearity'],output_file=linearoutfile)
         else:
@@ -507,14 +509,14 @@ class DarkPrep():
 
         return linDarkobj
 
-        
+
     def cropDark(self,model):
         # Cut the dark current array down to the size dictated
         # by the subarray bounds
         modshape = model.data.shape
         yd = modshape[-2]
         xd = modshape[-1]
-        
+
         if ((self.subarray_bounds[0] != 0) or (self.subarray_bounds[2] != (xd-1))
             or (self.subarray_bounds[1] != 0) or (self.subarray_bounds[3] != (yd-1))):
 
@@ -582,7 +584,7 @@ class DarkPrep():
 
         return model
 
-             
+
     def reorderDark(self,dark):
         # Reorder the input dark ramp using the requested
         # readout pattern (nframe,nskip). If the initial
@@ -592,7 +594,7 @@ class DarkPrep():
             datatype = np.float
         else:
             datatype = np.int32
-            
+
         # Get the info for the dark integration
         darkpatt = dark.header['READPATT']
         dark_nframe = dark.header['NFRAMES']
@@ -604,7 +606,7 @@ class DarkPrep():
 
         if dark.sbAndRefpix is not None:
             outsb = np.zeros((self.params['Readout']['nint'],self.params['Readout']['ngroup'],yd,xd))
-            
+
         # We can only keep a zero frame around if the input dark
         # is RAPID. Otherwise that information is lost.
         darkzero = None
@@ -616,7 +618,7 @@ class DarkPrep():
                 sbzero = dark.sbAndRefpix[:,0,:,:]
         elif ((darkpatt != 'RAPID') & (dark.zeroframe is None)):
             print("Unable to save the zeroth frame because the input dark current ramp is not RAPID.")
-            sbzero = None            
+            sbzero = None
         elif ((darkpatt == 'RAPID') & (dark.zeroframe is not None)):
             # In this case we already have the zeroframe
             if dark.sbAndRefpix is not None:
@@ -626,12 +628,12 @@ class DarkPrep():
             # we can't get sbAndRefpix for the zeroth frame
             # because the pattern is not RAPID.
             sbzero = None
-                
+
         # We have already guaranteed that either the readpatterns match
-        # or the dark is RAPID, so no need to worry about checking for 
+        # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
 
-        if ((darkpatt == 'RAPID') and (self.params['Readout']['readpatt'] != 'RAPID')): 
+        if ((darkpatt == 'RAPID') and (self.params['Readout']['readpatt'] != 'RAPID')):
 
             #deltaframe = self.params['Readout']['nskip']+self.params['Readout']['nframe']
             framesPerGroup = self.params['Readout']['nframe'] + self.params['Readout']['nskip']
@@ -639,11 +641,11 @@ class DarkPrep():
 
             if dark.sbAndRefpix is not None:
                 zeroaccumimage = np.zeros_like(outdark[0,0,:,:],dtype=np.float)
-            
+
             # Loop over integrations
             for integ in range(self.params['Readout']['nint']):
                 frames = np.arange(self.params['Readout']['nskip'],framesPerGroup)
-                
+
                 # Loop over groups
                 for i in range(self.params['Readout']['ngroup']):
                     # Average together the appropriate frames,
@@ -655,17 +657,17 @@ class DarkPrep():
                         accumimage = np.mean(dark.data[integ,frames,:,:],axis=0)
                         if dark.sbAndRefpix is not None:
                             zeroaccumimage = np.mean(dark.sbAndRefpix[integ,frames,:,:],axis=0)
-                        
+
                         # If no averaging needs to be done
                     else:
                         accumimage = dark.data[integ,frames[0],:,:]
                         if dark.sbAndRefpix is not None:
                             zeroaccumimage = dark.sbAndRefpix[integ,frames[0],:,:]
-                            
+
                     outdark[integ,i,:,:] += accumimage
                     if dark.sbAndRefpix is not None:
                         outsb[integ,i,:,:] += zeroaccumimage
-                    
+
                     # Increment the frame indexes
                     frames = frames + framesPerGroup
 
@@ -673,7 +675,7 @@ class DarkPrep():
             # If the input dark is not RAPID, or if the readout
             # pattern of the input dark and
             # the output ramp match, then no averaging needs to
-            # be done 
+            # be done
             outdark = dark.data[:,0:self.params['Readout']['ngroup'],:,:]
             if dark.sbAndRefpix is not None:
                 outsb = dark.sbAndRefpix[:,0:self.params['Readout']['ngroup'],:,:]
@@ -689,7 +691,7 @@ class DarkPrep():
         dark.data = outdark
         if dark.sbAndRefpix is not None:
             dark.sbAndRefpix = outsb
-        dark.header['READPATT'] = self.params['Readout']['readpatt'] 
+        dark.header['READPATT'] = self.params['Readout']['readpatt']
         dark.header['NFRAMES'] = self.params['Readout']['nframe']
         dark.header['NSKIP'] = self.params['Readout']['nskip']
         dark.header['NGROUPS'] = self.params['Readout']['ngroup']
@@ -697,7 +699,7 @@ class DarkPrep():
 
         return dark,sbzero
 
-   
+
     def darkints(self):
         # Check the number of integrations in the dark
         # current file and compare with the requested
@@ -743,7 +745,7 @@ class DarkPrep():
                     self.dark.sbAndRefpix = np.vstack((self.dark.sbAndRefpix,copysb))
                 if self.dark.zeroframe is not None:
                     self.dark.zeroframe = np.vstack((self.dark.zeroframe,copyzero))
-                
+
         #partial copy of dark (some integrations)
         if extras > 0:
             self.dark.data = np.vstack((self.dark.data,self.dark.data[0:extras,:,:,:]))
@@ -773,7 +775,7 @@ class DarkPrep():
             # in terms of how many copies of the original dark
             div = floor((ngroup*(nskip+nframe)) / inputframes)
             mod = (ngroup*(nskip+nframe)) % inputframes
-            
+
             # If more frames are needed than there are frames
             # in the original dark, then make copies of the
             # entire thing as many times as necessary, adding
@@ -784,7 +786,7 @@ class DarkPrep():
                 if obj.sbAndRefpix is not None:
                     extra_sb = np.copy(obj.sbAndRefpix)
                     obj.sbAndRefpix = np.hstack((obj.sbAndRefpix,extra_sb+obj.sbAndRefpix[:,-1,:,:]))
-                
+
             # At this point, if more frames are needed, but fewer
             # than an entire copy of self.dark.data, then add the
             # appropriate number of frames here.
@@ -793,7 +795,7 @@ class DarkPrep():
             if obj.sbAndRefpix is not None:
                 extra_sb = np.copy(obj.sbAndRefpix[:,1:mod+1,:,:]) - obj.sbAndRefpix[:,0,:,:]
                 obj.sbAndRefpix = np.hstack((obj.sbAndRefpix,extra_sb+obj.sbAndRefpix[:,-1,:,:]))
-            
+
         elif ngroup*(nskip+nframe) < inputframes:
             # If there are more frames in the dark than we'll need,
             # crop the extras in order to reduce memory use
@@ -802,7 +804,7 @@ class DarkPrep():
                 obj.sbAndRefpix = obj.sbAndRefpix[:,0:ngroup*(nskip+nframe),:,:]
         obj.header['NGROUPS'] = ngroup*(nskip+nframe)
 
-        
+
     def getSubarrayBounds(self):
         #find the bounds of the requested subarray
         if self.params['Readout']['array_name'] in self.subdict['AperName']:
@@ -826,7 +828,7 @@ class DarkPrep():
         else:
             print("WARNING: subarray name {} not found in the subarray dictionary {}.".format(self.params['Readout']['array_name'],self.params['Reffiles']['subarray_defs']))
             sys.exit()
-        
+
 
     def readSubarrayDefinitionFile(self):
         #read in the file that contains a list of subarray names and positions on the detector
@@ -847,13 +849,13 @@ class DarkPrep():
             sys.exit()
 
 
-        
+
     def readPatternCheck(self):
-        '''check the readout pattern that's entered and set nframe and nskip 
+        '''check the readout pattern that's entered and set nframe and nskip
            accordingly'''
         self.params['Readout']['readpatt'] = self.params['Readout']['readpatt'].upper()
 
-        #read in readout pattern definition file 
+        #read in readout pattern definition file
         #and make sure the possible readout patterns are in upper case
         self.readpatterns = ascii.read(self.params['Reffiles']['readpattdefs'])
         self.readpatterns['name'] = [s.upper() for s in self.readpatterns['name']]
@@ -873,7 +875,7 @@ class DarkPrep():
                    .format(self.params['Readout']['nframe'],
                            self.params['Readout']['nskip'])))
         else:
-            #if readpatt is not present in the definition file but the nframe/nskip combo is, then reset 
+            #if readpatt is not present in the definition file but the nframe/nskip combo is, then reset
             #readpatt to the appropriate value from the definition file
             readpatt_nframe = self.readpatterns['nframe'].data
             readpatt_nskip = self.readpatterns['nskip'].data
@@ -912,7 +914,7 @@ class DarkPrep():
         else:
             return True
 
-                
+
     def checkParams(self):
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in inst_list:
@@ -928,7 +930,7 @@ class DarkPrep():
                 print("not provided a linearized dark file to use. Without the")
                 print("pipeline, a raw dark cannot be used.")
                 sys.exit()
-            
+
         # Make sure nframe,nskip,ngroup are all integers
         try:
             self.params['Readout']['nframe'] = int(self.params['Readout']['nframe'])
@@ -954,7 +956,7 @@ class DarkPrep():
             print("WARNING: Input value of nint is not an integer.")
             sys.exit
 
-            
+
         # Make sure that the requested number of groups is
         # less than or equal to the maximum allowed. If you're
         # continuing on with an unknown readout pattern (not
@@ -975,7 +977,7 @@ class DarkPrep():
             self.params['Readout']['readpatt'] = maxgroups
 
         # Check for entries in the parameter file that are None or blank,
-        # indicating the step should be skipped. Create a dictionary of steps 
+        # indicating the step should be skipped. Create a dictionary of steps
         # and populate with True or False
         self.runStep = {}
         #self.runStep['linearity'] = self.checkRunStep(self.params['Reffiles']['linearity'])
@@ -989,7 +991,7 @@ class DarkPrep():
         #self.params['nonlin']['accuracy'] = self.checkParamVal(self.params['nonlin']['accuracy'],'nlin accuracy',1e-12,1e-6,1e-6)
         #self.params['nonlin']['maxiter'] = self.checkParamVal(self.params['nonlin']['maxiter'],'nonlin max iterations',5,40,10)
         #self.params['nonlin']['limit'] = self.checkParamVal(self.params['nonlin']['limit'],'nonlin max value',30000.,1.e6,66000.)
-    
+
         # If the pipeline is going to be used to create
         # the linearized dark current ramp, make sure the
         # specified configuration files are present.

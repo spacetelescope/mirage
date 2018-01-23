@@ -170,6 +170,7 @@ class Observation():
                 linearrampfile = self.params['Output']['file'].replace('.fits', '_linear.fits')
 
             # Full path of output file
+            linearrampfile = linearrampfile.split('/')[-1]
             linearrampfile = os.path.join(self.params['Output']['directory'], linearrampfile)
 
             # Create a linearized saturation map
@@ -230,9 +231,9 @@ class Observation():
         if 'raw' in self.params['Output']['datatype'].lower():
             if self.linDark.sbAndRefpix is not None:
                 if self.params['Output']['save_intermediates']:
+                    base_name = self.params['Output']['file'].split('/')[-1]
                     ofile = os.path.join(self.params['Output']['directory'],
-                                         self.params['Output']['file'][0:-5]
-                                         + '_doNonLin_accuracy.fits')
+                                         base_name[0:-5] + '_doNonLin_accuracy.fits')
                     savefile = True
                 else:
                     ofile = None
@@ -259,7 +260,8 @@ class Observation():
                 raw_zeroframe[raw_zeroframe > 65535] = 65535
 
                 # Save the raw ramp
-                rawrampfile = os.path.join(self.params['Output']['directory'], self.params['Output']['file'])
+                base_name = self.params['Output']['file'].split('/')[-1]
+                rawrampfile = os.path.join(self.params['Output']['directory'], base_name)
                 if self.params['Inst']['use_JWST_pipeline']:
                     self.saveDMS(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
                 else:
@@ -1659,7 +1661,8 @@ class Observation():
         # Save the crosstalk correction image
         if self.params['Output']['save_intermediates'] == True:
             phdu = fits.PrimaryHDU(xtalk_corr_im)
-            xtalkout = os.path.join(self.params['Output']['directory'], self.params['Output']['file'][0:-5] + '_xtalk_correction_image.fits')
+            base_name = self.params['Output']['file'].split('/')[-1]
+            xtalkout = os.path.join(self.params['Output']['directory'], base_name[0:-5] + '_xtalk_correction_image.fits')
             phdu.writeto(xtalkout, overwrite=True)
 
         return xtalk_corr_im
@@ -1776,7 +1779,8 @@ class Observation():
             crhits, crs_perframe = self.CRfuncs(npix, seed=self.params['cosmicRay']['seed'])
 
             #open output file to contain the list of cosmic rays
-            crlistout = self.params['Output']['file'][0:-5] + '_cosmicrays.list'
+            base_name = self.params['Output']['file'].split('/')[-1]
+            crlistout = os.path.join(self.params['Output']['directory'], base_name[0:-5] + '_cosmicrays.list')
             self.openCRListFile(crlistout, crhits)
 
             #counter for use in cosmic ray addition while looping over frames
