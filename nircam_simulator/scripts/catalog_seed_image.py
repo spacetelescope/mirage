@@ -458,7 +458,7 @@ class Catalog_seed():
         #check to see whether the position is in x,y or ra,dec
         pixelflag = False
         try:
-            if 'position_pixels' in mtlist.meta['comments'][0]:
+            if 'position_pixels' in mtlist.meta['comments'][0:4]:
                 pixelflag = True
         except:
             pass
@@ -467,7 +467,7 @@ class Catalog_seed():
         #or arcsec/sec.
         pixelvelflag = False
         try:
-            if 'velocity_pixels' in mtlist.meta['comments'][1]:
+            if 'velocity_pixels' in mtlist.meta['comments'][0:4]:
                 pixelvelflag = True
         except:
             pass
@@ -475,8 +475,8 @@ class Catalog_seed():
         # Check to see if magnitude system is specified in comments
         # If not, assume AB mags
         msys = 'abmag'
-        if 'mag' in mtlist.meta['comments'][0:3]:
-            msys = [l for l in mtlist.meta['comments'][0:3] if 'mag' in l][0]
+        if 'mag' in mtlist.meta['comments'][0:4]:
+            msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
         
         return mtlist,pixelflag,pixelvelflag,msys.lower()
 
@@ -973,7 +973,8 @@ class Catalog_seed():
 
         #ZODIACAL LIGHT
         if self.runStep['zodiacal'] == True:
-            zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
+            #zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
+            zodiangle = self.params['Telescope']['rotation']
             zodiacalimage,zodiacalheader = self.getImage(self.params['simSignals']['zodiacal'],arrayshape,True,zodiangle,arrayshape/2)
             signalimage = signalimage + zodiacalimage*self.params['simSignals']['zodiscale']
 
@@ -998,7 +999,7 @@ class Catalog_seed():
             #rateImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesPlusDetectorEffectsRateImage_elec_per_sec.fits'
             rateImageName = self.basename + '_AddedSources_elec_per_sec.fits'
             self.saveSingleFits(signalimage,rateImageName)
-            print("Signal rate image of all added sources (plus flats and IPC applied if requested) saved as {}".format(rateImageName))
+            print("Signal rate image of all added sources saved as {}".format(rateImageName))
 
         return signalimage, segmentation_map
 
@@ -1464,15 +1465,15 @@ class Catalog_seed():
             # are in units of pixels or RA,Dec
             pflag = False
             try:
-                if 'position_pixel' in gtab.meta['comments'][0:2]:
+                if 'position_pixels' in gtab.meta['comments'][0:4]:
                     pflag = True
             except:
                 pass
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            if 'mag' in gtab.meta['comments'][0:2]:
-                msys = [l for l in gtab.meta['comments'][0:2] if 'mag' in l][0]
+            if 'mag' in gtab.meta['comments'][0:4]:
+                msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
                 
         except:
@@ -1652,20 +1653,20 @@ class Catalog_seed():
             pflag = False
             rpflag = False
             try:
-                if 'position_pixel' in gtab.meta['comments'][0]:
+                if 'position_pixel' in gtab.meta['comments'][0:4]:
                     pflag = True
             except:
                 pass
             try:
-                if 'radius_pixel' in gtab.meta['comments'][1]:
+                if 'radius_pixel' in gtab.meta['comments'][0:4]:
                     rpflag = True
             except:
                 pass
             # Check to see if magnitude system is specified in the comments
             # If not assume AB mags
             msys = 'abmag'
-            if 'mag' in gtab.meta['comments'][0:3]:
-                msys = [l for l in gtab.meta['comments'][0:3] if 'mag' in l][0]
+            if 'mag' in gtab.meta['comments'][0:4]:
+                msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
             
         except:
             print("WARNING: Unable to open the galaxy source list file {}".format(filename))
@@ -2557,7 +2558,7 @@ class Catalog_seed():
         #exact answers
         if self.runStep['distortion_coeffs'] == True:
             if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
-                distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1)
+                distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1,format='csv')
             else:
                 print("WARNING: Input distortion coefficients file {} does not exist.".format(self.params['Reffiles']['distortion_coeffs']))
                 sys.exit()
@@ -2573,7 +2574,7 @@ class Catalog_seed():
                                                                 'science','ideal',ap_name)
             
             #Generate the coordinate transform for V2,V3 to 'ideal'
-            siaf = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1)
+            siaf = ascii.read(self.params['Reffiles']['distortion_coeffs'],header_start=1,format='csv')
             match = siaf['AperName'] == ap_name
             if np.any(match) == False:
                 print("Aperture name {} not found in input CSV file.".
