@@ -158,6 +158,7 @@ class AptInput:
         nci = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
         ncwfss = "{http://www.stsci.edu/JWST/APT/Template/NircamWfss}"
         wfscc = "{http://www.stsci.edu/JWST/APT/Template/WfscCommissioning}"
+        wfscga = "{http://www.stsci.edu/JWST/APT/Template/WfscGlobalAlignment}"
 
         # Set up dictionary of observation parameters to be populated
         ProposalParams_keys = ['PI_Name', 'Proposal_category', 'ProposalID',
@@ -244,7 +245,7 @@ class AptInput:
 
             # Are all the templates in the XML file something that we can handle?
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
-                                   'NircamEngineeringImaging']
+                                   'NircamEngineeringImaging', 'WfscGlobalAlignment']
             if template_name not in known_APT_templates:
                 # If not, turn back now.
                 raise ValueError('No protocol written to read {} template.'.format(template_name))
@@ -338,7 +339,7 @@ class AptInput:
                     APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
                     obs_tuple_list.append(tup_to_add)
 
-            # If template is WFSC
+            # If template is WFSC Commissioning
             if template_name in ['WfscCommissioning']:
                 # Set namespace
                 if template_name == 'WfscCommissioning':
@@ -405,6 +406,96 @@ class AptInput:
                     for j in range(num_WFCgroups + 1):
                         APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
                         obs_tuple_list.append(tup_to_add)
+
+            # If template is WFSC Global Alignment
+            if template_name in ['WfscGlobalAlignment']:
+                ns = wfscga
+
+                # Set parameters that are constant for all WFSC obs
+                typeflag = template_name
+                grismval = 'N/A'
+                short_pupil = 'CLEAR'
+                subarr = 'FULL'
+                pdither = '1'
+                pdithtype = 'NONE'
+                sdithtype = 'STANDARD'
+                sdither = '1'
+
+                # Determine the Global Alignment Iteration Type
+                GA_iteration = obs.find('.//' + wfscga + 'GaIteration').text
+
+                if GA_iteration == 'ADJUST1':
+                    n_exp = 3
+                elif GA_iteration == 'ADJUST2':
+                    n_exp = 6  # technically 5, but 3 is repeated?
+                elif GA_iteration == 'BSCORRECT':
+                    # Technically has 2 dithers, but that doesn't seem to be incorporated...
+                    n_exp = 2
+                elif GA_iteration == 'CORRECT+ADJUST':
+                    n_exp = 6  # technically 5, but 3 is repeated?
+                elif GA_iteration == 'CORRECT':
+                    n_exp = 3
+
+                # Find observation-specific parameters
+                mod = template.find(ns + 'Module').text
+                # num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
+
+                # Determine if there is an aperture override
+                override = obs.find('.//' + apt + 'FiducialPointOverride')
+                if override is not None:
+                    mod = override.text
+                    if 'FULL' not in mod:
+                        config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                        try:
+                            i_sub = list(config['AperName']).index(mod)
+                        except ValueError:
+                            i_sub = i_sub = [mod in name for name in  np.array(config['AperName'])]
+                            i_sub = np.where(i_sub)[0]
+                            if len(i_sub) > 1:
+                                raise ValueError('Unable to match \
+                                    FiducialPointOverride {} to valid \
+                                    aperture.'.format(mod))
+
+                        subarr = config['Name'][i_sub][0]
+                        print('Aperture override: subarray {}'.format(subarr[0]))
+
+                # Find filter parameters for all filter configurations within obs
+                ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
+
+                for conf in ga_nircam_configs:
+                    sfilt = conf.find(ns + 'ShortFilter').text
+                    lfilt = conf.find(ns + 'LongFilter').text
+                    rpatt = conf.find(ns + 'ReadoutPattern').text
+                    grps = conf.find(ns + 'Groups').text
+                    ints = conf.find(ns + 'Integrations').text
+
+                    # Separate pupil and filter in case of filter that is
+                    # mounted in the pupil wheel
+                    if ' + ' in sfilt:
+                        split_ind = sfilt.find(' + ')
+                        short_pupil = sfilt[0:split_ind]
+                        sfilt = sfilt[split_ind + 1:]
+                    else:
+                        short_pupil = 'CLEAR'
+
+                    if ' + ' in lfilt:
+                        p = lfilt.find(' + ')
+                        long_pupil = lfilt[0:p]
+                        lfilt = lfilt[p + 1:]
+                    else:
+                        long_pupil = 'CLEAR'
+
+                    # Add all parameters to dictionary
+                    tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                                  science_category, typeflag, mod, subarr, pdithtype,
+                                  pdither, sdithtype, sdither, sfilt, lfilt,
+                                  rpatt, grps, ints, short_pupil,
+                                  long_pupil, grismval, coordparallel)
+
+                # Repeat for the number of exposures + 1
+                for j in range(n_exp + 1):
+                    APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
+                    obs_tuple_list.append(tup_to_add)
 
             # If template is WFSS
             if template_name == 'NircamWfss':
@@ -529,6 +620,8 @@ class AptInput:
             if n_tiles == 0 and template_name in ['WfscCommissioning']:
                 if num_WFCgroups:
                     n_tiles = num_WFCgroups + 1
+            if n_tiles == 0 and template_name in ['WfscGlobalAlignment']:
+                n_tiles = n_exp + 1
 
             # Get observation name, if there is one
             if label == 'None':
@@ -744,6 +837,7 @@ class AptInput:
                             ddist.append(np.float(elements[21]))
                             observation_id.append('V' + vid + 'P00000000' + vgrp + seq + act)
                             act_counter  += 1
+
                     except:
                         pass
 

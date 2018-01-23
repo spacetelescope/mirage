@@ -1063,6 +1063,7 @@ class Observation():
         #EXPTYPE OPTIONS
         exptype = {'nircamimaging': 'NRC_IMAGE', 'nircamengineeringimaging': 'NRC_IMAGE',
                    'moving_target': 'NRC_TSIMAGE', 'wfsccommissioning': 'NRC_IMAGE',
+                   'wfscglobalalignment': 'NRC_IMAGE',
                    'nircamwfss': 'NRC_GRISM', 'tso_wfss': 'NRC_TSGRISM', 'coron': 'NRC_CORON'}
         try:
             outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['mode'].lower()]
@@ -2142,7 +2143,7 @@ class Observation():
 
         # check mode:
         possibleModes = ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
-                         'nircamwfss', 'wfsccommissioning']
+                         'nircamwfss', 'wfsccommissioning', 'wfscglobalalignment']
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
             pass

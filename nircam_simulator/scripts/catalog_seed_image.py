@@ -29,7 +29,7 @@ from . import segmentation_map as segmap
 
 inst_list = ['nircam']
 modes = {'nircam': ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
-                    'nircamwfss', 'wfsccommissioning']}
+                    'nircamwfss', 'wfsccommissioning', 'wfscglobalalignment']}
 inst_abbrev = {'nircam':'NRC'}
 pixelScale = {'nircam':{'sw':0.031, 'lw':0.063}}
 full_array_size = {'nircam':2048}
