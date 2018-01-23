@@ -98,9 +98,10 @@ class Observation():
 
         # Some basic checks on the inputs to make sure
         # the script won't have to abort due to bad inputs
-        self.checkParams()
+        # self.checkParams()
         self.readSubarrayDefinitionFile()
         self.getSubarrayBounds()
+        self.checkParams()
 
         # Read in cosmic ray library files if
         # CRs are to be added to the data later
@@ -241,15 +242,15 @@ class Observation():
 
                 raw_outramp = unlinearize.unlinearize(lin_outramp, nonlincoeffs, self.satmap,
                                                       lin_satmap,
-                                                      maxiter = self.params['nonlin']['maxiter'],
-                                                      accuracy = self.params['nonlin']['accuracy'],
-                                                      save_accuracy_map = savefile,
-                                                      accuracy_file = ofile)
+                                                      maxiter=self.params['nonlin']['maxiter'],
+                                                      accuracy=self.params['nonlin']['accuracy'],
+                                                      save_accuracy_map=savefile,
+                                                      accuracy_file=ofile)
                 raw_zeroframe = unlinearize.unlinearize(lin_zeroframe, nonlincoeffs, self.satmap,
                                                         lin_satmap,
-                                                        maxiter = self.params['nonlin']['maxiter'],
-                                                        accuracy = self.params['nonlin']['accuracy'],
-                                                        save_accuracy_map = False)
+                                                        maxiter=self.params['nonlin']['maxiter'],
+                                                        accuracy=self.params['nonlin']['accuracy'],
+                                                        save_accuracy_map=False)
 
                 # Add the superbias and reference pixel signal back in
                 raw_outramp = self.add_sbAndRefPix(raw_outramp, self.linDark.sbAndRefpix)
@@ -597,6 +598,7 @@ class Observation():
             print("set of mean coefficients derived from CV3 data.")
             nonlin = np.array([0., 1.0, 9.69903112e-07, 3.85263835e-11,
                                1.09267058e-16, -5.30613939e-20, 9.27963411e-25])
+        # print('Nonlinearity coefficients: ', nonlin)
         return nonlin
 
 
@@ -1299,8 +1301,9 @@ class Observation():
 
 
     def crop_to_subarray(self, data):
-        return data[self.subarray_bounds[1]:self.subarray_bounds[3]+1,
-                    self.subarray_bounds[0]:self.subarray_bounds[2]+1]
+        print('bounds: ', self.subarray_bounds)
+        return data[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                    self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
 
 
     def get_nonlin_coeffs(self, linfile):
@@ -1319,9 +1322,9 @@ class Observation():
                 tmp[nans] = 0.
             nonlin[cof, :, :] = tmp
 
-        # Crop to appropriate subarray
-        if "FULL" not in self.params['Readout']['array_name']:
-            nonlin = self.crop_to_subarray(nonlin)
+        # # Crop to appropriate subarray - ALREADY DONE IN readCalFile
+        # if "FULL" not in self.params['Readout']['array_name']:
+        #     nonlin = self.crop_to_subarray(nonlin)
 
         return nonlin
 
@@ -2124,13 +2127,18 @@ class Observation():
             sys.exit()
 
         #extract the appropriate subarray if necessary
-        if ((self.subarray_bounds[0] != 0) or (self.subarray_bounds[2] != (self.ffsize-1)) or (self.subarray_bounds[1] != 0) or (self.subarray_bounds[3] != (self.ffsize-1))):
+        if ((self.subarray_bounds[0] != 0) or
+            (self.subarray_bounds[2] != (self.ffsize - 1)) or
+            (self.subarray_bounds[1] != 0) or
+            (self.subarray_bounds[3] != (self.ffsize - 1))):
 
             if len(image.shape) == 2:
-                image = image[self.subarray_bounds[1]:self.subarray_bounds[3]+1, self.subarray_bounds[0]:self.subarray_bounds[2]+1]
+                image = image[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                              self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
 
             if len(image.shape) == 3:
-                image = image[:, self.subarray_bounds[1]:self.subarray_bounds[3]+1, self.subarray_bounds[0]:self.subarray_bounds[2]+1]
+                image = image[:, self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                              self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
 
         return image, header
 
@@ -2429,9 +2437,10 @@ class Observation():
         # of the detector. For those, trust that the user input is what they want.
         if "FULL" in self.params['Readout']['array_name'].upper():
             self.params['Readout']['namp'] = 4
+        elif self.subarray_bounds[2] - self.subarray_bounds[0] != 2047:
+            self.params['Readout']['namp'] = 1
         else:
-            if self.subarray_bounds[2]-self.subarray_bounds[0] != 2047:
-                self.params['Readout']['namp'] = 1
+            raise ValueError('Cannot determine number of amps.')
 
 
     def checkParamVal(self, value, typ, vmin, vmax, default):

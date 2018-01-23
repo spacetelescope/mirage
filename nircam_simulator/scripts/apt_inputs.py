@@ -40,6 +40,7 @@ July 2017 - V0: Initial version. Bryan Hilbert
 '''
 import os
 import sys
+import re
 import collections
 import argparse
 from lxml import etree
@@ -86,7 +87,7 @@ class AptInput:
         # Read in xml file
         tab = self.read_xml(self.input_xml)
 
-        ascii.write(Table(tab), 'as_read_in.csv', format='csv', overwrite=True)
+        # ascii.write(Table(tab), 'as_read_in.csv', format='csv', overwrite=True)
 
         # Expand the dictionary for multiple dithers. Expand such that there
         # is one entry in each list for each exposure, rather than one entry
@@ -256,11 +257,27 @@ class AptInput:
             label_ele = obs.find(apt + 'Label')
             if label_ele is not None:
                 label = label_ele.text
+                if (' (' in label) and (')' in label):
+                    label = re.split(r' \(|\)', label)[0]
+
             else:
                 label = 'None'
 
             # Get coordinated parallel (?)
             coordparallel = obs.find(apt + 'CoordinatedParallel').text
+
+            # Determine pointing offset?
+            offset = obs.find('.//' + apt + 'Offset')
+            try:
+                offset_x = offset.get('Xvalue')
+                offset_y = offset.get('Yvalue')
+            except AttributeError:
+                offset_x, offset_y = 0, 0
+
+            if (offset_x != 0) or (offset_y != 0):
+                print('* * * OFFSET OF ({}, {}) IN OBS {} NOT APPLIED ***'.format(offset_x,
+                                                                                  offset_y,
+                                                                                  i_obs + 1))
 
             # If template is NircamImaging or NircamEngineeringImaging
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
@@ -280,6 +297,24 @@ class AptInput:
                 subarr = template.find(ns + 'Subarray').text
                 pdithtype = template.find(ns + 'PrimaryDitherType').text
 
+                # Determine if there is an aperture override
+                override = obs.find('.//' + apt + 'FiducialPointOverride')
+                if override is not None:
+                    mod = override.text
+                    if 'FULL' not in mod:
+                        config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                        try:
+                            i_sub = list(config['AperName']).index(mod)
+                        except ValueError:
+                            i_sub = i_sub = [mod in name for name in  np.array(config['AperName'])]
+                            i_sub = np.where(i_sub)[0]
+                            if len(i_sub) > 1:
+                                raise ValueError('Unable to match \
+                                    FiducialPointOverride {} to valid \
+                                    aperture.'.format(mod))
+
+                        subarr = config['Name'][i_sub][0]
+                        print('Aperture override: subarray {}'.format(subarr[0]))
                 try:
                     pdither = template.find(ns + 'PrimaryDithers').text
                 except:
@@ -295,14 +330,6 @@ class AptInput:
                         sdither = np.int(stemp[0])
                     except:
                         sdither = '1'
-
-                offset = template.find('//' + apt + 'Offset')
-                offset_x = offset.get('Xvalue')
-                offset_y = offset.get('Yvalue')
-                if (offset_x != 0) or (offset_y != 0):
-                    print('* * * OFFSET OF ({}, {}) IN OBS {} NOT APPLIED ***'.format(offset_x,
-                                                                                      offset_y,
-                                                                                      i + 1))
 
                 # Find filter parameters for all filter configurations within obs
                 filter_configs = template.findall('.//' + ns + 'FilterConfig')
@@ -361,13 +388,24 @@ class AptInput:
                 mod = template.find(ns + 'Module').text
                 num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
 
-                offset = template.find('//' + apt + 'Offset')
-                offset_x = offset.get('Xvalue')
-                offset_y = offset.get('Yvalue')
-                if (offset_x != 0) or (offset_y != 0):
-                    print('* * * OFFSET OF ({}, {}) IN OBS {} NOT APPLIED ***'.format(offset_x,
-                                                                                      offset_y,
-                                                                                      i + 1))
+                # Determine if there is an aperture override
+                override = obs.find('.//' + apt + 'FiducialPointOverride')
+                if override is not None:
+                    mod = override.text
+                    if 'FULL' not in mod:
+                        config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                        try:
+                            i_sub = list(config['AperName']).index(mod)
+                        except ValueError:
+                            i_sub = i_sub = [mod in name for name in  np.array(config['AperName'])]
+                            i_sub = np.where(i_sub)[0]
+                            if len(i_sub) > 1:
+                                raise ValueError('Unable to match \
+                                    FiducialPointOverride {} to valid \
+                                    aperture.'.format(mod))
+
+                        subarr = config['Name'][i_sub][0]
+                        print('Aperture override: subarray {}'.format(subarr[0]))
 
                 # Find filter parameters for all filter configurations within obs
                 filter_configs = template.findall('.//' + ns + 'FilterConfig')
@@ -876,7 +914,13 @@ class AptInput:
             elif module == 'A':
                 detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
             elif module == 'B':
-                detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
+                detectors = ['B1', 'B2', 'base36encode', 'B4', 'B5']
+            elif 'A3' in module:
+                detectors = ['A3']
+            elif 'B4' in module:
+                detectors = ['B4']
+            else:
+                raise ValueError('Unknown module {}'.format(module))
 
             for key in dict:
                 finaltab[key].extend(([dict[key][i]] * len(detectors)))
@@ -898,9 +942,21 @@ class AptInput:
             # first find detector
             # need ra, dec and v2, v3 pairs from entry
             # to calculate ra, dec at each detector's reference location
+            config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
             detector = 'NRC' + self.exposure_tab['detector'][i]
             sub = self.exposure_tab['Subarray'][i]
             aperture = detector + '_' + sub
+            if aperture in config['AperName']:
+                pass
+            else:
+                aperture = [apername for apername, name in \
+                            np.array(config['AperName', 'Name']) if \
+                            (sub in apername) or (sub in name)]
+                if len(aperture) > 1 or len(aperture) == 0:
+                    raise ValueError('Cannot combine detector {} and subarray {}\
+                        into valid aperture name.'.format(detector, sub))
+                else:
+                    aperture = aperture[0]
 
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
@@ -949,9 +1005,8 @@ class AptInput:
         # find v2, v3 of detector reference location
         match = siaf['AperName'] == det
         if np.any(match) == False:
-            print("Aperture name {} not found in input CSV file.".
-                  format(aperture))
-            sys.exit()
+            raise ValueError("Aperture name {} not found in input CSV file {}.".
+                             format(det, self.siaf))
         v2 = siaf[match]['V2Ref']
         v3 = siaf[match]['V3Ref']
         return v2, v3

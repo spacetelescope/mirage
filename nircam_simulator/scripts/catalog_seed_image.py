@@ -2381,12 +2381,29 @@ class Catalog_seed():
 
         # Get the photflambda and photfnu values that go with
         # the filter
-        module = self.params['Readout']['array_name'][3]
+        aper_name = self.params['Readout']['array_name']
+        if aper_name[:2] == 'NC':
+            module = aper_name[3]
+        else:
+            aper_name_nosub = aper_name.replace('SUB', '')
+
+            is_A = 'A' in aper_name_nosub
+            is_B = 'B' in aper_name_nosub
+
+            if is_A and is_B:
+                raise ValueError('Cannot match {} to module'.format(aper_name))
+            elif is_A:
+                module = 'A'
+            elif is_B:
+                module = 'B'
 
         if self.params['Readout']['pupil'][0] == 'F':
             usephot = 'pupil'
         else:
             usephot = 'filter'
+
+        # if len(module) > 1:
+        # print(self.params['Readout']['array_name'])
         mtch = ((self.zps['Filter'] == self.params['Readout'][usephot]) & (self.zps['Module'] == module))
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
@@ -2473,15 +2490,13 @@ class Catalog_seed():
             match = siaf['AperName'] == ap_name
             if np.any(match) == False:
                 print("Aperture name {} not found in input CSV file.".
-                      format(aperture))
+                      format(ap_name))
                 sys.exit()
 
             siaf_row = siaf[match]
 
-
             # self.v2v32idlx, self.v2v32idly = read_siaf_table.get_siaf_v2v3_transform(self.params['Reffiles']['distortion_coeffs'], ap_name, to_system='ideal')
             self.v2v32idlx, self.v2v32idly = read_siaf_table.get_siaf_v2v3_transform(siaf_row, ap_name, to_system='ideal')
-
 
         # convert the input RA and Dec of the pointing position into floats
         # check to see if the inputs are in decimal units or hh:mm:ss strings

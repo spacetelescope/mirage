@@ -282,7 +282,7 @@ class SimInput:
                 subpixtot = np.int(file_dict['SubpixelPositions'])
             except:
                 subpixtot = np.int(file_dict['SubpixelPositions'][0])
-            primary_dither = np.ceil(1.*tot_dith/subpixtot)
+            primary_dither = np.ceil(1. * tot_dith / subpixtot)
             subpix_dither = tot_dith - (primary_dither * primarytot * subpixtot - subpixtot)
             file_dict['primary_dither_num'] = primary_dither
             file_dict['subpix_dither_num'] = subpix_dither
@@ -292,17 +292,36 @@ class SimInput:
         # Write summary of yaml files
         yaml_path = os.path.join(self.output_dir, 'V*.yaml')
         yamls = glob(yaml_path)
-        print('\n{} output files written to: {}'.format(len(yamls) , self.output_dir))
 
         filenames = [y.split('/')[-1] for y in yamls]
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
         obs_ids = sorted(list(set([m[8:11] for m in mosaic_numbers])))
 
+        print('\n')
+        i_mod = 0
         for obs in obs_ids:
             n_visits = len(list(set([m[5:8] for m in mosaic_numbers if m[8:11] == obs])))
             n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[8:11] == obs])))
-            print('Observation {}: \n   {} visit(s) \n   {} mosaic tile(s)'.format(obs, n_visits, n_tiles))
+            module = self.info['Module'][i_mod]
+
+            if module in ['A', 'B']:
+                n_det = 5
+                module = ' ' + module
+            if module == 'ALL':
+                n_det = 10
+                module = 's A and B'
+            if 'A3' in module:
+                n_det = 1
+                module = ' A3'
+            if 'B4' in module:
+                n_det = 1
+                module = ' B4'
+
+            i_mod += n_tiles * n_det
+
+            print('Observation {}: \n   {} visit(s) \n   {} mosaic tile(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
         print('\n{} mosaic tiles total.'.format(len(mosaic_numbers)))
+        print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
     def path_defs(self):
         # Set full paths for inputs
@@ -526,12 +545,22 @@ class SimInput:
             # need to find number of amps used
             sub = self.info['Subarray'][i]
             det = 'NRC' + self.info['detector'][i]
-            sub = det + '_' + sub
+            aperture = det + '_' + sub
 
-            match = sub == subarray_def['AperName']
+            match = aperture == subarray_def['AperName']
+
             if np.sum(match) == 0:
-                print("WARNING!! Subarray {} not found in definition file.".format(sub))
-                sys.exit()
+                config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
+                aperture = [apername for apername, name in \
+                            np.array(config['AperName', 'Name']) if \
+                            (sub in apername) or (sub in name)]
+
+                match = aperture == subarray_def['AperName']
+
+                if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+                    raise ValueError('Cannot combine detector {} and subarray {}\
+                        into valid aperture name.'.format(det, sub))
+
             amp = subarray_def['num_amps'][match][0]
             namp.append(amp)
 
@@ -709,8 +738,21 @@ class SimInput:
             f.write('  ngroup: {}              # Number of groups in integration\n'.format(input['Groups']))
             f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
             f.write('  namp: {}         # Number of amplifiers used in readout (4 for full frame, 1 for subarray)\n'.format(input['namp']))
+
             apunder = input['aperture'].find('_')
-            full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder+1:]
+            full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
+
+            config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
+            if full_ap not in config['AperName']:
+                full_ap = [apername for apername, name in \
+                           np.array(config['AperName', 'Name']) if \
+                           (full_ap in apername) or (full_ap in name)]
+                if len(full_ap) > 1 or len(full_ap) == 0:
+                    raise ValueError('Cannot match {} with valid aperture name.'
+                                     .format(full_ap))
+                else:
+                    full_ap = full_ap[0]
+
             f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
             f.write('  subarray_bounds: 0, 0, 159, 159          # Coords of subarray corners. (xstart, ystart, xend, yend) Over-ridden by array_name above. Currently not used. Could be used if output saved in raw format\n')
             f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
