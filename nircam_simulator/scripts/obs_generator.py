@@ -159,7 +159,32 @@ class Observation():
         # regardless of whether we are saving the linearized data or going
         # on to make raw data
         nonlincoeffs = self.get_nonlinearity_coeffs()
-            
+
+        # We need to first subtract superbias and refpix signals from the
+        # original saturation limits, and then linearize them
+        # Refpix signals will vary from group to group, but only by a few
+        # ADU. So let's cheat and just use the refpix signals from group 0
+
+        # Create a linearized saturation map
+        limits = np.zeros_like(self.satmap) + 1.e6
+
+        if self.linDark.sbAndRefpix is not None:
+            lin_satmap = unlinearize.nonLinFunc(self.satmap-self.linDark.sbAndRefpix[0,0,:,:],nonlincoeffs,limits)
+        elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'])):
+            # If the superbias and reference pixel signal is not available
+            # but the superbias reference file is, then just use that.
+            self.readSuperbiasFile()
+            lin_satmap = unlinearize.nonLinFunc(self.satmap-self.superbias,nonlincoeffs,limits)
+
+        elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'] == False)):
+            # If superbias and refpix signal is not available and
+            # the superbias reffile is also not available, fall back to
+            # a superbias value that is roughly correct. Error in this value
+            # will cause errors in saturation flagging for the highest signal
+            # pixels.
+            manual_sb = np.zeros_like(self.satmap) + 12000.
+            lin_satmap = unlinearize.nonLinFunc(self.satmap-manual_sb,nonlincoeffs,limits)
+        
         # Save the ramp if requested. This is the linear ramp,
         # ready to go into the Jump step of the pipeline
         if 'linear' in self.params['Output']['datatype'].lower():
@@ -172,31 +197,6 @@ class Observation():
             # Full path of output file
             linearrampfile = os.path.join(self.params['Output']['directory'],linearrampfile)
                 
-            # Create a linearized saturation map
-            #lin_satmap = self.apply_lincoeff(self.satmap,nonlincoeffs)
-            limits = np.zeros_like(self.satmap) + 1.e6
-
-            # We need to first subtract superbias and refpix signals from the
-            # original saturation limits, and then linearize them
-            # Refpix signals will vary from group to group, but only by a few
-            # ADU. So let's cheat and just use the refpix signals from group 0
-            if self.linDark.sbAndRefpix is not None:
-                lin_satmap = unlinearize.nonLinFunc(self.satmap-self.linDark.sbAndRefpix[0,0,:,:],nonlincoeffs,limits)
-            elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'])):
-                # If the superbias and reference pixel signal is not available
-                # but the superbias reference file is, then just use that.
-                self.readSuperbiasFile()
-                lin_satmap = unlinearize.nonLinFunc(self.satmap-self.superbias,nonlincoeffs,limits)
-
-            elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'] == False)):
-                # If superbias and refpix signal is not available and
-                # the superbias reffile is also not available, fall back to
-                # a superbias value that is roughly correct. Error in this value
-                # will cause errors in saturation flagging for the highest signal
-                # pixels.
-                manual_sb = np.zeros_like(self.satmap) + 12000.
-                lin_satmap = unlinearize.nonLinFunc(self.satmap-manual_sb,nonlincoeffs,limits)
-
             # Saturation flagging - to create the pixeldq extension
             # and make data ready for ramp fitting
             # Since we subtracted the superbias and refpix signal from the
