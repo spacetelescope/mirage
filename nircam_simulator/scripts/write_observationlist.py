@@ -1,4 +1,5 @@
 # Generate observation list files based on default values and APT output files
+import re
 from lxml import etree
 import numpy as np
 import pprint
@@ -28,16 +29,20 @@ def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=Non
     observation_data = tree.find(apt + 'DataRequests')
     obs_results = observation_data.findall('.//' + apt + 'Observation')
 
+    # Collect observation names and numbers for NIRCam/WFSC observations
     observations = []
     i_observations = []
     obs_names = []
-    obs_indices = range(len(obs_results))
-    for o, i_obs in zip(obs_results, obs_indices):
+    for i_obs, o in enumerate(obs_results):
         if o.find(apt + 'Instrument').text in ['NIRCAM', 'WFSC']:
             observations.append(o)
             i_observations.append(i_obs)
 
-            obs_names.append(o.find(apt + 'Label').text)
+            # Find observation name, and modify to exclude parantheticals
+            label = o.find(apt + 'Label').text
+            if (' (' in label) and (')' in label):
+                label = re.split(r' \(|\)', label)[0]
+            obs_names.append(label)
 
     num_obs = len(observations)
 
@@ -73,13 +78,6 @@ def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=Non
         print(all_param_lengths)
         raise ValueError('Not all provided parameters have compatible '
                          'dimensions. Will not write {}'.format(yaml_file))
-
-    # # Read in observation names from pointing file
-    # f = open(pointing_file)
-    # rows = f.readlines()
-    # f.close()
-    # obs_names = [row[2:-1].split(' (')[0] for row in rows if '* ' == row[:2]]
-    # num_obs = len(obs_names)
 
     write = ["# Observation list created by write_observationlist.py script in\n",
              "# nircam_simulator/scripts. Note: all values except filters and\n",
