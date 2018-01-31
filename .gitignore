@@ -1,0 +1,7 @@
+*.py~
+*.aptbackup
+*.yaml~
+*.list~
+build
+dist
+ring_nebula.fits
