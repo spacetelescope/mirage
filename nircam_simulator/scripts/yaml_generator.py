@@ -126,6 +126,7 @@ class SimInput:
         self.superbias_config = 'config'
         self.refpix_config = 'config'
         self.linearity_config = 'config'
+        self.filter_throughput = 'config'
         self.observation_table = None
         self.use_JWST_pipeline = True
         self.use_linearized_darks = False
@@ -149,6 +150,7 @@ class SimInput:
         self.configfiles['superbias_config'] = 'superbias.cfg'
         self.configfiles['refpix_config'] = 'refpix.cfg'
         self.configfiles['linearity_config'] = 'linearity.cfg'
+        self.configfiles['filter_throughput'] = 'placeholder.txt'
 
     def create_inputs(self):
         # Use full paths for inputs
@@ -293,7 +295,7 @@ class SimInput:
             file_dict['siaf'] = self.siaf
             self.write_yaml(file_dict)
 
-        # Write summary of yaml files
+        # Write out summary of all written yaml files
         yaml_path = os.path.join(self.output_dir, 'V*.yaml')
         yamls = glob(yaml_path)
 
@@ -356,6 +358,7 @@ class SimInput:
         self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
         self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
         self.fluxcal = self.set_config(self.fluxcal, 'fluxcal')
+        self.filter_throughput = self.set_config(self.filter_throughput, 'filter_throughput')
         self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init_config')
         self.refpix_config = self.set_config(self.refpix_config, 'refpix_config')
         self.saturation_config = self.set_config(self.saturation_config, 'saturation_config')
@@ -768,7 +771,8 @@ class SimInput:
             f.write('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values\n'.format(self.readpatt_def_file))
             f.write('  crosstalk: {}   # File containing crosstalk coefficients\n'.format(self.crosstalk))
             f.write('  filtpupilcombo: {}   # File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file\n'.format(self.filtpupil_pairs))
-            f.write('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.'.format(self.fluxcal))
+            f.write('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.\n'.format(self.fluxcal))
+            f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.filter_throughput))
             f.write('\n')
             f.write('nonlin:\n')
             f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')

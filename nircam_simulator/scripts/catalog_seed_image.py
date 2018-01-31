@@ -102,8 +102,8 @@ class Catalog_seed():
                                      self.params['Output']['file'][0:-5].split('/')[-1])
         self.params['Output']['file'] = self.basename + self.params['Output']['file'][-5:]
 
-        self.checkParams()
         self.readSubarrayDefinitionFile()
+        self.checkParams()
         self.getSubarrayBounds()
         self.instrument_specific_dicts(self.params['Inst']['instrument'].lower())
 
@@ -2484,26 +2484,29 @@ class Catalog_seed():
         # Read in list of zeropoints/photflam/photfnu
         self.zps = ascii.read(self.params['Reffiles']['flux_cal'])
 
-        # Get the photflambda and photfnu values that go with
-        # the filter
+        # Determine the NIRCam module and detector from the aperture name
         aper_name = self.params['Readout']['array_name']
-        if aper_name[:2] == 'NC':
-            module = aper_name[3]
-            detector = aper_name[3:5]
-        else:
-            aper_name_nosub = aper_name.replace('SUB', '')
+        try:
+            detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
+            module = detector[0]
+        except IndexError:
+            raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-            is_A = 'A' in aper_name_nosub
-            is_B = 'B' in aper_name_nosub
+        # if aper_name[:2] == 'NRC':
+        #     module = aper_name[3]
+        #     detector = aper_name[3:5]
+        # else:
+        #     aper_name_nosub = aper_name.replace('SUB', '')
 
-            if is_A and is_B:
-                raise ValueError('Cannot match {} to module'.format(aper_name))
-            elif is_A:
-                module = 'A'
-            elif is_B:
-                module = 'B'
+        #     is_A = 'A' in aper_name_nosub
+        #     is_B = 'B' in aper_name_nosub
 
-            print('WARNING: not assigning detector variable for case with apername ', aper_name)
+        #     if is_A and is_B:
+        #         raise ValueError('Cannot match {} to module'.format(aper_name))
+        #     elif is_A:
+        #         module = 'A'
+        #     elif is_B:
+        #         module = 'B'
 
         # make sure the requested filter is allowed. For imaging, all filters are allowed.
         # In the future, other modes will be more restrictive
@@ -2515,6 +2518,8 @@ class Catalog_seed():
             print("WARNING: requested filter {} is not in the list of possible filters.".format(self.params['Readout'][usefilt]))
             sys.exit()
 
+        # Get the photflambda and photfnu values that go with
+        # the filter
         mtch = ((self.zps['Filter'] == self.params['Readout'][usefilt]) &
                (self.zps['Module'] == module))
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
@@ -2654,16 +2659,20 @@ class Catalog_seed():
             if self.params['simSignals']['bkgdrate'].lower() in bkgdrate_options:
                 print(("Calculating background rate using jwst_background "
                        "based on {} level".format(self.params['simSignals']['bkgdrate'])))
+
                 # Find the appropriate filter throughput file
                 if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
                     filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
                                    .format(self.params['Readout'][usefilt].upper(), module.lower()))
                     filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
                     filter_file = os.path.join(filt_dir, filter_file)
+
                 else:
                     filter_file = self.params['Reffiles']['filter_throughput']
+
                 print(("Using {} filter throughput file for background calculation."
                        .format(filter_file)))
+
                 self.params['simSignals']['bkgdrate'] = \
                                 self.calculate_background(self.ra,
                                                           self.dec,
@@ -2857,12 +2866,12 @@ class Catalog_seed():
 
     def readSubarrayDefinitionFile(self):
         # read in the file that contains a list of subarray names and positions on the detector
+
         try:
             self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
         except:
             print("Error: could not read in subarray definitions file.")
             sys.exit()
-
 
     def getSubarrayBounds(self):
         # find the bounds of the requested subarray
