@@ -166,7 +166,8 @@ class AptInput:
                                'Science_category', 'Title']
         ObsParams_keys = ['Module', 'Subarray',
                           'PrimaryDitherType', 'PrimaryDithers', 'SubpixelPositions',
-                          'SubpixelDitherType', 'CoordinatedParallel']
+                          'SubpixelDitherType', 'CoordinatedParallel',
+                          'ObservationID', 'TileNumber', 'APTTemplate']
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
                              'ReadoutPattern', 'Groups', 'Integrations']
         OtherParams_keys = ['Mode', 'Grism']
@@ -306,7 +307,7 @@ class AptInput:
                         try:
                             i_sub = list(config['AperName']).index(mod)
                         except ValueError:
-                            i_sub = i_sub = [mod in name for name in  np.array(config['AperName'])]
+                            i_sub = i_sub = [mod in name for name in np.array(config['AperName'])]
                             i_sub = np.where(i_sub)[0]
                             if len(i_sub) > 1:
                                 raise ValueError('Unable to match \
@@ -315,6 +316,7 @@ class AptInput:
 
                         subarr = config['Name'][i_sub][0]
                         print('Aperture override: subarray {}'.format(subarr[0]))
+
                 try:
                     pdither = template.find(ns + 'PrimaryDithers').text
                 except:
@@ -362,7 +364,8 @@ class AptInput:
                                   science_category, typeflag, mod, subarr, pdithtype,
                                   pdither, sdithtype, sdither, sfilt, lfilt,
                                   rpatt, grps, ints, short_pupil,
-                                  long_pupil, grismval, coordparallel)
+                                  long_pupil, grismval, coordparallel,
+                                  i_obs + 1, 1, template_name)
                     APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
                     obs_tuple_list.append(tup_to_add)
 
@@ -433,15 +436,16 @@ class AptInput:
                     else:
                         long_pupil = 'CLEAR'
 
-                    # Add all parameters to dictionary
-                    tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                                  science_category, typeflag, mod, subarr, pdithtype,
-                                  pdither, sdithtype, sdither, sfilt, lfilt,
-                                  rpatt, grps, ints, short_pupil,
-                                  long_pupil, grismval, coordparallel)
-
                     # Repeat for the number of expected WFSC groups + 1
                     for j in range(num_WFCgroups + 1):
+                        # Add all parameters to dictionary
+                        tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                                      science_category, typeflag, mod, subarr, pdithtype,
+                                      pdither, sdithtype, sdither, sfilt, lfilt,
+                                      rpatt, grps, ints, short_pupil,
+                                      long_pupil, grismval, coordparallel,
+                                      i_obs + 1, j + 1, template_name)
+
                         APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
                         obs_tuple_list.append(tup_to_add)
 
@@ -523,15 +527,16 @@ class AptInput:
                     else:
                         long_pupil = 'CLEAR'
 
+                # Repeat for the number of exposures + 1
+                for j in range(n_exp + 1):
                     # Add all parameters to dictionary
                     tup_to_add = (pi_name, prop_id, prop_title, prop_category,
                                   science_category, typeflag, mod, subarr, pdithtype,
                                   pdither, sdithtype, sdither, sfilt, lfilt,
                                   rpatt, grps, ints, short_pupil,
-                                  long_pupil, grismval, coordparallel)
+                                  long_pupil, grismval, coordparallel,
+                                  i_obs + 1, j + 1, template_name)
 
-                # Repeat for the number of exposures + 1
-                for j in range(n_exp + 1):
                     APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
                     obs_tuple_list.append(tup_to_add)
 
@@ -593,7 +598,8 @@ class AptInput:
                                       pdithtype, pdither, sdithtype,
                                       sdither, sfilt, lfilt, rpatt, groups,
                                       integrations, short_pupil, long_pupil,
-                                      grismvalue, coordparallel)
+                                      grismvalue, coordparallel,
+                                      i_obs + 1, 1, template_name)
 
                         APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
                         obs_tuple_list.append(tup_to_add)
@@ -630,7 +636,8 @@ class AptInput:
                                              science_category, typeflag, mod, subarr, pdithtype,
                                              pdither, sdithtype, sdither, sfilt, lfilt,
                                              rpatt, grps, ints, short_pupil, long_pupil,
-                                             grismvalue, coordparallel)
+                                             grismvalue, coordparallel,
+                                             i_obs + 1, 1, template_name)
                         APTObservationParams = self.add_exposure(APTObservationParams, direct_tup_to_add)
                         obs_tuple_list.append(tup_to_add)
 
@@ -695,6 +702,9 @@ class AptInput:
         dictionary['LongPupil'].append(tup[18])
         dictionary['Grism'].append(tup[19])
         dictionary['CoordinatedParallel'].append(tup[20])
+        dictionary['ObservationID'].append(tup[21])
+        dictionary['TileNumber'].append(tup[22])
+        dictionary['APTTemplate'].append(tup[23])
         return dictionary
 
     def extract_value(self, line):

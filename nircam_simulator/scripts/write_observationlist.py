@@ -45,8 +45,20 @@ def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=Non
     xml_read = apt_inputs.AptInput()
     xml_table = xml_read.read_xml(xml_file)
 
-    sw_filters = xml_table['ShortFilter']
-    lw_filters = xml_table['LongFilter']
+    sw_filters = []
+    lw_filters = []
+    sw_filters_all = xml_table['ShortFilter']
+    lw_filters_all = xml_table['LongFilter']
+    tile_nums = xml_table['TileNumber']
+    observation_ids = xml_table['ObservationID']
+    for i_obs_all in set(observation_ids):
+        # i_obs_all = int(i_obs_all)
+        current_obs_indices = [i == i_obs_all for i in observation_ids]
+        if len(set(np.array(sw_filters_all)[current_obs_indices])) > 1:
+            raise ValueError('Multiple filters in one observation')
+            # At some point could use the tile_nums to fix this
+        sw_filters.append(sw_filters_all[current_obs_indices[0]])
+        lw_filters.append(lw_filters_all[current_obs_indices[0]])
 
     # # Choose only the catalogs from observations that will be used
     # print(i_observations)

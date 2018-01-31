@@ -22,6 +22,7 @@ nircam_simulator.egg-info/*
 nircam_simulator/examples/.ipynb_checkpoints/*
 nircam_simulator/OTECommissioning/*
 *.aptx
+*.docx
 
 # Files #
 #########
