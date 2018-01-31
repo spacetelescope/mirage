@@ -76,8 +76,9 @@ July 2017 - V0: Initial version. Bryan Hilbert
 
 '''
 
-import sys, os
-import imp
+import sys
+import os
+import pkg_resources
 from glob import glob
 from copy import deepcopy
 import argparse
@@ -87,7 +88,6 @@ from astropy.table import Table
 from astropy.io import ascii
 # sys.path.append(os.getcwd())
 from . import apt_inputs
-import pprint
 
 
 class SimInput:
@@ -130,9 +130,14 @@ class SimInput:
         self.use_JWST_pipeline = True
         self.use_linearized_darks = False
         self.simdata_output_dir = './'
+        self.psfpath = '/ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library'
+        self.psfbasename = 'nircam'
+        self.psfpixfrac = 0.25
+        self.psfwfe = 'predicted'
+        self.psfwfegroup = 0
 
         # Prepare to find files listed as 'config'
-        self.modpath = imp.find_module('nircam_simulator')[1]
+        self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
         self.configfiles = {}
         self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
         self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
@@ -145,7 +150,6 @@ class SimInput:
         self.configfiles['refpix_config'] = 'refpix.cfg'
         self.configfiles['linearity_config'] = 'linearity.cfg'
 
-
     def create_inputs(self):
         # Use full paths for inputs
         self.path_defs()
@@ -155,7 +159,7 @@ class SimInput:
             (self.siaf is not None) &
             (self.observation_table is not None)):
 
-            print('Using {}, \n      {},\n      {}, and \n      {} \n      to generate observation table.\n'.
+            print('Using {}, \n      {}, \n      {}, and \n      {} \n      to generate observation table.\n'.
                   format(self.observation_table, self.input_xml, self.pointing_file, self.siaf))
 
             # Define directories and paths
@@ -187,7 +191,7 @@ class SimInput:
             print('Reading table file: {}'.format(self.table_file))
             info = ascii.read(self.table_file)
             self.info = self.table_to_dict(info)
-            final_file = self.table_file+'_with_yaml_parameters.csv'
+            final_file = self.table_file + '_with_yaml_parameters.csv'
 
         else:
             print("WARNING. You must include either an ascii table file of observations.")
@@ -384,7 +388,6 @@ class SimInput:
             file = os.path.join(self.modpath, 'config', self.configfiles[prop])
         return file
 
-
     def add_catalogs(self):
         # Add list(s) of source catalogs to table
         self.info['point_source'] = [None] * len(self.info['Module'])
@@ -447,7 +450,6 @@ class SimInput:
                 self.multiple_catalog_match(filter, cattype, match)
             return match[0]
 
-
     def no_catalog_match(self, filter, cattype):
         # tell user if no catalog match was found
         print("WARNING: unable to find filter ({}) name".format(filter))
@@ -455,13 +457,11 @@ class SimInput:
         print("Using the first input for now. Make sure input catalog names have")
         print("the appropriate filter name in the filename to get matching to work.")
 
-
     def multiple_catalog_match(self, filter, cattype, matchlist):
         # tell the user if more than one catalog matches the filter/pupil
         print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
         print("Observation filter: {}".format(filter))
         print("Matched point source catalogs: {}".format(matchlist))
-
 
     def table_to_dict(self, tab):
         # convert the ascii table of observations to the
@@ -470,7 +470,6 @@ class SimInput:
         for colname in tab.colnames:
             dict[colname] = tab[colname].data
         return dict
-
 
     def make_start_times(self):
         # create exposure start times for each entry
@@ -486,12 +485,12 @@ class SimInput:
         epoch_base_time = '16:44:12'
         epoch_base_time0 = deepcopy(epoch_base_time)
 
-        # b = self.obsdate+'T'+self.obstime
+        # b = self.obsdate + 'T' + self.obstime
         # base = Time(b)
         epoch_base_date = self.info['epoch_start_date'][0]
 
         # epoch_start = deepcopy(epoch_base)
-        base = Time(epoch_base_date +'T'+ epoch_base_time)
+        base = Time(epoch_base_date + 'T' + epoch_base_time)
         base_date, base_time = base.iso.split()
 
         # add the times and dates of the first entry
@@ -500,8 +499,8 @@ class SimInput:
         # expstart.append(base.mjd)
 
         # pick some arbirary overhead values
-        act_overhead = 40 # seconds. (filter change)
-        visit_overhead = 600 # seconds. (slew)
+        act_overhead = 40  # seconds. (filter change)
+        visit_overhead = 600  # seconds. (slew)
 
         # get visit, activity_id info for first exposure
         actid = self.info['act_id'][0]
@@ -578,7 +577,7 @@ class SimInput:
             # new epoch - update the base time
             if epoch_date != epoch_base_date:
                 epoch_base_date = deepcopy(epoch_date)
-                base = Time(epoch_base_date+'T'+epoch_base_time)
+                base = Time(epoch_base_date + 'T' + epoch_base_time)
                 base_date, base_time = base.iso.split()
                 basereset = True
                 date_obs.append(base_date)
@@ -601,7 +600,6 @@ class SimInput:
                 print("Error. Fix me")
                 sys.exit()
 
-
             # For cases where the base time needs to change
             # continue down here
             xs = subarray_def['xstart'][match][0]
@@ -613,10 +611,10 @@ class SimInput:
             frametime = self.calcFrameTime(xd, yd, amp)
 
             # Estimate total exposure time
-            exptime = ((fpg+spg) * groups + fpg) * integrations * frametime
+            exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
 
             # Delta should include the exposure time, plus overhead
-            delta = TimeDelta(exptime+overhead, format='sec')
+            delta = TimeDelta(exptime + overhead, format='sec')
             base += delta
             base_date, base_time = base.iso.split()
 
@@ -637,24 +635,20 @@ class SimInput:
         self.info['nskip'] = nskip
         self.info['namp'] = namp
 
-
     def get_readpattern_defs(self):
         # read in the readpattern definition file
         tab = ascii.read(self.readpatt_def_file)
         return tab
-
 
     def get_subarray_defs(self):
         # read in subarray definition file and return table
         sub = ascii.read(self.subarray_def_file)
         return sub
 
-
     def calcFrameTime(self, xd, yd, namp):
         # calculate the exposure time of a single frame of the proposed output ramp
         # based on the size of the croped dark current integration
-        return (xd/namp + 12.) * (yd+1) * 10.00 * 1.e-6
-
+        return (xd / namp + 12.) * (yd + 1) * 10.00 * 1.e-6
 
     def make_output_names(self):
         # create output yaml file names to go with all of the
@@ -672,22 +666,19 @@ class SimInput:
         self.info['yamlfile'] = onames
         self.info['outputfits'] = fnames
 
-
     def get_dark(self, detector):
         # return the name of a dark current file to use as input
         # based on the detector being used
         files = self.dark_list[detector]
-        rand_index = np.random.randint(0, len(files)-1)
+        rand_index = np.random.randint(0, len(files) - 1)
         return files[rand_index]
-
 
     def get_lindark(self, detector):
         # return the name of a linearized dark current file to use as input
         # based on the detector being used
         files = self.lindark_list[detector]
-        rand_index = np.random.randint(0, len(files)-1)
+        rand_index = np.random.randint(0, len(files) - 1)
         return files[rand_index]
-
 
     def get_reffile(self, refs, detector):
         # return the appropriate reference file for detector
@@ -699,7 +690,6 @@ class SimInput:
                 return refs[key]
         print("WARNING: no file found for detector {} in {}"
               .format(detector, refs))
-
 
     def write_yaml(self, input):
         # create yaml file for a single exposure/detector
@@ -794,30 +784,30 @@ class SimInput:
             f.write('  seed: {}                           # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
-            f.write('  pointsource: {}   # File containing a list of point sources to add (x, y locations and magnitudes)\n'.format(input['{}_ptsrc'.format(catkey)]))   # 'point_source']))
-            f.write('  psfpath: /ifs/jwst/wit/witserv/data4/nrc/hilbert/simulated_data/psf_files/        # Path to PSF library\n')
-            f.write('  psfbasename: nircam                        # Basename of the files in the psf library\n')
-            f.write('  psfpixfrac: 0.1                           # Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n')
-            f.write('  psfwfe: 123                               # PSF WFE value (0, 115, 123, 132, 136, 150, 155)\n')
-            f.write('  psfwfegroup: 0                             # WFE realization group (0 to 9)\n')
-            f.write('  galaxyListFile: {}    # File containing a list of positions/ellipticities/magnitudes of galaxies to simulate\n'.format(input['{}_galcat'.format(catkey)]))   # 'galaxyListFile']))
-            f.write('  extended: {}          # Extended emission count rate image file name\n'.format(input['{}_ext'.format(catkey)]))     # 'extended']))
-            f.write('  extendedscale: {}                          # Scaling factor for extended emission image\n'.format(input['{}_extscl'.format(catkey)]))
-            f.write('  extendedCenter: {}                   # x, y pixel location at which to place the extended image if it is smaller than the output array size\n'.format(input['{}_extcent'.format(catkey)]))
-            f.write('  PSFConvolveExtended: True # Convolve the extended image with the PSF before adding to the output image (True or False)\n')
-            f.write('  movingTargetList: {}          # Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.\n'.format(input['{}_movptsrc'.format(catkey)]))   # 'movingTarg']))
-            f.write('  movingTargetSersic: {}  # ascii file containing a list of 2D sersic profiles to have moving through the field\n'.format(input['{}_movgal'.format(catkey)]))  # 'movingTargSersic']))
-            f.write('  movingTargetExtended: {}      # ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)\n'.format(input['{}_movext'.format(catkey)]))  # 'movingTargExtended']))
-            f.write('  movingTargetConvolveExtended: {}       # convolve the extended moving targets with PSF before adding.\n'.format(input['{}_movconv'.format(catkey)]))
-            f.write('  movingTargetToTrack: {} # File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target" \n'.format(input['{}_solarsys'.format(catkey)]))  # 'movingTargToTrack']))
-            f.write('  zodiacal:  None                          # Zodiacal light count rate image file \n')
-            f.write('  zodiscale:  1.0                            # Zodi scaling factor\n')
-            f.write('  scattered:  None                          # Scattered light count rate image file\n')
-            f.write('  scatteredscale: 1.0                        # Scattered light scaling factor\n')
-            f.write('  bkgdrate: {}                         # Constant background count rate (electrons/sec/pixel)\n'.format(input['{}_bkgd'.format(catkey)]))  # 'bkgdrate']))
-            f.write('  poissonseed: {}                  # Random number generator seed for Poisson simulation)\n'.format(np.random.randint(1, 2**32-2)))
-            f.write('  photonyield: True                         # Apply photon yield in simulation\n')
-            f.write('  pymethod: True                            # Use double Poisson simulation for photon yield\n')
+            f.write('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'.format(input['{}_ptsrc'.format(catkey)]))   #'point_source']))
+            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
+            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
+            f.write('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac))
+            f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
+            f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
+            f.write('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies to simulate\n'.format(input['{}_galcat'.format(catkey)]))   #'galaxyListFile']))
+            f.write('  extended: {}          #Extended emission count rate image file name\n'.format(input['{}_ext'.format(catkey)]))     #'extended']))
+            f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(input['{}_extscl'.format(catkey)]))
+            f.write('  extendedCenter: {}                   #x, y pixel location at which to place the extended image if it is smaller than the output array size\n'.format(input['{}_extcent'.format(catkey)]))
+            f.write('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output image (True or False)\n')
+            f.write('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.\n'.format(input['{}_movptsrc'.format(catkey)]))   #'movingTarg']))
+            f.write('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through the field\n'.format(input['{}_movgal'.format(catkey)]))  #'movingTargSersic']))
+            f.write('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)\n'.format(input['{}_movext'.format(catkey)]))  #'movingTargExtended']))
+            f.write('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'.format(input['{}_movconv'.format(catkey)]))
+            f.write('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target" \n'.format(input['{}_solarsys'.format(catkey)]))  #'movingTargToTrack']))
+            f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
+            f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
+            f.write('  scattered:  None                          #Scattered light count rate image file\n')
+            f.write('  scatteredscale: 1.0                        #Scattered light scaling factor\n')
+            f.write('  bkgdrate: {}                         #Constant background count rate (electrons/sec/pixel)\n'.format(input['{}_bkgd'.format(catkey)]))  #'bkgdrate']))
+            f.write('  poissonseed: {}                  #Random number generator seed for Poisson simulation)\n'.format(np.random.randint(1, 2**32-2)))
+            f.write('  photonyield: True                         #Apply photon yield in simulation\n')
+            f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
@@ -876,7 +866,6 @@ class SimInput:
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
         # print("Output file written to {}".format(yamlout))
 
-
     def reffile_setup(self):
         # create lists of reference files
         self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
@@ -900,24 +889,24 @@ class SimInput:
         self.lindark_list = {}
         for det in self.det_list:
             sbfiles = glob(os.path.join(sb_dir, '*fits'))
-            self.superbias_list[det] = [d for d in sbfiles if 'NRC'+det in d][0]
+            self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
             linfiles = glob(os.path.join(lin_dir, '*fits'))
             longdet = deepcopy(det)
             if '5' in det:
                 longdet = det.replace('5', 'LONG')
-            self.linearity_list[det] = [d for d in linfiles if 'NRC'+longdet in d][0]
+            self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
 
             gainfiles = glob(os.path.join(gain_dir, '*fits'))
-            self.gain_list[det] = [d for d in gainfiles if 'NRC'+det in d][0]
+            self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
 
             satfiles = glob(os.path.join(sat_dir, '*fits'))
-            self.saturation_list[det] = [d for d in satfiles if 'NRC'+det in d][0]
+            self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
 
             ipcfiles = glob(os.path.join(ipc_dir, '*fits'))
-            self.ipc_list[det] = [d for d in ipcfiles if 'NRC'+det in d][0]
+            self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
 
             distfiles = glob(os.path.join(dist_dir, '*asdf'))
-            self.astrometric_list[det] = [d for d in distfiles if 'NRC'+det in d][0]
+            self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
 
             pamfiles = glob(os.path.join(pam_dir, '*fits'))
             self.pam_list[det] = [d for d in pamfiles if det in d][0]
@@ -925,16 +914,15 @@ class SimInput:
             self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
             self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
-
     def add_options(self, parser=None, usage=None):
         if parser is None:
             parser = argparse.ArgumentParser(usage=usage, description='Simulate JWST ramp')
         parser.add_argument("--input_xml", help='XML file from APT describing the observations.')
         parser.add_argument("--pointing_file", help='Pointing file from APT describing observations.')
-        parser.add_argument("--siaf", help='CSV version of SIAF. Needed only in conjunction with input_xml+pointing.')
+        parser.add_argument("--siaf", help='CSV version of SIAF. Needed only in conjunction with input_xml + pointing.')
         parser.add_argument("--datatype", help='Type of data to save. Can be "linear", "raw" or "linear, raw"', default="linear")
         parser.add_argument("--output_dir", help='Directory into which the yaml files are output', default='./')
-        parser.add_argument("--table_file", help='Ascii table containing observation info. Use this or xml+pointing+siaf files.', default=None)
+        parser.add_argument("--table_file", help='Ascii table containing observation info. Use this or xml + pointing + siaf files.', default=None)
         parser.add_argument("--use_nonstsci_names", help="Use STScI naming convention for output files", action='store_true')
         parser.add_argument("--subarray_def_file", help="Ascii file containing subarray definitions", default='config')
         parser.add_argument("--readpatt_def_file", help='Ascii file containing readout pattern definitions', default='config')
@@ -950,6 +938,13 @@ class SimInput:
         parser.add_argument("--use_JWST_pipeline", help='True/False', action='store_true')
         parser.add_argument("--use_linearized_darks", help='True/False', action='store_true')
         parser.add_argument("--simdata_output_dir", help='Output directory for simulated exposure files', default='./')
+        parser.add_argument("--psfpath", help='Directory containing PSF library',
+                            default='/ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library')
+        parser.add_argument("--psfbasename", help="Basename of the files in the PSF library", default='nircam')
+        parser.add_argument("--psfpixfrac", help="Subpixel centering resolution of files in PSF library", default=0.25)
+        parser.add_argument("--psfwfe", help="Wavefront error value to use for PSFs", default='predicted')
+        parser.add_argument("--psfwfegroup", help="Realization index number for PSF files", default=0)
+
         return parser
 
 
@@ -958,15 +953,7 @@ if __name__ == '__main__':
     usagestring = 'USAGE: yaml_generator.py NIRCam_obs.xml NIRCam_obs.pointing'
 
     input = SimInput()
-    parser = input.add_options(usage = usagestring)
+    parser = input.add_options(usage=usagestring)
     args = parser.parse_args(namespace=input)
     input.reffile_setup()
     input.create_inputs()
-
-
-
-
-
-
-
-

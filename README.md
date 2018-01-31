@@ -1,22 +1,62 @@
 This repository contains code that can be used to generate
 simulated NIRCam data.
 
+Installation
+------------
+
+To install:
+python setup.py install
+
+
+Dependencies
+------------
+
+To simulate wide field slitless spectroscopy (WFSS) data:
+[NIRCam_Gsim][d1]: to disperse imaging data
+[GRISM_NIRCAM][d2]: NIRCam-specific grism configuration and sensitivity files
+[GRISMCONF][d3]: grism dispersion polynomials
+
+Background signals:
+[JWST backgrounds][d4]: Generate JWST Exposure Time Calculator-type backgrounds (zodiacal+thermal)
+
+[d1]: https://github.com/npirzkal/NIRCAM_Gsim
+[d2]: https://github.com/npirzkal/GRISM_NIRCAM
+[d3]: https://github.com/npirzkal/GRISMCONF
+[d4]: https://github.com/spacetelescope/jwst_backgrounds
+
+
+Calibration pipeline:
+[JWST calibration pipeline][d5]. Necessary if using raw dark current exposures as input. Optional otherwise.
+
+[d5]: https://github.com/STScI-JWST/jwst
+
+
+Examples
+--------
+
+See the notebooks in the "examples" subdirectory. There is one notebook
+for imaging simulations, one for WFSS simulations, and one for moving target
+(non-sidereal) simulations.
+
+
+Functionality
+-------------
+
 The code needed to create simulated data is split into
 four general parts:
 
 1. Generate a "seed image"
-2 (OPTIONAL) to create WFSS data, disperse the seed image
+2. (OPTIONAL) to create WFSS data, disperse the seed image
 3. Prepare an existing dark current ramp
 4. Combine the seed image with the dark 
 
 More details on these steps are given below:
 
-1. Generate a "seed image"
+### Generate a "seed image" ###
 
 This portion of the code generates a "seed image" from
-input source catalogs. This seed image will
-then be used as input to later steps in the NIRCam Data
-Simulator (not included in this repo yet).
+either input source catalogs or an input large field-of-view
+observation (fits file). 
 
 The seed image is a noiseless countrate image containing
 all of the sources specified in the input catalogs. Sources
@@ -30,118 +70,53 @@ but the information is all needed to run the entire
 NIRCam Data Simulator, so for the moment we've kept all
 of the inputs.
 
-Input fields used here include:
 
-Inst:
-
-  mode: examples - 'imaging', 'WFSS', 'moving_target'
-
-Readout:
-
-  array_name e.g. NRCB5_FULL
-  
-  filter
-
-  pupil
-
-Reffiles:
-
-  subarray_defs - file located in 'config' subdirectory
-
-  astrometric - CRDS-formatted distortion reference file
-
-  distortion_coeffs - SIAF
-
-  flux_cal - file with zeropoints located in 'config' subdirectory
-
-simSignals:
-
-  pointsource - ptsrc catalog, example in 'catalogs' subdirectory
-
-  psfpath - path to PSF library
-
-  psfbasename - base name of files in library
-
-  psfpixfrac - subpixel resolution of PSF library files
-
-  psfwfe - wavefront error to use
-
-  psfwfegroup - realization number for a given WFE
-
-  galaxyListFile - galaxy catalog, example in 'catalogs' subdirectory
-
-  extended - catalog of extended sources
-
-  extendedscale - multiplicative factor to scale extended target brightness (only if the magnitude of the extended target is set to None in the extended catalog)
-
-  extendedCenter - obsolete. No longer used.
-
-  PSFConvolveExtended - True/False, convolve extended objects with NIRCam PSF
-
-  movingTargetList - catalog of targets to trail across FOV (e.g KBOs while observing a sidereal target)
-
-  movingTargetSersic - catalog of "galaxies" (2D Sersic profiles) to trail across FOV
-
-  movingTargetExtended - catalog of extended sources to trail across FOV
-
-  movingTargetToTrack - catalog of a non-sidereal target to track. In this case, all targets in the pointsource, galaxyListFile, and extended catalogs will be trailed across the FOV. To use this, set the 'mode' keyword at the top to 'moving_target'
-  
-  bkgdrate - Uniform background signal to add, in units of ADU/sec
-
-Telescope:
-
-  ra: RA at the reference location of the detector/aperture being simulated
-
-  dec: Dec at the reference location of the detector/aperture being simulated
-
-  rotation: PAV3 of the telescope (degrees E of N)
-
-Output:
-
-  file: filename used as a base for the seed image output
-
-  directory: directory in which to place the output
-
-  save_intermediates: True/False, save intermediate data products
-
-  grism_source_image: True/False. If true, the length and width of the seed image are increased to larger than the detector FOV
-
-
-
-To use the code:
+**To use the code:**
 
 1) From the command line:
-
 python catalog_seed_image.py myfile.yaml
 
 2) Within python:
-
+```
 from nircam_simulator.nircam_simulator.scripts import catalog_seed_image as csi
-
 cat = csi.Catalog_seed()
-
 cat.paramfile = 'myfile.yaml'
+cat.make_seed()
+```
 
-cat.run()
-
-
-Outputs:
+**Outputs:**
 
 Multi-extension fits file with name ending in 'seed_image.fits', containing:
 
 Extension 0: empty
-
 Extension 1: seed image
-
 Extension 2: segmentation map
 
 Also, the seed image, segmentation map, and exposure info dictionary are available as:
+`self.seedimage`, `self.seed_segmap`, and `self.seedinfo`
 
-self.seedimage, self.seed_segmap, and self.seedinfo
+### Disperse the seed image ###
 
+Requires multiple imaging seed images as input. Output is a single, dispersed
+seed image that can be passed to later simulator steps just as imaging seed
+images. See WFSS notebook for an example.
 
+**To use:**
+```
+from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+crossing_filter = 'F444W'
+module = 'A'    # 'A' or 'B'
+direction = 'R' # 'R' for row or 'C' for column
+image_seeds = [seed1.seed_file, seed2.seed_file, seed3.seed_file, seed4.seed_file]
+dmode = 'mod{}_{}'.format(module.upper(),direction.upper())
+loc = os.path.join(datadir,"GRISM_NIRCAM/")
+background_file = "{}_{}_back.fits".format(crossing_filter,dmode)
+t = Grism_seed(image_seeds,crossing_filter,dmode,config_path=loc)
+t.observation()
+t.finalize(Back = background_file)
+```
 
-3. Prepare an existing dark current ramp
+### Prepare an existing dark current ramp ###
 
 The input dark current exposure will be reorganized into the
 requested readout pattern (if possible). If the input is not
@@ -156,17 +131,7 @@ is saved along side the linearized dark ramp such that it
 can be added back in later, if the user requests a raw output
 ramp from the NIRCam Data Simulator.
 
-Dependencies:
-
-If the:
-
-Inst:
-  use_JWST_pipeline
-
-input is set to true, then the JWST calibration pipeline is needed.
-
-
-Output:
+**Output:**
 
 The linearized dark current and zeroth frame as saved to a fits file
 that uses the name from the Output:file entry in the input yaml file
@@ -174,54 +139,49 @@ and ending with '_linearizedDark.fits'.
 
 These are also available as self.linDark and self.zeroModel
 
-
-To use:
-
+**To use:**
 python dark_prep.py myinputs.yaml
 
-or:
-
+**or:**
+```
 from nircam_simulator.nircam_simluator.scripts import dark_prep
 dark = dark_prep.DarkPrep()
 dark.paramfile = 'myinputs.yaml'
-dark.run()
+dark.prepare()
+```
 
+### Combine the seed image with the dark ###
 
-4. Combine the seed image with the dark
+This step takes as input a seed image (with associated segmentation
+map) and a linearized dark current exposure.
 
-This step takes as input a seed image (with segmentation
-map), which is a countrate image generated by (for example)
-catalog_seed_image. It also takes a linearized dark current
-exposure created by dark_prep.
-
-This step converts the seed image into a 4d signal ramp,
-adds poisson noise, cosmic rays, and other detector effects.
+The seed image is converted into a 4d signal ramp,
+and poisson noise, cosmic rays, and other detector effects
+are added.
 
 The ramp is then reorganized into the requested readout
 pattern and added to the dark current ramp.
 
-To use:
-
+**To use:**
 python obs_generator.py myinputs.yaml
 
-or:
-
+**or:**
+```
 from nircam_simulator.nircam_simulator.scripts import obs_generator
 obs = obs_generator.Observation()
 obs.linDark = 'V42424024002P000000000112o_B5_F250M_uncal_linear_dark_prep_object.fits'
 obs.seed = 'V42424024002P000000000112o_B5_F250M_uncal_F250M_seed_image.fits'
 obs.paramfile = 'myinputs.yaml'
 obs.create()
-
+```
 
 To create a simulated exposure, string together all of the steps:
-
+```
 from nircam_simulator.nircam_simulator.scripts import catalog_seed_image
 from nircam_simulator.nircam_simulator.scripts import dark_prep
 from nircam_simulator.nircam_simulator.scripts import obs_generator
 
 yamlfile = 'seed_catalog_test.yaml'
-
 cat = catalog_seed_image.Catalog_seed()
 cat.paramfile = yamlfile
 seedimage, segmap, seedinfo = cat.make_seed()
@@ -238,4 +198,17 @@ obs.seedheader = cat.seedinfo
 #obs.seed = 'V42424024002P000000000112o_B5_F250M_uncal_F250M_seed_image.fits'
 obs.paramfile = yamlfile
 obs.create()
+```
 
+### Convenience Functions ###
+
+**imaging_pipeline.py** - wrapper around the three steps needed to create an
+imaging mode simulated exposure. This also works for moving target
+simulations. Example use shown in the imaging notebook.
+
+**wfss_pipeline.py** - wrapper around the steps needed to create an WFSS
+simulated exposure. Example use shown in the WFSS notebook.
+
+**yaml_generator.py** - Beginning with an Astronomer's Proposal Tool (APT) file,
+create the yaml files necessary to simulate the entire proposal. Example use
+shown in the imaging and WFSS notebooks.

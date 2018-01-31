@@ -6,13 +6,14 @@ Add cosmic rays, poisson noise, etc.
 '''
 
 import sys, os
-import imp
+import pkg_resources
 import random
 import copy
 from math import radians
 import datetime
 import numpy as np
 from astropy.io import fits, ascii
+from astropy.table import Table
 from astropy.time import Time, TimeDelta
 import scipy.signal as s1
 import yaml
@@ -32,14 +33,14 @@ class Observation():
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
         # offset between the nominal output array coordinates.
-        self.coord_adjust = {'x':1., 'xoffset':0., 'y':1., 'yoffset':0.}
+        self.coord_adjust = {'x': 1., 'xoffset': 0., 'y': 1., 'yoffset': 0.}
 
         # Array size of a full frame image
         self.ffsize = 2048 #pixels on a side
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
-        self.modpath = imp.find_module('nircam_simulator')[1]
+        self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
 
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,
@@ -51,6 +52,7 @@ class Observation():
             local = os.path.exists(localpath)
             if local:
                 self.datadir = localpath
+                os.environ['NIRCAM_SIM_DATA'] = localpath
             else:
                 print(("WARNING: {} environment variable is not set."
                        .format(self.env_var)))
@@ -60,7 +62,6 @@ class Observation():
                 print("This should be set correctly if you installed")
                 print("the nircam_sim_data conda package.")
                 sys.exit()
-
 
     def create(self):
         print('')
@@ -83,7 +84,8 @@ class Observation():
             print('Reading in dark file: {}'.format(self.linDark))
             self.linDark = self.readDarkFile(self.linDark)
 
-        # Finally, collect information about the detector, which will be needed for astrometry later
+        # Finally, collect information about the detector,
+        # which will be needed for astrometry later
         self.detector = self.linDark.header['DETECTOR']
         self.instrument = self.linDark.header['INSTRUME']
         self.fastaxis = self.linDark.header['FASTAXIS']
@@ -149,8 +151,9 @@ class Observation():
             simexp, simzero = self.maskRefPix(simexp, simzero)
 
         # Add the simulated source ramp to the dark ramp
-        lin_outramp, lin_zeroframe = self.addSyntheticToDark(simexp, self.linDark,
-                                                             syn_zeroframe=simzero)
+        lin_outramp, lin_zeroframe, lin_sbAndRefpix = self.addSyntheticToDark(simexp,
+                                                                              self.linDark,
+                                                                              syn_zeroframe=simzero)
 
         # Add other detector effects (IPC/Crosstalk/PAM)
         lin_outramp = self.add_detector_effects(lin_outramp)
@@ -160,6 +163,34 @@ class Observation():
         # regardless of whether we are saving the linearized data or going
         # on to make raw data
         nonlincoeffs = self.get_nonlinearity_coeffs()
+
+        # We need to first subtract superbias and refpix signals from the
+        # original saturation limits, and then linearize them
+        # Refpix signals will vary from group to group, but only by a few
+        # ADU. So let's cheat and just use the refpix signals from group 0
+
+        # Create a linearized saturation map
+        limits = np.zeros_like(self.satmap) + 1.e6
+
+        if self.linDark.sbAndRefpix is not None:
+            lin_satmap = unlinearize.nonLinFunc(self.satmap - self.linDark.sbAndRefpix[0, 0, :, :],
+                                                nonlincoeffs, limits)
+        elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'])):
+            # If the superbias and reference pixel signal is not available
+            # but the superbias reference file is, then just use that.
+            self.readSuperbiasFile()
+            lin_satmap = unlinearize.nonLinFunc(self.satmap - self.superbias,
+                                                nonlincoeffs, limits)
+
+        elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'] == False)):
+            # If superbias and refpix signal is not available and
+            # the superbias reffile is also not available, fall back to
+            # a superbias value that is roughly correct. Error in this value
+            # will cause errors in saturation flagging for the highest signal
+            # pixels.
+            manual_sb = np.zeros_like(self.satmap) + 12000.
+            lin_satmap = unlinearize.nonLinFunc(self.satmap - manual_sb,
+                                                nonlincoeffs, limits)
 
         # Save the ramp if requested. This is the linear ramp,
         # ready to go into the Jump step of the pipeline
@@ -173,36 +204,6 @@ class Observation():
             # Full path of output file
             linearrampfile = linearrampfile.split('/')[-1]
             linearrampfile = os.path.join(self.params['Output']['directory'], linearrampfile)
-
-            # Create a linearized saturation map
-            #lin_satmap = self.apply_lincoeff(self.satmap, nonlincoeffs)
-            limits = np.zeros_like(self.satmap) + 1.e6
-
-            # We need to first subtract superbias and refpix signals from the
-            # original saturation limits, and then linearize them
-            # Refpix signals will vary from group to group, but only by a few
-            # ADU. So let's cheat and just use the refpix signals from group 0
-            if self.linDark.sbAndRefpix is not None:
-                # If the superbias and reference pixel signal is available
-                lin_satmap = unlinearize.nonLinFunc(self.satmap - self.linDark.sbAndRefpix[0, 0, :, :],
-                                                    nonlincoeffs, limits)
-
-            elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'])):
-                # If the superbias and reference pixel signal is not available
-                # but the superbias reference file is, then just use that.
-                self.readSuperbiasFile()
-                lin_satmap = unlinearize.nonLinFunc(self.satmap - self.superbias,
-                                                    nonlincoeffs, limits)
-
-            elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'] == False)):
-                # If superbias and refpix signal is not available and
-                # the superbias reffile is also not available, fall back to
-                # a superbias value that is roughly correct. Error in this value
-                # will cause errors in saturation flagging for the highest signal
-                # pixels.
-                manual_sb = np.zeros_like(self.satmap) + 12000.
-                lin_satmap = unlinearize.nonLinFunc(self.satmap - manual_sb, nonlincoeffs, limits)
-
 
             # Saturation flagging - to create the pixeldq extension
             # and make data ready for ramp fitting
@@ -253,7 +254,8 @@ class Observation():
                                                         save_accuracy_map=False)
 
                 # Add the superbias and reference pixel signal back in
-                raw_outramp = self.add_sbAndRefPix(raw_outramp, self.linDark.sbAndRefpix)
+                #raw_outramp = self.add_sbAndRefPix(raw_outramp,self.linDark.sbAndRefpix)
+                raw_outramp = self.add_sbAndRefPix(raw_outramp, lin_sbAndRefpix)
                 raw_zeroframe = self.add_sbAndRefPix(raw_zeroframe, self.linDark.zero_sbAndRefpix)
 
                 # Make sure all signals are < 65535
@@ -267,7 +269,7 @@ class Observation():
                     self.saveDMS(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
                 else:
                     self.savefits(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
-                stp.add_wcs(rawrampfile)
+                stp.add_wcs(rawrampfile,roll=self.params['Telescope']['rotation'])
                 print("Final raw exposure saved to")
                 print("{}".format(rawrampfile))
             else:
@@ -283,7 +285,6 @@ class Observation():
             for key2 in self.params[key1]:
                 if self.env_var in str(self.params[key1][key2]):
                     self.params[key1][key2] = self.params[key1][key2].replace('$'+self.env_var+'/', self.datadir)
-
 
     def filecheck(self):
         # Make sure the requested input files exist
@@ -312,7 +313,6 @@ class Observation():
         #for inp in ilist:
         #    self.input_check(inp)
 
-
     def ref_check(self, rele):
         # Check for the existence of the input reference file
         # Assume first that the file is in the directory tree
@@ -330,7 +330,6 @@ class Observation():
                        .format(rfile)))
                 sys.exit()
 
-
     def path_check(self, p):
         # Check for the existence of the input path.
         # Assume first that the path is in relation to
@@ -346,7 +345,6 @@ class Observation():
             print("{}. Not present in directory tree".format(self.pdir))
             print("specified by the {} environment variable.".format(self.env_var))
             sys.exit()
-
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In
@@ -366,7 +364,6 @@ class Observation():
                 print("Specified by the {}:{} field in".format(inparam[0], inparam[1]))
                 print("the input yaml file.")
                 sys.exit()
-
 
     def fullPaths(self):
         # Expand all input paths to be full paths
@@ -406,7 +403,6 @@ class Observation():
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
 
-
     def readParameterFile(self):
         # Read in the parameter file
         try:
@@ -416,7 +412,6 @@ class Observation():
             print("WARNING: unable to open {}".format(self.paramfile))
             sys.exit()
 
-
     def readSubarrayDefinitionFile(self):
         # Read in the file that contains a list of subarray
         # names and positions on the detector
@@ -425,7 +420,6 @@ class Observation():
         except:
             print("Error: could not read in subarray definitions file.")
             sys.exit()
-
 
     def readSaturationFile(self):
         # Read in saturation map
@@ -451,7 +445,6 @@ class Observation():
             dy, dx = self.dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
 
-
     def readSuperbiasFile(self):
         # Read in superbias
         if self.runStep['superbias']:
@@ -467,12 +460,11 @@ class Observation():
             print('CAUTION: no superbias provided. Quitting.')
             sys.exit()
 
-
     def inputChecks(self):
         # Make sure the input dark has a readout pattern
         # that is compatible with the requested output
         # readout pattern
-        darkpatt = dark.header['READPATT']
+        darkpatt = self.linDark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
             (darkpatt != 'RAPID')):
             print("WARNING: Unable to convert input dark with a readout pattern")
@@ -481,7 +473,6 @@ class Observation():
             print("The readout pattern of the dark must be RAPID or match")
             print("the requested output readout pattern.")
             sys.exit()
-
 
     def channel_specific_dicts(self):
         # Get detector/channel-specific values for things that
@@ -497,7 +488,6 @@ class Observation():
             channel = 'lw'
             self.pixscale = [0.063, 0.063]
 
-
     def flag_saturation(self, data, sat):
         # flag saturated data. return a dq map
         # with the appropriate dq value (2)
@@ -506,14 +496,13 @@ class Observation():
         satmap[satmap > 0] = 2
         return satmap
 
-
     def add_sbAndRefPix(self, ramp, sbref):
         # Add superbias and reference pixel-associated
         # signal to the input ramp
         rampdim = ramp.shape
         sbrefdim = sbref.shape
         if len(rampdim) != len(sbrefdim):
-            if len(rampdim) == (len(sbrefdim)+1):
+            if len(rampdim) == (len(sbrefdim) + 1):
                 newramp = ramp + sbref
             else:
                 print("WARNING: input ramp and superbias+refpix arrays have")
@@ -524,7 +513,6 @@ class Observation():
             # Inputs arrays have the same number of dimensions
             newramp = ramp + sbref
         return newramp
-
 
     def apply_lincoeff(self, data, cof):
         # Linearize the input data
@@ -539,7 +527,6 @@ class Observation():
             for i in range(len(cof[:, 0, 0])):
                 apply += (cof[i, :, :] * data**i)
         return apply
-
 
     def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
         # From the table of distortion coefficients,
@@ -581,7 +568,6 @@ class Observation():
         ysciscale = row['YSciScale'].data[0]
 
         return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
-
 
     def get_nonlinearity_coeffs(self):
         if self.params['Reffiles']['linearity'] is not None:
@@ -1123,22 +1109,22 @@ class Observation():
 
         outModel[0].header['TARGNAME'] = 'UNKNOWN'
 
-        outModel[0].header['WCSAXES'] = 2
-        outModel[0].header['CRVAL1'] = self.ra
-        outModel[0].header['CRVAL2'] = self.dec
-        outModel[0].header['CRPIX1'] = self.refpix_pos['x']+1.
-        outModel[0].header['CRPIX2'] = self.refpix_pos['y']+1.
-        outModel[0].header['CTYPE1'] = 'RA---TAN'
-        outModel[0].header['CTYPE2'] = 'DEC--TAN'
-        outModel[0].header['CUNIT1'] = 'deg'
-        outModel[0].header['CUNIT2'] = 'deg'
-        outModel[0].header['V2_REF'] = self.v2_ref
-        outModel[0].header['V3_REF'] = self.v3_ref
-        outModel[0].header['VPARITY'] = self.parity
-        outModel[0].header['V3I_YANG'] = self.v3yang
-        outModel[0].header['CDELT1'] = self.xsciscale / 3600.
-        outModel[0].header['CDELT2'] = self.ysciscale / 3600.
-        outModel[0].header['ROLL_REF'] = self.local_roll
+        outModel[1].header['WCSAXES'] = 2
+        outModel[1].header['CRVAL1'] = self.ra
+        outModel[1].header['CRVAL2'] = self.dec
+        outModel[1].header['CRPIX1'] = self.refpix_pos['x']+1.
+        outModel[1].header['CRPIX2'] = self.refpix_pos['y']+1.
+        outModel[1].header['CTYPE1'] = 'RA---TAN'
+        outModel[1].header['CTYPE2'] = 'DEC--TAN'
+        outModel[1].header['CUNIT1'] = 'deg'
+        outModel[1].header['CUNIT2'] = 'deg'
+        outModel[1].header['V2_REF'] = self.v2_ref
+        outModel[1].header['V3_REF'] = self.v3_ref
+        outModel[1].header['VPARITY'] = self.parity
+        outModel[1].header['V3I_YANG'] = self.v3yang
+        outModel[1].header['CDELT1'] = self.xsciscale / 3600.
+        outModel[1].header['CDELT2'] = self.ysciscale / 3600.
+        outModel[1].header['ROLL_REF'] = self.local_roll
 
         outModel[0].header['TARG_RA'] = self.ra #not correct
         outModel[0].header['TARG_DEC'] = self.dec #not correct
@@ -1325,9 +1311,7 @@ class Observation():
         # # Crop to appropriate subarray - ALREADY DONE IN readCalFile
         # if "FULL" not in self.params['Readout']['array_name']:
         #     nonlin = self.crop_to_subarray(nonlin)
-
         return nonlin
-
 
     def readDarkFile(self, filename):
         # Read in a prepared dark current exposure
@@ -1340,7 +1324,6 @@ class Observation():
         # Values are None for objects that don't exist
         return obj
 
-
     def readSeed(self, filename):
         # Read in the file containing the seed image/ramp
         with fits.open(filename) as h:
@@ -1351,7 +1334,6 @@ class Observation():
             except:
                 segmap = None
         return seed, segmap, seedheader
-
 
     def calcFrameTime(self, frame):
         #calculate the exposure time of a single frame of the proposed output ramp
@@ -1443,6 +1425,9 @@ class Observation():
         if ((syn_zeroframe is not None) & (dark.zeroframe is not None)):
             zeroframe = dark.zeroframe + syn_zeroframe
 
+        # To hold reordered superbias + refpix signals from the dark
+        reorder_sbandref = np.zeros_like(synthetic)
+
         # We have already guaranteed that either the readpatterns match
         # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
@@ -1451,6 +1436,7 @@ class Observation():
                          self.params['Readout']['nframe']
             frames = np.arange(0, self.params['Readout']['nframe'])
             accumimage = np.zeros_like(synthetic[0, :, :], dtype=np.int32)
+            sbaccumimage = np.zeros_like(synthetic[0, :, :], dtype=np.int32)
 
             # Loop over integrations
             for integ in range(self.params['Readout']['nint']):
@@ -1464,15 +1450,19 @@ class Observation():
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:
-                        accumimage = np.mean(dark.data[0, frames, :, :], axis=0)
+                        accumimage = np.mean(dark.data[integ, frames, :, :], axis=0)
+                        sbaccumimage = np.mean(dark.sbAndRefpix[integ, frames, :, :],
+                                               axis=0)
 
                         # If no averaging needs to be done
                     else:
-                        accumimage = dark.data[0, frames[0], :, :]
+                        accumimage = dark.data[integ, frames[0], :, :]
+                        sbaccumimage = dark.sbAndRefpix[integ, frames[0], :, :]
 
                     # Now add the averaged dark frame to the synthetic data,
                     # which has already been placed into the correct readout pattern
-                    synthetic[i, :, :] += accumimage
+                    synthetic[integ, i, :, :] += accumimage
+                    reorder_sbandref[integ, i, :, :] = sbaccumimage
 
                     # Increment the frame indexes
                     frames = frames + deltaframe
@@ -1484,6 +1474,7 @@ class Observation():
             # the dark current groups.
             synthetic = synthetic + dark.data[:, 0:self.params['Readout']['ngroup'], :, :]
             print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
+            reorder_sbandref = dark.sbAndRefpix
         # Case below should be caught within inputChecks()
         #else:
         #    print("WARNING: Unable to convert input dark with a readout pattern")
@@ -1493,14 +1484,13 @@ class Observation():
         #    print("the requested output readout pattern.")
         #    sys.exit()
 
-        return synthetic, zeroframe
-
+        return synthetic, zeroframe, reorder_sbandref
 
     def maskRefPix(self, ramp, zero):
         # Make sure that reference pixels have no signal
         # in the simulated source ramp
         maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
-        maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
+        maskimage[4:self.ffsize - 4, 4:self.ffsize - 4] = 1.
 
         #crop the mask to match the requested output array
         if "FULL" not in self.params['Readout']['array_name']:
@@ -1509,7 +1499,6 @@ class Observation():
         ramp *= maskimage
         zero *= maskimage
         return ramp, zero
-
 
     def add_flatfield_effects(self, ramp):
         #ILLUMINATION FLAT
@@ -1813,10 +1802,16 @@ class Observation():
             # Hold the averaged group signal
             accumimage = np.zeros((yd, xd))#, dtype=np.int32)
 
+            # Group 0: the initial nskip frames don't exist,
+            # so adjust indexes accordingly
+            rstart = 0
+            if i == 0:
+                rstart = self.params['Readout']['nskip']
+
             # Loop over frames within each group if necessary
-            for j in range(framesPerGroup):
+            for j in range(rstart,framesPerGroup):
                 # Frame index number in input data
-                frameindex = (i * framesPerGroup) + j
+                frameindex = (i * framesPerGroup) + j - self.params['Readout']['nskip']
 
                 # Signal only since previous frame
                 if ndim == 3:
@@ -1830,7 +1825,7 @@ class Observation():
                 # Create the frame by adding the delta signal
                 # and poisson noise associated with the delta signal
                 # to the previous frame
-                framesignal = previoussignal + poissonsignal + deltaframe
+                framesignal = previoussignal + poissonsignal
 
                 # Add cosmic rays
                 if self.runStep['cosmicray']:
@@ -1878,6 +1873,11 @@ class Observation():
         # Convert input seed image/ramp to a
         # ramp that includes poisson noise. No
         # cosmic rays are added
+
+        # Output ramp will be in requested readout pattern!
+        ndim = len(data.shape)
+
+
         if ndim == 3:
             ngroupin, yd, xd = data.shape
         elif ndim == 2:
@@ -2099,11 +2099,6 @@ class Observation():
     def readGainMap(self):
         # Read in the gain map. This will be used to
         # translate signals from e/s to ADU/sec
-        # print('Is this necessary? flux calibration goes from')
-        # print('magnitudes to adu/sec. Of course that doesnt account')
-        # print('at all for varying gain across the detector...')
-        print('Cosmic rays from the library are in units of e/sec.')
-
         if self.runStep['gain']:
             self.gainim, self.gainhead = self.readCalFile(self.params['Reffiles']['gain'])
             #set any NaN's to 1.0
@@ -2186,7 +2181,8 @@ class Observation():
         # be collected using 4 amps. Subarray data will always be 1 amp,
         # except for the grism subarrays which span the entire width of
         # the detector. Those can be read out using 1 or 4 amps.
-        self.setNumAmps()
+        # THIS IS NOW DONE IN GETSUBARRAYBOUNDS
+        #self.setNumAmps()
 
         # Make sure that the requested number of groups is less than or
         # equal to the maximum allowed.
@@ -2288,7 +2284,8 @@ class Observation():
         #The file above can be off by ~20 pixels in the corners of the array. This file will give
         #exact answers
         if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
-            distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'], header_start=1)
+            distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],
+                                         header_start=1, format='csv')
         else:
             print(("WARNING: Input distortion coefficients file {} "
                    "does not exist."
@@ -2376,57 +2373,66 @@ class Observation():
             self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
             self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
             print(('Requested readout pattern {} is valid. '
-                  'Using the nframe = {} and nskip = {}'
+                  'Using nframe = {} and nskip = {}'
                    .format(self.params['Readout']['readpatt'],
                            self.params['Readout']['nframe'],
                            self.params['Readout']['nskip'])))
         else:
+            # If the read pattern is not present in the definition file
+            # then quit.
+            print(("WARNING: the {} readout pattern is not defined in {}."
+                   .format(self.params['Readout']['readpatt'],
+                           self.params['Reffiles']['readpattdefs'])))
+            print("Quitting.")
+            sys.exit()
+
+
             # If read pattern is not present in the definition file but
             # the nframe/nskip combo is, then reset
             # readpatt to the appropriate value from the definition file
-            readpatt_nframe = self.readpatterns['nframe'].data
-            readpatt_nskip = self.readpatterns['nskip'].data
-            readpatt_name = self.readpatterns['name'].data
-            if self.params['Readout']['nframe'] in readpatt_nframe:
-                nfmtch = self.params['Readout']['nframe'] == readpatt_nframe
-                nskip_subset = readpatt_nskip[nfmtch]
-                name_subset = readpatt_name[nfmtch]
-                if self.params['Readout']['nskip'] in nskip_subset:
-                    finalmtch = self.params['Readout']['nskip'] == nskip_subset
-                    finalname = name_subset[finalmtch][0]
-                    print(("CAUTION: requested readout pattern {} not recognized."
-                           .format(self.params['Readout']['readpatt'])))
-                    print(("but the requested nframe/nskip combination ({}, {}), "
-                           "matches those values for".
-                           format(self.params['Readout']['nframe'],
-                                  self.params['Readout']['nskip'])))
-                    print(("the {} readout pattern, as listed in {}."
-                          .format(finalname, self.params['Reffiles']['readpattdefs'])))
-                    print('Continuing on using that as the readout pattern.')
-                    self.params['Readout']['readpatt'] = finalname
-                else:
-                    # Case where readpatt is not recognized, nframe is present
-                    # in the definition file, but nskip is not
-                    print(('Unrecognized readout pattern {}, and the input '
-                           'nframe/nskip combination {}, {} does not'
-                           .format(self.params['Readout']['readpatt'],
-                                   self.params['Readout']['nframe'],
-                                   self.params['Readout']['nskip'])))
-                    print(('match any present in {}. This is not a valid NIRCam '
-                          'readout pattern. Quitting.'
-                          .format(self.params['Reffiles']['readpattdefs'])))
-                    sys.exit()
-            else:
-                # Case where readpatt and nframe are not recognized
-                print(('Unrecognized readout pattern {}, and the input '
-                       'nframe/nskip combination {}, {} does not'
-                       .format(self.params['Readout']['readpatt'],
-                               self.params['Readout']['nframe'],
-                               self.params['Readout']['nskip'])))
-                print(('match any present in {}. This is not a valid NIRCam '
-                       'readout pattern. Quitting.'
-                       .format(self.params['Reffiles']['readpattdefs'])))
-                sys.exit()
+            #readpatt_nframe = self.readpatterns['nframe'].data
+            #readpatt_nskip = self.readpatterns['nskip'].data
+            #readpatt_name = self.readpatterns['name'].data
+            #if self.params['Readout']['nframe'] in readpatt_nframe:
+            #    nfmtch = self.params['Readout']['nframe'] == readpatt_nframe
+            #    nskip_subset = readpatt_nskip[nfmtch]
+            #    name_subset = readpatt_name[nfmtch]
+            #    if self.params['Readout']['nskip'] in nskip_subset:
+            #        finalmtch = self.params['Readout']['nskip'] == nskip_subset
+            #        finalname = name_subset[finalmtch][0]
+            #        print(("CAUTION: requested readout pattern {} not recognized."
+            #               .format(self.params['Readout']['readpatt'])))
+            #        print(("but the requested nframe/nskip combination ({},{}), "
+            #               "matches those values for".
+            #               format(self.params['Readout']['nframe'],
+            #                      self.params['Readout']['nskip'])))
+            #        print(("the {} readout pattern, as listed in {}."
+            #              .format(finalname,self.params['Reffiles']['readpattdefs'])))
+            #        print('Continuing on using that as the readout pattern.')
+            #        self.params['Readout']['readpatt'] = finalname
+            #    else:
+            #        # Case where readpatt is not recognized, nframe is present
+            #        # in the definition file, but nskip is not
+            #        print(('Unrecognized readout pattern {}, and the input '
+            #               'nframe/nskip combination {},{} does not'
+            #               .format(self.params['Readout']['readpatt'],
+            #                       self.params['Readout']['nframe'],
+            #                       self.params['Readout']['nskip'])))
+            #        print(('match any present in {}. This is not a valid NIRCam '
+            #              'readout pattern. Quitting.'
+            #              .format(self.params['Reffiles']['readpattdefs'])))
+            #        sys.exit()
+            #else:
+            #    # Case where readpatt and nframe are not recognized
+            #    print(('Unrecognized readout pattern {}, and the input '
+            #           'nframe/nskip combination {},{} does not'
+            #           .format(self.params['Readout']['readpatt'],
+            #                   self.params['Readout']['nframe'],
+            #                   self.params['Readout']['nskip'])))
+            #    print(('match any present in {}. This is not a valid NIRCam '
+            #           'readout pattern. Quitting.'
+            #           .format(self.params['Reffiles']['readpattdefs'])))
+            #    sys.exit()
 
 
     def setNumAmps(self):
@@ -2435,13 +2441,13 @@ class Observation():
         # generally use 1 amp, except for the grism-related
         # subarrays that span the entire width
         # of the detector. For those, trust that the user input is what they want.
+        amps = 4
         if "FULL" in self.params['Readout']['array_name'].upper():
             self.params['Readout']['namp'] = 4
         elif self.subarray_bounds[2] - self.subarray_bounds[0] != 2047:
             self.params['Readout']['namp'] = 1
         else:
             raise ValueError('Cannot determine number of amps.')
-
 
     def checkParamVal(self, value, typ, vmin, vmax, default):
         # Make sure the input value is a float and between min and max
@@ -2457,7 +2463,6 @@ class Observation():
             print(("ERROR: {} for {} is not within reasonable bounds. "
                    "Setting to {}".format(value, typ, default)))
             return default
-
 
     def add_options(self, parser=None, usage=None):
         if parser is None:

@@ -168,15 +168,15 @@ class Blot():
         pars = {'sinscl':1.0, 'interp':'poly5'}
         reffiles = {}
         mm = outlier_detection.OutlierDetection(blot_list,reffiles=reffiles,**pars)
-        blotted_datamodels = outlier_detection.blot_median(input_mod,blot_list,**mm.outlierpars)
+        self.blotted_datamodels = outlier_detection.blot_median(input_mod,blot_list,**mm.outlierpars)
 
-        for (bltted,det,ra,dec,roll) in \
-            zip(blotted_datamodels,self.detector,self.center_ra,\
-                self.center_dec,self.pav3):
-            if self.outfile is None:
-                self.outfile = 'blotted_from_{}_to_{}_{}_{}_{}.fits'.format(outbase,det,ra,dec,roll)
-            bltted.save(self.outfile)
-
+        #for (bltted,det,ra,dec,roll) in \
+        #    zip(blotted_datamodels,self.detector,self.center_ra,\
+        #        self.center_dec,self.pav3):
+        #    if self.outfile is None:
+        #        self.outfile = 'blotted_from_{}_to_{}_{}_{}_{}.fits'.format(outbase,det,ra,dec,roll)
+        #    bltted.save(self.outfile)
+        
 
     def get_siaf_info(self,detname):
         # get v2,v3 reference values and y3yangle for a given detector
