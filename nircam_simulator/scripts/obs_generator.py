@@ -107,7 +107,10 @@ class Observation():
         # CRs are to be added to the data later
         if self.runStep['cosmicray']:
             self.readCRFiles()
-            self.readGainMap()
+
+        # Read in gain map to be used for adding Poisson noise
+        # and to scale CRs to be in ADU
+        self.readGainMap()
             
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
@@ -1947,9 +1950,22 @@ class Observation():
             
     
     def doPoisson(self,signalimage):
-        # Add poisson noise to an input image
-        newimage = np.zeros_like(signalimage,dtype=np.float)
-        ndim = signalimage.shape
+        """Add poisson noise to an input image. Input is assumed
+        to be in units of ADU, meaning it must be multiplied by
+        the gain when calcuating Poisson noise. Then divide by the
+        gain in order for the returned image to also be in ADU
+
+        Arguments:
+        ----------
+        signalimage -- 2D array of signals in ADU
+
+        Returns:
+        --------
+        signalimage with Poisson noise added
+        """
+
+        #newimage = np.zeros_like(signalimage,dtype=np.float)
+        #ndim = signalimage.shape
 
         # Adjust the seed each time dopoisson is run
         np.random.seed()
@@ -1968,17 +1984,21 @@ class Observation():
         # Quantum yield is 1.0 for all NIRCam filters
         pym1 = 0.
         
-        # Add poisson noise to each pixel
-        for i in range(ndim[0]):
-            for j in range(ndim[1]):
-                try:
-                    newimage[i,j]=np.random.poisson(signalimage[i,j])
-                except:
-                    try:
-                        newimage[i,j]=np.random.poisson(np.absolute(signalimage[i,j]))
-                    except:
-                        print("Error: bad signal value at pixel (x,y)=({},{}) = {}".format(j,i,signalimage[i,j]))
-                        newimage[i,j] = 0.0
+        # Can't add Poisson noise to pixels with negative values
+        # Set those to zero when adding noise, then replace with
+        # original value
+        signalgain = signalimage * self.gainim
+        if np.min(signalgain) < 0.:
+            neg = signalgain < 0.
+            negatives = copy.deepcopy(signalgain)
+            negatives[neg] = signalgain[neg]
+            signalgain[neg] = 0.
+            # np.random.poisson returns integers
+            newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+            newimage[neg] = negatives[neg]
+        else:
+            newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+        newimage /= self.gainim
 
                 # Quantum yield for NIRCam is always 1.0 (so psym1=0)
                 #if self.params['simSignals']['photonyield'] and pym1 > 0.000001 and newimage[i,j] > 0:
