@@ -330,7 +330,7 @@ class Catalog_seed():
         #moving target using an extended object
         if self.runStep['movingTargetsExtended']:
             #print("Extended moving targets!!!")
-            mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],'extended',MT_tracking=tracking,ra_vel=tracking_ra_vel,dec_vel=tracking_dec_val)
+            mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],'extended',MT_tracking=tracking,tracking_ra_vel=ra_vel,tracking_dec_vel=dec_val)
             mov_targs_ramps.append(mov_targs_ext)
             if mov_targs_segmap is None:
                 mov_targs_segmap = np.copy(mt_ext_segmap)
@@ -518,13 +518,13 @@ class Catalog_seed():
                 # target. If it doesn't, then we have sidereal
                 # targets, and we can simply set their velocity
                 # as the inverse of that being tracked.
-                mtlist['x_or_RA_velocity'] -= tracking_ra_vel * (1./365.25/24.)
-                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel * (1./365.25/24.)
+                mtlist['x_or_RA_velocity'] -= tracking_ra_vel #* (1./365.25/24.)
+                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel #* (1./365.25/24.)
                 pixvelflag = trackingPixVelFlag
             except:
                 print('Setting velocity of targets equal to the non-sidereal tracking velocity')
-                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel * (1./365.25/24.)
-                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel * (1./365.25/24.)
+                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel #* (1./365.25/24.)
+                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel #* (1./365.25/24.)
                 pixvelflag = trackingPixVelFlag
 
         #get necessary information for coordinate transformations
@@ -655,8 +655,6 @@ class Catalog_seed():
             else:
                 indseg = self.seg_from_photutils(mt_source[-1,:,:],index,noiseval)
                 moving_segmap.segmap += indseg
-            print('movingTargetInputs, index {}, min,max segmap {},{}'.format(index,np.min(moving_segmap.segmap),np.max(moving_segmap.segmap)))
-                
         return mt_integration, moving_segmap.segmap
 
     
