@@ -64,6 +64,7 @@ class Observation():
 
 
     def create(self):
+        """MAIN FUNCTION"""
         print('')
         print("Running observation generator....")
         print('')
@@ -1410,17 +1411,30 @@ class Observation():
 
             
     def addSyntheticToDark(self,synthetic,dark,syn_zeroframe=None):
-        # If zeroframe is provided, the function uses that to create the
-        # dark+synthetic zeroframe that is returned. If not provided, the
-        # function attempts to use the 0th frame of the input synthetic ramp
+        """Add the synthetic data (now an exposure) to the dark current
+        exposure.
+
+        If zeroframe is provided, the function uses that to create the
+        dark+synthetic zeroframe that is returned. If not provided, the
+        function attempts to use the 0th frame of the input synthetic ramp
         
-        # Combine the cube of synthetic signals to the real dark current ramp.
-        # Be sure to adjust the dark current ramp if nframe/nskip is different
-        # than the nframe/nskip values that the dark was taken with.
+        Combine the cube of synthetic signals to the real dark current ramp.
+        Be sure to adjust the dark current ramp if nframe/nskip is different
+        than the nframe/nskip values that the dark was taken with.
 
-        # Only RAPID darks will be re-averaged into different readout patterns
-        # But a BRIGHT2 dark can be used to create a BRIGHT2 simulated ramp
+        Only RAPID darks will be re-averaged into different readout patterns
+        But a BRIGHT2 dark can be used to create a BRIGHT2 simulated ramp
+        
+        Arguments:
+        ----------
+        synthetic -- simulated signals, 4D array
+        dark -- dark current exposure, 4D array
+        syn_zeroframe -- zeroframe data associated with simulated data
 
+        Returns:
+        --------
+        4D exposure containing combined simulated + dark data
+        """
         # Get the info for the dark integration
         darkpatt = dark.header['READPATT']
         dark_nframe = dark.header['NFRAMES']
@@ -1511,7 +1525,8 @@ class Observation():
 
         
     def add_flatfield_effects(self,ramp):
-        #ILLUMINATION FLAT
+        """Add flat field effects to the exposure"""
+        # ILLUMINATION FLAT
         if self.runStep['illuminationflat']:
             illuminationflat,illuminationflatheader = self.readCalFile(self.params['Reffiles']['illumflat'])
             ramp *= illuminationflat
@@ -1520,7 +1535,6 @@ class Observation():
         if self.runStep['pixelflat']:
             pixelflat,pixelflatheader = self.readCalFile(self.params['Reffiles']['pixelflat'])
             ramp *= pixelflat
-
         return ramp
 
     
@@ -1717,44 +1731,64 @@ class Observation():
 
     
     def add_crs_and_noise(self,seed):
-        # Given a noiseless seed ramp, add cosmic
-        # rays and poisson noise
+        """Given a noiseless seed ramp, add cosmic
+        rays and poisson noise"""
         yd, xd = seed.shape[-2:]
+        seeddim = len(seed.shape)
         
         # Run one integration at a time
+        # because each needs its own collection
+        # of cosmic rays and poisson noise realization
         nint = self.params['Readout']['nint']
         ngroups = self.params['Readout']['ngroup']
-        sim_exposure = np.zeros((nint,ngroups,yd,xd))
-        sim_zero = np.zeros((nint,yd,xd))
+        sim_exposure = np.zeros((nint, ngroups, yd, xd))
+        sim_zero = np.zeros((nint, yd, xd))
         for integ in range(nint):
             print("Integration {}:".format(integ))
+            if seeddim == 2:
+                inseed = seed
+            elif seeddim == 4:
+                inseed = seed[integ,:,:,:]
             if self.runStep['cosmicray']:
-                ramp,rampzero = self.frameToRamp(seed)
+                ramp,rampzero = self.frameToRamp(inseed)
             else:
-                ramp,rampzero = self.frameToRamp_noCR(seed)
+                ramp,rampzero = self.frameToRamp_noCR(inseed)
             sim_exposure[integ,:,:,:] = ramp
             sim_zero[integ,:,:] = rampzero
         return sim_exposure,sim_zero
     
                 
     def frameToRamp(self,data):  
-        #*****UPDATED******
-        #***seed image (data) will be a 2d frame or 4d ramp.
-        #***loop over integrations and feed each in here.
-        # Convert rate image to ramp, add poisson noise
-        # and cosmic rays
+        """Convert rate image to ramp, add poisson noise
+        and cosmic rays
+
+        Arguments:
+        ----------
+        data -- seed image. Should be a 2d frame or 3d integration.
+        If the original seed image is a 4d exposure, call frameToRamp
+        with one integration at a time.
+
+        Returns:
+        --------
+        outramp -- 3d integration with cosmic rays and poisson noise
+        zeroframe -- 2d zeroframe
+        """
 
         # Output ramp will be in requested readout pattern!
         ndim = len(data.shape)
 
         #hopefully we don't need this and can find deltaimage on the fly...
-        if ndim == 3:
-            ngroupin,yd,xd = data.shape
+        if ndim == 4:
+            print("Shouldn't be here! No 4D seed images!")
+            sys.exit()
+            nintin, ngroupin, yd, xd = data.shape
+        elif ndim == 3:
+            ngroupin, yd, xd = data.shape
         #    deltaimage = np.zeros((ngroupin-1,yd,xd))
         #    for frame in xrange(1,ngroupin):
         #        deltaimage[frame-1,:,:] = data[frame,:,:] - data[frame-1,:,:]
         elif ndim == 2:
-            yd,xd = data.shape
+            yd, xd = data.shape
         #    ngroupin = None
         #    deltaimage = np.copy(data)
         #-----------------------
@@ -1764,9 +1798,12 @@ class Observation():
         # This should be the case only for data containing
         # moving targets.
         if ndim == 3:
-            print('moving target data shape',data.shape,yd,xd)
+            print('Moving target data shape',data.shape,yd,xd)
+            #newdata = np.zeros((nintin, ngroupin+1, yd, xd))
+            #newdata[:, 1:, :, :] = data
+            #data = newdata
             data = np.vstack((np.zeros((1,yd,xd)),data))
-            
+                
         outramp = np.zeros((self.params['Readout']['ngroup'],yd,xd),dtype=np.float)
         #totalsignalimage = np.zeros((yd,xd),dtype=np.float)
 

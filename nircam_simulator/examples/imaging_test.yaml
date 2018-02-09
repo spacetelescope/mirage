@@ -7,6 +7,7 @@ Readout:
   readpatt: RAPID        #Readout pattern (RAPID, BRIGHT2, etc)
   ngroup: 3              #Number of groups in integration
   nint: 1          #Number of integrations per exposure
+  resets_bet_ints: 1 #Number of detector resets between integrations
   array_name: NRCB5_FULL    #Name of array (FULL, SUB160, SUB64P, etc)
   filter: F250M       #Filter of simulated data (F090W, F322W2, etc)
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
@@ -22,7 +23,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   pixelflat: None 
   illumflat: None                               #Illumination flat field file
   astrometric: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
-  distortion_coeffs: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/SIAF/NIRCam_SIAF_2017-03-28.csv        #CSV file containing distortion coefficients
+  distortion_coeffs: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
   ipc: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
