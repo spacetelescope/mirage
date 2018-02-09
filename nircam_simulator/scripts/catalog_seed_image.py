@@ -92,6 +92,7 @@ class Catalog_seed():
 
         
     def make_seed(self):
+        """MAIN FUNCTION"""
         # Read in input parameters and quality check
         self.readParameterFile()
         self.expand_env_var()
@@ -111,8 +112,10 @@ class Catalog_seed():
             self.calcCoordAdjust()
 
         #image dimensions
-        self.nominal_dims = np.array([self.subarray_bounds[3]-self.subarray_bounds[1]+1,self.subarray_bounds[2]-self.subarray_bounds[0]+1])
-        self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],self.coord_adjust['x']])).astype(np.int)
+        self.nominal_dims = np.array([self.subarray_bounds[3]-self.subarray_bounds[1]+1,
+                                      self.subarray_bounds[2]-self.subarray_bounds[0]+1])
+        self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],
+                                                          self.coord_adjust['x']])).astype(np.int)
 
         #calculate the exposure time of a single frame, based on the size of the subarray
         self.calcFrameTime()
@@ -133,12 +136,14 @@ class Catalog_seed():
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
             outapp = '_nonsidereal_target'            
             
-        #if moving targets are requested (KBOs, asteroids, etc, NOT moving_target mode
-        #where the telescope slews), then create a RAPID integration which 
-        #includes those targets
+        # If moving targets are requested (KBOs, asteroids, etc,
+        # NOT moving_target mode where the telescope slews), then
+        # create a RAPID integration which includes those targets
         mov_targs_ramps = []
-        if (self.runStep['movingTargets'] | self.runStep['movingTargetsSersic'] | self.runStep['movingTargetsExtended']):
-            print('Creating signal ramp of sources that are moving with respect to telescope tracking.')
+        if (self.runStep['movingTargets'] | self.runStep['movingTargetsSersic']
+            | self.runStep['movingTargetsExtended']):
+            print(("Creating signal ramp of sources that are moving with "
+                   "respect to telescope tracking."))
             trailed_ramp, trailed_segmap = self.make_trailed_ramp()
             outapp += '_trailed_sources'
 
@@ -180,10 +185,17 @@ class Catalog_seed():
             units = 'e-/sec'
             yd,xd = arrayshape
             tgroup = 0.
+            print('Seed image is 2D.')
         elif len(arrayshape) == 3:
             units = 'e-'
-            g,yd,xd = arrayshape
+            g, yd, xd = arrayshape
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+            print('Seed image is 3D.')
+        elif len(arrayshape) == 4:
+            units = 'e-'
+            integ, g, yd, xd = arrayshape
+            tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+            print('Seed image is 4D.')
             
         self.seed_file = os.path.join(self.basename + '_' + self.params['Readout']['filter'] + '_seed_image.fits')
         xcent_fov = xd / 2
@@ -265,29 +277,35 @@ class Catalog_seed():
                 sys.exit()
                 
         
-    def combineSimulatedDataSources(self,inputtype,input1,mov_tar_ramp):
-        #inputtype can be 'countrate' in which case input needs to be made
-        #into a ramp before combining with mov_tar_ramp, or 'ramp' in which
-        #case you can combine directly. Use 'ramp' with
-        #moving_target MODE data, and 'countrate' with imaging MODE data
-
-        #Combine the countrate image with the moving target ramp.
-
+    def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
+        """Combine the exposure containing the trailed sources with the 
+        countrate image containing the static sources
+        inputtype can be 'countrate' in which case input needs to be made
+        into a ramp before combining with mov_tar_ramp, or 'ramp' in which
+        case you can combine directly. Use 'ramp' with
+        moving_target MODE data, and 'countrate' with imaging MODE data
+        """
         if inputtype == 'countrate':
-            #First change the countrate image into a ramp
-            yd,xd = input1.shape
-            num_frames = self.params['Readout']['ngroup'] * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
-            print("Countrate image of synthetic signals being converted to RAPID integration with {} frames.".format(num_frames))
-            input1_ramp = np.zeros((num_frames,yd,xd))
+            # First change the countrate image into a ramp
+            yd, xd = input1.shape
+            numints = self.params['Readout']['nint']
+            num_frames = self.params['Readout']['ngroup'] *\
+            (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+            print(("Countrate image of synthetic signals being converted to "
+                   "RAPID integration with {} frames.".format(num_frames)))
+            input1_ramp = np.zeros((numints, num_frames, yd, xd))
             for i in range(num_frames):
-                input1_ramp[i,:,:] = input1 * self.frametime * (i+1)
-
+                input1_ramp[0,i,:,:] = input1 * self.frametime * (i+1)
+            if numints > 1:
+                for integ in range(1,numints):
+                    input1_ramp[integ, :, :, :] = input1_ramp[0, :, :, :]
+                
         else:
-            #if input1 is a ramp rather than a countrate image
+            # If input1 is a ramp rather than a countrate image
             input1_ramp = input1
 
-        #combine the input1 ramp and the moving target ramp, which are
-        #now both RAPID mode
+        # Combine the input1 ramp and the moving target ramp, which are
+        # now both RAPID mode
         totalinput = input1_ramp + mov_tar_ramp
         return totalinput
 
@@ -378,63 +396,73 @@ class Catalog_seed():
 
             
     def non_sidereal_seed(self):
-        # Create a seed RAMP in the case where NIRCam is tracking
-        # a non-sidereal target
+        """Create a seed EXPOSURE in the case where NIRCam is tracking
+        a non-sidereal target
+        """
         
         # Create a count rate image containing only the non-sidereal target(s)
         # These will be stationary in the fov 
-        nonsidereal_countrate,nonsidereal_segmap,self.ra_vel,self.dec_vel,vel_flag = self.nonsidereal_CRImage(self.params['simSignals']['movingTargetToTrack'])
+        nonsidereal_countrate, nonsidereal_segmap, self.ra_vel, self.dec_vel, vel_flag \
+            = self.nonsidereal_CRImage(self.params['simSignals']['movingTargetToTrack'])
 
-        print('nonsidereal_crimage segmap max and min:',np.max(nonsidereal_segmap),np.min(nonsidereal_segmap))
-
+        #print('nonsidereal_crimage segmap max and min:',np.max(nonsidereal_segmap),
+        #      np.min(nonsidereal_segmap))
         
-        # Expand into a RAPID ramp and convert from signal rate to signals
-        ns_yd,ns_xd = nonsidereal_countrate.shape
-        totframes = self.params['Readout']['ngroup'] * (self.params['Readout']['nframe']+self.params['Readout']['nskip'])
+        # Expand into a RAPID exposure and convert from signal rate to signals
+        ns_yd, ns_xd = nonsidereal_countrate.shape
+        ns_int = self.params['Readout']['nint']
+        ns_group = self.params['Readout']['ngroup']
+        ns_nframe = self.params['Readout']['nframe']
+        ns_nskip = self.params['Readout']['nskip']
+        totframes = ns_group * (ns_nframe + ns_nskip)
         tmptimes = self.frametime * np.arange(1,totframes+1)
-        non_sidereal_ramp = np.zeros((totframes,ns_yd,ns_xd))
-        for i in range(totframes):
-            non_sidereal_ramp[i,:,:] = nonsidereal_countrate * tmptimes[i]
-        #non_sidereal_zero = non_sidereal_ramp[0,:,:]
 
-        #Now we need to collect all the other sources (point sources, galaxies, extended)
-        #in the other input files, and treat them as targets which will move across
-        #the field of view during the exposure.
+        #non_sidereal_ramp = np.zeros((totframes, ns_yd, ns_xd))
+        non_sidereal_ramp = np.zeros((ns_int, ns_group, ns_yd, ns_xd))
+        for i in range(totframes):
+            for integ in range(ns_int):
+                non_sidereal_ramp[integ, i, :, :] = nonsidereal_countrate * tmptimes[i]
+
+        # Now we need to collect all the other sources (point sources,
+        # galaxies, extended) in the other input files, and treat them
+        # as targets which will move across the field of view during
+        # the exposure.
         mtt_data_list = []
         mtt_data_segmap = None
         #mtt_zero_list = [] 
 
         if self.runStep['pointsource']:
-            # Now ptsrc is a list, which we need to get into movingTargetInputs...
-            mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],'pointSource',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
+            # Now ptsrc is a list, which we need to provide to
+            # movingTargetInputs
+            mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'], 'pointSource', MT_tracking=True, tracking_ra_vel=self.ra_vel, tracking_dec_vel=self.dec_vel, trackingPixVelFlag=vel_flag)
             mtt_data_list.append(mtt_ptsrc)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ptsrc_segmap)
             else:
                 mtt_data_segmap += mtt_ptsrc_segmap
-            print("Done with creating moving targets from {}".format(self.params['simSignals']['pointsource']))
-            print("Min and max values of ptsrc segmap: {},{}".format(np.min(mtt_ptsrc_segmap),np.max(mtt_ptsrc_segmap)))
+            print(("Done with creating moving targets from {}"
+                   .format(self.params['simSignals']['pointsource'])))
 
         if self.runStep['galaxies']:
-            mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],'galaxies',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
+            mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'], 'galaxies', MT_tracking=True, tracking_ra_vel=self.ra_vel, tracking_dec_vel=self.dec_vel, trackingPixVelFlag=vel_flag)
             mtt_data_list.append(mtt_galaxies)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_galaxies_segmap)
             else:
                 mtt_data_segmap += mtt_galaxies_segmap
-            print("Done with creating moving targets from {}".format(self.params['simSignals']['galaxyListFile']))
-            print("Min and max values of galaxy segmap: {},{}".format(np.min(mtt_galaxies_segmap),np.max(mtt_galaxies_segmap)))
+            print(("Done with creating moving targets from {}".
+                   format(self.params['simSignals']['galaxyListFile'])))
 
         if self.runStep['extendedsource']:
-            mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'],'extended',MT_tracking=True,tracking_ra_vel=self.ra_vel,tracking_dec_vel=self.dec_vel,trackingPixVelFlag=vel_flag)
+            mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'], 'extended', MT_tracking=True, tracking_ra_vel=self.ra_vel, tracking_dec_vel=self.dec_vel, trackingPixVelFlag=vel_flag)
             mtt_data_list.append(mtt_ext)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ext_segmap)
             else:
                 mtt_data_segmap += mtt_ext_segmap
-            print("Min and max values of extended segmap: {},{}".format(np.min(mtt_ext_segmap),np.max(mtt_ext_segmap)))
+            print(("Done with creating moving targets from {}".
+                   format(self.params['simSignals']['extended'])))
 
-                
         # Add in the other objects which are not being tracked on 
         # (i.e. the sidereal targets)
         if len(mtt_data_list) > 0:
@@ -446,16 +474,31 @@ class Catalog_seed():
         return non_sidereal_ramp, nonsidereal_segmap
 
     
-    def readMTFile(self,file):
-        #read in moving target list file
+    def readMTFile(self, file):
+        """
+        Read in moving target list file
+
+        Arguments:
+        ----------
+        file -- name of moving target catalog file 
+
+        Returns:
+        --------
+        table containing moving target entries
+        pixelflag (boolean) -- If true, locations are in units of
+             pixels. If false, locations are RA, Dec
+        pixelvelflag (boolean) -- If true, moving target velocities
+             are in units of pixels/hour. If false, arcsec/hour
+        magsys -- magnitude system of the moving target magnitudes
+        """
         mtlist = ascii.read(file,comment='#')
 
-        #convert all columns to floats
+        # Convert all relevant columns to floats
         for col in mtlist.colnames:
-            if mtlist[col].dtype in ['int64','int']:
+            if mtlist[col].dtype in ['int64', 'int']:
                 mtlist[col] = mtlist[col].data * 1.
-                
-        #check to see whether the position is in x,y or ra,dec
+
+        # Check to see whether the position is in x,y or ra,dec
         pixelflag = False
         try:
             if 'position_pixels' in mtlist.meta['comments'][0:4]:
@@ -463,8 +506,8 @@ class Catalog_seed():
         except:
             pass
 
-        #if present, check whether the velocity entries are pix/sec
-        #or arcsec/sec.
+        # If present, check whether the velocity entries are pix/sec
+        # or arcsec/sec.
         pixelvelflag = False
         try:
             if 'velocity_pixels' in mtlist.meta['comments'][0:4]:
@@ -472,23 +515,35 @@ class Catalog_seed():
         except:
             pass
 
+        # If present, check whether the radius entries (for galaxies)
+        # are in arcsec or pixels. If in arcsec, change to pixels
+        if 'radius' in mtlist.colnames:
+            if 'radius_pixels' not in mtlist.meta['comments'][0:4]:
+                mtlist['radius'] /= self.pixscale[0]
+
+        # If galaxies are present, change position angle from degrees
+        # to radians
+        if 'pos_angle' in mtlist.colnames:
+            mtlist['pos_angle'] = mtlist['pos_angle'] * np.pi / 180.
+                
         # Check to see if magnitude system is specified in comments
         # If not, assume AB mags
         msys = 'abmag'
         if 'mag' in mtlist.meta['comments'][0:4]:
             msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
-        
-        return mtlist,pixelflag,pixelvelflag,msys.lower()
 
+        return mtlist, pixelflag, pixelvelflag, msys.lower()
         
-    def movingTargetInputs(self,file,input_type,MT_tracking=False,tracking_ra_vel=None,tracking_dec_vel=None,trackingPixVelFlag=False):
-        # Read in listfile of moving targets and perform needed calculations to get inputs
-        # for moving_targets.py
+    def movingTargetInputs(self, file, input_type, MT_tracking=False,
+                           tracking_ra_vel=None, tracking_dec_vel=None,
+                           trackingPixVelFlag=False):
+        """Read in listfile of moving targets and perform needed 
+        calculations to get inputs for moving_targets.py
 
-        # Input_type can be 'pointSource','galaxies', or 'extended'
-            
+        input_type can be 'pointSource','galaxies', or 'extended'
+        """
         # Read input file - should be able to use for all modes
-        mtlist,pixelFlag,pixvelflag,magsys = self.readMTFile(file)
+        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(file)
 
         # If the input catalog has an index column
         # use that, otherwise add one
@@ -527,23 +582,44 @@ class Catalog_seed():
                 mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel #* (1./365.25/24.)
                 pixvelflag = trackingPixVelFlag
 
-        #get necessary information for coordinate transformations
+        # Get necessary information for coordinate transformations
         coord_transform = None
         if self.runStep['astrometric']:
-
-            #Read in the CRDS-format distortion reference file
+            # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
 
-        #Using the requested RA,Dec of the reference pixel, along with the 
-        #V2,V3 of the reference pixel, and the requested roll angle of the telescope
-        #create a matrix that can be used to translate between V2,V3 and RA,Dec
-        #for any pixel.
-        #v2,v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
+        # Using the requested RA,Dec of the reference pixel, along with the 
+        # V2,V3 of the reference pixel, and the requested roll angle of the telescope,
+        # create a matrix that can be used to translate between V2,V3 and RA,Dec
+        # for any pixel.
+        # v2,v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
         attitude_matrix = self.getAttitudeMatrix()
         
-        #exposure times for all frames
-        frameexptimes = self.frametime * np.arange(-1,self.params['Readout']['ngroup'] * (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
+        # Exposure times for all frames
+        numints = self.params['Readout']['nint']
+        numgroups = self.params['Readout']['ngroup']
+        numframes = self.params['Readout']['nframe']
+        numskips = self.params['Readout']['nskip']
+        numresets = self.params['Readout']['resets_bet_ints']
+
+        frames_per_group = numframes + numskips
+        total_frames = numgroups * frames_per_group
+        # If only one integration per exposure, then total_frames
+        # above is correct. For >1 integration, we need to add the reset
+        # frame to each integration (except the first), and sum the number of
+        # frames for all integrations
+        
+        if numints > 1:
+            # Frames for all integrations
+            total_frames *= numints
+            # Add the resets for all but the first and last integrations
+            total_frames += (numresets * (numints - 1))
+
+        frameexptimes = self.frametime * np.arange(-1,total_frames)
+        #frameexptimes = self.frametime * np.arange(-1,self.params['Readout']['ngroup']
+        #                                           * (self.params['Readout']['nframe']
+        #                                              + self.params['Readout']['nskip']))
             
         #output image dimensions
         #dims = np.array(self.dark.data[0,0,:,:].shape)
@@ -552,49 +628,68 @@ class Catalog_seed():
         newdimsy = np.int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
-        mt_integration = np.zeros((len(frameexptimes)-1,newdimsy,newdimsx))
-
+        #mt_integration = np.zeros((len(frameexptimes)-1, newdimsy, newdimsx))
+        mt_integration = np.zeros((numints, numgroups*frames_per_group, newdimsy, newdimsx))
+        
         # Corresponding (2D) segmentation map
         moving_segmap = segmap.SegMap()
         moving_segmap.xdim = newdimsx
         moving_segmap.ydim = newdimsy
         moving_segmap.initialize_map()
         
-        for index,entry in zip(indexes,mtlist):
+        for index, entry in zip(indexes, mtlist):
+            # For each object, calculate x,y or RA,Dec of initial position
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.getPositions(
+                entry['x_or_RA'], entry['y_or_Dec'], attitude_matrix,
+                coord_transform, pixelFlag)
 
-            #for each object, calculate x,y or ra,dec of initial position
-            pixelx,pixely,ra,dec,ra_str,dec_str = self.getPositions(entry['x_or_RA'],entry['y_or_Dec'],attitude_matrix,coord_transform,pixelFlag)
-
-            #now generate a list of x,y position in each frame
+            # Now generate a list of x,y position in each frame
             if pixvelflag == False:
-                #calculate the RA,Dec in each frame
-                #input velocities are arcsec/hour. ra/dec are in units of degrees,
-                #so divide velocities by 3600^2.
-                ra_frames = ra + (entry['x_or_RA_velocity']/3600./3600.) * frameexptimes
-                dec_frames = dec + (entry['y_or_Dec_velocity']/3600./3600.) * frameexptimes
+                # Calculate the RA,Dec in each frame
+                # input velocities are arcsec/hour. ra/dec are in units of degrees,
+                # so divide velocities by 3600^2.
+                ra_frames = ra + (entry['x_or_RA_velocity'] / 3600. / 3600.) * frameexptimes
+                dec_frames = dec + (entry['y_or_Dec_velocity'] / 3600. / 3600.) * frameexptimes
 
                 x_frames = []
                 y_frames = []
-                for in_ra,in_dec in zip(ra_frames,dec_frames):
-                    #calculate the x,y position at each frame
-                    px,py,pra,pdec,pra_str,pdec_str = self.getPositions(in_ra,in_dec,attitude_matrix,coord_transform,False)
+                for in_ra, in_dec in zip(ra_frames, dec_frames):
+                    # Calculate the x,y position at each frame
+                    px, py, pra, pdec, pra_str, pdec_str = self.getPositions(
+                        in_ra, in_dec, attitude_matrix, coord_transform, False)
                     x_frames.append(px)
                     y_frames.append(py)
                 x_frames = np.array(x_frames)
                 y_frames = np.array(y_frames)
                     
             else:
-                #if input velocities are pixels/hour, then generate the list of
-                #x,y in each frame directly
-                x_frames = pixelx + (entry['x_or_RA_velocity']/3600.) * frameexptimes
-                y_frames = pixely + (entry['y_or_Dec_velocity']/3600.) * frameexptimes
-                      
-            #If the target never falls on the detector, then move on to the next target
-            xfdiffs = np.fabs(x_frames - (newdimsx/2))
-            yfdiffs = np.fabs(y_frames - (newdimsy/2))
-            if np.min(xfdiffs) > (newdimsx/2) or np.min(yfdiffs) > (newdimsy/2):
-                continue
+                # If input velocities are pixels/hour, then generate the list of
+                # x,y in each frame directly
+                x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
+                y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
 
+            #print('x_frames: {}'.format(x_frames))
+            #print('y_frames: {}'.format(y_frames))
+                
+            # If the target never falls on the detector,
+            # then move on to the next target
+            #xfdiffs = np.fabs(x_frames - (newdimsx/2))
+            #yfdiffs = np.fabs(y_frames - (newdimsy/2))
+            #if np.min(xfdiffs) > (newdimsx/2) or np.min(yfdiffs) > (newdimsy/2):
+            #    continue
+
+            # If we have a point source, we can easily determine whether
+            # it completely misses the detector, since we know the size
+            # of the stamp already. For galaxies and extended sources,
+            # we have to get the stamp image first to see if any part of
+            # the stamp lands on the detector.
+            status = 'on'
+            if input_type == 'pointSource':
+                status = self.on_detector(x_frames, y_frames, self.centerpsf.shape,
+                                          (newdimsx, newdimsy))
+            if status == 'off':
+                continue
+            
             # So now we have xinit,yinit, a list of x,y positions for
             # each frame, and the frametime.
             # Subsample factor can be hardwired for now. outx and outy
@@ -606,58 +701,123 @@ class Catalog_seed():
                 stamp = self.centerpsf
 
             elif input_type == 'extended':
-                stamp,header = self.basicGetImage(entry['filename'])
+                stamp, header = self.basicGetImage(entry['filename'])
                 if entry['pos_angle'] != 0.:
-                    stamp = self.basicRotateImage(stamp,entry['pos_angle'])
+                    stamp = self.basicRotateImage(stamp, entry['pos_angle'])
 
-                #convolve with NIRCam PSF if requested
+                # Convolve with NIRCam PSF if requested
                 if self.params['simSignals']['PSFConvolveExtended']:
-                    stamp = s1.fftconvolve(stamp,self.centerpsf,mode='same')
+                    stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
             elif input_type == 'galaxies':
-                stamp = self.create_galaxy(entry['radius'],entry['ellipticity'],entry['sersic_index'],entry['pos_angle'],1.) #entry['counts_per_frame_e'])
-                #convolve the galaxy with the NIRCam PSF
-                stamp = s1.fftconvolve(stamp,self.centerpsf,mode='same')
+                stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], entry['pos_angle'], 1.) 
+                # Convolve the galaxy with the NIRCam PSF
+                stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
-            #normalize the PSF to a total signal of 1.0
+            # Normalize the PSF to a total signal of 1.0
             totalsignal = np.sum(stamp)
             stamp /= totalsignal
 
-            #Scale the stamp image to the requested magnitude
-            #scale = 10.**(0.4*(15.0-entry['magnitude']))
-            #rate = scale * mag15rate
-            rate = self.mag_to_countrate(magsys,entry['magnitude'],photfnu=self.photfnu,photflam=self.photflam)
+            # Scale the stamp image to the requested magnitude
+            rate = self.mag_to_countrate(magsys, entry['magnitude'],
+                                         photfnu=self.photfnu,
+                                         photflam=self.photflam)
             stamp *= rate
 
-            #each entry will have stamp image as array, ra_init,dec_init,ra_velocity,dec_velocity,frametime,numframes,subsample_factor,outputarrayxsize,outputarrayysize (maybe without the values that will be the same to each entry.
+            # Now that we have stamp images for galaxies and extended
+            # sources, check to see if they overlap the detector or not.
+            # NOTE: this will only catch sources that never overlap the
+            # detector for any of their positions.
+            if input_type != 'pointSource':
+                status = self.on_detector(x_frames, y_frames, stamp.shape,
+                                          (newdimsx, newdimsy))
+            if status == 'off':
+                continue
+            
+            # Each entry will have stamp image as array, ra_init, dec_init,
+            # ra_velocity, dec_velocity, frametime, numframes, subsample_factor,
+            # outputarrayxsize, outputarrayysize
+            # (maybe without the values that will be the same to each entry.
 
             #entryList = (stamp,ra,dec,entry[3]/3600.,entry[4]/3600.,self.frametime,numframes,subsample_factor,outx,outy)
             #entryList = (stamp,x_frames,y_frames,self.frametime,subsample_factor,outx,outy)
-            mt = moving_targets.MovingTarget()
-            mt.subsampx = 3
-            mt.subsampy = 3
-            mt_source = mt.create(stamp,x_frames,y_frames,self.frametime,newdimsx,newdimsy)
-            mt_integration += mt_source
 
-            noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-            if self.params['Inst']['mode'].lower() == 'wfss':
-                noiseval += self.grism_background
+            # Need to feed info into moving_targets one integration at a time.
+            # No need to feed in the reset frames, but they are necessary
+            # before this point in order to get the timing and positions
+            # correct.
+            for integ in range(numints):
+                framestart = integ * (frames_per_group * numgroups) + integ
+                frameend = framestart + (frames_per_group * numgroups) + 1
 
-            if input_type in ['pointSource','galaxies']:
+                # Now check to see if the stamp image overlaps the output
+                # aperture for this integration only. Above we removed sources
+                # that never overlap the aperture. Here we want to get rid
+                # of sources that overlap the detector in some integrations,
+                # but not this particular integration
+                status = 'on'
+                status = self.on_detector(x_frames[framestart:frameend],
+                                          y_frames[framestart:frameend],
+                                          stamp.shape,(newdimsx, newdimsy))
+                if status == 'off':
+                    continue
 
-                #if input_type == 'galaxies':
-                #    print(mt_source.shape)
-                #    h0=fits.PrimaryHDU(mt_source)
-                #    hl = fits.HDUList([h0])
-                #    hl.writeto('test_galaxy.fits',overwrite=True)
-                #    stop
-                moving_segmap.add_object_noise(mt_source[-1,:,:],0,0,index,noiseval)
-            else:
-                indseg = self.seg_from_photutils(mt_source[-1,:,:],index,noiseval)
-                moving_segmap.segmap += indseg
+                mt = moving_targets.MovingTarget()
+                mt.subsampx = 3
+                mt.subsampy = 3
+                #mt_source = mt.create(stamp, x_frames, y_frames, self.frametime, newdimsx, newdimsy)
+                #print("Prepping to input to moving_targets: integ: {}, framestart: {}, frameend: {}, xframelen: {}, yframelen: {}, {}, {}, {}".format(integ,framestart,frameend,len(x_frames),len(y_frames),newdimsx,newdimsy,stamp.shape))
+
+                mt_source = mt.create(stamp, x_frames[framestart:frameend],
+                                      y_frames[framestart:frameend],
+                                      self.frametime, newdimsx, newdimsy)
+                #mt_integration += mt_source
+                mt_integration[integ,:,:,:] += mt_source
+                
+                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
+                if self.params['Inst']['mode'].lower() == 'wfss':
+                    noiseval += self.grism_background
+
+                if input_type in ['pointSource', 'galaxies']:
+                    moving_segmap.add_object_noise(mt_source[-1,:,:], 0, 0, index, noiseval)
+                else:
+                    indseg = self.seg_from_photutils(mt_source[-1,:,:], index, noiseval)
+                    moving_segmap.segmap += indseg
         return mt_integration, moving_segmap.segmap
 
     
+    def on_detector(self,xloc, yloc, stampdim, finaldim):
+        """Given a set of x, y locations, stamp image dimensions,
+        and final image dimensions, determine whether the stamp
+        image will overlap at all with the final image, or
+        completely miss it.
+
+        Arguments:
+        ----------
+        xloc -- list of x-coordinate locations of source
+        yloc -- list of y-coordinate locations of source
+        stampdim -- tuple of x,y dimension lengths of stamp image
+        finaldim -- tuple of x,y dimension lengths of final image
+
+        Returns:
+        --------
+        state of stamp image:
+        "on" -- stamp image fully or partially overlaps the final
+             image for at least one xloc, yloc pair
+        "off" -- stamp image never overlaps with final image
+        """
+        status = 'on'
+        stampx, stampy = stampdim
+        stampminx = np.min(xloc - (stampx / 2))
+        stampminy = np.min(yloc - (stampy / 2))
+        stampmaxx = np.max(xloc + (stampx / 2))
+        stampmaxy = np.max(yloc + (stampy / 2))
+        finalx, finaly = finaldim
+        if ((stampminx > finalx) or (stampmaxx < 0) or
+            (stampminy > finaly) or (stampmaxy < 0)):
+            status = 'off'
+        return status
+
     def getPositions(self,inx,iny,matrix,transform,pixelflag):
         #input a row containing x,y or ra,dec values, and figure out
         #x,y, RA, Dec, and RA string and Dec string 
@@ -699,13 +859,24 @@ class Catalog_seed():
 
 
     def nonsidereal_CRImage(self,file):
-        # Create countrate image of non-sidereal sources
-        # that are being tracked.
+        """
+        Create countrate image of non-sidereal sources
+        that are being tracked.
+
+        Arguments:
+        ----------
+        file -- name of the file containing the tracked moving targets.
+
+        Returns:
+        --------
+        countrate image (2D) containing the tracked non-sidereal targets.
+        """
         totalCRList = []
         totalSegList = []
         
         # Read in file containing targets
-        targs,pixFlag,velFlag,magsys = self.readMTFile(self.params['simSignals']['movingTargetToTrack'])
+        #targs,pixFlag,velFlag,magsys = self.readMTFile(self.params['simSignals']['movingTargetToTrack'])
+        targs, pixFlag, velFlag, magsys = self.readMTFile(file)
         
         # We need to keep track of the proper motion of the
         # target being tracked, because all other objects in
@@ -1665,7 +1836,7 @@ class Catalog_seed():
             msys = 'abmag'
             if 'mag' in gtab.meta['comments'][0:4]:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
-            
+
         except:
             print("WARNING: Unable to open the galaxy source list file {}".format(filename))
             sys.exit()
@@ -1844,7 +2015,8 @@ class Catalog_seed():
                 filteredList.add_row(entry)
 
         #Write the results to a file
-        print("Number of galaxies found within the requested aperture: {}".format(len(filteredList)))
+        print(("Number of galaxies found within the requested aperture: {}"
+               .format(len(filteredList))))
         filteredList.meta['comments'] = ["Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra,self.dec,self.params['Telescope']['rotation'],nx,ny)]
         filteredOut = self.basename + '_galaxySources.list'
         filteredList.write(filteredOut,format='ascii',overwrite=True)
@@ -1859,31 +2031,63 @@ class Catalog_seed():
         meshmax = np.min([np.int(self.ffsize*self.coord_adjust['y']),radius*100.])
         x,y = np.meshgrid(np.arange(meshmax), np.arange(meshmax))
 
-        #center the galaxy in the array
-        xc = meshmax/2
-        yc = meshmax/2
+        # Center the galaxy in the array
+        xc = meshmax / 2
+        yc = meshmax / 2
         
-        #create model
-        #print('posang is {}'.format(posang))
-        mod = Sersic2D(amplitude = 1,r_eff = radius, n=sersic, x_0=xc, y_0=yc, ellip=ellipticity, theta=posang)
+        # Create model
+        mod = Sersic2D(amplitude=1, r_eff=radius, n=sersic, x_0=xc, y_0=yc,
+                       ellip=ellipticity, theta=posang)
 
-        #create instance of model
+        # Create instance of model
         img = mod(x, y)
 
-        #check to see if you've cropped too small and there is still significant signal
-        #at the edges
-        
+        # Check to see if you've cropped too small and there is still significant signal
+        # at the edges
         mxedge = np.max(np.array([np.max(img[:,-1]),np.max(img[:,0]),np.max(img[0,:]),np.max(img[-1,:])]))
         if mxedge > 0.001:
             print('Too small!')
 
-        #scale such that the total number of counts in the galaxy matches the input
+        # Scale such that the total number of counts in the galaxy matches the input
         summedcounts = np.sum(img)
+        if summedcounts == 0:
+            print('in create_galaxy: ',radius,ellipticity,sersic,posang,totalcounts)
         factor = totalcounts / summedcounts
         img = img * factor
+
+        # Crop image down such that it contains 99.95% of the total signal
+        img = self.crop_galaxy_stamp(img,0.9995)
         return img
     
-    
+    def crop_galaxy_stamp(self, stamp, threshold):
+        """Crop an input stamp image containing a galaxy to a size that
+        contains only threshold times the total signal. This is an
+        attempt to speed up the simulator a bit, since the galaxy stamp
+        images are often very large. Note that galaxy stamp images being
+        fed into this function are currently always square.
+
+        Arguments:
+        ----------
+        stamp -- 2D stamp image of galaxy
+        threshold -- fraction of total flux to keep in the cropped image
+                      (e.g. 0.999 = 99.9%)
+
+        Returns:
+        --------
+        cropped image
+        """
+        totsignal = np.sum(stamp)
+        yd, xd = stamp.shape
+        mid = np.int(xd / 2)
+        for rad in range(mid):
+            signal = np.sum(stamp[mid-rad:mid+rad+1, mid-rad:mid+rad+1]) / totsignal
+            if signal >= threshold:
+                return stamp[mid-rad:mid+rad+1, mid-rad:mid+rad+1]
+        # If we make it all the way through the stamp without
+        # hitting the threshold, then return the full stamp image
+        return stamp
+
+            
 
     def makeGalaxyImage(self,file,psf):
         #Using the entries in the 'simSignals' 'galaxyList' file, create a countrate image
@@ -2407,6 +2611,7 @@ class Catalog_seed():
                     
 
     def checkParams(self):
+        """Check input parameters for expected datatypes, values"""
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in inst_list:
             print("WARNING: {} instrument not implemented within ramp simulator")
@@ -2418,7 +2623,10 @@ class Catalog_seed():
         if self.params['Inst']['mode'] in possibleModes:
             pass
         else:
-            print("WARNING: unrecognized mode {} for {}. Must be one of: {}".format(self.params['Inst']['mode'],self.params['Inst']['instrument'],possibleModes))
+            print(("WARNING: unrecognized mode {} for {}."
+                   "Must be one of: {}".format(self.params['Inst']['mode'],
+                                               self.params['Inst']['instrument'],
+                                               possibleModes)))
             sys.exit()
 
         # Set nframe and nskip according to the values in the
