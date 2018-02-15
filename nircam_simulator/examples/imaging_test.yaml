@@ -1,6 +1,6 @@
 Inst:
   instrument: NIRCam          #Instrument name
-  mode: imaging               #Observation mode (e.g. imaging, WFSS, moving_target)
+  mode: nircamimaging               #Observation mode (e.g. imaging, WFSS, moving_target)
   use_JWST_pipeline: False   #Use pipeline in data transformations
 
 Readout:
@@ -19,10 +19,10 @@ Reffiles:                                 #Set to None or leave blank if you wis
   linearity: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/linearity/NRCBLONG_17161_LinearityCoeff_ADU0_2016-05-22_ssblinearity_v2_DMSorient.fits    #linearity correction coefficients
   saturation: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/saturation/NRCB5_17161_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
   gain: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
-  pixelflat: None 
+  pixelflat: None
   illumflat: None                               #Illumination flat field file
   astrometric: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
-  distortion_coeffs: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/SIAF/NIRCam_SIAF_2017-03-28.csv        #CSV file containing distortion coefficients
+  distortion_coeffs: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
   ipc: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
@@ -63,8 +63,8 @@ simSignals:
   movingTargetSersic: None  #ascii file containing a list of 2D sersic profiles to have moving through the field
   movingTargetExtended: None      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
   movingTargetConvolveExtended: True       #convolve the extended moving targets with PSF before adding.
-  movingTargetToTrack: None #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target" 
-  zodiacal:  None                          #Zodiacal light count rate image file 
+  movingTargetToTrack: None #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+  zodiacal:  None                          #Zodiacal light count rate image file
   zodiscale:  1.0                            #Zodi scaling factor
   scattered:  None                          #Scattered light count rate image file
   scatteredscale: 1.0                        #Scattered light scaling factor

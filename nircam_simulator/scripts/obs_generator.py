@@ -814,7 +814,10 @@ class Observation():
         #exptypes = ['NRC_IMAGE', 'NRC_GRISM', 'NRC_TACQ', 'NRC_CORON', 'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
         #nrc_tacq and nrc_coron are not currently implemented.
 
-        exptype = {'imaging':'NRC_IMAGE', 'moving_target':'NRC_TSIMAGE', 'wfss':'NRC_GRISM', 'tso_wfss':'NRC_TSGRISM', 'coron':'NRC_CORON'}
+        exptype = {'nircamimaging': 'NRC_IMAGE', 'nircamengineeringimaging': 'NRC_IMAGE',
+                   'moving_target': 'NRC_TSIMAGE', 'wfsccommissioning': 'NRC_IMAGE',
+                   'wfscglobalalignment': 'NRC_IMAGE',
+                   'nircamwfss': 'NRC_GRISM', 'tso_wfss': 'NRC_TSGRISM', 'coron': 'NRC_CORON'}
 
         try:
             outModel.meta.exposure.type = exptype[self.params['Inst']['mode'].lower()]

@@ -84,7 +84,6 @@ class DarkPrep():
             self.getBaseDark()
             self.linDark = None
         else:
-            print(self.params['Reffiles']['linearized_darkfile'])
             self.readLinearDark()
             self.dark = self.linDark
 

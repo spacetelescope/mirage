@@ -454,7 +454,7 @@ class Catalog_seed():
 
     def readMTFile(self, file):
         # read in moving target list file
-        mtlist = ascii.read(file, comment='# ')
+        mtlist = ascii.read(file)
 
         # convert all columns to floats
         for col in mtlist.colnames:
@@ -1458,7 +1458,7 @@ class Catalog_seed():
     def readPointSourceFile(self, filename):
         # Read in the point source list
         try:
-            gtab = ascii.read(filename, comment='# ')
+            gtab = ascii.read(filename)
             # Look at the header lines to see if inputs
             # are in units of pixels or RA, Dec
             pflag = False
@@ -1636,7 +1636,7 @@ class Catalog_seed():
         # Read in the galaxy source list
         try:
             # read table
-            gtab = ascii.read(filename, comment='# ')
+            gtab = ascii.read(filename)
 
             # Look at the header lines to see if inputs
             # are in units of pixels or RA, Dec
@@ -2810,10 +2810,8 @@ class Catalog_seed():
             if c1:
                 self.params[rele[0]][rele[1]] = rfile
             else:
-                print(("WARNING: Unable to locate the {}, {}"
-                       .format(rele[0], rele[1])))
-                print(("input file! Not present in {}"
-                       .format(rfile)))
+                print(("WARNING: Unable to locate the {}, {}".format(rele[0], rele[1])))
+                print(("input file! Not present in {}".format(rfile)))
                 sys.exit()
 
     def path_check(self, p):
