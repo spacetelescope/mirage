@@ -1076,51 +1076,55 @@ class AptInput:
         obs_sw_filt = []
         obs_lw_filt = []
 
-        for obs in intab['obs_label']:
+        for exp, obs in zip(intab['exposure'], intab['obs_label']):
             match = np.where(obs == onames)[0]
             if len(match) == 0:
-                print("No valid epoch line found for observation {}".format(obs))
-                print(type(obs))
-                print(onames, obs)
-                sys.exit()
-            else:
-                # print('Matching {} from xml with {} from observation listfile'.format(obs, onames[match[0]]))
-                # obslist = self.obstab['Observation{}'.format(match[0] + 1)]
-                obslist = self.obstab[onums[match[0]]]
-                obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
-                obs_pav3.append(obslist['PAV3'])
-                obs_sw_ptsrc.append(obslist['SW']['PointSourceCatalog'])
-                obs_sw_galcat.append(obslist['SW']['GalaxyCatalog'])
-                obs_sw_ext.append(obslist['SW']['ExtendedCatalog'])
-                obs_sw_extscl.append(obslist['SW']['ExtendedScale'])
-                obs_sw_extcent.append(obslist['SW']['ExtendedCenter'])
-                obs_sw_movptsrc.append(obslist['SW']['MovingTargetList'])
-                obs_sw_movgal.append(obslist['SW']['MovingTargetSersic'])
-                obs_sw_movext.append(obslist['SW']['MovingTargetExtended'])
-                obs_sw_movconv.append(obslist['SW']['MovingTargetConvolveExtended'])
-                obs_sw_solarsys.append(obslist['SW']['MovingTargetToTrack'])
-                obs_sw_bkgd.append(obslist['SW']['BackgroundRate'])
-                obs_lw_ptsrc.append(obslist['LW']['PointSourceCatalog'])
-                obs_lw_galcat.append(obslist['LW']['GalaxyCatalog'])
-                obs_lw_ext.append(obslist['LW']['ExtendedCatalog'])
-                obs_lw_extscl.append(obslist['LW']['ExtendedScale'])
-                obs_lw_extcent.append(obslist['LW']['ExtendedCenter'])
-                obs_lw_movptsrc.append(obslist['LW']['MovingTargetList'])
-                obs_lw_movgal.append(obslist['LW']['MovingTargetSersic'])
-                obs_lw_movext.append(obslist['LW']['MovingTargetExtended'])
-                obs_lw_movconv.append(obslist['LW']['MovingTargetConvolveExtended'])
-                obs_lw_solarsys.append(obslist['LW']['MovingTargetToTrack'])
-                obs_lw_bkgd.append(obslist['LW']['BackgroundRate'])
+                raise StandardError("No valid epoch line found for observation {} in observation table ({}).".format(obs, onames))
 
-                # Override filters if given
-                try:
-                    obs_sw_filt.append(obslist['SW']['Filter'])
-                except:
-                    pass
-                try:
-                    obs_lw_filt.append(obslist['LW']['Filter'])
-                except:
-                    pass
+            # Match observation from observationtable.yaml with observatoins
+            # from  APT XML/pointing; extract the date and PAV3
+            obslist = self.obstab[onums[match[0]]]
+            obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
+            obs_pav3.append(obslist['PAV3'])
+
+            # Then, match up with the filter configuration using the exposure
+            # number
+            exposure = exp[-1]
+            filter_config = 'FilterConfig{}'.format(exposure)
+            obslist = obslist[filter_config]
+
+            obs_sw_ptsrc.append(obslist['SW']['PointSourceCatalog'])
+            obs_sw_galcat.append(obslist['SW']['GalaxyCatalog'])
+            obs_sw_ext.append(obslist['SW']['ExtendedCatalog'])
+            obs_sw_extscl.append(obslist['SW']['ExtendedScale'])
+            obs_sw_extcent.append(obslist['SW']['ExtendedCenter'])
+            obs_sw_movptsrc.append(obslist['SW']['MovingTargetList'])
+            obs_sw_movgal.append(obslist['SW']['MovingTargetSersic'])
+            obs_sw_movext.append(obslist['SW']['MovingTargetExtended'])
+            obs_sw_movconv.append(obslist['SW']['MovingTargetConvolveExtended'])
+            obs_sw_solarsys.append(obslist['SW']['MovingTargetToTrack'])
+            obs_sw_bkgd.append(obslist['SW']['BackgroundRate'])
+            obs_lw_ptsrc.append(obslist['LW']['PointSourceCatalog'])
+            obs_lw_galcat.append(obslist['LW']['GalaxyCatalog'])
+            obs_lw_ext.append(obslist['LW']['ExtendedCatalog'])
+            obs_lw_extscl.append(obslist['LW']['ExtendedScale'])
+            obs_lw_extcent.append(obslist['LW']['ExtendedCenter'])
+            obs_lw_movptsrc.append(obslist['LW']['MovingTargetList'])
+            obs_lw_movgal.append(obslist['LW']['MovingTargetSersic'])
+            obs_lw_movext.append(obslist['LW']['MovingTargetExtended'])
+            obs_lw_movconv.append(obslist['LW']['MovingTargetConvolveExtended'])
+            obs_lw_solarsys.append(obslist['LW']['MovingTargetToTrack'])
+            obs_lw_bkgd.append(obslist['LW']['BackgroundRate'])
+
+            # Override filters if given
+            try:
+                obs_sw_filt.append(obslist['SW']['Filter'])
+            except:
+                pass
+            try:
+                obs_lw_filt.append(obslist['LW']['Filter'])
+            except:
+                pass
 
         intab['epoch_start_date'] = obs_start
         intab['pav3'] = obs_pav3
