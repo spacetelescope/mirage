@@ -315,7 +315,7 @@ class AptInput:
                                     aperture.'.format(mod))
 
                         subarr = config['Name'][i_sub][0]
-                        print('Aperture override: subarray {}'.format(subarr[0]))
+                        print('Aperture override: subarray {}'.format(subarr))
 
                 try:
                     pdither = template.find(ns + 'PrimaryDithers').text
@@ -408,7 +408,7 @@ class AptInput:
                                     aperture.'.format(mod))
 
                         subarr = config['Name'][i_sub][0]
-                        print('Aperture override: subarray {}'.format(subarr[0]))
+                        print('Aperture override: subarray {}'.format(subarr))
 
                 # Find filter parameters for all filter configurations within obs
                 filter_configs = template.findall('.//' + ns + 'FilterConfig')
@@ -499,7 +499,7 @@ class AptInput:
                                     aperture.'.format(mod))
 
                         subarr = config['Name'][i_sub][0]
-                        print('Aperture override: subarray {}'.format(subarr[0]))
+                        print('Aperture override: subarray {}'.format(subarr))
 
                 # Find filter parameters for all filter configurations within obs
                 ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
@@ -1030,9 +1030,9 @@ class AptInput:
 
         onames = []
         onums = []
-        for key1 in self.obstab:
-            onames.append(self.obstab[key1]['Name'])
-            onums.append(key1)
+        for observation in self.obstab:
+            onames.append(self.obstab[observation]['Name'])
+            onums.append(observation)
         onames = np.array(onames)
 
         obs_start = []

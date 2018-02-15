@@ -20,6 +20,7 @@ from astropy.modeling.models import Sersic2D
 from astropy.convolution import convolve
 from asdf import AsdfFile
 import yaml
+import time
 
 from . import rotations  # this is Colin's set of rotation functions
 from . import polynomial # more of Colin's functions
@@ -1169,14 +1170,25 @@ class Catalog_seed():
         pslist.write('#\n')
         pslist.write("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n")
 
-
+        start_time = time.time()
+        times = []
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
             #try:
             #line below (if 1>0) used to keep the block
             # of code below at correct indent for the try: above
             # the try: is commented out for code testing.
-            if 1>0:
+            if 1 > 0:
+                # Warn user of how long this calcuation might take...
+                if index < 100:
+                    elapsed_time = time.time() - start_time
+                    times.append(elapsed_time)
+                    start_time = time.time()
+                elif index == 100:
+                    avg_time = np.mean(times)
+                    total_time = len(indexes) * avg_time
+                    print('Expected time to process {} sources: {:.2f} seconds ({:.2f} minutes)'.format(len(indexes), total_time, total_time/60))
+
                 try:
                     entry0 = float(values['x_or_RA'])
                     entry1 = float(values['y_or_Dec'])
@@ -1551,8 +1563,8 @@ class Catalog_seed():
             # to 'science' coordinate systems
 
             # Now V2, V3 to undistorted angular distance from the reference pixel
-            xidl = self.v2v32idlx(pixelv2-self.v2_ref, pixelv3-self.v3_ref)
-            yidl = self.v2v32idly(pixelv2-self.v2_ref, pixelv3-self.v3_ref)
+            xidl = self.v2v32idlx(pixelv2 - self.v2_ref, pixelv3 - self.v3_ref)
+            yidl = self.v2v32idly(pixelv2 - self.v2_ref, pixelv3 - self.v3_ref)
 
             # Finally, undistorted distances to distorted pixel values
             deltapixelx, deltapixely, err, iter = polynomial.invert(self.x_sci2idl, self.y_sci2idl, xidl, yidl, 5)
