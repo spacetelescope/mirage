@@ -4,6 +4,7 @@ from lxml import etree
 import numpy as np
 import pprint
 from nircam_simulator.scripts import apt_inputs
+from . import read_apt_xml
 
 def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=None):
     # Define "default" values (probably should be changed eventually)
@@ -46,9 +47,9 @@ def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=Non
 
     num_obs = len(observations)
 
-    # Read in filters from XML file
-    xml_read = apt_inputs.AptInput()
-    xml_table = xml_read.read_xml(xml_file)
+    # Read in filters from APT .xml file
+    readxml_obj = read_apt_xml.ReadAPTXML()
+    xml_table = readxml_obj.read_xml(xml_file)
 
     sw_filters = {}
     lw_filters = {}
