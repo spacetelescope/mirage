@@ -242,7 +242,8 @@ class AptInput:
 
             # Are all the templates in the XML file something that we can handle?
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
-                                   'NircamEngineeringImaging', 'WfscGlobalAlignment']
+                                   'NircamEngineeringImaging', 'WfscGlobalAlignment',
+                                   'WfscCoarsePhasing', 'WfscFinePhasing']
             if template_name not in known_APT_templates:
                 # If not, turn back now.
                 raise ValueError('No protocol written to read {} template.'.format(template_name))
@@ -291,7 +292,13 @@ class AptInput:
             if template_name in ['WfscGlobalAlignment']:
                 n_exp = self.read_globalalignment_template(template, template_name, obs, prop_params)
 
+            # If template is WFSC Coarse Phasing
+            if template_name in ['WfscCoarsePhasing']:
+                n_tiles_phasing = self.read_coarsephasing_template(template, template_name, obs, prop_params)
 
+            # If template is WFSC Fine Phasing
+            if template_name in ['WfscFinePhasing']:
+                n_tiles_phasing = self.read_finephasing_template(template, template_name, obs, prop_params)
 
             # If template is WFSS
             if template_name == 'NircamWfss':
@@ -314,6 +321,8 @@ class AptInput:
                     n_tiles = num_WFCgroups + 1
             if n_tiles == 0 and template_name == 'WfscGlobalAlignment':
                 n_tiles = n_exp + 1
+            if n_tiles == 0 and 'Phasing' in template_name:
+                n_tiles = n_tiles_phasing
 
             # Get observation name, if there is one
             if label == 'None':
@@ -591,6 +600,191 @@ class AptInput:
             self.obs_tuple_list.append(tup_to_add)
 
         return n_exp
+
+    def read_coarsephasing_template(self, template, template_name, obs, prop_params):
+        # Get proposal parameters
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        ns = "{http://www.stsci.edu/JWST/APT/Template/WfscCoarsePhasing}"
+
+        # Set parameters that are constant for all WFSC obs
+        typeflag = template_name
+        grismval = 'N/A'
+        pdither = '1'
+        pdithtype = 'NONE'
+        sdithtype = 'STANDARD'
+        sdither = '1'
+
+        # Find the module and derive the subarrays
+        mod = template.find(ns + 'Module').text
+        if mod == 'A':
+            mods = ['SUB96DHSPILA'] + ['DHSPILA'] * 6
+            subarrs = ['NRCA3_DHSPIL_SUB96'] + ['NRCA3_DHSPIL'] * 6
+        if mod == 'B':
+            mods = ['SUB96DHSPILB'] + ['DHSPILB'] * 6
+            subarrs = ['NRCB4_DHSPIL_SUB96'] + ['NRCB4_DHSPIL'] * 6
+
+        # Find the exposure parameters for the In Focus, DHS, and Defocus modes
+        readouts = [r.text for r in obs.findall('.//' + ns + 'ReadoutPattern')]
+        groups = [g.text for g in obs.findall('.//' + ns + 'Groups')]
+        integrations = [i.text for i in obs.findall('.//' + ns + 'Integrations')]
+        inds = [0, 1, 1, 1, 1, 2, 2]
+        readouts = np.array(readouts)[inds]
+        groups = np.array(groups)[inds]
+        integrations = np.array(integrations)[inds]
+
+        # List the pupils and filters in the appropriate order
+        sw_pupils = ['CLEAR', 'GDHS0', 'GDHS0', 'GDHS60', 'GDHS60', 'WLP8', 'WLM8']
+        sw_filts = ['F212N', 'F150W2', 'F150W2', 'F150W2', 'F150W2', 'F212N', 'F212N']
+        lw_pupils = ['F405N'] * 7
+        lw_filts = ['F444W'] * 7
+
+        for i in range(7):
+            mod = mods[i]
+            subarr = subarrs[i]
+
+            sfilt = sw_filts[i]
+            lfilt = lw_filts[i]
+            short_pupil = sw_pupils[i]
+            long_pupil = lw_pupils[i]
+
+            rpatt = readouts[i]
+            grps = groups[i]
+            ints = integrations[i]
+
+            # Repeat for two dithers
+            for j in range(2):
+                # Add all parameters to dictionary
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, mod, subarr, pdithtype,
+                              pdither, sdithtype, sdither, sfilt, lfilt,
+                              rpatt, grps, ints, short_pupil,
+                              long_pupil, grismval, coordparallel,
+                              i_obs + 1, j + 1, template_name)
+
+                self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+                self.obs_tuple_list.append(tup_to_add)
+        n_tiles_phasing = 14
+
+        return n_tiles_phasing
+
+    def read_finephasing_template(self, template, template_name, obs, prop_params):
+        # Get proposal parameters
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        ns = "{http://www.stsci.edu/JWST/APT/Template/WfscFinePhasing}"
+
+        # Set parameters that are constant for all WFSC obs
+        typeflag = template_name
+        grismval = 'N/A'
+        pdither = '1'
+        pdithtype = 'NONE'
+        sdithtype = 'STANDARD'
+        sdither = '1'
+
+        # Find the module and derive the subarrays
+        mod = template.find(ns + 'Module').text
+
+        # Determine if there is an aperture override
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        if override is not None:
+            mod = override.text
+            if 'FULL' not in mod:
+                config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                try:
+                    i_sub = list(config['AperName']).index(mod)
+                except ValueError:
+                    i_sub = [mod in name for name in np.array(config['AperName'])]
+                    i_sub = np.where(i_sub)[0]
+                    if len(i_sub) > 1:
+                        raise ValueError('Unable to match \
+                            FiducialPointOverride {} to valid \
+                            aperture.'.format(mod))
+
+                subarr = config['Name'][i_sub][0]
+                print('Aperture override: subarray {}'.format(subarr))
+
+        # Determine the sensing type, and list the pupils and filters
+        # in the appropriate order
+        sensing_type = obs.find('.//' + ns + 'SensingType').text
+        if sensing_type == 'Fine Phasing':
+            n_configs = 5
+            n_dithers = 2
+
+            subarrs = [subarr] * n_configs
+            mods = [mod] * n_configs
+
+            sw_pupils = ['WLM8', 'WLP8', 'WLP8', 'WLM8', 'CLEAR']
+            sw_filts = ['F212N', 'F212N', 'WLP4', 'WLP4', 'WLP4']
+            lw_pupils = ['F405N'] * n_configs
+            lw_filts = ['F444W'] * n_configs
+
+            # Find the exposure parameters for the +/- 8, + 12, and +/-4 modes
+            readouts = [r.text for r in obs.findall('.//' + ns + 'ReadoutPattern')]
+            groups = [g.text for g in obs.findall('.//' + ns + 'Groups')]
+            integrations = [i.text for i in obs.findall('.//' + ns + 'Integrations')]
+            inds = [0, 0, 1, 2, 2]
+            readouts = np.array(readouts)[inds]
+            groups = np.array(groups)[inds]
+            integrations = np.array(integrations)[inds]
+
+        elif sensing_type == 'LOS Jitter':
+            n_configs = 2
+            n_dithers = 1
+
+            subarrs = ['SUB64FP1' + mod, 'SUB8FP1' + mod]
+            mods = subarrs
+
+            sw_pupils = ['CLEAR', 'CLEAR']
+            sw_filts = ['F212N', 'F200W']
+            lw_pupils = ['F405N'] * n_configs # default?
+            lw_filts = ['F444W'] * n_configs # default?
+
+            # Find/define the exposure parameters for the target
+            # acquisition and LOS imaging modes
+            readouts = ['RAPID', 'RAPID']
+            acq_groups = obs.find('.//' + ns + 'AcqNumGroups').text
+            LOSimg_groups = obs.find('.//' + ns + 'LosImgNumGroups').text
+            groups = [acq_groups, LOSimg_groups]
+            LOSimg_ints = obs.find('.//' + ns + 'LosImgNumInts').text
+            integrations = [1, LOSimg_ints]
+
+        sensing = obs.find('.//' + self.apt + 'WavefrontSensing').text
+        if sensing == 'SENSING_ONLY':
+            n_repeats = 1
+        else:
+            n_repeats = 2
+
+        for z in range(n_repeats):
+            for i in range(n_configs):
+                subarr = subarrs[i]
+                mod = mods[i]
+
+                sfilt = sw_filts[i]
+                lfilt = lw_filts[i]
+                short_pupil = sw_pupils[i]
+                long_pupil = lw_pupils[i]
+
+                rpatt = readouts[i]
+                grps = groups[i]
+                ints = integrations[i]
+
+                # Repeat for two dithers
+                for j in range(n_dithers):
+                    # Add all parameters to dictionary
+                    tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                                  science_category, typeflag, mod, subarr, pdithtype,
+                                  pdither, sdithtype, sdither, sfilt, lfilt,
+                                  rpatt, grps, ints, short_pupil,
+                                  long_pupil, grismval, coordparallel,
+                                  i_obs + 1, j + 1, template_name)
+
+                    self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+                    self.obs_tuple_list.append(tup_to_add)
+
+        n_tiles_phasing = n_configs * n_dithers * n_repeats
+
+        return n_tiles_phasing
 
     def read_wfss_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
