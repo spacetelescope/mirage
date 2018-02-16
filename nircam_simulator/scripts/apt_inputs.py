@@ -153,13 +153,8 @@ class AptInput:
         with open(infile) as f:
             tree = etree.parse(f)
 
-        # Define the needed namespaces
-        apt = '{http://www.stsci.edu/JWST/APT}'
-        ncei = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
-        nci = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
-        ncwfss = "{http://www.stsci.edu/JWST/APT/Template/NircamWfss}"
-        wfscc = "{http://www.stsci.edu/JWST/APT/Template/WfscCommissioning}"
-        wfscga = "{http://www.stsci.edu/JWST/APT/Template/WfscGlobalAlignment}"
+        # Define the APT namespace
+        self.apt = '{http://www.stsci.edu/JWST/APT}'
 
         # Set up dictionary of observation parameters to be populated
         ProposalParams_keys = ['PI_Name', 'Proposal_category', 'ProposalID',
@@ -175,9 +170,9 @@ class AptInput:
         APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
                                     FilterParams_keys + OtherParams_keys
 
-        APTObservationParams = {}
+        self.APTObservationParams = {}
         for key in APTObservationParams_keys:
-            APTObservationParams[key] = []
+            self.APTObservationParams[key] = []
 
         # Get high-level information: proposal info - - - - - - - - - - - - - -
 
@@ -189,37 +184,37 @@ class AptInput:
         propcat_default = 'GO'
 
         # Get just the element with the proposal information
-        proposal_info = tree.find(apt + 'ProposalInformation')
+        proposal_info = tree.find(self.apt + 'ProposalInformation')
 
         # Title
         try:
-            prop_title = proposal_info.find(apt + 'Title').text
+            prop_title = proposal_info.find(self.apt + 'Title').text
         except:
             prop_title = proptitle_default
 
         # Proposal ID
         try:
-            prop_id = proposal_info.find(apt + 'ProposalID').text
+            prop_id = proposal_info.find(self.apt + 'ProposalID').text
         except:
             prop_id = propid_default
 
         # Proposal Category
         try:
-            prop_category = proposal_info.find(apt + 'ProposalCategory')[0]
+            prop_category = proposal_info.find(self.apt + 'ProposalCategory')[0]
             prop_category = etree.QName(prop_category).localname
         except:
             prop_category = propcat_default
 
         # Science Category
         try:
-            science_category = proposal_info.find(apt + 'ScientificCategory').text
+            science_category = proposal_info.find(self.apt + 'ScientificCategory').text
         except:
             science_category = scicat_default
 
         # Principal Investigator Name
         try:
-            pi_firstname = proposal_info.find('.//' + apt + 'FirstName').text
-            pi_lastname = proposal_info.find('.//' + apt + 'LastName').text
+            pi_firstname = proposal_info.find('.//' + self.apt + 'FirstName').text
+            pi_lastname = proposal_info.find('.//' + self.apt + 'LastName').text
             pi_name = ' '.join([pi_firstname, pi_lastname])
         except:
             pi_name = piname_default
@@ -227,14 +222,14 @@ class AptInput:
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
         # Find all observations (but use only those that use NIRCam or are WFSC)
-        observation_data = tree.find(apt + 'DataRequests')
-        obs_results = observation_data.findall('.//' + apt + 'Observation')
+        observation_data = tree.find(self.apt + 'DataRequests')
+        obs_results = observation_data.findall('.//' + self.apt + 'Observation')
 
         observations = []
         i_observations = []
         obs_indices = range(len(obs_results))
         for o, i_obs in zip(obs_results, obs_indices):
-            if o.find(apt + 'Instrument').text in ['NIRCAM', 'WFSC']:
+            if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC']:
                 observations.append(o)
                 i_observations.append(i_obs)
 
@@ -242,7 +237,7 @@ class AptInput:
         for i_obs, obs in zip(i_observations, observations):
 
             # Determine what template is used for the observation
-            template = obs.find(apt + 'Template')[0]
+            template = obs.find(self.apt + 'Template')[0]
             template_name = etree.QName(template).localname
 
             # Are all the templates in the XML file something that we can handle?
@@ -252,420 +247,72 @@ class AptInput:
                 # If not, turn back now.
                 raise ValueError('No protocol written to read {} template.'.format(template_name))
 
-            obs_tuple_list = []
-
             # Get observation label
-            label_ele = obs.find(apt + 'Label')
+            label_ele = obs.find(self.apt + 'Label')
             if label_ele is not None:
                 label = label_ele.text
                 if (' (' in label) and (')' in label):
                     label = re.split(r' \(|\)', label)[0]
-
             else:
                 label = 'None'
 
-            # Get coordinated parallel (?)
-            coordparallel = obs.find(apt + 'CoordinatedParallel').text
+            # Get coordinated parallel
+            coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
 
             # Determine pointing offset?
-            offset = obs.find('.//' + apt + 'Offset')
+            offset = obs.find('.//' + self.apt + 'Offset')
             try:
                 offset_x = offset.get('Xvalue')
                 offset_y = offset.get('Yvalue')
             except AttributeError:
                 offset_x, offset_y = 0, 0
-
             if (offset_x != 0) or (offset_y != 0):
                 print('* * * OFFSET OF ({}, {}) IN OBS {} NOT APPLIED ***'.format(offset_x,
                                                                                   offset_y,
                                                                                   i_obs + 1))
 
+            prop_params = [pi_name, prop_id, prop_title, prop_category,
+                           science_category, coordparallel, i_obs]
+
+            # Create empty list that will be populated with a tuple of parameters
+            # for every observation
+            self.obs_tuple_list = []
+
+            # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # If template is NircamImaging or NircamEngineeringImaging
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
-                # Set namespace
-                if template_name == 'NircamImaging':
-                    ns = nci
-                elif template_name == 'NircamEngineeringImaging':
-                    ns = ncei
-
-                # Set parameters that are constant for all imaging obs
-                typeflag = template_name
-                grismval = 'N/A'
-                short_pupil = 'CLEAR'
-
-                # Find observation-specific parameters
-                mod = template.find(ns + 'Module').text
-                subarr = template.find(ns + 'Subarray').text
-                pdithtype = template.find(ns + 'PrimaryDitherType').text
-
-                # Determine if there is an aperture override
-                override = obs.find('.//' + apt + 'FiducialPointOverride')
-                if override is not None:
-                    mod = override.text
-                    if 'FULL' not in mod:
-                        config = ascii.read('../config/NIRCam_subarray_definitions.list')
-                        try:
-                            i_sub = list(config['AperName']).index(mod)
-                        except ValueError:
-                            i_sub = i_sub = [mod in name for name in np.array(config['AperName'])]
-                            i_sub = np.where(i_sub)[0]
-                            if len(i_sub) > 1:
-                                raise ValueError('Unable to match \
-                                    FiducialPointOverride {} to valid \
-                                    aperture.'.format(mod))
-
-                        subarr = config['Name'][i_sub][0]
-                        print('Aperture override: subarray {}'.format(subarr))
-
-                try:
-                    pdither = template.find(ns + 'PrimaryDithers').text
-                except:
-                    pdither = '1'
-
-                sdithtype = template.find(ns + 'SubpixelDitherType').text
-
-                try:
-                    sdither = template.find(ns + 'SubpixelPositions').text
-                except:
-                    try:
-                        stemp = template.find(ns + 'CoordinatedParallelSubpixelPositions').text
-                        sdither = np.int(stemp[0])
-                    except:
-                        sdither = '1'
-
-                # Find filter parameters for all filter configurations within obs
-                filter_configs = template.findall('.//' + ns + 'FilterConfig')
-
-                for filt in filter_configs:
-                    sfilt = filt.find(ns + 'ShortFilter').text
-                    lfilt = filt.find(ns + 'LongFilter').text
-                    rpatt = filt.find(ns + 'ReadoutPattern').text
-                    grps = filt.find(ns + 'Groups').text
-                    ints = filt.find(ns + 'Integrations').text
-
-                    # Separate pupil and filter in case of filter that is
-                    # mounted in the pupil wheel
-                    if ' + ' in sfilt:
-                        split_ind = sfilt.find(' + ')
-                        short_pupil = sfilt[0:split_ind]
-                        sfilt = sfilt[split_ind + 1:]
-                    else:
-                        short_pupil = 'CLEAR'
-
-                    if ' + ' in lfilt:
-                        p = lfilt.find(' + ')
-                        long_pupil = lfilt[0:p]
-                        lfilt = lfilt[p + 1:]
-                    else:
-                        long_pupil = 'CLEAR'
-
-                    # Add all parameters to dictionary
-                    tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                                  science_category, typeflag, mod, subarr, pdithtype,
-                                  pdither, sdithtype, sdither, sfilt, lfilt,
-                                  rpatt, grps, ints, short_pupil,
-                                  long_pupil, grismval, coordparallel,
-                                  i_obs + 1, 1, template_name)
-                    APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
-                    obs_tuple_list.append(tup_to_add)
+                self.read_imaging_template(template, template_name, obs, prop_params)
 
             # If template is WFSC Commissioning
             if template_name in ['WfscCommissioning']:
-                # Set namespace
-                if template_name == 'WfscCommissioning':
-                    ns = wfscc
-                # elif template_name == 'NircamEngineeringImaging':
-                #     ns = ncei
-
-                # Set parameters that are constant for all WFSC obs
-                typeflag = template_name
-                grismval = 'N/A'
-                short_pupil = 'CLEAR'
-                subarr = 'FULL'
-                pdithtype = 'NONE'
-                pdither = '1'
-                sdithtype = 'STANDARD'
-                sdither = '1'
-
-                # Find observation-specific parameters
-                mod = template.find(ns + 'Module').text
-                num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
-
-                # Determine if there is an aperture override
-                override = obs.find('.//' + apt + 'FiducialPointOverride')
-                if override is not None:
-                    mod = override.text
-                    if 'FULL' not in mod:
-                        config = ascii.read('../config/NIRCam_subarray_definitions.list')
-                        try:
-                            i_sub = list(config['AperName']).index(mod)
-                        except ValueError:
-                            i_sub = i_sub = [mod in name for name in  np.array(config['AperName'])]
-                            i_sub = np.where(i_sub)[0]
-                            if len(i_sub) > 1:
-                                raise ValueError('Unable to match \
-                                    FiducialPointOverride {} to valid \
-                                    aperture.'.format(mod))
-
-                        subarr = config['Name'][i_sub][0]
-                        print('Aperture override: subarray {}'.format(subarr))
-
-                # Find filter parameters for all filter configurations within obs
-                filter_configs = template.findall('.//' + ns + 'FilterConfig')
-
-                for filt in filter_configs:
-                    sfilt = filt.find(ns + 'ShortFilter').text
-                    lfilt = filt.find(ns + 'LongFilter').text
-                    rpatt = filt.find(ns + 'ReadoutPattern').text
-                    grps = filt.find(ns + 'Groups').text
-                    ints = filt.find(ns + 'Integrations').text
-
-                    # Separate pupil and filter in case of filter that is
-                    # mounted in the pupil wheel
-                    if ' + ' in sfilt:
-                        split_ind = sfilt.find(' + ')
-                        short_pupil = sfilt[0:split_ind]
-                        sfilt = sfilt[split_ind + 1:]
-                    else:
-                        short_pupil = 'CLEAR'
-
-                    if ' + ' in lfilt:
-                        p = lfilt.find(' + ')
-                        long_pupil = lfilt[0:p]
-                        lfilt = lfilt[p + 1:]
-                    else:
-                        long_pupil = 'CLEAR'
-
-                    # Repeat for the number of expected WFSC groups + 1
-                    for j in range(num_WFCgroups + 1):
-                        # Add all parameters to dictionary
-                        tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                                      science_category, typeflag, mod, subarr, pdithtype,
-                                      pdither, sdithtype, sdither, sfilt, lfilt,
-                                      rpatt, grps, ints, short_pupil,
-                                      long_pupil, grismval, coordparallel,
-                                      i_obs + 1, j + 1, template_name)
-
-                        APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
-                        obs_tuple_list.append(tup_to_add)
+                num_WFCgroups = self.read_commissioning_template(template, template_name, obs, prop_params)
 
             # If template is WFSC Global Alignment
             if template_name in ['WfscGlobalAlignment']:
-                ns = wfscga
+                n_exp = self.read_globalalignment_template(template, template_name, obs, prop_params)
 
-                # Set parameters that are constant for all WFSC obs
-                typeflag = template_name
-                grismval = 'N/A'
-                short_pupil = 'CLEAR'
-                subarr = 'FULL'
-                pdither = '1'
-                pdithtype = 'NONE'
-                sdithtype = 'STANDARD'
-                sdither = '1'
 
-                # Determine the Global Alignment Iteration Type
-                GA_iteration = obs.find('.//' + wfscga + 'GaIteration').text
-
-                if GA_iteration == 'ADJUST1':
-                    n_exp = 3
-                elif GA_iteration == 'ADJUST2':
-                    n_exp = 6  # technically 5, but 3 is repeated?
-                elif GA_iteration == 'BSCORRECT':
-                    # Technically has 2 dithers, but that doesn't seem to be incorporated...
-                    n_exp = 2
-                elif GA_iteration == 'CORRECT+ADJUST':
-                    n_exp = 6  # technically 5, but 3 is repeated?
-                elif GA_iteration == 'CORRECT':
-                    n_exp = 3
-
-                # Find observation-specific parameters
-                mod = template.find(ns + 'Module').text
-                # num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
-
-                # Determine if there is an aperture override
-                override = obs.find('.//' + apt + 'FiducialPointOverride')
-                if override is not None:
-                    mod = override.text
-                    if 'FULL' not in mod:
-                        config = ascii.read('../config/NIRCam_subarray_definitions.list')
-                        try:
-                            i_sub = list(config['AperName']).index(mod)
-                        except ValueError:
-                            i_sub = i_sub = [mod in name for name in  np.array(config['AperName'])]
-                            i_sub = np.where(i_sub)[0]
-                            if len(i_sub) > 1:
-                                raise ValueError('Unable to match \
-                                    FiducialPointOverride {} to valid \
-                                    aperture.'.format(mod))
-
-                        subarr = config['Name'][i_sub][0]
-                        print('Aperture override: subarray {}'.format(subarr))
-
-                # Find filter parameters for all filter configurations within obs
-                ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
-
-                for conf in ga_nircam_configs:
-                    sfilt = conf.find(ns + 'ShortFilter').text
-                    lfilt = conf.find(ns + 'LongFilter').text
-                    rpatt = conf.find(ns + 'ReadoutPattern').text
-                    grps = conf.find(ns + 'Groups').text
-                    ints = conf.find(ns + 'Integrations').text
-
-                    # Separate pupil and filter in case of filter that is
-                    # mounted in the pupil wheel
-                    if ' + ' in sfilt:
-                        split_ind = sfilt.find(' + ')
-                        short_pupil = sfilt[0:split_ind]
-                        sfilt = sfilt[split_ind + 1:]
-                    else:
-                        short_pupil = 'CLEAR'
-
-                    if ' + ' in lfilt:
-                        p = lfilt.find(' + ')
-                        long_pupil = lfilt[0:p]
-                        lfilt = lfilt[p + 1:]
-                    else:
-                        long_pupil = 'CLEAR'
-
-                # Repeat for the number of exposures + 1
-                for j in range(n_exp + 1):
-                    # Add all parameters to dictionary
-                    tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                                  science_category, typeflag, mod, subarr, pdithtype,
-                                  pdither, sdithtype, sdither, sfilt, lfilt,
-                                  rpatt, grps, ints, short_pupil,
-                                  long_pupil, grismval, coordparallel,
-                                  i_obs + 1, j + 1, template_name)
-
-                    APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
-                    obs_tuple_list.append(tup_to_add)
 
             # If template is WFSS
             if template_name == 'NircamWfss':
-                # Set namespace
-                ns = ncwfss
+                self.read_wfss_template(template, template_name, obs, prop_params)
 
-                mod = template.find(ns + 'Module').text
-                subarr = template.find(ns + 'Subarray').text
-                grismval = template.find(ns + 'Grism').text
-                if grismval == 'BOTH':
-                    grismval = ['GRISMR', 'GRISMC']
-                else:
-                    grismval = [grismval]
-                # pdithtype = template.find(ns + 'PrimaryDitherType').text
-                # pdither = template.find(ns + 'PrimaryDithers').text
-                # sdither = template.find(ns + 'SubpixelPositions').text
-                # sdithtype = template.find(ns + 'SubpixelPositions').text
-                explist = template.find(ns + 'ExposureList')
-                expseqs = explist.findall(ns + 'ExposureSequences')
-
-                # if BOTH was specified for the grism,
-                # then we need to repeat the sequence of
-                # grism/direct/grism/direct/outoffield for each grism
-                for gnum in range(len(grismval)):
-                    for expseq in expseqs:
-                        # sequence = grism, direct, grism, direct, outoffield
-                        # if grism == both, sequence is done for grismr,
-                        # then repeated for grismc
-                        grismvalue = grismval[gnum]
-                        # need to switch the order of the grism and direct
-                        # exposures in order for them to be chronological
-                        grismexp = expseq.find(ns + 'GrismExposure')
-                        typeflag = 'WFSS'
-                        sfilt = grismexp.find(ns + 'ShortFilter').text
-                        lfilt = grismexp.find(ns + 'LongFilter').text
-                        rpatt = grismexp.find(ns + 'ReadoutPattern').text
-                        groups = grismexp.find(ns + 'Groups').text
-                        integrations = grismexp.find(ns + 'Integrations').text
-
-                        pdithtype = template.find(ns + 'PrimaryDitherType').text
-                        pdither = template.find(ns + 'PrimaryDithers').text
-                        sdither = template.find(ns + 'SubpixelPositions').text
-                        sdithtype = template.find(ns + 'SubpixelPositions').text
-
-                        # separate pupil and filter in case of filter
-                        # that is mounted in the pupil wheel
-                        if ' + ' in sfilt:
-                            p = sfilt.find(' + ')
-                            short_pupil = sfilt[0:p]
-                            sfilt = sfilt[p + 1:]
-                        else:
-                            short_pupil = 'CLEAR'
-
-                        long_pupil = grismvalue
-                        tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                                      science_category, typeflag, mod, subarr,
-                                      pdithtype, pdither, sdithtype,
-                                      sdither, sfilt, lfilt, rpatt, groups,
-                                      integrations, short_pupil, long_pupil,
-                                      grismvalue, coordparallel,
-                                      i_obs + 1, 1, template_name)
-
-                        APTObservationParams = self.add_exposure(APTObservationParams, tup_to_add)
-                        obs_tuple_list.append(tup_to_add)
-
-                        directexp = expseq.find(ns + 'DiExposure')
-                        typeflag = template_name
-                        pdither = '1'  # direct image has no dithers
-                        sdither = '1'  # direct image has no dithers
-                        sdithtype = '1'  # direct image has no dithers
-                        grismvalue = 'N/A'
-                        sfilt = directexp.find(ns + 'ShortFilter').text
-                        lfilt = directexp.find(ns + 'LongFilter').text
-                        rpatt = directexp.find(ns + 'ReadoutPattern').text
-                        grps = directexp.find(ns + 'Groups').text
-                        ints = directexp.find(ns + 'Integrations').text
-
-                        # separate pupil and filter in case of filter
-                        # that is mounted in the pupil wheel
-                        if ' + ' in sfilt:
-                            p = sfilt.find(' + ')
-                            short_pupil = sfilt[0:p]
-                            sfilt = sfilt[p + 1:]
-                        else:
-                            short_pupil = 'CLEAR'
-
-                        if ' + ' in lfilt:
-                            p = lfilt.find(' + ')
-                            long_pupil = lfilt[0:p]
-                            lfilt = lfilt[p + 1:]
-                        else:
-                            long_pupil = 'CLEAR'
-
-                        direct_tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                                             science_category, typeflag, mod, subarr, pdithtype,
-                                             pdither, sdithtype, sdither, sfilt, lfilt,
-                                             rpatt, grps, ints, short_pupil, long_pupil,
-                                             grismvalue, coordparallel,
-                                             i_obs + 1, 1, template_name)
-                        APTObservationParams = self.add_exposure(APTObservationParams, direct_tup_to_add)
-                        obs_tuple_list.append(tup_to_add)
-
-                    # Now we need to add the two out-of-field exposures, which are
-                    # not present in the APT file (but are in the associated pointing
-                    # file from APT. We can just
-                    # duplicate the entries for the direct images taken immediately
-                    # prior. BUT, will there ever be a case where there is no preceding
-                    # direct image?
-                    APTObservationParams = self.add_exposure(APTObservationParams, direct_tup_to_add)
-                    APTObservationParams = self.add_exposure(APTObservationParams, direct_tup_to_add)
-                    obs_tuple_list.append(tup_to_add)
-                    obs_tuple_list.append(tup_to_add)
+            # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
             # Now we need to look for mosaic details, if any
-            mostile = obs.findall('.//' + apt + 'MosaicTiles')
+            mostile = obs.findall('.//' + self.apt + 'MosaicTiles')
             n_tiles = len(mostile)
 
             if n_tiles > 1:
                 for i in range(n_tiles - 1):
-                    for tup in obs_tuple_list:
-                        APTObservationParams = self.add_exposure(APTObservationParams, tup)
+                    for tup in self.obs_tuple_list:
+                        self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup)
 
             # If WFSC, look at expected groups rather than mosaic tiles:
-            if n_tiles == 0 and template_name in ['WfscCommissioning']:
+            if n_tiles == 0 and template_name == 'WfscCommissioning':
                 if num_WFCgroups:
                     n_tiles = num_WFCgroups + 1
-            if n_tiles == 0 and template_name in ['WfscGlobalAlignment']:
+            if n_tiles == 0 and template_name == 'WfscGlobalAlignment':
                 n_tiles = n_exp + 1
 
             # Get observation name, if there is one
@@ -676,8 +323,388 @@ class AptInput:
 
             print("Found {} mosaic tile(s) for observation {} {}".format(n_tiles, i_obs + 1, label))
 
-        return APTObservationParams
+        return self.APTObservationParams
 
+    def read_imaging_template(self, template, template_name, obs, prop_params):
+        # Get proposal parameters
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        # Set namespace
+        if template_name == 'NircamImaging':
+            ns = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
+        elif template_name == 'NircamEngineeringImaging':
+            ns = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
+
+        # Set parameters that are constant for all imaging obs
+        typeflag = template_name
+        grismval = 'N/A'
+        short_pupil = 'CLEAR'
+
+        # Find observation-specific parameters
+        mod = template.find(ns + 'Module').text
+        subarr = template.find(ns + 'Subarray').text
+        pdithtype = template.find(ns + 'PrimaryDitherType').text
+
+        # Determine if there is an aperture override
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        if override is not None:
+            mod = override.text
+            if 'FULL' not in mod:
+                config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                try:
+                    i_sub = list(config['AperName']).index(mod)
+                except ValueError:
+                    i_sub = [mod in name for name in np.array(config['AperName'])]
+                    i_sub = np.where(i_sub)[0]
+                    if len(i_sub) > 1:
+                        raise ValueError('Unable to match \
+                            FiducialPointOverride {} to valid \
+                            aperture.'.format(mod))
+
+                subarr = config['Name'][i_sub][0]
+                print('Aperture override: subarray {}'.format(subarr))
+
+        try:
+            pdither = template.find(ns + 'PrimaryDithers').text
+        except:
+            pdither = '1'
+
+        sdithtype = template.find(ns + 'SubpixelDitherType').text
+
+        try:
+            sdither = template.find(ns + 'SubpixelPositions').text
+        except:
+            try:
+                stemp = template.find(ns + 'CoordinatedParallelSubpixelPositions').text
+                sdither = np.int(stemp[0])
+            except:
+                sdither = '1'
+
+        # Find filter parameters for all filter configurations within obs
+        filter_configs = template.findall('.//' + ns + 'FilterConfig')
+
+        for filt in filter_configs:
+            sfilt = filt.find(ns + 'ShortFilter').text
+            lfilt = filt.find(ns + 'LongFilter').text
+            rpatt = filt.find(ns + 'ReadoutPattern').text
+            grps = filt.find(ns + 'Groups').text
+            ints = filt.find(ns + 'Integrations').text
+
+            # Separate pupil and filter in case of filter that is
+            # mounted in the pupil wheel
+            if ' + ' in sfilt:
+                split_ind = sfilt.find(' + ')
+                short_pupil = sfilt[0:split_ind]
+                sfilt = sfilt[split_ind + 1:]
+            else:
+                short_pupil = 'CLEAR'
+
+            if ' + ' in lfilt:
+                p = lfilt.find(' + ')
+                long_pupil = lfilt[0:p]
+                lfilt = lfilt[p + 1:]
+            else:
+                long_pupil = 'CLEAR'
+
+            # Add all parameters to dictionary
+            tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                          science_category, typeflag, mod, subarr, pdithtype,
+                          pdither, sdithtype, sdither, sfilt, lfilt,
+                          rpatt, grps, ints, short_pupil,
+                          long_pupil, grismval, coordparallel,
+                          i_obs + 1, 1, template_name)
+            self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+            self.obs_tuple_list.append(tup_to_add)
+
+    def read_commissioning_template(self, template, template_name, obs, prop_params):
+        # Get proposal parameters
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        # Set namespace
+        ns = "{http://www.stsci.edu/JWST/APT/Template/WfscCommissioning}"
+
+        # Set parameters that are constant for all WFSC obs
+        typeflag = template_name
+        grismval = 'N/A'
+        short_pupil = 'CLEAR'
+        subarr = 'FULL'
+        pdithtype = 'NONE'
+        pdither = '1'
+        sdithtype = 'STANDARD'
+        sdither = '1'
+
+        # Find observation-specific parameters
+        mod = template.find(ns + 'Module').text
+        num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
+
+        # Determine if there is an aperture override
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        if override is not None:
+            mod = override.text
+            if 'FULL' not in mod:
+                config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                try:
+                    i_sub = list(config['AperName']).index(mod)
+                except ValueError:
+                    i_sub = [mod in name for name in np.array(config['AperName'])]
+                    i_sub = np.where(i_sub)[0]
+                    if len(i_sub) > 1:
+                        raise ValueError('Unable to match \
+                            FiducialPointOverride {} to valid \
+                            aperture.'.format(mod))
+
+                subarr = config['Name'][i_sub][0]
+                print('Aperture override: subarray {}'.format(subarr))
+
+        # Find filter parameters for all filter configurations within obs
+        filter_configs = template.findall('.//' + ns + 'FilterConfig')
+
+        for filt in filter_configs:
+            sfilt = filt.find(ns + 'ShortFilter').text
+            lfilt = filt.find(ns + 'LongFilter').text
+            rpatt = filt.find(ns + 'ReadoutPattern').text
+            grps = filt.find(ns + 'Groups').text
+            ints = filt.find(ns + 'Integrations').text
+
+            # Separate pupil and filter in case of filter that is
+            # mounted in the pupil wheel
+            if ' + ' in sfilt:
+                split_ind = sfilt.find(' + ')
+                short_pupil = sfilt[0:split_ind]
+                sfilt = sfilt[split_ind + 1:]
+            else:
+                short_pupil = 'CLEAR'
+
+            if ' + ' in lfilt:
+                p = lfilt.find(' + ')
+                long_pupil = lfilt[0:p]
+                lfilt = lfilt[p + 1:]
+            else:
+                long_pupil = 'CLEAR'
+
+            # Repeat for the number of expected WFSC groups + 1
+            for j in range(num_WFCgroups + 1):
+                # Add all parameters to dictionary
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, mod, subarr, pdithtype,
+                              pdither, sdithtype, sdither, sfilt, lfilt,
+                              rpatt, grps, ints, short_pupil,
+                              long_pupil, grismval, coordparallel,
+                              i_obs + 1, j + 1, template_name)
+
+                self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+                self.obs_tuple_list.append(tup_to_add)
+
+        return num_WFCgroups
+
+    def read_globalalignment_template(self, template, template_name, obs, prop_params):
+        # Get proposal parameters
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        ns = "{http://www.stsci.edu/JWST/APT/Template/WfscGlobalAlignment}"
+
+        # Set parameters that are constant for all WFSC obs
+        typeflag = template_name
+        grismval = 'N/A'
+        short_pupil = 'CLEAR'
+        subarr = 'FULL'
+        pdither = '1'
+        pdithtype = 'NONE'
+        sdithtype = 'STANDARD'
+        sdither = '1'
+
+        # Determine the Global Alignment Iteration Type
+        GA_iteration = obs.find('.//' + ns + 'GaIteration').text
+
+        if GA_iteration == 'ADJUST1':
+            n_exp = 3
+        elif GA_iteration == 'ADJUST2':
+            n_exp = 6  # technically 5, but 3 is repeated?
+        elif GA_iteration == 'BSCORRECT':
+            # Technically has 2 dithers, but that doesn't seem to be incorporated...
+            n_exp = 2
+        elif GA_iteration == 'CORRECT+ADJUST':
+            n_exp = 6  # technically 5, but 3 is repeated?
+        elif GA_iteration == 'CORRECT':
+            n_exp = 3
+
+        # Find observation-specific parameters
+        mod = template.find(ns + 'Module').text
+        # num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
+
+        # Determine if there is an aperture override
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        if override is not None:
+            mod = override.text
+            if 'FULL' not in mod:
+                config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                try:
+                    i_sub = list(config['AperName']).index(mod)
+                except ValueError:
+                    i_sub = [mod in name for name in np.array(config['AperName'])]
+                    i_sub = np.where(i_sub)[0]
+                    if len(i_sub) > 1:
+                        raise ValueError('Unable to match \
+                            FiducialPointOverride {} to valid \
+                            aperture.'.format(mod))
+
+                subarr = config['Name'][i_sub][0]
+                print('Aperture override: subarray {}'.format(subarr))
+
+        # Find filter parameters for all filter configurations within obs
+        ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
+
+        for conf in ga_nircam_configs:
+            sfilt = conf.find(ns + 'ShortFilter').text
+            lfilt = conf.find(ns + 'LongFilter').text
+            rpatt = conf.find(ns + 'ReadoutPattern').text
+            grps = conf.find(ns + 'Groups').text
+            ints = conf.find(ns + 'Integrations').text
+
+            # Separate pupil and filter in case of filter that is
+            # mounted in the pupil wheel
+            if ' + ' in sfilt:
+                split_ind = sfilt.find(' + ')
+                short_pupil = sfilt[0:split_ind]
+                sfilt = sfilt[split_ind + 1:]
+            else:
+                short_pupil = 'CLEAR'
+
+            if ' + ' in lfilt:
+                p = lfilt.find(' + ')
+                long_pupil = lfilt[0:p]
+                lfilt = lfilt[p + 1:]
+            else:
+                long_pupil = 'CLEAR'
+
+        # Repeat for the number of exposures + 1
+        for j in range(n_exp + 1):
+            # Add all parameters to dictionary
+            tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                          science_category, typeflag, mod, subarr, pdithtype,
+                          pdither, sdithtype, sdither, sfilt, lfilt,
+                          rpatt, grps, ints, short_pupil,
+                          long_pupil, grismval, coordparallel,
+                          i_obs + 1, j + 1, template_name)
+
+            self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+            self.obs_tuple_list.append(tup_to_add)
+
+        return n_exp
+
+    def read_wfss_template(self, template, template_name, obs, prop_params):
+        # Get proposal parameters
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        # Set namespace
+        ns = "{http://www.stsci.edu/JWST/APT/Template/NircamWfss}"
+
+        mod = template.find(ns + 'Module').text
+        subarr = template.find(ns + 'Subarray').text
+        grismval = template.find(ns + 'Grism').text
+        if grismval == 'BOTH':
+            grismval = ['GRISMR', 'GRISMC']
+        else:
+            grismval = [grismval]
+        # pdithtype = template.find(ns + 'PrimaryDitherType').text
+        # pdither = template.find(ns + 'PrimaryDithers').text
+        # sdither = template.find(ns + 'SubpixelPositions').text
+        # sdithtype = template.find(ns + 'SubpixelPositions').text
+        explist = template.find(ns + 'ExposureList')
+        expseqs = explist.findall(ns + 'ExposureSequences')
+
+        # if BOTH was specified for the grism,
+        # then we need to repeat the sequence of
+        # grism/direct/grism/direct/outoffield for each grism
+        for gnum in range(len(grismval)):
+            for expseq in expseqs:
+                # sequence = grism, direct, grism, direct, outoffield
+                # if grism == both, sequence is done for grismr,
+                # then repeated for grismc
+                grismvalue = grismval[gnum]
+                # need to switch the order of the grism and direct
+                # exposures in order for them to be chronological
+                grismexp = expseq.find(ns + 'GrismExposure')
+                typeflag = 'WFSS'
+                sfilt = grismexp.find(ns + 'ShortFilter').text
+                lfilt = grismexp.find(ns + 'LongFilter').text
+                rpatt = grismexp.find(ns + 'ReadoutPattern').text
+                groups = grismexp.find(ns + 'Groups').text
+                integrations = grismexp.find(ns + 'Integrations').text
+
+                pdithtype = template.find(ns + 'PrimaryDitherType').text
+                pdither = template.find(ns + 'PrimaryDithers').text
+                sdither = template.find(ns + 'SubpixelPositions').text
+                sdithtype = template.find(ns + 'SubpixelPositions').text
+
+                # separate pupil and filter in case of filter
+                # that is mounted in the pupil wheel
+                if ' + ' in sfilt:
+                    p = sfilt.find(' + ')
+                    short_pupil = sfilt[0:p]
+                    sfilt = sfilt[p + 1:]
+                else:
+                    short_pupil = 'CLEAR'
+
+                long_pupil = grismvalue
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, mod, subarr,
+                              pdithtype, pdither, sdithtype,
+                              sdither, sfilt, lfilt, rpatt, groups,
+                              integrations, short_pupil, long_pupil,
+                              grismvalue, coordparallel,
+                              i_obs + 1, 1, template_name)
+
+                self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+                self.obs_tuple_list.append(tup_to_add)
+
+                directexp = expseq.find(ns + 'DiExposure')
+                typeflag = template_name
+                pdither = '1'  # direct image has no dithers
+                sdither = '1'  # direct image has no dithers
+                sdithtype = '1'  # direct image has no dithers
+                grismvalue = 'N/A'
+                sfilt = directexp.find(ns + 'ShortFilter').text
+                lfilt = directexp.find(ns + 'LongFilter').text
+                rpatt = directexp.find(ns + 'ReadoutPattern').text
+                grps = directexp.find(ns + 'Groups').text
+                ints = directexp.find(ns + 'Integrations').text
+
+                # separate pupil and filter in case of filter
+                # that is mounted in the pupil wheel
+                if ' + ' in sfilt:
+                    p = sfilt.find(' + ')
+                    short_pupil = sfilt[0:p]
+                    sfilt = sfilt[p + 1:]
+                else:
+                    short_pupil = 'CLEAR'
+
+                if ' + ' in lfilt:
+                    p = lfilt.find(' + ')
+                    long_pupil = lfilt[0:p]
+                    lfilt = lfilt[p + 1:]
+                else:
+                    long_pupil = 'CLEAR'
+
+                direct_tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                                     science_category, typeflag, mod, subarr, pdithtype,
+                                     pdither, sdithtype, sdither, sfilt, lfilt,
+                                     rpatt, grps, ints, short_pupil, long_pupil,
+                                     grismvalue, coordparallel,
+                                     i_obs + 1, 1, template_name)
+                self.APTObservationParams = self.add_exposure(self.APTObservationParams, direct_tup_to_add)
+                self.obs_tuple_list.append(tup_to_add)
+
+            # Now we need to add the two out-of-field exposures, which are
+            # not present in the APT file (but are in the associated pointing
+            # file from APT. We can just
+            # duplicate the entries for the direct images taken immediately
+            # prior. BUT, will there ever be a case where there is no preceding
+            # direct image?
+            self.APTObservationParams = self.add_exposure(self.APTObservationParams, direct_tup_to_add)
+            self.APTObservationParams = self.add_exposure(self.APTObservationParams, direct_tup_to_add)
+            self.obs_tuple_list.append(tup_to_add)
+            self.obs_tuple_list.append(tup_to_add)
 
     def add_exposure(self, dictionary, tup):
         # add an exposure to the dictionary
@@ -1089,7 +1116,7 @@ class AptInput:
 
             # Then, match up with the filter configuration using the exposure
             # number
-            exposure = exp[-1]
+            exposure = int(exp[-2:])
             filter_config = 'FilterConfig{}'.format(exposure)
             obslist = obslist[filter_config]
 
