@@ -64,6 +64,7 @@ class Observation():
                 sys.exit()
 
     def create(self):
+        """MAIN FUNCTION"""
         print('')
         print("Running observation generator....")
         print('')
@@ -109,7 +110,10 @@ class Observation():
         # CRs are to be added to the data later
         if self.runStep['cosmicray']:
             self.readCRFiles()
-            self.readGainMap()
+
+        # Read in gain map to be used for adding Poisson noise
+        # and to scale CRs to be in ADU
+        self.readGainMap()
 
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
@@ -913,7 +917,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         #get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() != 'wfss':
+        if self.params['Inst']['mode'].lower() != 'nircamwfss':
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -1159,7 +1163,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         #get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() != 'wfss':
+        if self.params['Inst']['mode'].lower() != 'nircamwfss':
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -1404,17 +1408,30 @@ class Observation():
 
 
     def addSyntheticToDark(self, synthetic, dark, syn_zeroframe=None):
-        # If zeroframe is provided, the function uses that to create the
-        # dark+synthetic zeroframe that is returned. If not provided, the
-        # function attempts to use the 0th frame of the input synthetic ramp
+        """Add the synthetic data (now an exposure) to the dark current
+        exposure.
 
-        # Combine the cube of synthetic signals to the real dark current ramp.
-        # Be sure to adjust the dark current ramp if nframe/nskip is different
-        # than the nframe/nskip values that the dark was taken with.
+        If zeroframe is provided, the function uses that to create the
+        dark+synthetic zeroframe that is returned. If not provided, the
+        function attempts to use the 0th frame of the input synthetic ramp
 
-        # Only RAPID darks will be re-averaged into different readout patterns
-        # But a BRIGHT2 dark can be used to create a BRIGHT2 simulated ramp
+        Combine the cube of synthetic signals to the real dark current ramp.
+        Be sure to adjust the dark current ramp if nframe/nskip is different
+        than the nframe/nskip values that the dark was taken with.
 
+        Only RAPID darks will be re-averaged into different readout patterns
+        But a BRIGHT2 dark can be used to create a BRIGHT2 simulated ramp
+
+        Arguments:
+        ----------
+        synthetic -- simulated signals, 4D array
+        dark -- dark current exposure, 4D array
+        syn_zeroframe -- zeroframe data associated with simulated data
+
+        Returns:
+        --------
+        4D exposure containing combined simulated + dark data
+        """
         # Get the info for the dark integration
         darkpatt = dark.header['READPATT']
         dark_nframe = dark.header['NFRAMES']
@@ -1503,8 +1520,9 @@ class Observation():
         zero *= maskimage
         return ramp, zero
 
-    def add_flatfield_effects(self, ramp):
-        #ILLUMINATION FLAT
+    def add_flatfield_effects(self,ramp):
+        """Add flat field effects to the exposure"""
+        # ILLUMINATION FLAT
         if self.runStep['illuminationflat']:
             illuminationflat, illuminationflatheader = self.readCalFile(self.params['Reffiles']['illumflat'])
             ramp *= illuminationflat
@@ -1513,7 +1531,6 @@ class Observation():
         if self.runStep['pixelflat']:
             pixelflat, pixelflatheader = self.readCalFile(self.params['Reffiles']['pixelflat'])
             ramp *= pixelflat
-
         return ramp
 
     def add_detector_effects(self, ramp):
@@ -1707,46 +1724,63 @@ class Observation():
 
         return image
 
-
-    def add_crs_and_noise(self, seed):
-        # Given a noiseless seed ramp, add cosmic
-        # rays and poisson noise
+    def add_crs_and_noise(self,seed):
+        """Given a noiseless seed ramp, add cosmic
+        rays and poisson noise"""
         yd, xd = seed.shape[-2:]
+        seeddim = len(seed.shape)
 
         # Run one integration at a time
+        # because each needs its own collection
+        # of cosmic rays and poisson noise realization
         nint = self.params['Readout']['nint']
         ngroups = self.params['Readout']['ngroup']
         sim_exposure = np.zeros((nint, ngroups, yd, xd))
         sim_zero = np.zeros((nint, yd, xd))
 
-        print("Adding CRs and poission noise.")
         for integ in range(nint):
             print("Integration {}:".format(integ))
+            if seeddim == 2:
+                inseed = seed
+            elif seeddim == 4:
+                inseed = seed[integ, :, :, :]
             if self.runStep['cosmicray']:
-                ramp, rampzero = self.frameToRamp(seed)
+                ramp, rampzero = self.frameToRamp(inseed)
             else:
-                ramp, rampzero = self.frameToRamp_noCR(seed)
+                ramp, rampzero = self.frameToRamp_noCR(inseed)
             sim_exposure[integ, :, :, :] = ramp
             sim_zero[integ, :, :] = rampzero
         return sim_exposure, sim_zero
 
-
     def frameToRamp(self, data):
-        #*****UPDATED******
-        #***seed image (data) will be a 2d frame or 4d ramp.
-        #***loop over integrations and feed each in here.
-        # Convert rate image to ramp, add poisson noise
-        # and cosmic rays
+        """Convert rate image to ramp, add poisson noise
+        and cosmic rays
+
+        Arguments:
+        ----------
+        data -- seed image. Should be a 2d frame or 3d integration.
+        If the original seed image is a 4d exposure, call frameToRamp
+        with one integration at a time.
+
+        Returns:
+        --------
+        outramp -- 3d integration with cosmic rays and poisson noise
+        zeroframe -- 2d zeroframe
+        """
 
         # Output ramp will be in requested readout pattern!
         ndim = len(data.shape)
 
         #hopefully we don't need this and can find deltaimage on the fly...
-        if ndim == 3:
+        if ndim == 4:
+            print("Shouldn't be here! No 4D seed images!")
+            sys.exit()
+            nintin, ngroupin, yd, xd = data.shape
+        elif ndim == 3:
             ngroupin, yd, xd = data.shape
-        #    deltaimage = np.zeros((ngroupin-1, yd, xd))
-        #    for frame in xrange(1, ngroupin):
-        #        deltaimage[frame-1, :, :] = data[frame, :, :] - data[frame-1, :, :]
+        #    deltaimage = np.zeros((ngroupin-1,yd,xd))
+        #    for frame in xrange(1,ngroupin):
+        #        deltaimage[frame-1,:,:] = data[frame,:,:] - data[frame-1,:,:]
         elif ndim == 2:
             yd, xd = data.shape
         #    ngroupin = None
@@ -1758,17 +1792,20 @@ class Observation():
         # This should be the case only for data containing
         # moving targets.
         if ndim == 3:
-            print('moving target data shape', data.shape, yd, xd)
+            print('Moving target data shape', data.shape, yd, xd)
+            #newdata = np.zeros((nintin, ngroupin+1, yd, xd))
+            #newdata[:, 1:, :, :] = data
+            #data = newdata
             data = np.vstack((np.zeros((1, yd, xd)), data))
 
         outramp = np.zeros((self.params['Readout']['ngroup'], yd, xd), dtype=np.float)
-        #totalsignalimage = np.zeros((yd, xd), dtype=np.float)
+        #totalsignalimage = np.zeros((yd,xd),dtype=np.float)
 
         # Set up functions to apply cosmic rays later
         # Need the total number of active pixels in the
         # output array to multiply the CR rate by
         if self.runStep['cosmicray']:
-            npix = int(yd*xd+0.02)
+            npix = int(yd * xd + 0.02)
 
             # Reinitialize the cosmic ray functions for each integration
             crhits, crs_perframe = self.CRfuncs(npix, seed=self.params['cosmicRay']['seed'])
@@ -1870,8 +1907,6 @@ class Observation():
 
         return outramp, zeroframe
 
-
-
     def frameToRamp_noCR(self, data):
         # Convert input seed image/ramp to a
         # ramp that includes poisson noise. No
@@ -1948,11 +1983,23 @@ class Observation():
             outramp[i, :, :] = accumimage
         return outramp, zeroframe
 
-
     def doPoisson(self, signalimage):
-        # Add poisson noise to an input image
-        newimage = np.zeros_like(signalimage, dtype=np.float)
-        ndim = signalimage.shape
+        """Add poisson noise to an input image. Input is assumed
+        to be in units of ADU, meaning it must be multiplied by
+        the gain when calcuating Poisson noise. Then divide by the
+        gain in order for the returned image to also be in ADU
+
+        Arguments:
+        ----------
+        signalimage -- 2D array of signals in ADU
+
+        Returns:
+        --------
+        signalimage with Poisson noise added
+        """
+
+        #newimage = np.zeros_like(signalimage,dtype=np.float)
+        #ndim = signalimage.shape
 
         # Adjust the seed each time dopoisson is run
         np.random.seed()
@@ -1971,17 +2018,21 @@ class Observation():
         # Quantum yield is 1.0 for all NIRCam filters
         pym1 = 0.
 
-        # Add poisson noise to each pixel
-        for i in range(ndim[0]):
-            for j in range(ndim[1]):
-                try:
-                    newimage[i, j]=np.random.poisson(signalimage[i, j])
-                except:
-                    try:
-                        newimage[i, j]=np.random.poisson(np.absolute(signalimage[i, j]))
-                    except:
-                        print("Error: bad signal value at pixel (x, y)=({}, {}) = {}".format(j, i, signalimage[i, j]))
-                        newimage[i, j] = 0.0
+        # Can't add Poisson noise to pixels with negative values
+        # Set those to zero when adding noise, then replace with
+        # original value
+        signalgain = signalimage * self.gainim
+        if np.min(signalgain) < 0.:
+            neg = signalgain < 0.
+            negatives = copy.deepcopy(signalgain)
+            negatives[neg] = signalgain[neg]
+            signalgain[neg] = 0.
+            # np.random.poisson returns integers
+            newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+            newimage[neg] = negatives[neg]
+        else:
+            newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+        newimage /= self.gainim
 
                 # Quantum yield for NIRCam is always 1.0 (so psym1=0)
                 #if self.params['simSignals']['photonyield'] and pym1 > 0.000001 and newimage[i, j] > 0:
@@ -2000,7 +2051,6 @@ class Observation():
                 #            newimage[i, j] = newimage[i, j] + 1
         return newimage
 
-
     def doCosmicRays(self, image, ngroup, iframe, nframe, ncr):
         # Change the seed each time this is run, or else simulated
         # exposures that have more than 1 integration will have the
@@ -2011,23 +2061,23 @@ class Observation():
         # Add cosmic rays to a frame
         nray = int(ncr)
 
-        i=0
-        dims=image.shape
+        i = 0
+        dims = image.shape
         while i < nray:
-            i=i+1
-            j=int(self.generator1.random()*dims[0])
-            k=int(self.generator1.random()*dims[1])
-            n=int(self.generator1.random()*10.0)
-            m=int(self.generator1.random()*1000.0)
-            crimage=np.copy(self.cosmicrays[n][m, :, :])
-            i1=max(j-10, 0)
-            i2=min(j+11, dims[0])
-            j1=max(k-10, 0)
-            j2=min(k+11, dims[1])
-            k1=10-(j-i1)
-            k2=10+(i2-j)
-            l1=10-(k-j1)
-            l2=10+(j2-k)
+            i = i+1
+            j = int(self.generator1.random()*dims[0])
+            k = int(self.generator1.random()*dims[1])
+            n = int(self.generator1.random()*10.0)
+            m = int(self.generator1.random()*1000.0)
+            crimage = np.copy(self.cosmicrays[n][m, :, :])
+            i1 = max(j-10, 0)
+            i2 = min(j+11, dims[0])
+            j1 = max(k-10, 0)
+            j2 = min(k+11, dims[1])
+            k1 = 10-(j-i1)
+            k2 = 10+(i2-j)
+            l1 = 10-(k-j1)
+            l2 = 10+(j2-k)
 
             # Insert cosmic ray (divided by gain to put into ADU)
             image[i1:i2, j1:j2] = image[i1:i2, j1:j2] + crimage[k1:k2, l1:l2] / self.gainim[k1:k2, l1:l2]

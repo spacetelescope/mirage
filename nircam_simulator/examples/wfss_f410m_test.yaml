@@ -7,6 +7,7 @@ Readout:
   readpatt: RAPID        #Readout pattern (RAPID, BRIGHT2, etc)
   ngroup: 3              #Number of groups in integration
   nint: 1          #Number of integrations per exposure
+  resets_bet_ints: 1 #Number of detector resets between integrations
   array_name: NRCB5_FULL    #Name of array (FULL, SUB160, SUB64P, etc)
   filter: F410M       #Filter of simulated data (F090W, F322W2, etc)
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
