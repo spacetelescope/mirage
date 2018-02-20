@@ -367,7 +367,11 @@ class AptInput:
             # first find detector
             # need ra, dec and v2, v3 pairs from entry
             # to calculate ra, dec at each detector's reference location
-            config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
+            scripts_path = os.path.dirname(os.path.realpath(__file__))
+            modpath = os.path.split(scripts_path)[0]
+            subarray_def_file = os.path.join(modpath, 'config', 'NIRCam_subarray_definitions.list')
+
+            config = ascii.read(subarray_def_file)
             detector = 'NRC' + self.exposure_tab['detector'][i]
             sub = self.exposure_tab['Subarray'][i]
             aperture = detector + '_' + sub

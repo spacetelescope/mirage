@@ -552,7 +552,7 @@ class SimInput:
             match = aperture == subarray_def['AperName']
 
             if np.sum(match) == 0:
-                config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
+                config = ascii.read(self.subarray_def_file)
                 aperture = [apername for apername, name in \
                             np.array(config['AperName', 'Name']) if \
                             (sub in apername) or (sub in name)]

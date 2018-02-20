@@ -230,7 +230,6 @@ class Observation():
             stp.add_wcs(linearrampfile, roll=self.params['Telescope']['rotation'])
             # print("Final linearized exposure saved to:")
             # print("{}".format(linearrampfile))
-            print("Observation generation complete.")
 
         # If the raw version is requested, we need to unlinearize
         # the ramp
@@ -281,6 +280,8 @@ class Observation():
                 print("with the superbias and reference pixels is not present in")
                 print("the dark current data object. Quitting.")
                 sys.exit()
+
+        print("Observation generation complete.")
 
     def expand_env_var(self):
         # Replace the environment variable name in any inputs
