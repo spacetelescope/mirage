@@ -1,7 +1,35 @@
+# Compiled source #
+###################
+*.pyc
 *.py~
-*.aptbackup
-*.yaml~
+
+# Package Stuff #
+#################
+build/*
+dist/*
+nircam_simulator.egg-info/*
+
+# Lists and images #
+######################
+*.list
 *.list~
-build
-dist
+*.fits
+*.yaml
+*.yaml~
+*.csv
+
+# Other #
+#########
+.ipynb_checkpoints/*
+nircam_simulator/examples/.ipynb_checkpoints/*
+nircam_simulator/OTECommissioning/*
+*.aptx
+*.aptbackup
+*.docx
+
+# Files #
+#########
 ring_nebula.fits
+nircam_simulator/ClassMaps.txt
+nircam_simulator/examples/*.ipynb
+nircam_simulator/scripts/apt_inputs_OLD.py
