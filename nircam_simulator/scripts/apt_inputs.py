@@ -36,6 +36,8 @@ rotations.py - Colin Cox's module of WCS-related functions
 HISTORY:
 
 July 2017 - V0: Initial version. Bryan Hilbert
+Feb 2018  - V1: Updated to work for multiple filter pairs per observation
+            Lauren Chambers
 
 '''
 import os
@@ -74,6 +76,7 @@ class AptInput:
         self.observation_table = ''
 
     def create_input_table(self):
+        """MAIN FUNCTION"""
         # Expand paths to full paths
         self.input_xml = os.path.abspath(self.input_xml)
         self.pointing_file = os.path.abspath(self.pointing_file)
@@ -89,24 +92,18 @@ class AptInput:
         readxml_obj = read_apt_xml.ReadAPTXML()
         tab = readxml_obj.read_xml(self.input_xml)
 
-        # ascii.write(Table(tab), 'as_read_in.csv', format='csv', overwrite=True)
-
         # Expand the dictionary for multiple dithers. Expand such that there
         # is one entry in each list for each exposure, rather than one entry
         # for each set of dithers
         xmltab = self.expand_for_dithers(tab)
-        # ascii.write(Table(xmltab), 'expand_for_dithers.csv', format='csv', overwrite=True)
 
-        # read in the pointing file and produce dictionary
+        # Read in the pointing file and produce dictionary
         pointing_tab = self.get_pointing_info(self.pointing_file, xmltab['ProposalID'][0])
 
-        # combine the dictionaries
+        # Combine the dictionaries
         obstab = self.combine_dicts(xmltab, pointing_tab)
-        # ascii.write(Table(obstab), 'add_pointing_info.csv', format='csv', overwrite=True)
 
-        # add epoch information
-        # obstab = self.add_epochs(obstab)
-        # add epoch and catalog information
+        # Add epoch and catalog information
         obstab = self.add_observation_info(obstab)
 
         # Expand for detectors. Create one entry in each list for each
@@ -128,33 +125,41 @@ class AptInput:
         print('Final csv exposure list written to {}'.format(self.output_csv))
 
     def extract_value(self, line):
-        # extract text from xml line
+        """Extract text from xml line"""
         gt = line.find('>')
         lt = line.find('<', gt)
         return line[gt + 1:lt]
 
     def expand_for_dithers(self, indict):
-        # Expand a given dictionary to create one entry
-        # for each dither
-        # define the dictionary to hold the expanded entries
+        """
+        Expand a given dictionary to create one entry
+        for each dither
+        define the dictionary to hold the expanded entries
 
-        # in here we should also reset the primary and subpixel dither
-        # numbers to 1, to avoid confusion.
+        In here we should also reset the primary and subpixel dither
+        numbers to 1, to avoid confusion.
 
+        Parameters:
+        -----------
+        indict -- dictionary of observations
+
+        Returns:
+        --------
+        Dictionary, expanded to include a separate entry for
+        each dither
+        """
         expanded = {}
         for key in indict:
             expanded[key] = []
 
-        # loop over entries in dict and duplicate by the
+        # Loop over entries in dict and duplicate by the
         # number of dither positions
         # keys = np.array(indict.keys())
         keys = indict.keys()
         for i in range(len(indict['PrimaryDithers'])):
-            # entry = np.array([item[i] for item in dict.values()])
             arr = np.array([item[i] for item in indict.values()])
             entry = dict(zip(keys, arr))
 
-            # subpix = entry[keys == 'SubpixelPositions']
             subpix = entry['SubpixelPositions']
             if subpix == '0':
                 subpix = [[1]]
@@ -162,8 +167,7 @@ class AptInput:
                 subpix = [[4]]
             if subpix == '9-Point':
                 subpix = [[9]]
-            # in WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
-            # primary = entry[keys == 'PrimaryDithers']
+            # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
             primary = entry['PrimaryDithers']
             if primary == '0':
                 primary = [1]
@@ -174,6 +178,17 @@ class AptInput:
         return expanded
 
     def base36encode(self, integer):
+        """
+        Translate a base 10 integer to base 36
+
+        Parameters:
+        -----------
+        integer -- a base 10 integer
+
+        Returns:
+        --------
+        The integer translated to base 36
+        """
         chars, encoded = '0123456789abcdefghijklmnopqrstuvwxyz', ''
 
         while integer > 0:
@@ -183,7 +198,19 @@ class AptInput:
         return encoded.zfill(2)
 
     def get_pointing_info(self, file, propid):
-        # read in information from APT's pointing file
+        """
+        Read in information from APT's pointing file
+
+        Parameters:
+        -----------
+        file -- Name of APT-exported pointing file to be read
+        propid -- Proposal ID number (integer). This is used to
+                  create various ID fields
+
+        Returns:
+        --------
+        Dictionary of pointing-related information
+        """
         tar = []
         tile = []
         exp = []
@@ -221,7 +248,7 @@ class AptInput:
                 if len(line) > 1:
                     elements = line.split()
 
-                    # look for lines that give visit/observation numbers
+                    # Look for lines that give visit/observation numbers
                     if line[0:2] == '* ':
                         paren = line.rfind('(')
                         if paren == -1:
@@ -247,7 +274,7 @@ class AptInput:
                             print('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
-                        # skip the line at the beginning of each
+                        # Skip the line at the beginning of each
                         # visit that gives info on the target,
                         # but is not actually an observation
                         # These lines have 'Exp' values of 0,
@@ -317,14 +344,35 @@ class AptInput:
         return pointing
 
     def combine_dicts(self, dict1, dict2):
-        # Now combine the dictionaries from the xml file and the pointing file
+        """
+        Combine two dictionaries into a single dictionary
+
+        Parameters:
+        -----------
+        dict1 -- dictionary
+        dict2 -- dictionary
+
+        Returns:
+        --------
+        Combined dictionary
+        """
         combined = dict1.copy()
         combined.update(dict2)
         return combined
 
     def expand_for_detectors(self, obstab):
-        # Expand dictionary to have one line per detector, rather than the
-        # one line per module that is in the input
+        """
+        Expand dictionary to have one entry per detector, rather than the
+        one line per module that is in the input
+
+        Parameters:
+        -----------
+        obstab -- dictionary containing one entry per module
+
+        Returns:
+        --------
+        dictionary expanded to have one entry per detector
+        """
         finaltab = {}
         for key in obstab:
             finaltab[key] = []
@@ -355,16 +403,18 @@ class AptInput:
         return finaltab
 
     def ra_dec_update(self):
-        # given the v2, v3 values in each entry, calculate RA, Dec
-
-        # read in siaf
-        distortionTable = ascii.read(self.siaf, header_start=1)
+        """ 
+        Given the V2, V3 values for the reference pixels associated
+        with detector apertures, calculate corresponding RA, Dec.
+        """
+        # Read in siaf
+        distortionTable = ascii.read(self.siaf, header_start=1, format='csv')
 
         aperture_ra = []
         aperture_dec = []
         for i in range(len(self.exposure_tab['Module'])):
 
-            # first find detector
+            # First find detector
             # need ra, dec and v2, v3 pairs from entry
             # to calculate ra, dec at each detector's reference location
             scripts_path = os.path.dirname(os.path.realpath(__file__))
@@ -394,45 +444,39 @@ class AptInput:
             pointing_v3 = np.float(self.exposure_tab['v3'][i])
             pav3 = np.float(self.exposure_tab['pav3'][i])
 
-            # print('pointing_v2, pointing_v3: ',pointing_v2, pointing_v3)
-            # print('pointing ra & dec: ', pointing_ra, pointing_dec)
-
             # calculate local roll angle
             local_roll = set_telescope_pointing.compute_local_roll(pav3, pointing_ra,
                                                                    pointing_dec,
                                                                    pointing_v2,
                                                                    pointing_v3)
-            # print('local_roll: ', local_roll)
             # create attitude_matrix
             attitude_matrix = rotations.attitude(pointing_v2, pointing_v3,
                                                  pointing_ra, pointing_dec, local_roll)
-            # print(attitude_matrix)
 
             # find v2, v3 of the reference location for the detector
             aperture_v2, aperture_v3 = self.ref_location(distortionTable, aperture)
 
-            # print('aperture_v2, aperture_v3: ',aperture_v2[0], aperture_v3[0])
-
-            # print('aperture_v2, aperture_v3: ',aperture_v2[0], aperture_v3[0])
-
             # calculate RA, Dec of reference location for the detector
             ra, dec = rotations.pointing(attitude_matrix, aperture_v2, aperture_v3)
-            # if dec < 0:
-            #    print("ra, dec: {}, {}".format(ra, dec))
-            #    print('attitude matrix {}'.format(attitude_matrix))
-            #    print('aperture v2, v3: {}, {}'.format(aperture_v2.data, aperture_v3.data))
-            #    print(pointing_v2, pointing_v3, pointing_ra, pointing_dec, local_roll, pav3)
-            #    stop
-
-            # print('ra & dec: ', ra, dec, '\n')
-
             aperture_ra.append(ra)
             aperture_dec.append(dec)
         self.exposure_tab['ra_ref'] = aperture_ra
         self.exposure_tab['dec_ref'] = aperture_dec
 
     def ref_location(self, siaf, det):
-        # find v2, v3 of detector reference location
+        """
+        Find v2, v3 of detector reference location
+
+        Parameters:
+        -----------
+        siaf -- astropy table containing SIAF-related information 
+        det -- string containing the full aperture name of interest
+               (e.g. 'NRCA1_FULL')
+
+        Returns:
+        --------
+        V2, V3 values for the requested aperture's reference location
+        """
         match = siaf['AperName'] == det
 
         if not np.any(match):
@@ -443,8 +487,20 @@ class AptInput:
         return v2, v3
 
     def add_observation_info(self, intab):
-        # Add information about each observation. Catalog names,
-        # dates, PAV3 values, etc.
+        """
+        Add information about each observation. Catalog names,
+        dates, PAV3 values, etc., which are retrieved from the 
+        observation list yaml file.
+
+        Parameters:
+        -----------
+        intab -- astropy table containing exposure information
+
+        Returns:
+        --------
+        Updated table with information from the observation list
+        yaml file added.
+        """
 
         with open(self.observation_table, 'r') as infile:
             self.obstab = yaml.load(infile)
@@ -502,7 +558,7 @@ class AptInput:
             if len(match) == 0:
                 raise StandardError("No valid epoch line found for observation {} in observation table ({}).".format(obs, onames))
 
-            # Match observation from observationtable.yaml with observatoins
+            # Match observation from observation table yaml file with observatoins
             # from  APT XML/pointing; extract the date and PAV3
             obslist = self.obstab[onums[match[0]]]
             obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
@@ -581,6 +637,7 @@ class AptInput:
         return intab
 
     def add_epochs(self, intab):
+        """NOT CURRENTLY USED"""
         # add information on the epoch of each observation
         # if the user entered a list of epochs, read that in
         default_date = '2020-10-14'
