@@ -135,8 +135,6 @@ class Catalog_seed():
         # the detector
         if self.params['Inst']['mode'].lower() == 'moving_target':
             print('Creating signal ramp of synthetic inputs')
-            print(("need to adjust moving target work for multiple "
-                   "integrations! everything above has been modified"))
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
 
             outapp = '_nonsidereal_target'
@@ -268,16 +266,20 @@ class Catalog_seed():
             try:
                 return 10**((mag + 48.6) / -2.5) / photfnu
             except:
-                print("AB mag to countrate conversion failed.")
-                print("magnitude = {}, photfnu = {}".format(mag, photfnu))
-                sys.exit()
+                #print("AB mag to countrate conversion failed.")
+                #print("magnitude = {}, photfnu = {}".format(mag, photfnu))
+                #sys.exit()
+                raise ValueError(("AB mag to countrate conversion failed."
+                                  "magnitude = {}, photfnu = {}".format(mag, photfnu)))
         if magsys.lower() == 'stmag':
             try:
                 return 10**((mag + 21.1) / -2.5) / photflam
             except:
-                print("ST mag to countrate conversion failed.")
-                print("magnitude = {}, photflam = {}".format(mag, photflam))
-                sys.exit()
+                raise ValueError(("ST mag to countrate conversion failed."
+                                  "magnitude = {}, photflam = {}".format(mag, photflam)))
+                #print("ST mag to countrate conversion failed.")
+                #print("magnitude = {}, photflam = {}".format(mag, photflam))
+                #sys.exit()
 
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
@@ -1071,7 +1073,7 @@ class Catalog_seed():
 
             # save the point source image for examination by user
             if self.params['Output']['save_intermediates'] == True:
-                psfImageName = self.basename + '_pointSourceRateImage_elec_per_sec.fits'
+                psfImageName = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(psfimage)
                 h1 = fits.ImageHDU(ptsrc_segmap)
                 hlist = fits.HDUList([h0, h1])
@@ -1107,7 +1109,7 @@ class Catalog_seed():
 
             # save the galaxy image for examination by the user
             if self.params['Output']['save_intermediates'] == True:
-                galImageName = self.basename + '_galaxyRateImage_elec_per_sec.fits'
+                galImageName = self.basename + '_galaxyRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(galaxyCRImage)
                 h1 = fits.ImageHDU(galaxy_segmap)
                 hlist = fits.HDUList([h0, h1])
@@ -1141,7 +1143,7 @@ class Catalog_seed():
 
             # Save extended source image and segmap
             if self.params['Output']['save_intermediates'] == True:
-                extImageName = self.basename + '_extendedObject_elec_per_sec.fits'
+                extImageName = self.basename + '_extendedObject_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(extimage)
                 h1 = fits.ImageHDU(ext_segmap)
                 hlist = fits.HDUList([h0, h1])
@@ -1182,15 +1184,15 @@ class Catalog_seed():
 
         # Save the image containing all of the added sources from the 'sky'
         # if self.params['Output']['save_intermediates'] == True:
-        #    sourcesImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesRateImage_elec_per_sec.fits'
+        #    sourcesImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesRateImage_adu_per_sec.fits'
         #    self.saveSingleFits(signalimage, sourcesImageName)
         #    print("Image of added sources from the 'sky' saved as {}".format(sourcesImageName))
 
 
         # Save the final rate image of added signals
         if self.params['Output']['save_intermediates'] == True:
-            # rateImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesPlusDetectorEffectsRateImage_elec_per_sec.fits'
-            rateImageName = self.basename + '_AddedSources_elec_per_sec.fits'
+            # rateImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesPlusDetectorEffectsRateImage_adu_per_sec.fits'
+            rateImageName = self.basename + '_AddedSources_adu_per_sec.fits'
             self.saveSingleFits(signalimage, rateImageName)
             print("Signal rate image of all added sources saved as {}".format(rateImageName))
 
@@ -1202,8 +1204,7 @@ class Catalog_seed():
         '''
         match = table['AperName'] == aperture
         if np.any(match) == False:
-            print("Aperture name {} not found in input CSV file.".format(aperture))
-            sys.exit()
+            raise ValueError("Aperture name {} not found in input CSV file.".format(aperture))
 
         row = table[match]
 
@@ -1212,9 +1213,9 @@ class Catalog_seed():
         elif ((from_sys == 'ideal') & (to_sys == 'science')):
             label = 'Idl2Sci'
         else:
-            print("WARNING: from_sys of {} and to_sys of {} not a valid transformation.".format(from_sys, to_sys))
-            sys.exit()
-
+            raise ValueError(("WARNING: from_sys of {} and to_sys of {} not "
+                              "a valid transformation.".format(from_sys, to_sys)))
+            
         # get the coefficients, return as list
         X_cols = [c for c in row.colnames if label + 'X' in c]
         Y_cols = [c for c in row.colnames if label + 'Y' in c]
@@ -1263,8 +1264,7 @@ class Catalog_seed():
             edgey = int(301 / 2)
             print("INFO: no PSF library specified, but point sources are to be added to")
             print("the output. PSFs will be generated by WebbPSF on the fly")
-            print("Not yet implemented.")
-            sys.exit()
+            raise NotImplementedError("Not yet implemented.")
 
         pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'), dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
 
@@ -1275,9 +1275,7 @@ class Catalog_seed():
             else:
                 print("Point list input positions assumed to be in units of RA and Dec.")
         except:
-            print("WARNING: Unable to open the point source list file {}".format(filename))
-            sys.exit()
-
+            raise NameError("WARNING: Unable to open the point source list file {}".format(filename))
 
         # File to save adjusted point source locations
         psfile = self.params['Output']['file'][0:-5] + '_pointsources.list'
@@ -1328,6 +1326,11 @@ class Catalog_seed():
         # v2, v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
         attitude_matrix = self.getAttitudeMatrix()
 
+        #Define the min and max source locations (in pixels) that fall onto the subarray
+        #Include the effects of a requested grism_direct image, and also keep sources that
+        #will only partially fall on the subarray
+        #pixel coords here can still be negative and kept if the grism image is being made
+        
         # First, coord limits for just the subarray
         miny = 0
         maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
@@ -1360,11 +1363,11 @@ class Catalog_seed():
         times = []
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
-            #try:
+            try:
             #line below (if 1>0) used to keep the block
             # of code below at correct indent for the try: above
             # the try: is commented out for code testing.
-            if 1 > 0:
+            #if 1 > 0:
                 # Warn user of how long this calcuation might take...
                 if index < 100:
                     elapsed_time = time.time() - start_time
@@ -1563,9 +1566,7 @@ class Catalog_seed():
                     if local:
                         webbpsfimage = fits.getdata(psffn)
                     else:
-                        print("PSF file {}".format(psffn))
-                        print("not found.")
-                        sys.exit()
+                        raise FileNotFoundError("PSF file {} not found.".format(psffn))
                 except:
                     print("ERROR: Could not load PSF file {} from library".format(psffn))
                     sys.exit()
@@ -1621,10 +1622,6 @@ class Catalog_seed():
                 # getpointsourcelist because if the PSF is not centered
                 # in the webbpsf stamp, then the area to be pulled from
                 # the stamp may shift off of the detector.
-                # print(psffn, dims, psfdims, xoff, yoff, nx, ny, nxshift, nyshift)
-                # print(j1, j2, i1, i2, l1, l2, k1, k2)
-                # print(entry)
-                # sys.exit()
                 pass
 
         return psfimage, seg.segmap
@@ -1732,12 +1729,11 @@ class Catalog_seed():
                 sign = -1
                 values[0] = values[0].replace("-", " ")
             else:
-                sign =  + 1
+                sign =  +1
             dec0 = sign*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
             return ra0, dec0
         except:
-            print("Error parsing RA, Dec strings: {} {}".format(rastr, decstr))
-            sys.exit()
+            raise ValueError("Error parsing RA, Dec strings: {} {}".format(rastr, decstr))
 
     def RADecToXY_astrometric(self, ra, dec, attitude_matrix, coord_transform):
         # Translate backwards, RA, Dec to V2, V3
@@ -2239,11 +2235,9 @@ class Catalog_seed():
             if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
                 print(j1, i1, l1, k1)
                 print('bad low')
-                # sys.exit()
             if j2 > (dims[0] + 1) or i2 > (dims[1] + 1) or l2 > (galdims[1] + 1) or k2 > (galdims[1] + 1):
                 print(j2, i2, l2, k2)
                 print('bad high')
-                # sys.exit()
 
             if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < dims[0]) and (i1 < dims[0])):
                 galimage[j1:j2, i1:i2] = galimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2]
@@ -2335,10 +2329,10 @@ class Catalog_seed():
         #Loop over input lines in the source list
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
-            #try:
+            try:
             #line below (if 1>0) used to keep the block of code below at correct indent for the try: above
             #the try: is commented out for code testing.
-            if 1>0:
+            #if 1>0:
                 try:
                     entry0 = float(values['x_or_RA'])
                     entry1 = float(values['y_or_Dec'])
@@ -2397,7 +2391,8 @@ class Catalog_seed():
                 if len(eshape) == 2:
                     edgey, edgex = eshape / 2
                 else:
-                    print("WARNING, extended source image {} is not 2D! Not sure how to proceed. Quitting.".format(values['filename']))
+                    print(("WARNING, extended source image {} is not 2D! "
+                           "Not sure how to proceed. Quitting.".format(values['filename'])))
                     sys.exit()
 
                 #Define the min and max source locations (in pixels) that fall onto the subarray
@@ -2579,12 +2574,10 @@ class Catalog_seed():
             if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
                 print(j1, i1, l1, k1)
                 print('bad low')
-                sys.exit()
             if j2 > (dims[0] + 1) or i2 > (dims[1] + 1) or \
                l2 > (psfdims[1] + 1) or k2 > (psfdims[1] + 1):
                 print(j2, i2, l2, k2)
                 print('bad high')
-                sys.exit()
 
             # Add stamp image to the extended source countrate image
             extimage[j1:j2, i1:i2] = extimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2] * counts
@@ -2648,8 +2641,7 @@ class Catalog_seed():
         """Check input parameters for expected datatypes, values"""
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in inst_list:
-            print("WARNING: {} instrument not implemented within ramp simulator")
-            sys.exit()
+            raise NotImplementedError("WARNING: {} instrument not implemented within ramp simulator")
 
         # Check entered mode:
         possibleModes = modes[self.params['Inst']['instrument'].lower()]
@@ -2657,10 +2649,9 @@ class Catalog_seed():
         if self.params['Inst']['mode'] in possibleModes:
             pass
         else:
-            print(("WARNING: unrecognized mode {} for {}. Must be one of: {}".format(self.params['Inst']['mode'],
-                                                                                     self.params['Inst']['instrument'],
-                                                                                     possibleModes)))
-            sys.exit()
+            raise ValueError(("WARNING: unrecognized mode {} for {}. Must be one of: {}"
+                   .format(self.params['Inst']['mode'],
+                           self.params['Inst']['instrument'],possibleModes)))
 
         # Set nframe and nskip according to the values in the
         # readout pattern definition file
@@ -2750,8 +2741,8 @@ class Catalog_seed():
         else:
             usefilt = 'filter'
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
-            print("WARNING: requested filter {} is not in the list of possible filters.".format(self.params['Readout'][usefilt]))
-            sys.exit()
+            raise ValueError(("WARNING: requested filter {} is not in the list of "
+                   "possible filters.".format(self.params['Readout'][usefilt])))
 
         # Get the photflambda and photfnu values that go with
         # the filter
@@ -2770,14 +2761,13 @@ class Catalog_seed():
 
             wfe = self.params['simSignals']['psfwfe']
             if wfe not in wfe_options:
-                print("WARNING: invalid wavefront error (psfwfe) input: {}".format(wfe))
-                print("psfwfe must be one of: {}".format(wfe_options))
-                sys.exit()
+                raise ValueError(("WARNING: invalid wavefront error (psfwfe) input: {}"
+                                  "psfwfe must be one of: {}".format(wfe, wfe_options)))
             wfegroup = self.params['simSignals']['psfwfegroup']
             if wfegroup not in wfegroup_options:
-                print("WARNING: invalid wavefront group (psfwfegroup) value: {}".format(wfegroup))
-                print("psfwfegroup must be one of: {}".format(wfegroup_options))
-                sys.exit()
+                raise ValueError(("WARNING: invalid wavefront group (psfwfegroup) "
+                                  "value: {}. psfwfegroup must be one of: {}"
+                                  .format(wfegroup, wfegroup_options)))
             basename = self.params['simSignals']['psfbasename'] + '_'
             if wfe == 0:
                 psfname = basename + self.params['simSignals'][usefilt].lower() + '_zero'
@@ -2832,8 +2822,9 @@ class Catalog_seed():
             if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
                 distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'], header_start=1, format='csv')
             else:
-                print("WARNING: Input distortion coefficients file {} does not exist.".format(self.params['Reffiles']['distortion_coeffs']))
-                sys.exit()
+                raise FileNotFoundError(("WARNING: Input distortion coefficients file {} "
+                                         "does not exist."
+                                         .format(self.params['Reffiles']['distortion_coeffs'])))
 
             # read in coefficients for the forward 'science' to 'ideal' coordinate transformation.
             # 'science' is in units of distorted pixels, while 'ideal' is the undistorted
@@ -2850,9 +2841,7 @@ class Catalog_seed():
 
             match = siaf['AperName'] == ap_name
             if not np.any(match):
-                print("Aperture name {} not found in input CSV file.".
-                      format(ap_name))
-                sys.exit()
+                raise ValueError("Aperture name {} not found in input CSV file.".format(ap_name))
 
             siaf_row = siaf[match]
 
@@ -2873,8 +2862,7 @@ class Catalog_seed():
 
         if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or \
            self.ra is None or self.dec is None:
-            print("WARNING: bad requested RA and Dec {} {}".format(self.ra, self.dec))
-            sys.exit()
+            raise ValueError("WARNING: bad requested RA and Dec {} {}".format(self.ra, self.dec))
 
         # make sure the rotation angle is a float
         try:
@@ -2915,10 +2903,9 @@ class Catalog_seed():
                                                           level=self.params['simSignals']['bkgdrate'].lower())
                 print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
             else:
-                print(("WARNING: unrecognized background rate value. "
-                       "Must be either a number or one of: {}"
-                       .format(bkgdrate_options)))
-                sys.exit()
+                raise ValueError(("WARNING: unrecognized background rate value. "
+                                  "Must be either a number or one of: {}"
+                                  .format(bkgdrate_options)))
 
         #check that the various scaling factors are floats and within a reasonable range
         #self.params['cosmicRay']['scale'] = self.checkParamVal(self.params['cosmicRay']['scale'], 'cosmicRay', 0, 100, 1)
@@ -2928,40 +2915,24 @@ class Catalog_seed():
 
         # make sure the requested output format is an allowed value
         if self.params['Output']['format'] not in allowedOutputFormats:
-            print("WARNING: unsupported output format {} requested. Possible options are {}.".format(self.params['Output']['format'], allowedOutputFormats))
-            sys.exit()
+            raise ValueError(("WARNING: unsupported output format {} requested. "
+                              "Possible options are {}.".format(self.params['Output']['format'],
+                                                                allowedOutputFormats)))
 
         # Entries for creating the grims input image
         if not isinstance(self.params['Output']['grism_source_image'], bool):
             if self.params['Output']['grism_source_image'].lower() == 'none':
                 self.params['Output']['grism_source_image'] = False
             else:
-                print("WARNING: grism_source_image needs to be True or False")
-                sys.exit()
+                raise ValueError("WARNING: grism_source_image needs to be True or False")
 
         # Location of extended image on output array, pixel x, y values.
         try:
             self.params['simSignals']['extendedCenter'] = np.fromstring(self.params['simSignals']['extendedCenter'], dtype=int, sep=", ")
         except:
-            print("WARNING: not able to parse the extendedCenter list {}. It should be a comma-separated list of x and y pixel positions.".format(self.params['simSignals']['extendedCenter']))
-            sys.exit()
-
-        # Time series settings
-        # if self.params['Inst']['mode'] == 'tso':
-        #
-        #    # make sure slew rate and angle are floats
-        #    try:
-        #        self.params['Telescope']['slewRate'] = np.float(self.params['Telescope']['slewRate'])
-        #    except:
-        #        print("WARNING: input slew rate {} is not an integer or float.".format(self.params['Telescope']['slewRate']))
-        #        sys.exit()
-        #
-        #    try:
-        #        self.params['Telescope']['slewAngle'] = np.float(self.params['Telescope']['slewAngle'])
-        #    except:
-        #        print("WARNING: input slew angle {} is not an integer or float.".format(self.params['Telescope']['slewAngle']))
-        #        sys.exit()
-
+            raise RuntimeError(("WARNING: not able to parse the extendedCenter list {}. "
+                                "It should be a comma-separated list of x and y pixel positions."
+                                .format(self.params['simSignals']['extendedCenter'])))
 
         # check the output metadata, including visit and observation numbers, obs_id, etc
         #
@@ -3005,11 +2976,9 @@ class Catalog_seed():
         else:
             # If the read pattern is not present in the definition file
             # then quit.
-            print(("WARNING: the {} readout pattern is not defined in {}."
-                   .format(self.params['Readout']['readpatt'],
-                           self.params['Reffiles']['readpattdefs'])))
-            print("Quitting.")
-            sys.exit()
+            raise ValueError(("WARNING: the {} readout pattern is not defined in {}."
+                              .format(self.params['Readout']['readpatt'],
+                                      self.params['Reffiles']['readpattdefs'])))
 
     def filecheck(self):
         # Make sure the requested input files exist
@@ -3045,9 +3014,9 @@ class Catalog_seed():
             if c1:
                 self.params[rele[0]][rele[1]] = rfile
             else:
-                print(("WARNING: Unable to locate the {}, {}".format(rele[0], rele[1])))
-                print(("input file! Not present in {}".format(rfile)))
-                sys.exit()
+                raise FileNotFoundError(("WARNING: Unable to locate the {}, {} "
+                                         "input file! Not present in {}"
+                                         .format(rele[0], rele[1], rfile)))
 
     def path_check(self, p):
         # Check for the existence of the input path.
@@ -3060,10 +3029,10 @@ class Catalog_seed():
         if c1:
             self.params[p[0]][p[1]] = pth
         else:
-            print("WARNING: Unable to find the requested path")
-            print("{}. Not present in directory tree".format(self.pdir))
-            print("specified by the {} environment variable.".format(self.env_var))
-            sys.exit()
+            raise NotADirectoryError(("WARNING: Unable to find the requested path "
+                                      "{}. Not present in directory tree specified by "
+                                      "the {} environment variable."
+                                      .format(self.pdir, self.env_var)))
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In
@@ -3078,23 +3047,22 @@ class Catalog_seed():
             if c:
                 self.params[inparam[0]][inparam[1]] = ifile
             else:
-                print("WARNING: Unable to locate {}".format(ifile))
-                print("Specified by the {}:{} field in".format(inparam[0], inparam[1]))
-                print("the input yaml file.")
-                sys.exit()
+                raise FileNotFoundError(("WARNING: Unable to locate {} Specified "
+                                         "by the {}:{} field in the input yaml file."
+                                         .format(ifile, inparam[0], inparam[1])))
 
     def checkParamVal(self, value, typ, vmin, vmax, default):
         # make sure the input value is a float and between min and max
         try:
             value = float(value)
         except:
-            print("WARNING: {} for {} is not a float.".format(value, typ))
-            sys.exit()
+            raise ValueError("WARNING: {} for {} is not a float.".format(value, typ))
 
         if ((value >= vmin) & (value <= vmax)):
             return value
         else:
-            print("ERROR: {} for {} is not within reasonable bounds. Setting to {}".format(value, typ, default))
+            print(("ERROR: {} for {} is not within reasonable bounds. "
+                   "Setting to {}".format(value, typ, default)))
             return default
 
     def readSubarrayDefinitionFile(self):
@@ -3103,8 +3071,7 @@ class Catalog_seed():
         try:
             self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
         except:
-            print("Error: could not read in subarray definitions file.")
-            sys.exit()
+            raise RuntimeError("Error: could not read in subarray definitions file.")
 
     def getSubarrayBounds(self):
         # find the bounds of the requested subarray
@@ -3125,17 +3092,15 @@ class Catalog_seed():
                     print(("readout time. You have requested {} amps."
                            .format(self.params['Readout']['namp'])))
                 else:
-                    print(("WARNING: {} requires the number of amps "
-                           "to be 1 or 4. You have requested {}."
-                           .format(self.params['Readout']['array_name'],
-                                   self.params['Readout']['namp'])))
-                    sys.exit()
+                    raise ValueError(("WARNING: {} requires the number of amps "
+                                      "to be 1 or 4. You have requested {}."
+                                      .format(self.params['Readout']['array_name'],
+                                              self.params['Readout']['namp'])))
         else:
-            print(("WARNING: subarray name {} not found in the "
-                   "subarray dictionary {}."
-                   .format(self.params['Readout']['array_name'],
-                           self.params['Reffiles']['subarray_defs'])))
-            sys.exit()
+            raise ValueError(("WARNING: subarray name {} not found in the "
+                              "subarray dictionary {}."
+                              .format(self.params['Readout']['array_name'],
+                                      self.params['Reffiles']['subarray_defs'])))
 
     def instrument_specific_dicts(self, instrument):
         # get instrument-specific values for things that
@@ -3207,8 +3172,7 @@ class Catalog_seed():
         elif level.lower() == 'high':
             perc = 0.9
         else:
-            print("Unrecognized background level string")
-            sys.exit()
+            raise ValueError("Unrecognized background level string")
 
         # Interpolate to the requested level
         bval = np.interp(perc, y, x) * u.MJy / u.steradian
