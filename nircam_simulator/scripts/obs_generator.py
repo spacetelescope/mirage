@@ -22,6 +22,9 @@ from . import unlinearize
 from . import read_fits
 
 
+inst_list = ['nircam']
+modes = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"]}
+
 class Observation():
     def __init__(self):
         self.linDark = None
@@ -228,8 +231,8 @@ class Observation():
                               err_ext=err, group_dq=groupdq, pixel_dq=pixeldq)
 
             stp.add_wcs(linearrampfile, roll=self.params['Telescope']['rotation'])
-            # print("Final linearized exposure saved to:")
-            # print("{}".format(linearrampfile))
+            print("Final linearized exposure saved to:")
+            print("{}".format(linearrampfile))
 
         # If the raw version is requested, we need to unlinearize
         # the ramp
@@ -284,19 +287,23 @@ class Observation():
         print("Observation generation complete.")
 
     def expand_env_var(self):
-        # Replace the environment variable name in any inputs
-        # where it is used.
+        """
+        Replace the environment variable name in any inputs
+        where it is used.
+        """
         for key1 in self.params:
             for key2 in self.params[key1]:
                 if self.env_var in str(self.params[key1][key2]):
                     self.params[key1][key2] = self.params[key1][key2].replace('$'+self.env_var+'/', self.datadir)
 
     def filecheck(self):
-        # Make sure the requested input files exist
-        # For reference files, assume first that they are located in
-        # the directory tree under the datadir (from the NIRCAM_SIM_DATA
-        # environment variable). If not, assume the input is a full path
-        # and check there.
+        """
+        Make sure the requested input files exist
+        For reference files, assume first that they are located in
+        the directory tree under the datadir (from the NIRCAM_SIM_DATA
+        environment variable). If not, assume the input is a full path
+        and check there.
+        """
         rlist = [['Reffiles', 'badpixmask'],
                  ['Reffiles', 'linearity'],
                  ['Reffiles', 'saturation'],
@@ -304,24 +311,27 @@ class Observation():
                  ['Reffiles', 'pixelAreaMap'],
                  ['Reffiles', 'gain']]
         plist = [['cosmicRay', 'path']]
-        #ilist = [['simSignals', 'pointsource'],
-        #         ['simSignals', 'galaxyListFile'],
-        #         ['simSignals', 'extended'],
-        #         ['simSignals', 'movingTargetList'],
-        #         ['simSignals', 'movingTargetSersic'],
-        #         ['simSignals', 'movingTargetExtended'],
-        #         ['simSignals', 'movingTargetToTrack']]
         for ref in rlist:
             self.ref_check(ref)
         for path in plist:
             self.path_check(path)
-        #for inp in ilist:
-        #    self.input_check(inp)
 
     def ref_check(self, rele):
-        # Check for the existence of the input reference file
-        # Assume first that the file is in the directory tree
-        # specified by the NIRCAM_SIM_DATA environment variable.
+        """
+        Check for the existence of the input reference file
+        Assume first that the file is in the directory tree
+        specified by the NIRCAM_SIM_DATA environment variable.
+
+        Parameters:
+        -----------
+        rele -- Tuple containing the nested keys that point
+                to the refrence file of interest. These come
+                from the yaml input file
+
+        Reutrns:
+        --------
+        Nothing
+        """
         rfile = self.params[rele[0]][rele[1]]
         if rfile.lower() != 'none':
             rfile = os.path.abspath(rfile)
@@ -329,27 +339,36 @@ class Observation():
             if c1:
                 self.params[rele[0]][rele[1]] = rfile
             else:
-                print(("WARNING: Unable to locate the {}, {}"
-                       .format(rele[0], rele[1])))
-                print(("input file! Not present in {}"
-                       .format(rfile)))
-                sys.exit()
+                raise FileNotFoundError(("WARNING: Unable to locate the "
+                                         "{}, {} input file! Not present in {}."
+                                         .format(rele[0], rele[1], rfile)))
 
     def path_check(self, p):
-        # Check for the existence of the input path.
-        # Assume first that the path is in relation to
-        # the directory tree specified by the NIRCAM_DATA_SIM
-        # environment variable
+        """
+        Check for the existence of the input path.
+        Assume first that the path is in relation to
+        the directory tree specified by the NIRCAM_DATA_SIM
+        environment variable
+        
+        Parameters:
+        -----------
+        p -- Tuple containing the nested keys that point
+             to a directory in self.params
+
+        Returns:
+        --------
+        Nothing
+        """
         pth = self.params[p[0]][p[1]]
         pth = os.path.abspath(pth)
         c1 = os.path.exists(pth)
         if c1:
             self.params[p[0]][p[1]] = pth
         else:
-            print("WARNING: Unable to find the requested path")
-            print("{}. Not present in directory tree".format(self.pdir))
-            print("specified by the {} environment variable.".format(self.env_var))
-            sys.exit()
+            raise NotADirectoryError(("WARNING: Unable to find the requested path "
+                                      "{}. Not present in directory tree specified "
+                                      "by the {} environment variable."
+                                      .format(pth, self.env_var)))
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In
@@ -465,19 +484,19 @@ class Observation():
             print('CAUTION: no superbias provided. Quitting.')
             sys.exit()
 
-    def inputChecks(self):
+    def readpattern_compatible(self):
         # Make sure the input dark has a readout pattern
         # that is compatible with the requested output
         # readout pattern
         darkpatt = self.linDark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
             (darkpatt != 'RAPID')):
-            print("WARNING: Unable to convert input dark with a readout pattern")
-            print("of {}, to the requested readout pattern of {}."
-                  .format(darkpatt, self.params['Readout']['readpatt']))
-            print("The readout pattern of the dark must be RAPID or match")
-            print("the requested output readout pattern.")
-            sys.exit()
+            raise ValueError(("WARNING: Unable to convert input dark with a "
+                              "readout pattern of {}, to the requested readout "
+                              "pattern of {}. The readout pattern of the dark "
+                              "must be RAPID or match the requested output "
+                              "readout pattern.".format(darkpatt,
+                                           self.params['Readout']['readpatt'])))
 
     def channel_specific_dicts(self):
         # Get detector/channel-specific values for things that
@@ -816,19 +835,18 @@ class Observation():
             outModel.zeroframe = np.zeros((numint, ys, xs))
 
         #EXPTYPE OPTIONS
-        #exptypes = ['NRC_IMAGE', 'NRC_GRISM', 'NRC_TACQ', 'NRC_CORON', 'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
+        #exptypes = ['NRC_IMAGE', 'NRC_GRISM', 'NRC_TACQ', 'NRC_CORON',
+        #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
         #nrc_tacq and nrc_coron are not currently implemented.
 
-        exptype = {'nircamimaging': 'NRC_IMAGE', 'nircamengineeringimaging': 'NRC_IMAGE',
-                   'moving_target': 'NRC_TSIMAGE', 'wfsccommissioning': 'NRC_IMAGE',
-                   'wfscglobalalignment': 'NRC_IMAGE',
-                   'nircamwfss': 'NRC_GRISM', 'tso_wfss': 'NRC_TSGRISM', 'coron': 'NRC_CORON'}
+        exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
+                   'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
 
         try:
-            outModel.meta.exposure.type = exptype[self.params['Inst']['mode'].lower()]
+            outModel.meta.exposure.type = exptype[self.params['Inst']['instrument'].lower()]\
+                                          [self.params['Inst']['mode'].lower()]
         except:
-            print('EXPTYPE mapping not complete for this!!! FIX ME!')
-            sys.exit()
+            raise ValueError('EXPTYPE mapping not complete for this!!! FIX ME!')
 
         #update various header keywords
         dims = outModel.data.shape
@@ -918,7 +936,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         #get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() != 'nircamwfss':
+        if self.params['Inst']['mode'].lower() not in ['wfss','ts_wfss']:
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -1059,15 +1077,14 @@ class Observation():
         #    self.dark = self.dark[0:3]
 
         #EXPTYPE OPTIONS
-        exptype = {'nircamimaging': 'NRC_IMAGE', 'nircamengineeringimaging': 'NRC_IMAGE',
-                   'moving_target': 'NRC_TSIMAGE', 'wfsccommissioning': 'NRC_IMAGE',
-                   'wfscglobalalignment': 'NRC_IMAGE',
-                   'nircamwfss': 'NRC_GRISM', 'tso_wfss': 'NRC_TSGRISM', 'coron': 'NRC_CORON'}
+        exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
+                   'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+
         try:
-            outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['mode'].lower()]
+            outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['instrument'].lower()]\
+                                             [self.params['Inst']['mode'].lower()]
         except:
-            print('EXPTYPE mapping not complete for this!!! FIX ME!')
-            sys.exit()
+            raise ValueError('EXPTYPE mapping not complete for this!!! FIX ME!')
 
         #update various header keywords
         dims = outModel[1].data.shape
@@ -1164,7 +1181,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         #get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() != 'nircamwfss':
+        if self.params['Inst']['mode'].lower() not in ['wfss','ts_wfss']:
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -1235,7 +1252,7 @@ class Observation():
 
         outModel.writeto(filename, overwrite=True)
 
-        print("Final output integration saved to {}".format(filename))
+        #print("Final output integration saved to {}".format(filename))
         return filename
 
 
@@ -2002,8 +2019,8 @@ class Observation():
         #newimage = np.zeros_like(signalimage,dtype=np.float)
         #ndim = signalimage.shape
 
-        # Adjust the seed each time dopoisson is run
-        np.random.seed()
+        # Set the seed
+        np.random.seed(self.params['simSignals']['poissonseed'])
 
         # Find the appropriate quantum yield value for the filter
         #if self.params['simSignals']['photonyield']:
@@ -2112,6 +2129,7 @@ class Observation():
 
 
     def poissonFuncs(self, seed=4243):
+        """Not used"""
         np.random.seed(seed)
         self.generator2 = random.Random()
         self.generator2.seed(seed)
@@ -2194,29 +2212,32 @@ class Observation():
 
     def checkParams(self):
         # check instrument name
-        if self.params['Inst']['instrument'].lower() != 'nircam':
-            print("WARNING: instrument not set to 'NIRCam'. Resetting.")
-            self.params['Inst']['instrument'] = 'NIRCam'
+        if self.params['Inst']['instrument'].lower() not in inst_list:
+            raise ValueError(("WARNING: instrument {} not in the list of "
+                              "available instruments: {}"
+                              .format(self.params['Inst']['instrument'].lower(),inst_list)))
 
         # check output filename - make sure it's fits
         if self.params['Output']['file'][-5:].lower() != '.fits':
             self.params['Output']['file'] += '.fits'
 
         # check mode:
-        possibleModes = ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
-                         'nircamwfss', 'wfsccommissioning', 'wfscglobalalignment']
+        possibleModes = modes[self.params['Inst']['instrument'].lower()]
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
             pass
         else:
-            print(("WARNING: unrecognized mode {}. Must be one of: {}"
-                   .format(self.params['Inst']['mode'], possibleModes)))
-            sys.exit()
+            raise ValueError(("WARNING: unrecognized mode {}. Must be one of: {}"
+                              .format(self.params['Inst']['mode'], possibleModes)))
 
         # Make sure input readout pattern, nframe/nkip combination
         # is valid
         self.readpatternCheck()
 
+        # Check that readout patterns of input dark and requested output
+        # are compatible
+        self.readpattern_compatible()
+        
         # Make sure ngroup and nint are integers
         try:
             self.params['Readout']['ngroup'] = int(self.params['Readout']['ngroup'])
@@ -2229,14 +2250,6 @@ class Observation():
         except:
             print("WARNING: Input value of nint is not an integer.")
             sys.exit
-
-
-        # Check the number of amps. Full frame data will always
-        # be collected using 4 amps. Subarray data will always be 1 amp,
-        # except for the grism subarrays which span the entire width of
-        # the detector. Those can be read out using 1 or 4 amps.
-        # THIS IS NOW DONE IN GETSUBARRAYBOUNDS
-        #self.setNumAmps()
 
         # Make sure that the requested number of groups is less than or
         # equal to the maximum allowed.
@@ -2488,20 +2501,6 @@ class Observation():
             #           .format(self.params['Reffiles']['readpattdefs'])))
             #    sys.exit()
 
-
-    def setNumAmps(self):
-        # Set the number of amps used in the output data.
-        # Full frame data always use 4 amps. Suabrray data
-        # generally use 1 amp, except for the grism-related
-        # subarrays that span the entire width
-        # of the detector. For those, trust that the user input is what they want.
-        amps = 4
-        if "FULL" in self.params['Readout']['array_name'].upper():
-            self.params['Readout']['namp'] = 4
-        elif self.subarray_bounds[2] - self.subarray_bounds[0] != 2047:
-            self.params['Readout']['namp'] = 1
-        else:
-            raise ValueError('Cannot determine number of amps.')
 
     def checkParamVal(self, value, typ, vmin, vmax, default):
         # Make sure the input value is a float and between min and max
