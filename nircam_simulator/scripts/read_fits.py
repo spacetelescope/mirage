@@ -94,7 +94,7 @@ class Read_fits():
         h = RampModel(self.file)
 
         #remove any non-pipeline related keywords (e.g. CV3 temps/voltages)
-        try:
+        if 'extra_fits' in dir(h):
             h.__delattr__('extra_fits')
 
         self.data = h.data
