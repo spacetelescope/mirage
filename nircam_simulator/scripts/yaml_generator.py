@@ -73,6 +73,8 @@ apt_inputs.py - Functions for reading and parsing xml and pointing files from AP
 HISTORY:
 
 July 2017 - V0: Initial version. Bryan Hilbert
+Feb 2018 - V1: Updates to accomodate multiple filter pairs per 
+               observation. Launren Chambers
 
 '''
 
@@ -86,7 +88,6 @@ import numpy as np
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
 from astropy.io import ascii
-# sys.path.append(os.getcwd())
 from . import apt_inputs
 
 
@@ -301,13 +302,13 @@ class SimInput:
 
         filenames = [y.split('/')[-1] for y in yamls]
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
-        obs_ids = sorted(list(set([m[8:11] for m in mosaic_numbers])))
+        obs_ids = sorted(list(set([m[9:12] for m in mosaic_numbers])))
 
         print('\n')
         i_mod = 0
         for obs in obs_ids:
-            n_visits = len(list(set([m[5:8] for m in mosaic_numbers if m[8:11] == obs])))
-            n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[8:11] == obs])))
+            n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
+            n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
             module = self.info['Module'][i_mod]
 
             if module in ['A', 'B']:
@@ -325,12 +326,12 @@ class SimInput:
 
             i_mod += n_tiles * n_det
 
-            print('Observation {}: \n   {} visit(s) \n   {} mosaic tile(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
-        print('\n{} mosaic tiles total.'.format(len(mosaic_numbers)))
+            print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
+        print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
     def path_defs(self):
-        # Set full paths for inputs
+        """Expand input files to have full paths"""
         self.input_xml = os.path.abspath(self.input_xml)
         self.pointing_file = os.path.abspath(self.pointing_file)
         self.siaf = os.path.abspath(self.siaf)
@@ -338,22 +339,6 @@ class SimInput:
         self.simdata_output_dir = os.path.abspath(self.simdata_output_dir)
         if self.table_file is not None:
             self.table_file = os.path.abspath(self.table_file)
-        # self.subarray_def_file = self.set_config(self.subarray_def_file, 'NIRCam_subarray_definitions.list')
-        # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'nircam_read_pattern_definitions.list')
-        # self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'nircam_filter_pupil_pairings.list')
-        # # self.mag15counts = self.set_config(self.mag15counts, 'nircam_mag15_countrates.list')
-        # self.fluxcal = self.set_config(self.fluxcal, 'NIRCam_zeropoints.list')
-        # self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init.cfg')
-        # self.refpix_config = self.set_config(self.refpix_config, 'refpix.cfg')
-        # self.saturation_config = self.set_config(self.saturation_config, 'saturation.cfg')
-        # self.superbias_config = self.set_config(self.superbias_config, 'superbias.cfg')
-        # self.linearity_config = self.set_config(self.linearity_config, 'dq_init.cfg')
-        # if self.observation_table is not None:
-        #    self.observation_table = os.path.abspath(self.observation_table)
-        # if self.crosstalk not in [None, 'dist']:
-        #    self.crosstalk = os.path.abspath(self.crosstalk)
-        # elif self.crosstalk == 'dist':
-        #    self.crosstalk = os.path.join(os.path.dirname(os.path.realpath('yaml_generator.py')), 'config/xtalk20150303g0.errorcut.txt')
         self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
         self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
@@ -371,20 +356,21 @@ class SimInput:
         elif self.crosstalk == 'config':
             self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
-    # def set_config(self, prop, defaultval=None):
-    #    # If a given file is listed as 'config'
-    #    # then set it in the yaml output as in
-    #    # the config subdirectory
-    #    if prop not in ['config']:
-    #        prop = os.path.abspath(prop)
-    #    elif prop == 'config':
-    #        prop = os.path.join(os.path.dirname(os.path.realpath('yaml_generator.py')), 'config/', defaultval)
-    #    return prop
-
     def set_config(self, file, prop):
-        # If a given file is listed as 'config'
-        # then set it in the yaml output as in
-        # the config subdirectory
+        """
+        If a given file is listed as 'config'
+        then set it in the yaml output as being in
+        the config subdirectory.
+
+        Parameters:
+        -----------
+        file -- Name of the input file
+        prop -- String. Type of file that file is.
+
+        Returns:
+        --------
+        Full path name to the input file
+        """
         if file.lower() not in ['config']:
             file = os.path.abspath(file)
         elif file.lower() == 'config':
@@ -392,7 +378,10 @@ class SimInput:
         return file
 
     def add_catalogs(self):
-        # Add list(s) of source catalogs to table
+        """
+        Add list(s) of source catalogs to the table containing the
+        observation information
+        """
         self.info['point_source'] = [None] * len(self.info['Module'])
         self.info['galaxyListFile'] = [None] * len(self.info['Module'])
         self.info['extended'] = [None] * len(self.info['Module'])
@@ -434,8 +423,24 @@ class SimInput:
 
 
     def catalog_match(self, filter, pupil, catalog_list, cattype):
-        # given a filter and pupil value, along with a list of input
-        # catalogs, find the catalogs that match the pupil or filter
+        """
+        Given a filter and pupil value, along with a list of input
+        catalogs, find the catalog names that contain each filter/
+        pupil name.
+
+        Parameters:
+        -----------
+        filter -- String name of a filter element
+        pupil -- String name of a pupil element
+        catalog_list -- List of catalog filenames
+        cattype -- String containing the type of catalog in
+                   the list.
+
+        Returns:
+        --------
+        Name of catalog that contains the name of the
+        input filter/pupil element
+        """
         if pupil[0].upper() == 'F':
             match = [s for s in catalog_list if pupil.lower() in s.lower()]
             if len(match) == 0:
@@ -454,29 +459,54 @@ class SimInput:
             return match[0]
 
     def no_catalog_match(self, filter, cattype):
-        # tell user if no catalog match was found
+        """
+        Tell user if no catalog match was found.
+
+        Parameters:
+        -----------
+        filter -- String name of filter element
+        cattype -- String, type of catalog (e.g. pointsource)
+        """
         print("WARNING: unable to find filter ({}) name".format(filter))
         print("in any of the given {} inputs".format(cattype))
         print("Using the first input for now. Make sure input catalog names have")
         print("the appropriate filter name in the filename to get matching to work.")
 
     def multiple_catalog_match(self, filter, cattype, matchlist):
-        # tell the user if more than one catalog matches the filter/pupil
+        """
+        Tell the user if more than one catalog matches the filter/pupil
+
+        Parameters:
+        filter -- String name of filter element
+        cattype -- String, type of catalog (e.g. pointsource)
+        matchlist -- List of matching catalog names
+        """
         print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
         print("Observation filter: {}".format(filter))
         print("Matched point source catalogs: {}".format(matchlist))
 
     def table_to_dict(self, tab):
-        # convert the ascii table of observations to the
-        # needed dictionary
+        """
+        Convert the ascii table of observations to a dictionary
+
+        Parameters:
+        -----------
+        tab -- astropy Table containing observation information
+
+        Returns:
+        --------
+        Dictionary of observation information
+        """
         dict = {}
         for colname in tab.colnames:
             dict[colname] = tab[colname].data
         return dict
 
     def make_start_times(self):
-        # create exposure start times for each entry
-        # the time and date to start with are optional inputs
+        """
+        Create exposure start times for each entry in
+        the observation dictionary
+        """
         date_obs = []
         time_obs = []
         expstart = []
@@ -488,32 +518,23 @@ class SimInput:
         epoch_base_time = '16:44:12'
         epoch_base_time0 = deepcopy(epoch_base_time)
 
-        # b = self.obsdate + 'T' + self.obstime
-        # base = Time(b)
         epoch_base_date = self.info['epoch_start_date'][0]
-
-        # epoch_start = deepcopy(epoch_base)
         base = Time(epoch_base_date + 'T' + epoch_base_time)
         base_date, base_time = base.iso.split()
 
-        # add the times and dates of the first entry
-        # date_obs.append(base_date)
-        # time_obs.append(base_time)
-        # expstart.append(base.mjd)
-
-        # pick some arbirary overhead values
-        act_overhead = 40  # seconds. (filter change)
+        # Pick some arbirary overhead values
+        act_overhead = 90  # seconds. (filter change)
         visit_overhead = 600  # seconds. (slew)
 
-        # get visit, activity_id info for first exposure
+        # Get visit, activity_id info for first exposure
         actid = self.info['act_id'][0]
         visit = self.info['visit_num'][0]
         obsname = self.info['obs_label'][0]
 
-        # read in file containing subarray definitions
+        # Read in file containing subarray definitions
         subarray_def = self.get_subarray_defs()
 
-        # now read in readpattern definitions
+        # Now read in readpattern definitions
         readpatt_def = self.get_readpattern_defs()
 
         for i in range(len(self.info['Module'])):
@@ -525,7 +546,7 @@ class SimInput:
             next_visit = self.info['visit_num'][i]
             next_obsname = self.info['obs_label'][i]
 
-            # get the values of nframes, nskip, and namp
+            # Get the values of nframes, nskip, and namp
             readpatt = self.info['ReadoutPattern'][i]
 
             # Find the readpattern of the file
@@ -552,7 +573,7 @@ class SimInput:
             match = aperture == subarray_def['AperName']
 
             if np.sum(match) == 0:
-                config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
+                config = ascii.read(self.subarray_def_file)
                 aperture = [apername for apername, name in \
                             np.array(config['AperName', 'Name']) if \
                             (sub in apername) or (sub in name)]
@@ -639,23 +660,37 @@ class SimInput:
         self.info['namp'] = namp
 
     def get_readpattern_defs(self):
-        # read in the readpattern definition file
+        """Read in the readpattern definition file and return table"""
         tab = ascii.read(self.readpatt_def_file)
         return tab
 
     def get_subarray_defs(self):
-        # read in subarray definition file and return table
+        """Read in subarray definition file and return table"""
         sub = ascii.read(self.subarray_def_file)
         return sub
 
     def calcFrameTime(self, xd, yd, namp):
-        # calculate the exposure time of a single frame of the proposed output ramp
-        # based on the size of the croped dark current integration
+        """
+        Calculate the exposure time of a single frame of the proposed output ramp
+        based on the size of the croped dark current integration
+
+        Parameters:
+        -----------
+        xd -- Integer x-coordinate size of the aperture to read out, in pixels
+        yd -- Integer y-coordinate size of the aperture to read out, in pixels
+        nanp -- Integer number of amplifiers used to read out the aperture
+
+        Returns:
+        --------
+        The amount of time needed, in seconds, to read out the detector
+        """
         return (xd / namp + 12.) * (yd + 1) * 10.00 * 1.e-6
 
     def make_output_names(self):
-        # create output yaml file names to go with all of the
-        # entries in the dictionary
+        """
+        Create output yaml file names to go with all of the
+        entries in the dictionary
+        """
         onames = []
         fnames = []
         for i in range(len(self.info['Module'])):
@@ -664,30 +699,59 @@ class SimInput:
             mode = self.info['Mode'][i]
             dither = str(self.info['dither'][i]).zfill(2)
             onames.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}.yaml'.format(act, det, mode, dither))))
-            # fnames.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}_uncal.fits'.format(act, det, mode, dither))))
             fnames.append('Act{}_{}_{}_Dither{}_uncal.fits'.format(act, det, mode, dither))
         self.info['yamlfile'] = onames
         self.info['outputfits'] = fnames
 
     def get_dark(self, detector):
-        # return the name of a dark current file to use as input
-        # based on the detector being used
+        """
+        Return the name of a dark current file to use as input
+        based on the detector being used
+
+        Parameters:
+        -----------
+        detector -- string name of detector being used
+
+        Returns:
+        --------
+        Name of a dark current file to use for this detector
+        """
         files = self.dark_list[detector]
         rand_index = np.random.randint(0, len(files) - 1)
         return files[rand_index]
 
     def get_lindark(self, detector):
-        # return the name of a linearized dark current file to use as input
-        # based on the detector being used
+        """
+        Return the name of a linearized dark current file to 
+        use as input based on the detector being used
+
+        Parameters:
+        -----------
+        detector -- string name of detector being used
+
+        Returns:
+        --------
+        Name of a linearized dark current file to use for this detector
+        """
         files = self.lindark_list[detector]
         rand_index = np.random.randint(0, len(files) - 1)
         return files[rand_index]
 
     def get_reffile(self, refs, detector):
-        # return the appropriate reference file for detector
-        # and given reference file dictionary. Assume that
-        # refs is a dictionary in the form of:
-        # {'A1':'filenamea1.fits', 'A2':'filenamea2.fits'...}
+        """
+        Return the appropriate reference file for detector
+        and given reference file dictionary. 
+
+        Parameters:
+        -----------
+        refs -- dictionary in the form of:
+             {'A1':'filenamea1.fits', 'A2':'filenamea2.fits'...}
+        detector -- String name of detector
+
+        Returns:
+        --------
+        Name of reference file appropriate for given detector
+        """
         for key in refs:
             if detector in key:
                 return refs[key]
@@ -695,8 +759,14 @@ class SimInput:
               .format(detector, refs))
 
     def write_yaml(self, input):
-        # create yaml file for a single exposure/detector
-        # input is a dictionary containing all needed info
+        """
+        Create yaml file for a single exposure/detector
+
+        Parameters:
+        -----------
+        input -- dictionary containing all needed exposure 
+                 information for one exposure
+        """
 
         # select the right filter
         if np.int(input['detector'][-1]) < 5:
@@ -735,7 +805,11 @@ class SimInput:
             apunder = input['aperture'].find('_')
             full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
 
-            config = ascii.read('/Users/lchambers/TEL/nircam_simulator/nircam_simulator/config/NIRCam_subarray_definitions.list')
+            scripts_path = os.path.dirname(os.path.realpath(__file__))
+            modpath = os.path.split(scripts_path)[0]
+            subarray_def_file = os.path.join(modpath, 'config', 'NIRCam_subarray_definitions.list')
+            config = ascii.read(subarray_def_file)
+
             if full_ap not in config['AperName']:
                 full_ap = [apername for apername, name in \
                            np.array(config['AperName', 'Name']) if \
@@ -868,10 +942,9 @@ class SimInput:
             f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
-        # print("Output file written to {}".format(yamlout))
 
     def reffile_setup(self):
-        # create lists of reference files
+        """Create lists of reference files associate with each detector"""
         self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
         sb_dir = os.path.join(self.datadir, 'reference_files/superbias')
         lin_dir = os.path.join(self.datadir, 'reference_files/linearity')
