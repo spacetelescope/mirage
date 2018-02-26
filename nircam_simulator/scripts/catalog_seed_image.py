@@ -30,8 +30,10 @@ from . import moving_targets
 from . import segmentation_map as segmap
 
 inst_list = ['nircam']
-modes = {'nircam': ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
-                    'nircamwfss', 'wfsccommissioning', 'wfscglobalalignment']}
+#modes = {'nircam': ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
+#                    'nircamwfss', 'wfsccommissioning', 'wfscglobalalignment']}
+modes = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"]}
+tracking_list = ['sidereal','non-sidereal']
 inst_abbrev = {'nircam':'NRC'}
 pixelScale = {'nircam':{'sw':0.031, 'lw':0.063}}
 full_array_size = {'nircam':2048}
@@ -125,7 +127,7 @@ class Catalog_seed():
         self.calcFrameTime()
 
         # For imaging mode, generate the countrate image using the catalogs
-        if self.params['Inst']['mode'].lower() != 'moving_target':
+        if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             print('Creating signal rate image of synthetic inputs.')
             self.seedimage, self.seed_segmap = self.addedSignals()
             outapp = ''
@@ -133,14 +135,13 @@ class Catalog_seed():
         # If we are tracking a non-sidereal target, then
         # everything in the catalogs needs to be streaked across
         # the detector
-        if self.params['Inst']['mode'].lower() == 'moving_target':
+        if self.params['Telescope']['tracking'].lower() == 'non-sidereal':
             print('Creating signal ramp of synthetic inputs')
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
 
             outapp = '_nonsidereal_target'
 
-        # If moving targets are requested (KBOs, asteroids, etc,
-        # NOT moving_target mode where the telescope slews), then
+        # If non-sidereal targets are requested (KBOs, asteroids, etc,
         # create a RAPID integration which includes those targets
         mov_targs_ramps = []
         if (self.runStep['movingTargets'] | self.runStep['movingTargetsSersic']
@@ -153,7 +154,7 @@ class Catalog_seed():
             # Now we need to expand frameimage into a ramp
             # so we can add the trailed objects
             print('Combining trailed object ramp with that containing tracked targets')
-            if self.params['Inst']['mode'].lower() != 'moving_target':
+            if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
                 self.seedimage = self.combineSimulatedDataSources('countrate', self.seedimage, trailed_ramp)
             else:
                 self.seedimage = self.combineSimulatedDataSources('ramp', self.seedimage, trailed_ramp)
@@ -287,7 +288,7 @@ class Catalog_seed():
         inputtype can be 'countrate' in which case input needs to be made
         into a ramp before combining with mov_tar_ramp, or 'ramp' in which
         case you can combine directly. Use 'ramp' with
-        moving_target MODE data, and 'countrate' with imaging MODE data
+        non-sidereal TRACKING data, and 'countrate' with sidereal TRACKING data
         """
         if inputtype == 'countrate':
             # First change the countrate image into a ramp
@@ -319,7 +320,7 @@ class Catalog_seed():
         mov_targs_ramps = []
         mov_targs_segmap = None
 
-        if self.params['Inst']['mode'].lower() != 'moving_target':
+        if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             tracking = False
             ra_vel = None
             dec_vel = None
@@ -394,7 +395,7 @@ class Catalog_seed():
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
         # offsets between the nominal output array and the input lists if the observation being
-        # modeled is TSO or TSO + grism output modes
+        # modeled is wfss
 
         dtor = math.radians(1.)
 
@@ -803,7 +804,7 @@ class Catalog_seed():
                 mt_integration[integ, :, :, :] += mt_source
 
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() == 'nircamwfss':
+                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
                     noiseval += self.grism_background
 
                 if input_type in ['pointSource', 'galaxies']:
@@ -1464,7 +1465,8 @@ class Catalog_seed():
 
                     # write out positions, distances, and counts to the output file
                     pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts))
-
+            except:
+                pass
         self.n_pointsources = len(pointSourceList)
         print("Number of point sources found within the requested aperture: {}".format(self.n_pointsources))
         # close the output file
@@ -1613,7 +1615,7 @@ class Catalog_seed():
                 psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() == 'nircamwfss':
+                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
                     noiseval += self.grism_background
                 seg.add_object_noise(webbpsfimage[l1:l2, k1:k2] * counts, j1, i1, entry['index'], noiseval)
             except:
@@ -2243,7 +2245,7 @@ class Catalog_seed():
                 galimage[j1:j2, i1:i2] = galimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2]
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() == 'nircamwfss':
+                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
                     noiseval += self.grism_background
                 segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
 
@@ -2491,8 +2493,9 @@ class Catalog_seed():
 
                     #write out positions, distances, and counts to the output file
                     eslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (indexnum, ra_str, dec_str, ra, dec, pixelx, pixely, magwrite, countrate, framecounts))
-                #except:
-                #    print("ERROR: bad point source line %s. Skipping." % (line))
+            except:
+                #print("ERROR: bad point source line %s. Skipping." % (line))
+                pass
         print("Number of extended sources found within the requested aperture: {}".format(len(extSourceList)))
         # close the output file
         eslist.close()
@@ -2583,7 +2586,7 @@ class Catalog_seed():
             extimage[j1:j2, i1:i2] = extimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2] * counts
             # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
             noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-            if self.params['Inst']['mode'].lower() == 'nircamwfss':
+            if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
                 noiseval += self.grism_background
 
             #segmentation.add_object_noise(stamp[l1:l2, k1:k2]*counts, j1, i1, entry['index'], noiseval)
@@ -2653,6 +2656,13 @@ class Catalog_seed():
                    .format(self.params['Inst']['mode'],
                            self.params['Inst']['instrument'],possibleModes)))
 
+        # Check telescope tracking entry
+        self.params['Telescope']['tracking'] = self.params['Telescope']['tracking'].lower()
+        if self.params['Telescope']['tracking'] not in tracking_list:
+            raise ValueError(("WARNING: telescope tracking set to {}, but must be one "
+                              "of {}.".format(self.params['Telescope']['tracking'],
+                                              tracking_list)))
+        
         # Set nframe and nskip according to the values in the
         # readout pattern definition file
         self.read_pattern_check()
