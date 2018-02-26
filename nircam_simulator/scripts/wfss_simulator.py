@@ -74,8 +74,9 @@ class WFSSSim():
         self.module = None
         self.direction = None
         self.prepDark = None
+        self.save_dispersed_seed = True
+        self.disp_seed_filename = None
 
-        
     def create(self):
         # Make sure inputs are correct
         self.check_inputs()
@@ -100,7 +101,20 @@ class WFSSSim():
                                dmode,config_path=loc)
         disp_seed.observation()
         disp_seed.finalize(Back = background_file)
-        
+
+        # Save the dispersed seed image
+        if self.save_dispersed_seed:
+            hh00 = fits.PrimaryHDU()
+            hh11 = fits.ImageHDU(disp_seed.final)
+            hhll = fits.HDUList([hh00,hh11])
+            if self.disp_seed_filename is None:
+                pdir, pf = os.path.split(self.paramfiles[0])
+                dname = 'dispersed_seed_image_for_' + pf
+                self.disp_seed_filename = os.path.join(pdir, dname)
+            hhll.writeto(self.disp_seed_filename)
+            print(("Dispersed seed image saved to {}"
+                   .format(self.disp_seed_filename)))
+            
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:

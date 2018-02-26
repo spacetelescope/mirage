@@ -1878,8 +1878,12 @@ class Observation():
                     deltaframe = data * self.frametime
 
                 # Add poisson noise
-                poissonsignal = self.doPoisson(deltaframe)
+                poissonsignal = self.doPoisson(deltaframe, self.params['simSignals']['poissonseed'])
 
+                # Increment poisson seed value so that the next frame doesn't have identical
+                # noise
+                self.params['simSignals']['poissonseed'] += 1
+                
                 # Create the frame by adding the delta signal
                 # and poisson noise associated with the delta signal
                 # to the previous frame
@@ -1887,7 +1891,10 @@ class Observation():
 
                 # Add cosmic rays
                 if self.runStep['cosmicray']:
-                    framesignal = self.doCosmicRays(framesignal, i, j, self.params['Readout']['nframe'], crs_perframe[frameindex])
+                    framesignal = self.doCosmicRays(framesignal, i, j, self.params['Readout']['nframe'], crs_perframe[frameindex], self.params['cosmicRay']['seed'])
+                    # Increment the seed, so that every frame doesn't have identical
+                    # cosmic rays
+                    self.params['cosmicRay']['seed'] += 1
 
                 # Keep track of the total signal in the ramp,
                 # so that we don't neglect signal which comes
@@ -1968,9 +1975,15 @@ class Observation():
 
                 # Add poisson noise
                 if ndim == 3:
-                    framesignal = self.doPoisson(data[frameindex+1])
+                    framesignal = self.doPoisson(data[frameindex+1],
+                                                 self.params['simSignals']['poissonseed'])
                 elif ndim == 2:
-                    framesignal = self.doPoisson(data*frameindex)
+                    framesignal = self.doPoisson(data*frameindex,
+                                                 self.params['simSignals']['poissonseed'])
+
+                # Increment poisson seed value so that the next frame doesn't have identical
+                # noise
+                self.params['simSignals']['poissonseed'] += 1
 
                 # Keep track of the total signal in the ramp,
                 # so that we don't neglect signal which comes
@@ -2001,7 +2014,7 @@ class Observation():
             outramp[i, :, :] = accumimage
         return outramp, zeroframe
 
-    def doPoisson(self, signalimage):
+    def doPoisson(self, signalimage, seedval):
         """Add poisson noise to an input image. Input is assumed
         to be in units of ADU, meaning it must be multiplied by
         the gain when calcuating Poisson noise. Then divide by the
@@ -2010,6 +2023,7 @@ class Observation():
         Arguments:
         ----------
         signalimage -- 2D array of signals in ADU
+        seedval -- Integer seed value for the random number generator
 
         Returns:
         --------
@@ -2020,7 +2034,7 @@ class Observation():
         #ndim = signalimage.shape
 
         # Set the seed
-        np.random.seed(self.params['simSignals']['poissonseed'])
+        np.random.seed(seedval)
 
         # Find the appropriate quantum yield value for the filter
         #if self.params['simSignals']['photonyield']:
@@ -2069,12 +2083,12 @@ class Observation():
                 #            newimage[i, j] = newimage[i, j] + 1
         return newimage
 
-    def doCosmicRays(self, image, ngroup, iframe, nframe, ncr):
+    def doCosmicRays(self, image, ngroup, iframe, nframe, ncr, seedval):
         # Change the seed each time this is run, or else simulated
         # exposures that have more than 1 integration will have the
         # same cosmic rays in each integration
         self.generator1 = random.Random()
-        self.generator1.seed()
+        self.generator1.seed(seedval)
 
         # Add cosmic rays to a frame
         nray = int(ncr)
