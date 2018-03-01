@@ -110,6 +110,7 @@ class WFSSSim():
             hh00 = fits.PrimaryHDU()
             hh11 = fits.ImageHDU(disp_seed.final)
             hhll = fits.HDUList([hh00,hh11])
+            hhll[0].header['units'] = 'e-/sec'
             if self.disp_seed_filename is None:
                 pdir, pf = os.path.split(self.paramfiles[0])
                 dname = 'dispersed_seed_image_for_' + pf + '.fits'

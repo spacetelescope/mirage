@@ -160,6 +160,9 @@ class Catalog_seed():
                 self.seedimage = self.combineSimulatedDataSources('ramp', self.seedimage, trailed_ramp)
             self.seed_segmap += trailed_segmap
 
+        # Translate the final seed image to units of e-/sec or e-
+        self.seedimage *= self.gainim
+            
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
 
@@ -3212,6 +3215,41 @@ class Catalog_seed():
         bval /= mjy_str
         return bval.value
 
+    def readGainMap(self):
+        # Read in the gain map. This will be used to
+        # translate signals from e/s to ADU/sec
+        if self.runStep['gain']:
+            self.gainim, self.gainhead = self.readCalFile(self.params['Reffiles']['gain'])
+            #set any NaN's to 1.0
+            bad = ((~np.isfinite(self.gainim)) | (self.gainim == 0))
+            self.gainim[bad] = 1.0
+
+    def readCalFile(self, filename):
+        # Read in the specified calibration file
+        try:
+            with fits.open(filename) as h:
+                image = h[1].data
+                header = h[0].header
+        except:
+            print("WARNING: Unable to open {}")
+            sys.exit()
+
+        # Extract the appropriate subarray if necessary
+        if ((self.subarray_bounds[0] != 0) or
+            (self.subarray_bounds[2] != (self.ffsize - 1)) or
+            (self.subarray_bounds[1] != 0) or
+            (self.subarray_bounds[3] != (self.ffsize - 1))):
+
+            if len(image.shape) == 2:
+                image = image[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                              self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
+
+            if len(image.shape) == 3:
+                image = image[:, self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                              self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
+
+        return image, header
+    
     def saveSingleFits(self, image, name, key_dict=None, image2=None, image2type=None):
         #save an array into the first extension of a fits file
         h0 = fits.PrimaryHDU()

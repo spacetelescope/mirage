@@ -31,7 +31,8 @@ class Observation():
         self.seed = None
         self.segmap = None
         self.seedheader = None
-
+        self.seedunits = 'e-/sec'
+        
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -118,6 +119,13 @@ class Observation():
         # and to scale CRs to be in ADU
         self.readGainMap()
 
+        # If seed image is in units of electrons/sec then divide
+        # by the gain to put in ADU/sec
+        if self.seedheader['units'] in ["e-/sec","e-"]:
+            print(("Seed image is in units of {}. Dividing by gain."
+                   .format(self.seedheader['units'])))
+            self.seed /= self.gainim
+        
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
         seeddim = len(self.seed.shape)
