@@ -2662,6 +2662,12 @@ class Catalog_seed():
             raise ValueError(("WARNING: telescope tracking set to {}, but must be one "
                               "of {}.".format(self.params['Telescope']['tracking'],
                                               tracking_list)))
+
+        # Non-sidereal WFSS observations are not yet supported
+        if self.params['Telescope']['tracking'] == 'non-sidereal' and \
+           self.params['Inst']['mode'] in ['wfss','ts_wfss']:
+            raise ValueError(("WARNING: wfss observations with non-sidereal "
+                              "targets not yet supported."))
         
         # Set nframe and nskip according to the values in the
         # readout pattern definition file

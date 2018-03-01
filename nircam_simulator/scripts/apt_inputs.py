@@ -556,7 +556,7 @@ class AptInput:
         for exp, obs in zip(intab['exposure'], intab['obs_label']):
             match = np.where(obs == onames)[0]
             if len(match) == 0:
-                raise StandardError("No valid epoch line found for observation {} in observation table ({}).".format(obs, onames))
+                raise ValueError("No valid epoch line found for observation {} in observation table ({}).".format(obs, onames))
 
             # Match observation from observation table yaml file with observatoins
             # from  APT XML/pointing; extract the date and PAV3

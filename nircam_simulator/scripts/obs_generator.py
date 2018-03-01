@@ -1513,15 +1513,6 @@ class Observation():
             synthetic = synthetic + dark.data[:, 0:self.params['Readout']['ngroup'], :, :]
             print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
             reorder_sbandref = dark.sbAndRefpix
-        # Case below should be caught within inputChecks()
-        #else:
-        #    print("WARNING: Unable to convert input dark with a readout pattern")
-        #    print("of {}, to the requested readout pattern of {}."
-        #          .format(darkpatt, self.params['Readout']['readpatt']))
-        #    print("The readout pattern of the dark must be RAPID or match")
-        #    print("the requested output readout pattern.")
-        #    sys.exit()
-
         return synthetic, zeroframe, reorder_sbandref
 
     def maskRefPix(self, ramp, zero):
