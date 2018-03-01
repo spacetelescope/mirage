@@ -74,8 +74,10 @@ class WFSSSim():
         self.module = None
         self.direction = None
         self.prepDark = None
+        self.save_dispersed_seed = True
+        self.disp_seed_filename = None
+        self.extrapolate_SED = False
 
-        
     def create(self):
         # Make sure inputs are correct
         self.check_inputs()
@@ -96,11 +98,26 @@ class WFSSSim():
         loc = os.path.join(self.datadir,"GRISM_NIRCAM/")
         background_file = ("{}_{}_back.fits"
                            .format(self.crossing_filter,dmode))
-        disp_seed = Grism_seed(imseeds,self.crossing_filter,
-                               dmode,config_path=loc)
+        disp_seed = Grism_seed(imseeds, self.crossing_filter,
+                               dmode, config_path=loc,
+                               extrapolate_SED=self.extrapolate_SED)
         disp_seed.observation()
         disp_seed.finalize(Back = background_file)
-        
+
+        # Save the dispersed seed image
+        if self.save_dispersed_seed:
+            from astropy.io import fits
+            hh00 = fits.PrimaryHDU()
+            hh11 = fits.ImageHDU(disp_seed.final)
+            hhll = fits.HDUList([hh00,hh11])
+            if self.disp_seed_filename is None:
+                pdir, pf = os.path.split(self.paramfiles[0])
+                dname = 'dispersed_seed_image_for_' + pf + '.fits'
+                self.disp_seed_filename = os.path.join(pdir, dname)
+            hhll.writeto(self.disp_seed_filename, overwrite=True)
+            print(("Dispersed seed image saved to {}"
+                   .format(self.disp_seed_filename)))
+            
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
@@ -186,6 +203,7 @@ class WFSSSim():
         parser.add_argument("--module",help = "NIRCam module to use for simulation. Use 'A' or 'B'",default=None)
         parser.add_argument("--direction",help = "Direction of dispersion (along rows or along columns). Use 'R' or 'C'",default=None)
         parser.add_argument("--override_dark",help="If supplied, skip the dark preparation step and use the supplied dark to make the exposure", default=None)
+        parser.add_argument("--extrapolate_SED", help="If true, the SED created from the filter-averaged magnitudes will be extrapolated to fill the wavelngth range of the grism", action='store_true')
         return parser
 
 
