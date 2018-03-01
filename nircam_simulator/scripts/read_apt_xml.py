@@ -270,7 +270,8 @@ class ReadAPTXML():
             ns = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
 
         # Set parameters that are constant for all imaging obs
-        typeflag = template_name
+        #typeflag = template_name
+        typeflag = 'imaging'
         grismval = 'N/A'
         short_pupil = 'CLEAR'
 
@@ -342,7 +343,8 @@ class ReadAPTXML():
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscCommissioning}"
 
         # Set parameters that are constant for all WFSC obs
-        typeflag = template_name
+        #typeflag = template_name
+        typeflag = 'imaging'
         grismval = 'N/A'
         short_pupil = 'CLEAR'
         subarr = 'FULL'
@@ -406,7 +408,8 @@ class ReadAPTXML():
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscGlobalAlignment}"
 
         # Set parameters that are constant for all WFSC obs
-        typeflag = template_name
+        #typeflag = template_name
+        typeflag = 'imaging'
         grismval = 'N/A'
         short_pupil = 'CLEAR'
         subarr = 'FULL'
@@ -485,7 +488,8 @@ class ReadAPTXML():
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscCoarsePhasing}"
 
         # Set parameters that are constant for all WFSC obs
-        typeflag = template_name
+        #typeflag = template_name
+        typeflag = 'imaging'
         grismval = 'N/A'
         pdither = '1'
         pdithtype = 'NONE'
@@ -552,7 +556,8 @@ class ReadAPTXML():
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscFinePhasing}"
 
         # Set parameters that are constant for all WFSC obs
-        typeflag = template_name
+        #typeflag = template_name
+        typeflag = 'imaging'
         grismval = 'N/A'
         pdither = '1'
         pdithtype = 'NONE'
@@ -717,7 +722,8 @@ class ReadAPTXML():
                 self.obs_tuple_list.append(tup_to_add)
 
                 directexp = expseq.find(ns + 'DiExposure')
-                typeflag = template_name
+                #typeflag = template_name
+                typeflag = 'imaging'
                 pdither = '1'  # direct image has no dithers
                 sdither = '1'  # direct image has no dithers
                 sdithtype = '1'  # direct image has no dithers

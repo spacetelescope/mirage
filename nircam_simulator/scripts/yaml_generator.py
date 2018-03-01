@@ -137,6 +137,8 @@ class SimInput:
         self.psfpixfrac = 0.25
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
+        self.resets_bet_ints = 1 # NIRCam should be 1
+        self.tracking = 'sidereal'
 
         # Prepare to find files listed as 'config'
         self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
@@ -253,6 +255,9 @@ class SimInput:
             if self.info['Mode'][i] == 'WFSS':
                 grism_source_image[i] = 'True'
                 grism_input_only[i] = 'True'
+                # SW detectors shouldn't be wfss
+                if self.info['detector'][i][-1] != '5':
+                    self.info['Mode'][i] = 'imaging'
         self.info['grism_source_image'] = grism_source_image
         self.info['grism_input_only'] = grism_input_only
 
@@ -276,6 +281,7 @@ class SimInput:
 
         # Now go through the lists one element at a time
         # and create a yaml file for each.
+        yamls = []
         for i in range(len(self.info['detector'])):
             file_dict = {}
             for key in self.info:
@@ -294,11 +300,12 @@ class SimInput:
             file_dict['primary_dither_num'] = primary_dither
             file_dict['subpix_dither_num'] = subpix_dither
             file_dict['siaf'] = self.siaf
-            self.write_yaml(file_dict)
-
+            fname = self.write_yaml(file_dict)
+            yamls.append(fname)
+            
         # Write out summary of all written yaml files
         yaml_path = os.path.join(self.output_dir, 'V*.yaml')
-        yamls = glob(yaml_path)
+        #yamls = glob(yaml_path)
 
         filenames = [y.split('/')[-1] for y in yamls]
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
@@ -791,16 +798,14 @@ class SimInput:
         with open(yamlout, 'w') as f:
             f.write('Inst:\n')
             f.write('  instrument: {}          # Instrument name\n'.format('NIRCam'))
-            f.write('  mode: {}                # Observation mode (e.g. imaging, WFSS, moving_target)\n'.format(input['Mode']))
+            f.write('  mode: {}                # Observation mode (e.g. imaging, WFSS)\n'.format(input['Mode']))
             f.write('  use_JWST_pipeline: {}   # Use pipeline in data transformations\n'.format(input['use_JWST_pipeline']))
             f.write('\n')
             f.write('Readout:\n')
             f.write('  readpatt: {}        # Readout pattern (RAPID, BRIGHT2, etc) overrides nframe, nskip unless it is not recognized\n'.format(input['ReadoutPattern']))
-            f.write('  nframe: {}        # Number of frames per group\n'.format(input['nframe']))
-            f.write('  nskip: {}         # Number of skipped frames between groups\n'.format(input['nskip']))
             f.write('  ngroup: {}              # Number of groups in integration\n'.format(input['Groups']))
             f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
-            f.write('  namp: {}         # Number of amplifiers used in readout (4 for full frame, 1 for subarray)\n'.format(input['namp']))
+            f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
             apunder = input['aperture'].find('_')
             full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
@@ -821,7 +826,6 @@ class SimInput:
                     full_ap = full_ap[0]
 
             f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
-            f.write('  subarray_bounds: 0, 0, 159, 159          # Coords of subarray corners. (xstart, ystart, xend, yend) Over-ridden by array_name above. Currently not used. Could be used if output saved in raw format\n')
             f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
             f.write('  pupil: {}        # Pupil element for simulated data (CLEAR, GRISMC, etc)\n'.format(input[pupilkey]))
             f.write('\n')
@@ -882,7 +886,7 @@ class SimInput:
             f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
             f.write('  scattered:  None                          #Scattered light count rate image file\n')
             f.write('  scatteredscale: 1.0                        #Scattered light scaling factor\n')
-            f.write('  bkgdrate: {}                         #Constant background count rate (electrons/sec/pixel)\n'.format(input['{}_bkgd'.format(catkey)]))  #'bkgdrate']))
+            f.write("  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel) or 'high','medium','low' similar to what is used in the ETC\n".format(input['{}_bkgd'.format(catkey)]))  #'bkgdrate']))
             f.write('  poissonseed: {}                  #Random number generator seed for Poisson simulation)\n'.format(np.random.randint(1, 2**32-2)))
             f.write('  photonyield: True                         #Apply photon yield in simulation\n')
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
@@ -891,6 +895,7 @@ class SimInput:
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
             f.write('  dec: {}                    # Dec of simulated pointing\n'.format(input['dec_ref']))
             f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(input['pav3']))
+            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
             f.write('\n')
             f.write('newRamp:\n')
             f.write('  dq_configfile: {}\n'.format(self.dq_init_config))
@@ -907,7 +912,6 @@ class SimInput:
             f.write('  format: DMS          # Output file format Options: DMS, SSR(not yet implemented)\n')
             f.write('  save_intermediates: False   # Save intermediate products separately (point source image, etc)\n')
             f.write('  grism_source_image: {}   # grism\n'.format(input['grism_source_image']))
-            f.write('  grism_input_only: {}     # grism\n'.format(input['grism_input_only']))
             f.write('  unsigned: True   # Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)\n')
             f.write('  dmsOrient: True    # Output in DMS orientation (vs. fitswriter orientation).\n')
             f.write('  program_number: {}    # Program Number\n'.format(input['ProposalID']))
@@ -942,7 +946,8 @@ class SimInput:
             f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
-
+        return yamlout
+            
     def reffile_setup(self):
         """Create lists of reference files associate with each detector"""
         self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
@@ -1021,6 +1026,8 @@ class SimInput:
         parser.add_argument("--psfpixfrac", help="Subpixel centering resolution of files in PSF library", default=0.25)
         parser.add_argument("--psfwfe", help="Wavefront error value to use for PSFs", default='predicted')
         parser.add_argument("--psfwfegroup", help="Realization index number for PSF files", default=0)
+        parser.add_argument("--resets_bet_ints", help="Number of detector resets between integrations", default=1)
+        parser.add_argument("--tracking", help="Type of telescope tracking: 'sidereal' or 'non-sidereal'", default='sidereal')
 
         return parser
 
