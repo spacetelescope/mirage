@@ -38,6 +38,8 @@ HISTORY:
 import os
 import sys
 import argparse
+from numpy import nanmedian, isfinite
+from astropy.io import fits
 from nircam_simulator.scripts import catalog_seed_image
 from nircam_simulator.scripts import dark_prep
 from nircam_simulator.scripts import obs_generator
@@ -77,6 +79,7 @@ class WFSSSim():
         self.save_dispersed_seed = True
         self.disp_seed_filename = None
         self.extrapolate_SED = False
+        self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL"]
 
     def create(self):
         # Make sure inputs are correct
@@ -104,12 +107,40 @@ class WFSSSim():
         disp_seed.observation()
         disp_seed.finalize(Back = background_file)
 
+        # Get gain map
+        gainfile = cat.params['Reffiles']['gain']
+        gain, gainheader = self.read_gain_file(gainfile)
+        
+        # Disperser output is always full frame. Crop to the
+        # requested subarray if necessary       
+        if cat.params['Readout']['array_name'] not in self.fullframe_apertures:
+            print("Subarray bounds: {}".format(cat.subarray_bounds))
+            print("Dispersed seed image size: {}".format(disp_seed.final.shape))
+            disp_seed.final = self.crop_to_subarray(disp_seed.final, cat.subarray_bounds)
+            gain = self.crop_to_subarray(gain, cat.subarray_bounds)
+            # Segmentation map will be centered in a frame that is larger
+            # than full frame by a factor of sqrt(2), so crop appropriately
+            segy, segx = cat.seed_segmap.shape
+            dx = int((segx - 2048) / 2)
+            dy = int((segy - 2048) / 2)
+            segbounds = [cat.subarray_bounds[0] + dx, cat.subarray_bounds[1] + dy,
+                         cat.subarray_bounds[2] + dx, cat.subarray_bounds[3] + dy]
+            cat.seed_segmap = self.crop_to_subarray(cat.seed_segmap, segbounds)
+            
+        # Convert seed image to ADU/sec to be consistent
+        # with other simulator outputs
+        disp_seed.final /= gain
+
+        # Update seed image header to reflect the
+        # division by the gain
+        cat.seedinfo['units'] = 'ADU/sec'
+
         # Save the dispersed seed image
         if self.save_dispersed_seed:
-            from astropy.io import fits
             hh00 = fits.PrimaryHDU()
             hh11 = fits.ImageHDU(disp_seed.final)
             hhll = fits.HDUList([hh00,hh11])
+            hhll[0].header['units'] = 'ADU/sec'
             if self.disp_seed_filename is None:
                 pdir, pf = os.path.split(self.paramfiles[0])
                 dname = 'dispersed_seed_image_for_' + pf + '.fits'
@@ -117,7 +148,7 @@ class WFSSSim():
             hhll.writeto(self.disp_seed_filename, overwrite=True)
             print(("Dispersed seed image saved to {}"
                    .format(self.disp_seed_filename)))
-            
+
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
@@ -188,13 +219,112 @@ class WFSSSim():
             print("of 2 or more yaml files.")
             sys.exit()
         
+    def read_param_file(self, file):
+        """
+        Read in yaml simulator parameter file
+
+        Parameters:
+        -----------
+        file -- Name of a yaml file in the proper format
+                for the nircam_simaultor
+
+        Returns:
+        --------
+        Nested dictionary with the yaml file's contents
+        """
+        import yaml
+        try:
+            with open(file, 'r') as infile:
+                data = yaml.load(infile)
+        except:
+            raise IOError("WARNING: unable to open {}".format(file))
+
+    def read_gain_file(self, file):
+        """
+        Read in CRDS-formatted gain reference file
+        
+        Paramters:
+        ----------
+        file -- Name of gain reference file
+
+        Returns:
+        --------
+        Detector gain map (2d numpy array)
+        """
+        try:
+            with fits.open(file) as h:
+                image = h[1].data
+                header = h[0].header
+        except:
+            raise IOError("WARNING: Unable to open gain file: {}".format(file))
+
+        mngain = nanmedian(image)
+            
+        # Set pixels with a gain value of 0 equal to mean
+        image[image == 0] = mngain
+        # Set any pixels with non-finite values equal to mean
+        image[~isfinite(image)] = mngain
+        return image, header
+
+    def crop_to_subarray(self, data, bounds):
+        """
+        Crop the given full frame array down to the appropriate
+        subarray size and location based on the requested subarray
+        name.
+
+        Parameters:
+        -----------
+        data -- 2d numpy array. Full frame image. (2048 x 2048)
+        bounds -- 4-element list containing the full frame indices that
+                  define the position of the subarray. 
+                  [xstart, ystart, xend, yend]
+
+        Returns:
+        --------
+        Cropped 2d numpy array
+        """
+        yl, xl = data.shape
+        valid = [False, False, False, False]
+        valid = [(b>=0 and b<xl) for b in bounds[0:3:2]]
+        validy = [(b>=0 and b<yl) for b in bounds[1:4:2]]
+        valid.extend(validy)
+
+        print(valid)
+        print(bounds)
+        print(yl, xl)
+        
+        if all(valid):
+            return data[bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        else:
+            raise ValueError(("WARNING: subarray bounds are outside the "
+                              "dimensions of the input array."))
+        
+    def read_subarr_defs(self, subfile):
+        # read in the file that contains a list of subarray
+        # names and positions on the detector
+        try:
+            subdict = ascii.read(subfile, data_start=1, header_start=0)
+            return subdict
+        except:
+            raise RuntimeError(("Error: could not read in subarray definitions file "
+                                "{}".format(subfile)))
+
+    def get_subarr_bounds(self, subname, sdict):
+        # find the bounds of the requested subarray
+        if subname in sdict['AperName']:
+            mtch = subname == sdict['AperName']
+            bounds = [sdict['xstart'].data[mtch][0], sdict['ystart'].data[mtch][0],
+                      sdict['xend'].data[mtch][0], sdict['yend'].data[mtch][0]]
+            return bounds
+        else:
+            raise ValueError(("WARNING: {} is not a subarray aperture name present "
+                              "in the subarray definition file.".format(subname)))
 
     def invalid(self,field,value):
         print(("WARNING: invalid value for {}: {}"
                .format(field,value)))
         sys.exit()
 
-        
     def add_options(self,parser = None, usage = None):
         if parser is None:
             parser = argparse.ArgumentParser(usage = usage, description="Wrapper for the creation of WFSS simulated exposures.")

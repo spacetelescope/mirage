@@ -31,7 +31,8 @@ class Observation():
         self.seed = None
         self.segmap = None
         self.seedheader = None
-
+        self.seedunits = 'ADU/sec'
+        
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -118,6 +119,18 @@ class Observation():
         # and to scale CRs to be in ADU
         self.readGainMap()
 
+        # If seed image is in units of electrons/sec then divide
+        # by the gain to put in ADU/sec
+        if 'units' in self.seedheader.keys():
+            if self.seedheader['units'] in ["e-/sec","e-"]:
+                print(("Seed image is in units of {}. Dividing by gain."
+                       .format(self.seedheader['units'])))
+                self.seed /= self.gainim
+        else:
+            raise ValueError(("'units' keyword not present in header of "
+                             "seed image. Unable to determine whether the "
+                             "seed image is in units of ADU or electrons."))
+                
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
         seeddim = len(self.seed.shape)
@@ -2044,17 +2057,26 @@ class Observation():
         # Can't add Poisson noise to pixels with negative values
         # Set those to zero when adding noise, then replace with
         # original value
+
+        print(np.min(self.gainim), np.nanmin(self.gainim), np.min(self.gainim[4:2044,4:2044]))
+        print(np.nanmax(signalimage))
+        
         signalgain = signalimage * self.gainim
-        if np.min(signalgain) < 0.:
+        print(np.nanmax(signalgain))
+        highpix = np.where(signalgain == np.nanmax(signalgain))
+        print(highpix)
+        if np.nanmin(signalgain) < 0.:
             neg = signalgain < 0.
             negatives = copy.deepcopy(signalgain)
             negatives[neg] = signalgain[neg]
             signalgain[neg] = 0.
-            # np.random.poisson returns integers
-            newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+        
+        # Add poisson noise    
+        newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+
+        if np.nanmin(signalgain) < 0.:
             newimage[neg] = negatives[neg]
-        else:
-            newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
+
         newimage /= self.gainim
 
                 # Quantum yield for NIRCam is always 1.0 (so psym1=0)
@@ -2195,7 +2217,7 @@ class Observation():
                 image = h[1].data
                 header = h[0].header
         except:
-            print("WARNING: Unable to open {}")
+            print("WARNING: Unable to open {}".format(filename))
             sys.exit()
 
         #extract the appropriate subarray if necessary

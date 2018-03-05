@@ -160,12 +160,76 @@ class Catalog_seed():
                 self.seedimage = self.combineSimulatedDataSources('ramp', self.seedimage, trailed_ramp)
             self.seed_segmap += trailed_segmap
 
+
+        #TESTTESTTEST
+        hh00 = fits.PrimaryHDU(self.seedimage)
+        hhll = fits.HDUList([hh00])
+        hhll.writeto('subarr_seedim.fits',overwrite=True)
+            
+        # For seed images to be dispersed in WFSS mode,
+        # embed the seed image in a full frame array. The disperser
+        # tool does not work on subarrays
+        if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
+            ('FULL' not in self.params['Readout']['array_name'])):
+            self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
+        
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
-
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
+    def pad_wfss_subarray(self, seed, seg):
+        """
+        WFSS seed images that are to go into the disperser
+        must be full frame (or larger). The disperser cannot 
+        work on subarray images. So embed the subarray seed image
+        in a full-frame sized array.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        Padded seed image and segmentation map
+        """
+        seeddim = seed.shape
+        nx = np.int(2048 * self.grism_direct_factor)
+        ffextra = np.int((nx - 2048) / 2)
+        bounds = np.array(self.subarray_bounds)
+
+        subextrax = np.int((seeddim[-1] - bounds[2]) / 2)
+        subextray = np.int((seeddim[-2] - bounds[3]) / 2)
+
+        extradiffy = ffextra - subextray
+        extradiffx = ffextra - subextrax
+
+        
+        print(self.subarray_bounds)
+        print(ffextra)
+        print(subextrax, subextray)
+        print(extradiffx, extradiffy)
+        print(seeddim)
+        print(nx)
+        print(extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1)
+        
+        exbounds = [extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1]
+        
+        
+        if len(seeddim) == 2:
+            padded_seed = np.zeros((nx, nx))
+            padded_seed[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
+            padded_seg = np.zeros((nx, nx), dtype=np.int)
+            padded_seg[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
+        elif len(seeddim) == 4:
+            padded_seed = np.zeros((seeddim[0], seeddim[1], nx, nx))
+            padded_seed[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
+            padded_seg = np.zeros((seeddim[0], seeddim[1], nx, nx), dtype=np.int)
+            padded_seg[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
+        else:
+            raise ValueError("Seed image is not 2D or 4D. It should be.")
+        return padded_seed, padded_seg
+        
     def saveSeedImage(self):
         # Create the grism direct image or ramp to be saved
 
@@ -185,17 +249,17 @@ class Catalog_seed():
 
         arrayshape = self.seedimage.shape
         if len(arrayshape) == 2:
-            units = 'e-/sec'
+            units = 'ADU/sec'
             yd, xd = arrayshape
             tgroup = 0.
             print('Seed image is 2D.')
         elif len(arrayshape) == 3:
-            units = 'e-'
+            units = 'ADU'
             g, yd, xd = arrayshape
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print('Seed image is 3D.')
         elif len(arrayshape) == 4:
-            units = 'e-'
+            units = 'ADU'
             integ, g, yd, xd = arrayshape
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print('Seed image is 4D.')
@@ -216,12 +280,23 @@ class Catalog_seed():
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
         kw['PHOTPLAM'] = self.pivot * 1.e4 # put into angstroms
-        kw['NOMXDIM'] = self.nominal_dims[0]
-        kw['NOMYDIM'] = self.nominal_dims[1]
+        kw['NOMXDIM'] = self.nominal_dims[1]
+        kw['NOMYDIM'] = self.nominal_dims[0]
         kw['NOMXSTRT'] = self.coord_adjust['xoffset'] + 1
-        kw['NOMXEND'] = self.nominal_dims[0] + self.coord_adjust['xoffset']
+        kw['NOMXEND'] = self.nominal_dims[1] + self.coord_adjust['xoffset']
         kw['NOMYSTRT'] = self.coord_adjust['yoffset'] + 1
-        kw['NOMYEND'] = self.nominal_dims[1] + self.coord_adjust['yoffset']
+        kw['NOMYEND'] = self.nominal_dims[0] + self.coord_adjust['yoffset']
+
+        # Seed images provided to disperser are always embedded in an array
+        # with dimensions equal to full frame * self.grism_direct_factor
+        if self.params['Inst']['mode'] in ['wfss', 'ts_wfss']:
+            kw['NOMXDIM'] = self.ffsize
+            kw['NOMYDIM'] = self.ffsize
+            kw['NOMXSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
+            kw['NOMXEND'] = kw['NOMXSTRT'] + self.ffsize - 1
+            kw['NOMYSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
+            kw['NOMYEND'] = kw['NOMYSTRT'] + self.ffsize - 1
+        
         kw['GRISMPAD'] = self.grism_direct_factor
         self.seedinfo = kw
         self.saveSingleFits(self.seedimage, self.seed_file, key_dict=kw, image2=self.seed_segmap, image2type='SEGMAP')
