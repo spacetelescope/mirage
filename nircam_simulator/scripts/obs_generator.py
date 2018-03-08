@@ -22,8 +22,10 @@ from . import unlinearize
 from . import read_fits
 
 
-inst_list = ['nircam']
-modes = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"]}
+INST_LIST = ['nircam', 'niriss', 'fgs']
+MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
+         "niriss": ["imaging"],
+         "fgs": ["imaging"]}
 
 class Observation():
     def __init__(self):
@@ -430,6 +432,23 @@ class Observation():
                         , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
                         , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}
 
+        all_config_files = {'nircam': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
+                                       , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
+                                       , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
+                                       , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
+                                       , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'},
+                            'niriss': {'Reffiles-readpattdefs':'niriss_readout_pattern.txt'
+                                       , 'Reffiles-subarray_defs':'niriss_subarrays.list'
+                                       , 'Reffiles-flux_cal':'niriss_zeropoint_values.out'
+                                       , 'Reffiles-crosstalk':'niriss_xtalk_zeros.txt'
+                                       , 'Reffiles-filtpupilcombo':'niriss_dual_wheel_list.txt'},
+                            'fgs': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
+                                    , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
+                                    , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
+                                    , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
+                                    , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}}
+        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
+                            
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none', 'config']:
@@ -852,8 +871,10 @@ class Observation():
         #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
         #nrc_tacq and nrc_coron are not currently implemented.
 
-        exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
-                   'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
+                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                   "niriss": {"imaging": "NIS_IMAGE"},
+                   "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
             outModel.meta.exposure.type = exptype[self.params['Inst']['instrument'].lower()]\
@@ -1090,8 +1111,12 @@ class Observation():
         #    self.dark = self.dark[0:3]
 
         #EXPTYPE OPTIONS
-        exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
-                   'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+        #exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
+        #           'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
+                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                   "niriss": {"imaging": "NIS_IMAGE"},
+                   "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
             outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['instrument'].lower()]\
@@ -2239,17 +2264,17 @@ class Observation():
 
     def checkParams(self):
         # check instrument name
-        if self.params['Inst']['instrument'].lower() not in inst_list:
+        if self.params['Inst']['instrument'].lower() not in INST_LIST:
             raise ValueError(("WARNING: instrument {} not in the list of "
                               "available instruments: {}"
-                              .format(self.params['Inst']['instrument'].lower(),inst_list)))
+                              .format(self.params['Inst']['instrument'].lower(),INST_LIST)))
 
         # check output filename - make sure it's fits
         if self.params['Output']['file'][-5:].lower() != '.fits':
             self.params['Output']['file'] += '.fits'
 
         # check mode:
-        possibleModes = modes[self.params['Inst']['instrument'].lower()]
+        possibleModes = MODES[self.params['Inst']['instrument'].lower()]
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
             pass

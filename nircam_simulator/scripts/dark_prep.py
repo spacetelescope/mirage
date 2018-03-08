@@ -23,7 +23,7 @@ import yaml
 from . import read_fits
 
 # Allowed instruments
-inst_list = ['nircam']
+INST_LIST = ['nircam', 'niriss', 'fgs']
 
 class DarkPrep():
 
@@ -326,14 +326,40 @@ class DarkPrep():
                                 'linear_configfile'],
                     'Output': ['file', 'directory']}
 
-        config_files = {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                        'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                        'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                        'newRamp-dq_configfile': 'dq_init.cfg',
-                        'newRamp-sat_configfile': 'saturation.cfg',
-                        'newRamp-superbias_configfile': 'superbias.cfg',
-                        'newRamp-refpix_configfile': 'refpix.cfg',
-                        'newRamp-linear_configfile': 'linearity.cfg'}
+        #config_files = {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+        #                'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+        #                'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+        #                'newRamp-dq_configfile': 'dq_init.cfg',
+        #                'newRamp-sat_configfile': 'saturation.cfg',
+        #                'newRamp-superbias_configfile': 'superbias.cfg',
+        #                'newRamp-refpix_configfile': 'refpix.cfg',
+        #                'newRamp-linear_configfile': 'linearity.cfg'}
+
+        all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                       'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                       'newRamp-dq_configfile': 'dq_init.cfg',
+                                       'newRamp-sat_configfile': 'saturation.cfg',
+                                       'newRamp-superbias_configfile': 'superbias.cfg',
+                                       'newRamp-refpix_configfile': 'refpix.cfg',
+                                       'newRamp-linear_configfile': 'linearity.cfg'},
+                            'niriss': {'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
+                                       'Reffiles-subarray_defs': 'niriss_subarrays.list',
+                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
+                                       'newRamp-dq_configfile': 'dq_init.cfg',
+                                       'newRamp-sat_configfile': 'saturation.cfg',
+                                       'newRamp-superbias_configfile': 'superbias.cfg',
+                                       'newRamp-refpix_configfile': 'refpix.cfg',
+                                       'newRamp-linear_configfile': 'linearity.cfg'},
+                            'fgs': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                    'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                    'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                    'newRamp-dq_configfile': 'dq_init.cfg',
+                                    'newRamp-sat_configfile': 'saturation.cfg',
+                                    'newRamp-superbias_configfile': 'superbias.cfg',
+                                    'newRamp-refpix_configfile': 'refpix.cfg',
+                                    'newRamp-linear_configfile': 'linearity.cfg'}}
+        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
         for key1 in pathdict:
             for key2 in pathdict[key1]:
@@ -876,8 +902,9 @@ class DarkPrep():
 
     def checkParams(self):
         # Check instrument name
-        if self.params['Inst']['instrument'].lower() not in inst_list:
-            print("WARNING: {} instrument not implemented within ramp simulator")
+        if self.params['Inst']['instrument'].lower() not in INST_LIST:
+            print(("WARNING: {} instrument not implemented within "
+                   "simulator".format(self.params['Inst']['instrument'])))
             sys.exit()
 
         # If user requests not to use the pipeline,
