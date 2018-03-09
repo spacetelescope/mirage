@@ -37,9 +37,9 @@ TRACKING_LIST = ['sidereal','non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
                'niriss': 'NIS',
                'fgs': 'FGS'}
-PIXELSCALE = {'nircam':{'sw':0.031, 'lw':0.063},
-              'niriss':{0.065},
-              'fgs':{0.065}}
+PIXELSCALE = {'nircam': {'sw':0.031, 'lw':0.063},
+              'niriss': 0.065,
+              'fgs': 0.065}
 FULL_ARRAY_SIZE = {'nircam': 2048,
                    'niriss': 2048,
                    'fgs':2048}
@@ -237,21 +237,6 @@ class Catalog_seed():
         
     def saveSeedImage(self):
         # Create the grism direct image or ramp to be saved
-
-        # Get the photflambda and photfnu values that go with
-        # the filter
-        # module = self.params['Readout']['array_name'][3]
-
-        # zps = ascii.read(self.params['Reffiles']['flux_cal'])
-        # if self.params['Readout']['pupil'][0] == 'F':
-        #    usephot = 'pupil'
-        # else:
-        #    usephot = 'filter'
-        # mtch = ((self.zps['Filter'] == self.params['Readout'][usephot]) & (self.zps['Module'] == module))
-        # photflam = self.zps['PHOTFLAM'][mtch][0]
-        # photfnu = self.zps['PHOTFNU'][mtch][0]
-        # pivot = self.zps['Pivot_wave'][mtch][0]
-
         arrayshape = self.seedimage.shape
         if len(arrayshape) == 2:
             units = 'ADU/sec'
@@ -394,7 +379,7 @@ class Catalog_seed():
             num_frames = self.params['Readout']['ngroup'] * \
                          (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print("Countrate image of synthetic signals being converted to "
-                  "RAPID integration with {} frames.".format(num_frames))
+                  "RAPID/NISRAPID integration with {} frames.".format(num_frames))
             input1_ramp = np.zeros((numints, num_frames, yd, xd))
             for i in range(num_frames):
                 input1_ramp[0, i, :, :] = input1 * self.frametime * (i + 1)
@@ -1320,6 +1305,13 @@ class Catalog_seed():
         x_coeffs = [row[c].data[0] for c in X_cols]
         y_coeffs = [row[c].data[0] for c in Y_cols]
 
+        # Strip off masked coefficients, where the column exists but there
+        # is no corresponding coefficient in the SIAF
+        x_coeffs = [c for c in x_coeffs if np.isfinite(c)]
+        y_coeffs = [c for c in y_coeffs if np.isfinite(c)]
+        #x_coeffs = [c if np.isfinite(c) else 0. for c in x_coeffs]
+        #y_coeffs = [c if np.isfinite(c) else 0. for c in y_coeffs]
+
         # Also get the V2, V3 values of the reference pixel
         v2ref = row['V2Ref'].data[0]
         v3ref = row['V3Ref'].data[0]
@@ -1396,7 +1388,7 @@ class Catalog_seed():
         if np.min(indexes) <= self.maxindex:
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
-        print("after point sources, max index is {}".format(self.maxindex))
+        print("After point sources, max index is {}".format(self.maxindex))
 
         dtor = math.radians(1.)
         nx = (self.subarray_bounds[2] - self.subarray_bounds[0]) + 1
@@ -1474,7 +1466,8 @@ class Catalog_seed():
                 elif index == 100:
                     avg_time = np.mean(times)
                     total_time = len(indexes) * avg_time
-                    print('Expected time to process {} sources: {:.2f} seconds ({:.2f} minutes)'.format(len(indexes), total_time, total_time/60))
+                    print(("Expected time to process {} sources: {:.2f} seconds "
+                           "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
 
                 try:
                     entry0 = float(values['x_or_RA'])
@@ -1492,7 +1485,7 @@ class Catalog_seed():
 
                 # Case where point source list entries are given with RA and Dec
                 if not pixelflag:
-
+                    
                     # If distortion is to be included - either with or without the full set of coordinate
                     # translation coefficients
                     if self.runStep['astrometric']:
@@ -1522,7 +1515,6 @@ class Catalog_seed():
                 mag = float(values['magnitude'])
 
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
-
                     # set up an entry for the output table
                     entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
@@ -1848,8 +1840,20 @@ class Catalog_seed():
             yidl = self.v2v32idly(pixelv2 - self.v2_ref, pixelv3 - self.v3_ref)
 
             # Finally, undistorted distances to distorted pixel values
-            deltapixelx, deltapixely, err, iter = polynomial.invert(self.x_sci2idl, self.y_sci2idl, xidl, yidl, 5)
+            ncoeff = len(self.x_sci2idl)
+            if ncoeff == 21:
+                polynomial_order = 5
+            elif ncoeff == 15:
+                polynomial_order = 4
+            elif ncoeff == 10:
+                polynomial_order = 3
+            else:
+                raise ValueError(("WARNING: {} science to ideal coefficients read in from "
+                                  "SIAF. Not sure what polynomial order this corresponds to."
+                                  .format(ncoeff)))
 
+            deltapixelx, deltapixely, err, iter = polynomial.invert(self.x_sci2idl, self.y_sci2idl,
+                                                                    xidl, yidl, polynomial_order)
             pixelx = deltapixelx + self.refpix_pos['x']
             pixely = deltapixely + self.refpix_pos['y']
 
@@ -2347,7 +2351,8 @@ class Catalog_seed():
                 segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
 
             else:
-                print("Source located entirely outside the field of view. Skipping.")
+                pass
+                #print("Source located entirely outside the field of view. Skipping.")
 
         return galimage, segmentation.segmap
 
@@ -2831,22 +2836,6 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-        # if aper_name[:2] == 'NRC':
-        #     module = aper_name[3]
-        #     detector = aper_name[3:5]
-        # else:
-        #     aper_name_nosub = aper_name.replace('SUB', '')
-
-        #     is_A = 'A' in aper_name_nosub
-        #     is_B = 'B' in aper_name_nosub
-
-        #     if is_A and is_B:
-        #         raise ValueError('Cannot match {} to module'.format(aper_name))
-        #     elif is_A:
-        #         module = 'A'
-        #     elif is_B:
-        #         module = 'B'
-
         # make sure the requested filter is allowed. For imaging, all filters are allowed.
         # In the future, other modes will be more restrictive
         if self.params['Readout']['pupil'][0].upper() == 'F':
@@ -3003,7 +2992,7 @@ class Catalog_seed():
                                        .format(self.params['Readout'][usefilt].upper(), module.lower()))
                     elif instrm == 'niriss':
                         filter_file = ("{}_niriss_throughput_nopy1.txt"
-                                       .format(self.params['Readout'][usefilt].upper()))
+                                       .format(self.params['Readout'][usefilt].lower()))
                     elif instrm == 'fgs':
                         raise ValueError("Filter throughputs for FGS not yet available")
                     filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
@@ -3151,7 +3140,7 @@ class Catalog_seed():
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
                                       "{}. Not present in directory tree specified by "
                                       "the {} environment variable."
-                                      .format(self.pdir, self.env_var)))
+                                      .format(pth, self.env_var)))
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In

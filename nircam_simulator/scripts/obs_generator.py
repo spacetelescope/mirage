@@ -392,7 +392,6 @@ class Observation():
         # This is intended primarily for user-generated inputs like
         # source catalogs
         ifile = self.params[inparam[0]][inparam[1]]
-        print('ifile is', ifile)
         if ifile.lower() != 'none':
             ifile = os.path.abspath(ifile)
             c = os.path.isfile(ifile)
@@ -465,8 +464,7 @@ class Observation():
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)
         except:
-            print("WARNING: unable to open {}".format(self.paramfile))
-            sys.exit()
+            raise IOError("WARNING: unable to open {}".format(self.paramfile))
 
     def readSubarrayDefinitionFile(self):
         # Read in the file that contains a list of subarray
@@ -474,8 +472,7 @@ class Observation():
         try:
             self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
         except:
-            print("Error: could not read in subarray definitions file.")
-            sys.exit()
+            raise IOError("Error: could not read in subarray definitions file.")
 
     def readSaturationFile(self):
         # Read in saturation map
@@ -507,26 +504,25 @@ class Observation():
             try:
                 self.superbias, self.superbiasheader = self.readCalFile(self.params['Reffiles']['superbias'])
             except:
-                print(('WARNING: unable to open superbias file {}.'
-                       .format(self.params['Reffiles']['superbias'])))
-                print(("Please provide a valid file "
-                       "in the superbias entry in the parameter file."))
-                sys.exit()
+                raise IOError(("WARNING: unable to open superbias file {}. "
+                               "Please provide a valid file in the superbias "
+                               "entry in the parameter file."
+                               .format(self.params['Reffiles']['superbias'])))
         else:
-            print('CAUTION: no superbias provided. Quitting.')
-            sys.exit()
+            raise ValueError('CAUTION: no superbias provided. Quitting.')
 
     def readpattern_compatible(self):
         # Make sure the input dark has a readout pattern
         # that is compatible with the requested output
         # readout pattern
+        rapids = ["RAPID", "NISRAPID"]
         darkpatt = self.linDark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
-            (darkpatt != 'RAPID')):
+            (darkpatt not in rapids)):
             raise ValueError(("WARNING: Unable to convert input dark with a "
                               "readout pattern of {}, to the requested readout "
                               "pattern of {}. The readout pattern of the dark "
-                              "must be RAPID or match the requested output "
+                              "must be RAPID, NISRAPID or match the requested output "
                               "readout pattern.".format(darkpatt,
                                            self.params['Readout']['readpatt'])))
 
@@ -561,10 +557,10 @@ class Observation():
             if len(rampdim) == (len(sbrefdim) + 1):
                 newramp = ramp + sbref
             else:
-                print("WARNING: input ramp and superbias+refpix arrays have")
-                print("different dimensions. Cannot combine.")
-                print("Ramp dim: {}, SBRef dim: {}".format(len(rampdim), len(sbrefdim)))
-                sys.exit()
+                raise ValueError(("WARNING: input ramp and superbias+refpix "
+                                  "arrays have different dimensions. Cannot combine. "
+                                  "Ramp dim: {}, SBRef dim: {}"
+                                  .format(len(rampdim), len(sbrefdim))))
         else:
             # Inputs arrays have the same number of dimensions
             newramp = ramp + sbref
@@ -590,8 +586,8 @@ class Observation():
         # transformation and return as a list for x and another for y
         match = table['AperName'] == aperture
         if np.any(match) == False:
-            print("Aperture name {} not found in input CSV file.".format(aperture))
-            sys.exit()
+            raise ValueError(("Aperture name {} not found in input CSV "
+                              "file.".format(aperture)))
 
         row = table[match]
 
@@ -600,9 +596,8 @@ class Observation():
         elif ((from_sys == 'ideal') & (to_sys == 'science')):
             label = 'Idl2Sci'
         else:
-            print(("WARNING: from_sys of {} and to_sys of {} not a "
-                   "valid transformation.".format(from_sys, to_sys)))
-            sys.exit()
+            raise ValueError(("WARNING: from_sys of {} and to_sys of {} not a "
+                              "valid transformation.".format(from_sys, to_sys)))
 
         # Get the coefficients, return as list
         X_cols = [c for c in row.colnames if label+'X' in c]
@@ -836,9 +831,8 @@ class Observation():
         elif mod == 'ramp':
             from jwst.datamodels import RampModel as DataModel
         else:
-            print("Model type to use for saving output is not recognized")
-            print("Must be either '1b' or 'ramp'.")
-            sys.exit()
+            raise ValueError(("Model type to use for saving output is "
+                              "not recognized. Must be either '1b' or 'ramp'."))
         outModel = DataModel()
 
         #make sure the ramp to be saved has the right number of dimensions
@@ -894,12 +888,13 @@ class Observation():
         outModel.meta.date = start_time_string
         outModel.meta.telescope = 'JWST'
         outModel.meta.instrument.name = self.params['Inst']['instrument'].upper()
-        outModel.meta.instrument.module = self.detector[3]
-
-        channel = 'SHORT'
-        if 'LONG' in self.detector:
-            channel = 'LONG'
-        outModel.meta.instrument.channel = channel
+        if self.instrument.upper() == 'NIRCAM':
+            outModel.meta.instrument.module = self.detector[3]
+            channel = 'SHORT'
+            if 'LONG' in self.detector:
+                channel = 'LONG'
+            outModel.meta.instrument.channel = channel
+                
         outModel.meta.instrument.detector = self.detector
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
@@ -1138,12 +1133,14 @@ class Observation():
 
         outModel[0].header['INSTRUME'] = self.params['Inst']['instrument'].upper()
         outModel[0].header['DETECTOR'] = self.detector
-        outModel[0].header['MODULE'] = self.detector[3]
 
-        channel = 'SHORT'
-        if 'LONG' in self.detector:
-            channel = 'LONG'
-        outModel[0].header['CHANNEL'] = channel
+        if self.instrument.upper() == 'NIRCAM':
+            outModel[0].header['MODULE'] = self.detector[3]
+            channel = 'SHORT'
+            if 'LONG' in self.detector:
+                channel = 'LONG'
+            outModel[0].header['CHANNEL'] = channel
+            
         outModel[0].header['FASTAXIS'] = self.fastaxis
         outModel[0].header['SLOWAXIS'] = self.slowaxis
 
@@ -1348,12 +1345,9 @@ class Observation():
         grouptable = grouptable[1:]
         return grouptable
 
-
     def crop_to_subarray(self, data):
-        print('bounds: ', self.subarray_bounds)
         return data[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
                     self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
-
 
     def get_nonlin_coeffs(self, linfile):
         # Read in non-linearity coefficients
@@ -1475,8 +1469,9 @@ class Observation():
         Be sure to adjust the dark current ramp if nframe/nskip is different
         than the nframe/nskip values that the dark was taken with.
 
-        Only RAPID darks will be re-averaged into different readout patterns
-        But a BRIGHT2 dark can be used to create a BRIGHT2 simulated ramp
+        Only RAPID, NISRAPID darks will be re-averaged into different 
+        readout patterns. But a BRIGHT2 dark can be used to create a 
+        BRIGHT2 simulated ramp
 
         Arguments:
         ----------
@@ -1507,7 +1502,8 @@ class Observation():
         # We have already guaranteed that either the readpatterns match
         # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
-        if ((darkpatt == 'RAPID') and (self.params['Readout']['readpatt'] != 'RAPID')):
+        rapids = ["RAPID", "NISRAPID"]
+        if ((darkpatt in rapids) and (self.params['Readout']['readpatt'] not in rapids)):
             deltaframe = self.params['Readout']['nskip'] + \
                          self.params['Readout']['nframe']
             frames = np.arange(0, self.params['Readout']['nframe'])
@@ -1619,9 +1615,12 @@ class Observation():
         # Input is always 4D
         ints, groups, yd, xd = exposure.shape
         if self.params['Readout']['namp'] == 4:
-            xdet = self.detector[3:5].upper()
-            if xdet[1] == 'L':
-                xdet = xdet[0] + '5'
+            if self.instrument.upper() == 'NIRCAM':
+                xdet = self.detector[3:5].upper()
+                if xdet[1] == 'L':
+                    xdet = xdet[0] + '5'
+            else:
+                xdet = self.detector
             xtcoeffs = self.readCrossTalkFile(self.params['Reffiles']['crosstalk'], xdet)
             # Only sources on the detector will create crosstalk.
             # If signalimage is larger than full frame
@@ -2082,14 +2081,8 @@ class Observation():
         # Can't add Poisson noise to pixels with negative values
         # Set those to zero when adding noise, then replace with
         # original value
-
-        print(np.min(self.gainim), np.nanmin(self.gainim), np.min(self.gainim[4:2044,4:2044]))
-        print(np.nanmax(signalimage))
-        
         signalgain = signalimage * self.gainim
-        print(np.nanmax(signalgain))
         highpix = np.where(signalgain == np.nanmax(signalgain))
-        print(highpix)
         if np.nanmin(signalgain) < 0.:
             neg = signalgain < 0.
             negatives = copy.deepcopy(signalgain)
