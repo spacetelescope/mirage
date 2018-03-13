@@ -1632,11 +1632,11 @@ class Catalog_seed():
             else:
                 bstr = str(b)[0:4]
 
-            if ((a != 0) & (astr[-1] == '0')):
-                astr = astr[0:-1]
-            if ((b != 0) & (bstr[-1] == '0')):
-                bstr = bstr[0:-1]
-
+            if astr == "0.0":
+                astr = "0.00"
+            if bstr == "0.0":
+                bstr = "0.00"
+                
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr
@@ -1662,6 +1662,10 @@ class Catalog_seed():
                     print("ERROR: Could not load PSF file {} from library".format(psffn))
                     sys.exit()
 
+            # Normalize the total signal in the PSF as read in
+            totalsignal = np.sum(webbpsfimage)
+            webbpsfimage /= totalsignal
+                    
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
             nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
@@ -2906,7 +2910,7 @@ class Catalog_seed():
         # has the PSF centered on the pixel. This will be used
         # if there are sersic or extended sources that need to
         # be convolved with the NIRCam PSF before adding
-        centerpsffile = os.path.join(self.params['simSignals']['psfpath'], psfname + '_0p0_0p0.fits')
+        centerpsffile = os.path.join(self.params['simSignals']['psfpath'], psfname + '_0p00_0p00.fits')
         self.centerpsf = fits.getdata(centerpsffile)
         self.centerpsf = self.cropPSF(self.centerpsf)
 
