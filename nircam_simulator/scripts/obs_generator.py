@@ -1598,7 +1598,7 @@ class Observation():
         # If the IPC kernel is designed for the
         # removal of IPC, we need to invert it
         if self.params['Reffiles']['invertIPC']:
-            print("Iverting IPC kernel prior to convolving with image")
+            print("Inverting IPC kernel prior to convolving with image")
             yk, xk = ipcimage.shape
             newkernel = 0. - ipcimage
             newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
