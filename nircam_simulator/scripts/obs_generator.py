@@ -907,7 +907,8 @@ class Observation():
         outModel.meta.program.continuation_id = 0
 
         outModel.meta.target.catalog_name = 'UNKNOWN'
-
+        outModel.meta.coordinates.reference_frame = 'ICRS'
+        
         outModel.meta.wcsinfo.wcsaxes = 2
         outModel.meta.wcsinfo.crval1 = self.ra
         outModel.meta.wcsinfo.crval2 = self.dec
@@ -1122,7 +1123,7 @@ class Observation():
         outModel[0].header['FASTAXIS'] = self.fastaxis
         outModel[0].header['SLOWAXIS'] = self.slowaxis
 
-        outModel[0].header['RADESYS'] = 'ICRS'
+        outModel[1].header['RADESYS'] = 'ICRS'
 
         outModel[0].header['ORIGIN'] = 'STScI'
         outModel[0].header['FILENAME'] = os.path.split(filename)[1]
@@ -1263,6 +1264,8 @@ class Observation():
         n_int, n_group, n_y, n_x = outModel[1].data.shape
         outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], rampexptime, n_int, n_group, n_y, n_x)
 
+
+        print('wcsaxes is {}'.format(outModel[1].header['WCSAXES']))
         outModel.writeto(filename, overwrite=True)
 
         #print("Final output integration saved to {}".format(filename))
@@ -2057,14 +2060,8 @@ class Observation():
         # Can't add Poisson noise to pixels with negative values
         # Set those to zero when adding noise, then replace with
         # original value
-
-        print(np.min(self.gainim), np.nanmin(self.gainim), np.min(self.gainim[4:2044,4:2044]))
-        print(np.nanmax(signalimage))
-        
         signalgain = signalimage * self.gainim
-        print(np.nanmax(signalgain))
         highpix = np.where(signalgain == np.nanmax(signalgain))
-        print(highpix)
         if np.nanmin(signalgain) < 0.:
             neg = signalgain < 0.
             negatives = copy.deepcopy(signalgain)
