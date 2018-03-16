@@ -1588,28 +1588,233 @@ class Observation():
 
         return ramp
 
-    def addIPC(self, exposure):
-        # Input is always 4D
-        ints, groups, yd, xd = exposure.shape
+    #def addIPC(self, exposure):
+    #    # Input is always 4D
+    #    ints, groups, yd, xd = exposure.shape
 
-        # Prepare IPC effects
-        ipcimage = fits.getdata(self.params['Reffiles']['ipc'])
+    #    # Prepare IPC effects
+    #    ipcimage = fits.getdata(self.params['Reffiles']['ipc'])
 
-        # If the IPC kernel is designed for the
-        # removal of IPC, we need to invert it
+    #    # If the IPC kernel is designed for the
+    #    # removal of IPC, we need to invert it
+    #    if self.params['Reffiles']['invertIPC']:
+    #        print("Inverting IPC kernel prior to convolving with image")
+    #        yk, xk = ipcimage.shape
+    #        newkernel = 0. - ipcimage
+    #        newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
+    #        ipcimage = newkernel
+
+    #    # Apply the kernel to each frame of each integration
+    #    for integ in range(ints):
+    #        for group in range(groups):
+    #            exposure[integ, group, :, :] = s1.fftconvolve(exposure[integ, group, :, :], ipcimage, mode="same")
+    #    return exposure
+
+    def addIPC(self, data):
+        """
+        Add interpixel capacitance effects to the data. This is done by 
+        convolving the data with a kernel. The kernel is read in from the
+        file specified by self.params['Reffiles']['ipc']. The core of this
+        function was copied from the IPC correction step in the JWST
+        calibration pipeline.
+
+        Parameters:
+        -----------
+        data : obj
+            4d numpy ndarray containing the data to which the 
+            IPC effects will be added
+
+        Returns:
+        --------
+        returns : obj
+            4d numpy ndarray of the modified data
+        """
+        output_data = np.copy(data)
+        # Shape of the data, which may include reference pix
+        shape = output_data.shape
+
+        # Read in IPC kernel data
+        kernel = fits.getdata(self.params['Reffiles']['ipc'])
+        kshape = kernel.shape
+
+        # Find the number of reference pixel rows and columns
+        # in output_data
+        if self.subarray_bounds[0] < 4:
+            left_columns = 4 - self.subarray_bounds[0]
+        else:
+            left_columns = 0
+        if self.subarray_bounds[2] > 2043:
+            right_columns = 4 - (2047 - self.subarray_bounds[2])
+        else:
+            right_columns = 0
+        if self.subarray_bounds[1] < 4:
+            bottom_rows = 4 - self.subarray_bounds[1]
+        else:
+            bottom_rows = 0
+        if self.subarray_bounds[3] > 2043:
+            top_rows = 4 - (2047 - self.subarray_bounds[3])
+        else:
+            top_rows = 0
+
+        # Invert the kernel if requested, to go from a kernel
+        # designed to remove IPC effects to one designed to
+        # add IPC effects
         if self.params['Reffiles']['invertIPC']:
-            print("Inverting IPC kernel prior to convolving with image")
-            yk, xk = ipcimage.shape
-            newkernel = 0. - ipcimage
-            newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
-            ipcimage = newkernel
+            print("Iverting IPC kernel prior to convolving with image")
+            kernel = self.invert_ipc_kernel(kernel)
 
-        # Apply the kernel to each frame of each integration
-        for integ in range(ints):
-            for group in range(groups):
-                exposure[integ, group, :, :] = s1.fftconvolve(exposure[integ, group, :, :], ipcimage, mode="same")
+        # These axes lengths exclude reference pixels, if there are any.
+        ny = shape[-2] - (bottom_rows + top_rows)
+        nx = shape[-1] - (left_columns + right_columns)
 
-        return exposure
+        # The temporary array temp is larger than the science part of
+        # output_data by a border (set to zero) that's about half of the
+        # kernel size, so the convolution can be done without checking for
+        # out of bounds.
+        # b_b, t_b, l_b, and r_b are the widths of the borders on the
+        # bottom, top, left, and right, respectively.
+        b_b = kshape[0] // 2
+        t_b = kshape[0] - b_b - 1
+        l_b = kshape[1] // 2
+        r_b = kshape[1] - l_b - 1
+        tny = ny + b_b + t_b
+        yoff = bottom_rows           # offset in output_data
+        tnx = nx + l_b + r_b
+        xoff = left_columns          # offset in output_data
+
+        # Loop over integrations and groups
+        for integration in range(shape[0]):
+            for group in range(shape[1]):
+        
+                # Copy the science portion (not the reference pixels) of output_data
+                # to this temporary array, then make subsequent changes in-place to
+                # output_data.
+                temp = np.zeros((tny, tnx), dtype=output_data.dtype)
+                temp[b_b:b_b + ny, l_b:l_b + nx] = \
+                    output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx].copy()
+
+                # After setting this slice to zero, we'll incrementally add to it.
+                output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] = 0.
+
+                if len(kshape) == 2:
+                    # 2-D IPC kernel.  Loop over pixels of the deconvolution kernel.
+                    # In this section, `part` has the same shape as `temp`.
+                    middle_j = kshape[0] // 2
+                    middle_i = kshape[1] // 2
+                    for j in range(kshape[0]):
+                        jstart = kshape[0] - j - 1
+                        for i in range(kshape[1]):
+                            if i == middle_i and j == middle_j:
+                                continue                # the middle pixel is done last
+                            part = kernel[j, i] * temp
+                            istart = kshape[1] - i - 1
+                            output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += \
+                                        part[jstart:jstart + ny, istart:istart + nx]
+                    # The middle pixel of the IPC kernel is expected to be the largest,
+                    # so add that last.
+                    part = kernel[middle_j, middle_i] * temp
+                    output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += \
+                                part[middle_j:middle_j + ny, middle_i:middle_i + nx]
+
+                else:
+                    # 4-D IPC kernel.  Extract a subset of the kernel:  all of the
+                    # first two axes, but only the portion of the last two axes
+                    # corresponding to the science data (i.e. possibly a subarray,
+                    # and certainly excluding reference pixels).
+                    k_temp = np.zeros((kshape[0], kshape[1], tny, tnx),
+                                      dtype=kernel.dtype)
+                    k_temp[:, :, b_b:b_b + ny, l_b:l_b + nx] = \
+                            kernel[:, :, yoff:yoff + ny, xoff:xoff + nx]
+
+                    # In this section, `part` has shape (ny, nx), which is smaller
+                    # than `temp`.
+                    middle_j = kshape[0] // 2
+                    middle_i = kshape[1] // 2
+                    for j in range(kshape[0]):
+                        jstart = kshape[0] - j - 1
+                        for i in range(kshape[1]):
+                            if i == middle_i and j == middle_j:
+                                continue                # the middle pixel is done last
+                            istart = kshape[1] - i - 1
+                            # The slice of k_temp includes different pixels for the
+                            # first or second axes within each loop, but the same slice
+                            # for the last two axes.
+                            # The slice of temp (a copy of the science data) includes
+                            # a different offset for each loop.
+                            part = k_temp[j, i, b_b:b_b + ny, l_b:l_b + nx] * \
+                                   temp[jstart:jstart + ny, istart:istart + nx]
+                            output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
+                    # Add the product for the middle pixel last.
+                    part = k_temp[middle_j, middle_i, b_b:b_b + ny, l_b:l_b + nx] * \
+                           temp[middle_j:middle_j + ny, middle_i:middle_i + nx]
+                    output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
+        return output_data
+
+    def invert_ipc_kernel(self, kern):
+        """
+        Invert the IPC kernel such that it goes from being used to remove
+        IPC effects from data, to being used to add IPC effects to data,
+        or vice versa.
+
+        Parameters:
+        -----------
+        kern : obj
+            numpy ndarray, either 2D or 4D, containing the kernel
+
+        Returns:
+        --------
+        returns : obj
+            numpy ndarray containing iInverted" kernel
+        """
+        from numpy.linalg import inv
+        shape = kern.shape
+        ys = 0
+        ye = shape[-2]
+        xs = 0
+        xe = shape[-1]
+        if shape[-1] == 2048:
+            xs = 4
+            xe = 2044
+        if shape[-2] == 2048:
+            ys = 4
+            ye = 2044
+        if len(shape) == 2:
+            subkernel = kern[ys:ye, xs:xe]
+        elif len(shape) == 4:
+            subkernel = kern[:, : , ys:ye, xs:xe]    
+
+        #subkernel = self.singular_check(subkernel)
+
+        if len(shape) == 2:
+            ky, kx = subkernel.shape
+            deltafunc = np.zeros((ky, kx))
+            deltafunc[ky // 2, kx // 2] = 1
+            try:
+                newsubkernel = np.matmul(inv(subkernel), deltafunc)
+            except np.linalg.linalg.LinAlgError:
+                print("WARNING: IPC kernel is singular! Can't invert!")
+                sys.exit()
+        elif len(shape) == 4:
+            ky, kx, dety, detx = subkernel.shape
+            deltafunc = np.zeros((ky, kx))
+            deltafunc[ky // 2, kx // 2] = 1
+            newsubkernel = np.zeros((ky, kx, dety, detx))
+            for x in range(detx):
+                for y in range(dety):
+                    try:
+                        newsubkernel[:, :, y, x] = np.matmul(inv(subkernel[:, :, y, x]),
+                                                             deltafunc)
+                    except:
+                        print(("WARNING: IPC kernel is singular at (x,y) = "
+                               "({},{}). Can't invert!".format(x, y)))
+                        sys.exit()
+        newkernel = np.copy(kern)
+        if len(shape) == 2:
+            newkernel[ys:ye, xs:xe] = newsubkernel
+        elif len(shape) == 4:
+            newkernel[:, :, ys:ye, xs:xe] = newsubkernel
+                    
+        return newkernel
 
     def addCrosstalk(self, exposure):
         # Input is always 4D
