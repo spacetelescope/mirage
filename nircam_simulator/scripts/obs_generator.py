@@ -162,9 +162,7 @@ class Observation():
         # All done in one function to save memory
         simexp, simzero = self.add_crs_and_noise(self.seed)
 
-        # Add detector effects (IPC, crosstalk, etc)
-        # to the ramp of simulated sources + cosmic rays
-        # (the dark current ramp already has these effects)
+        # Multiply flat fields
         simexp = self.add_flatfield_effects(simexp)
         simzero = self.add_flatfield_effects(np.expand_dims(simzero, axis=1))[:, 0, :, :]
 
@@ -172,12 +170,18 @@ class Observation():
         if self.params['Output']['grism_source_image'] == False:
             simexp, simzero = self.maskRefPix(simexp, simzero)
 
+        # Add IPC effects
+        # (Dark current ramp already has IPC in it)
+        if self.runStep['ipc']:
+            simexp = self.addIPC(simexp)
+            simzero = self.addIPC(np.expand_dims(simzero, axis=1))[:, 0, :, :]
+
         # Add the simulated source ramp to the dark ramp
         lin_outramp, lin_zeroframe, lin_sbAndRefpix = self.addSyntheticToDark(simexp,
                                                                               self.linDark,
                                                                               syn_zeroframe=simzero)
 
-        # Add other detector effects (IPC/Crosstalk/PAM)
+        # Add other detector effects (Crosstalk/PAM)
         lin_outramp = self.add_detector_effects(lin_outramp)
         lin_zeroframe = self.add_detector_effects(np.expand_dims(lin_zeroframe, axis=1))[:, 0, :, :]
 
@@ -1580,9 +1584,6 @@ class Observation():
         return ramp
 
     def add_detector_effects(self, ramp):
-        if self.runStep['ipc']:
-            ramp = self.addIPC(ramp)
-
         if self.runStep['crosstalk']:
             ramp = self.addCrosstalk(ramp)
 
