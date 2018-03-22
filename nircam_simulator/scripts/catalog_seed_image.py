@@ -29,18 +29,23 @@ from . import set_telescope_pointing_separated as set_telescope_pointing
 from . import moving_targets
 from . import segmentation_map as segmap
 
-inst_list = ['nircam']
-#modes = {'nircam': ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
-#                    'nircamwfss', 'wfsccommissioning', 'wfscglobalalignment']}
-modes = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"]}
-tracking_list = ['sidereal','non-sidereal']
-inst_abbrev = {'nircam':'NRC'}
-pixelScale = {'nircam':{'sw':0.031, 'lw':0.063}}
-full_array_size = {'nircam':2048}
-allowedOutputFormats = ['DMS']
-#wfe_options = [0, 115, 123, 136, 155]
-wfe_options = ['predicted', 'requirements']
-wfegroup_options = np.arange(5)
+INST_LIST = ['nircam', 'niriss', 'fgs']
+MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
+         'niriss': ["imaging"],
+         'fgs': ["imaging"]}  
+TRACKING_LIST = ['sidereal','non-sidereal']
+inst_abbrev = {'nircam': 'NRC',
+               'niriss': 'NIS',
+               'fgs': 'FGS'}
+PIXELSCALE = {'nircam': {'sw':0.031, 'lw':0.063},
+              'niriss': 0.065,
+              'fgs': 0.065}
+FULL_ARRAY_SIZE = {'nircam': 2048,
+                   'niriss': 2048,
+                   'fgs':2048}
+ALLOWEDOUTPUTFORMATS = ['DMS']
+WFE_OPTIONS = ['predicted', 'requirements']
+WFEGROUP_OPTIONS = np.arange(5)
 
 class Catalog_seed():
     def __init__(self):
@@ -232,21 +237,6 @@ class Catalog_seed():
         
     def saveSeedImage(self):
         # Create the grism direct image or ramp to be saved
-
-        # Get the photflambda and photfnu values that go with
-        # the filter
-        # module = self.params['Readout']['array_name'][3]
-
-        # zps = ascii.read(self.params['Reffiles']['flux_cal'])
-        # if self.params['Readout']['pupil'][0] == 'F':
-        #    usephot = 'pupil'
-        # else:
-        #    usephot = 'filter'
-        # mtch = ((self.zps['Filter'] == self.params['Readout'][usephot]) & (self.zps['Module'] == module))
-        # photflam = self.zps['PHOTFLAM'][mtch][0]
-        # photfnu = self.zps['PHOTFNU'][mtch][0]
-        # pivot = self.zps['Pivot_wave'][mtch][0]
-
         arrayshape = self.seedimage.shape
         if len(arrayshape) == 2:
             units = 'ADU/sec'
@@ -320,11 +310,28 @@ class Catalog_seed():
                                   'movingTargetExtended', 'movingTargetToTrack'],
                     'Output':['file', 'directory']}
 
-        config_files = {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                        'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                        'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                        'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                        'Reffiles-filter_throughput': 'placeholder.txt'}
+        #config_files = {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+        #                'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
+        #                'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+        #                'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+        #                'Reffiles-filter_throughput': 'placeholder.txt'}
+
+        all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                       'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
+                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                       'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                       'Reffiles-filter_throughput': 'placeholder.txt'},
+                            'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
+                                       'Reffiles-flux_cal': 'niriss_zeropoint_values.out',
+                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
+                                       'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
+                                       'Reffiles-filter_throughput': 'placeholder.txt'},
+                            'fgs': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                    'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
+                                    'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                    'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                    'Reffiles-filter_throughput': 'placeholder.txt'}}
+        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
         for key1 in pathdict:
             for key2 in pathdict[key1]:
@@ -372,7 +379,7 @@ class Catalog_seed():
             num_frames = self.params['Readout']['ngroup'] * \
                          (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print("Countrate image of synthetic signals being converted to "
-                  "RAPID integration with {} frames.".format(num_frames))
+                  "RAPID/NISRAPID integration with {} frames.".format(num_frames))
             input1_ramp = np.zeros((numints, num_frames, yd, xd))
             for i in range(num_frames):
                 input1_ramp[0, i, :, :] = input1 * self.frametime * (i + 1)
@@ -482,7 +489,7 @@ class Catalog_seed():
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[3] - self.subarray_bounds[1] + 1) / 2.)
 
     def non_sidereal_seed(self):
-        """Create a seed EXPOSURE in the case where NIRCam is tracking
+        """Create a seed EXPOSURE in the case where the instrument is tracking
         a non-sidereal target
         """
 
@@ -809,13 +816,13 @@ class Catalog_seed():
                 if entry['pos_angle'] != 0.:
                     stamp = self.basicRotateImage(stamp, entry['pos_angle'])
 
-                # Convolve with NIRCam PSF if requested
+                # Convolve with instrument PSF if requested
                 if self.params['simSignals']['PSFConvolveExtended']:
                     stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
             elif input_type == 'galaxies':
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], entry['pos_angle'], 1.)
-                # Convolve the galaxy with the NIRCam PSF
+                # Convolve the galaxy with the instrument PSF
                 stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
             # Normalize the PSF to a total signal of 1.0
@@ -1088,7 +1095,7 @@ class Catalog_seed():
             # translate the extended source list into an image
             extCRImage, extSegmap = self.makeExtendedSourceImage(extlist, extstamps)
 
-            # if requested, convolve the stamp images with the NIRCam PSF
+            # if requested, convolve the stamp images with the instrument PSF
             if self.params['simSignals']['PSFConvolveExtended']:
                 extCRImage = s1.fftconvolve(extCRImage, self.centerpsf, mode='same')
 
@@ -1298,6 +1305,13 @@ class Catalog_seed():
         x_coeffs = [row[c].data[0] for c in X_cols]
         y_coeffs = [row[c].data[0] for c in Y_cols]
 
+        # Strip off masked coefficients, where the column exists but there
+        # is no corresponding coefficient in the SIAF
+        x_coeffs = [c for c in x_coeffs if np.isfinite(c)]
+        y_coeffs = [c for c in y_coeffs if np.isfinite(c)]
+        #x_coeffs = [c if np.isfinite(c) else 0. for c in x_coeffs]
+        #y_coeffs = [c if np.isfinite(c) else 0. for c in y_coeffs]
+
         # Also get the V2, V3 values of the reference pixel
         v2ref = row['V2Ref'].data[0]
         v3ref = row['V3Ref'].data[0]
@@ -1374,7 +1388,7 @@ class Catalog_seed():
         if np.min(indexes) <= self.maxindex:
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
-        print("after point sources, max index is {}".format(self.maxindex))
+        print("After point sources, max index is {}".format(self.maxindex))
 
         dtor = math.radians(1.)
         nx = (self.subarray_bounds[2] - self.subarray_bounds[0]) + 1
@@ -1452,7 +1466,8 @@ class Catalog_seed():
                 elif index == 100:
                     avg_time = np.mean(times)
                     total_time = len(indexes) * avg_time
-                    print('Expected time to process {} sources: {:.2f} seconds ({:.2f} minutes)'.format(len(indexes), total_time, total_time/60))
+                    print(("Expected time to process {} sources: {:.2f} seconds "
+                           "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
 
                 try:
                     entry0 = float(values['x_or_RA'])
@@ -1470,7 +1485,7 @@ class Catalog_seed():
 
                 # Case where point source list entries are given with RA and Dec
                 if not pixelflag:
-
+                    
                     # If distortion is to be included - either with or without the full set of coordinate
                     # translation coefficients
                     if self.runStep['astrometric']:
@@ -1500,7 +1515,6 @@ class Catalog_seed():
                 mag = float(values['magnitude'])
 
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
-
                     # set up an entry for the output table
                     entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
@@ -1648,6 +1662,10 @@ class Catalog_seed():
                     print("ERROR: Could not load PSF file {} from library".format(psffn))
                     sys.exit()
 
+            # Normalize the total signal in the PSF as read in
+            totalsignal = np.sum(webbpsfimage)
+            webbpsfimage /= totalsignal
+                    
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
             nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
@@ -1826,8 +1844,20 @@ class Catalog_seed():
             yidl = self.v2v32idly(pixelv2 - self.v2_ref, pixelv3 - self.v3_ref)
 
             # Finally, undistorted distances to distorted pixel values
-            deltapixelx, deltapixely, err, iter = polynomial.invert(self.x_sci2idl, self.y_sci2idl, xidl, yidl, 5)
+            ncoeff = len(self.x_sci2idl)
+            if ncoeff == 21:
+                polynomial_order = 5
+            elif ncoeff == 15:
+                polynomial_order = 4
+            elif ncoeff == 10:
+                polynomial_order = 3
+            else:
+                raise ValueError(("WARNING: {} science to ideal coefficients read in from "
+                                  "SIAF. Not sure what polynomial order this corresponds to."
+                                  .format(ncoeff)))
 
+            deltapixelx, deltapixely, err, iter = polynomial.invert(self.x_sci2idl, self.y_sci2idl,
+                                                                    xidl, yidl, polynomial_order)
             pixelx = deltapixelx + self.refpix_pos['x']
             pixely = deltapixely + self.refpix_pos['y']
 
@@ -2273,7 +2303,7 @@ class Catalog_seed():
             # first create the galaxy image
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], xposang*np.pi/180., entry['counts_per_frame_e'])
 
-            # convolve the galaxy with the NIRCam PSF
+            # convolve the galaxy with the instrument PSF
             stamp = s1.fftconvolve(stamp, psf, mode='same')
 
             # Now add the stamp to the main image
@@ -2325,7 +2355,8 @@ class Catalog_seed():
                 segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
 
             else:
-                print("Source located entirely outside the field of view. Skipping.")
+                pass
+                #print("Source located entirely outside the field of view. Skipping.")
 
         return galimage, segmentation.segmap
 
@@ -2718,11 +2749,11 @@ class Catalog_seed():
     def checkParams(self):
         """Check input parameters for expected datatypes, values"""
         # Check instrument name
-        if self.params['Inst']['instrument'].lower() not in inst_list:
+        if self.params['Inst']['instrument'].lower() not in INST_LIST:
             raise NotImplementedError("WARNING: {} instrument not implemented within ramp simulator")
 
         # Check entered mode:
-        possibleModes = modes[self.params['Inst']['instrument'].lower()]
+        possibleModes = MODES[self.params['Inst']['instrument'].lower()]
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
             pass
@@ -2733,10 +2764,10 @@ class Catalog_seed():
 
         # Check telescope tracking entry
         self.params['Telescope']['tracking'] = self.params['Telescope']['tracking'].lower()
-        if self.params['Telescope']['tracking'] not in tracking_list:
+        if self.params['Telescope']['tracking'] not in TRACKING_LIST:
             raise ValueError(("WARNING: telescope tracking set to {}, but must be one "
                               "of {}.".format(self.params['Telescope']['tracking'],
-                                              tracking_list)))
+                                              TRACKING_LIST)))
 
         # Non-sidereal WFSS observations are not yet supported
         if self.params['Telescope']['tracking'] == 'non-sidereal' and \
@@ -2801,29 +2832,13 @@ class Catalog_seed():
         # Read in list of zeropoints/photflam/photfnu
         self.zps = ascii.read(self.params['Reffiles']['flux_cal'])
 
-        # Determine the NIRCam module and detector from the aperture name
+        # Determine the instrument module and detector from the aperture name
         aper_name = self.params['Readout']['array_name']
         try:
             detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
             module = detector[0]
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
-
-        # if aper_name[:2] == 'NRC':
-        #     module = aper_name[3]
-        #     detector = aper_name[3:5]
-        # else:
-        #     aper_name_nosub = aper_name.replace('SUB', '')
-
-        #     is_A = 'A' in aper_name_nosub
-        #     is_B = 'B' in aper_name_nosub
-
-        #     if is_A and is_B:
-        #         raise ValueError('Cannot match {} to module'.format(aper_name))
-        #     elif is_A:
-        #         module = 'A'
-        #     elif is_B:
-        #         module = 'B'
 
         # make sure the requested filter is allowed. For imaging, all filters are allowed.
         # In the future, other modes will be more restrictive
@@ -2851,14 +2866,14 @@ class Catalog_seed():
                 self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath'] + '/'
 
             wfe = self.params['simSignals']['psfwfe']
-            if wfe not in wfe_options:
+            if wfe not in WFE_OPTIONS:
                 raise ValueError(("WARNING: invalid wavefront error (psfwfe) input: {}"
-                                  "psfwfe must be one of: {}".format(wfe, wfe_options)))
+                                  "psfwfe must be one of: {}".format(wfe, WFE_OPTIONS)))
             wfegroup = self.params['simSignals']['psfwfegroup']
-            if wfegroup not in wfegroup_options:
+            if wfegroup not in WFEGROUP_OPTIONS:
                 raise ValueError(("WARNING: invalid wavefront group (psfwfegroup) "
                                   "value: {}. psfwfegroup must be one of: {}"
-                                  .format(wfegroup, wfegroup_options)))
+                                  .format(wfegroup, WFEGROUP_OPTIONS)))
             basename = self.params['simSignals']['psfbasename'] + '_'
             if wfe == 0:
                 psfname = basename + self.params['simSignals'][usefilt].lower() + '_zero'
@@ -2866,7 +2881,6 @@ class Catalog_seed():
                                                        self.params['simSignals'][usefilt].lower() + \
                                                        '/zero/'
             else:
-                #psfname=basename + self.params['Readout'][usefilt].lower() + "_" + str(wfe) + "_" + str(wfegroup)
                 psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
                                                          'psfxpos', 'psfypos',
                                                          self.params['Readout'][usefilt].lower(),
@@ -2976,8 +2990,15 @@ class Catalog_seed():
 
                 # Find the appropriate filter throughput file
                 if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
-                    filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
-                                   .format(self.params['Readout'][usefilt].upper(), module.lower()))
+                    instrm = self.params['Inst']['instrument'].lower()
+                    if instrm == 'nircam':
+                        filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
+                                       .format(self.params['Readout'][usefilt].upper(), module.lower()))
+                    elif instrm == 'niriss':
+                        filter_file = ("{}_niriss_throughput_nopy1.txt"
+                                       .format(self.params['Readout'][usefilt].lower()))
+                    elif instrm == 'fgs':
+                        raise ValueError("Filter throughputs for FGS not yet available")
                     filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
                     filter_file = os.path.join(filt_dir, filter_file)
 
@@ -3005,10 +3026,10 @@ class Catalog_seed():
         self.params['simSignals']['scatteredscale'] = self.checkParamVal(self.params['simSignals']['scatteredscale'], 'scatteredLight', 0, 10000, 1)
 
         # make sure the requested output format is an allowed value
-        if self.params['Output']['format'] not in allowedOutputFormats:
+        if self.params['Output']['format'] not in ALLOWEDOUTPUTFORMATS:
             raise ValueError(("WARNING: unsupported output format {} requested. "
                               "Possible options are {}.".format(self.params['Output']['format'],
-                                                                allowedOutputFormats)))
+                                                                ALLOWEDOUTPUTFORMATS)))
 
         # Entries for creating the grims input image
         if not isinstance(self.params['Output']['grism_source_image'], bool):
@@ -3123,7 +3144,7 @@ class Catalog_seed():
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
                                       "{}. Not present in directory tree specified by "
                                       "the {} environment variable."
-                                      .format(self.pdir, self.env_var)))
+                                      .format(pth, self.env_var)))
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In
@@ -3198,7 +3219,7 @@ class Catalog_seed():
         # don't need to be in the parameter file
 
         # array size of a full frame image
-        self.ffsize = full_array_size[instrument]
+        self.ffsize = FULL_ARRAY_SIZE[instrument]
 
         # pixel scale - return as a 2-element list, with pixscale for x and y.
         if instrument.lower() == 'nircam':
@@ -3208,9 +3229,9 @@ class Catalog_seed():
                 channel = 'sw'
             else:
                 channel = 'lw'
-            self.pixscale = [pixelScale[instrument][channel], pixelScale[instrument][channel]]
+            self.pixscale = [PIXELSCALE[instrument][channel], PIXELSCALE[instrument][channel]]
         else:
-            self.pixscale = [pixelScale[instrument], pixelScale[instrument]]
+            self.pixscale = [PIXELSCALE[instrument], PIXELSCALE[instrument]]
 
     def read_filter_throughput(self, file):
         '''Read in the ascii file containing the filter

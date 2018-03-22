@@ -22,8 +22,10 @@ from . import unlinearize
 from . import read_fits
 
 
-inst_list = ['nircam']
-modes = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"]}
+INST_LIST = ['nircam', 'niriss', 'fgs']
+MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
+         "niriss": ["imaging"],
+         "fgs": ["imaging"]}
 
 class Observation():
     def __init__(self):
@@ -390,7 +392,6 @@ class Observation():
         # This is intended primarily for user-generated inputs like
         # source catalogs
         ifile = self.params[inparam[0]][inparam[1]]
-        print('ifile is', ifile)
         if ifile.lower() != 'none':
             ifile = os.path.abspath(ifile)
             c = os.path.isfile(ifile)
@@ -430,6 +431,23 @@ class Observation():
                         , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
                         , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}
 
+        all_config_files = {'nircam': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
+                                       , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
+                                       , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
+                                       , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
+                                       , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'},
+                            'niriss': {'Reffiles-readpattdefs':'niriss_readout_pattern.txt'
+                                       , 'Reffiles-subarray_defs':'niriss_subarrays.list'
+                                       , 'Reffiles-flux_cal':'niriss_zeropoint_values.out'
+                                       , 'Reffiles-crosstalk':'niriss_xtalk_zeros.txt'
+                                       , 'Reffiles-filtpupilcombo':'niriss_dual_wheel_list.txt'},
+                            'fgs': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
+                                    , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
+                                    , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
+                                    , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
+                                    , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}}
+        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
+                            
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none', 'config']:
@@ -446,8 +464,7 @@ class Observation():
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)
         except:
-            print("WARNING: unable to open {}".format(self.paramfile))
-            sys.exit()
+            raise IOError("WARNING: unable to open {}".format(self.paramfile))
 
     def readSubarrayDefinitionFile(self):
         # Read in the file that contains a list of subarray
@@ -455,8 +472,7 @@ class Observation():
         try:
             self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
         except:
-            print("Error: could not read in subarray definitions file.")
-            sys.exit()
+            raise IOError("Error: could not read in subarray definitions file.")
 
     def readSaturationFile(self):
         # Read in saturation map
@@ -488,26 +504,25 @@ class Observation():
             try:
                 self.superbias, self.superbiasheader = self.readCalFile(self.params['Reffiles']['superbias'])
             except:
-                print(('WARNING: unable to open superbias file {}.'
-                       .format(self.params['Reffiles']['superbias'])))
-                print(("Please provide a valid file "
-                       "in the superbias entry in the parameter file."))
-                sys.exit()
+                raise IOError(("WARNING: unable to open superbias file {}. "
+                               "Please provide a valid file in the superbias "
+                               "entry in the parameter file."
+                               .format(self.params['Reffiles']['superbias'])))
         else:
-            print('CAUTION: no superbias provided. Quitting.')
-            sys.exit()
+            raise ValueError('CAUTION: no superbias provided. Quitting.')
 
     def readpattern_compatible(self):
         # Make sure the input dark has a readout pattern
         # that is compatible with the requested output
         # readout pattern
+        rapids = ["RAPID", "NISRAPID"]
         darkpatt = self.linDark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
-            (darkpatt != 'RAPID')):
+            (darkpatt not in rapids)):
             raise ValueError(("WARNING: Unable to convert input dark with a "
                               "readout pattern of {}, to the requested readout "
                               "pattern of {}. The readout pattern of the dark "
-                              "must be RAPID or match the requested output "
+                              "must be RAPID, NISRAPID or match the requested output "
                               "readout pattern.".format(darkpatt,
                                            self.params['Readout']['readpatt'])))
 
@@ -542,10 +557,10 @@ class Observation():
             if len(rampdim) == (len(sbrefdim) + 1):
                 newramp = ramp + sbref
             else:
-                print("WARNING: input ramp and superbias+refpix arrays have")
-                print("different dimensions. Cannot combine.")
-                print("Ramp dim: {}, SBRef dim: {}".format(len(rampdim), len(sbrefdim)))
-                sys.exit()
+                raise ValueError(("WARNING: input ramp and superbias+refpix "
+                                  "arrays have different dimensions. Cannot combine. "
+                                  "Ramp dim: {}, SBRef dim: {}"
+                                  .format(len(rampdim), len(sbrefdim))))
         else:
             # Inputs arrays have the same number of dimensions
             newramp = ramp + sbref
@@ -571,8 +586,8 @@ class Observation():
         # transformation and return as a list for x and another for y
         match = table['AperName'] == aperture
         if np.any(match) == False:
-            print("Aperture name {} not found in input CSV file.".format(aperture))
-            sys.exit()
+            raise ValueError(("Aperture name {} not found in input CSV "
+                              "file.".format(aperture)))
 
         row = table[match]
 
@@ -581,9 +596,8 @@ class Observation():
         elif ((from_sys == 'ideal') & (to_sys == 'science')):
             label = 'Idl2Sci'
         else:
-            print(("WARNING: from_sys of {} and to_sys of {} not a "
-                   "valid transformation.".format(from_sys, to_sys)))
-            sys.exit()
+            raise ValueError(("WARNING: from_sys of {} and to_sys of {} not a "
+                              "valid transformation.".format(from_sys, to_sys)))
 
         # Get the coefficients, return as list
         X_cols = [c for c in row.colnames if label+'X' in c]
@@ -817,9 +831,8 @@ class Observation():
         elif mod == 'ramp':
             from jwst.datamodels import RampModel as DataModel
         else:
-            print("Model type to use for saving output is not recognized")
-            print("Must be either '1b' or 'ramp'.")
-            sys.exit()
+            raise ValueError(("Model type to use for saving output is "
+                              "not recognized. Must be either '1b' or 'ramp'."))
         outModel = DataModel()
 
         #make sure the ramp to be saved has the right number of dimensions
@@ -852,8 +865,10 @@ class Observation():
         #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
         #nrc_tacq and nrc_coron are not currently implemented.
 
-        exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
-                   'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
+                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                   "niriss": {"imaging": "NIS_IMAGE"},
+                   "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
             outModel.meta.exposure.type = exptype[self.params['Inst']['instrument'].lower()]\
@@ -873,12 +888,13 @@ class Observation():
         outModel.meta.date = start_time_string
         outModel.meta.telescope = 'JWST'
         outModel.meta.instrument.name = self.params['Inst']['instrument'].upper()
-        outModel.meta.instrument.module = self.detector[3]
-
-        channel = 'SHORT'
-        if 'LONG' in self.detector:
-            channel = 'LONG'
-        outModel.meta.instrument.channel = channel
+        if self.instrument.upper() == 'NIRCAM':
+            outModel.meta.instrument.module = self.detector[3]
+            channel = 'SHORT'
+            if 'LONG' in self.detector:
+                channel = 'LONG'
+            outModel.meta.instrument.channel = channel
+                
         outModel.meta.instrument.detector = self.detector
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
@@ -1091,8 +1107,12 @@ class Observation():
         #    self.dark = self.dark[0:3]
 
         #EXPTYPE OPTIONS
-        exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
-                   'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+        #exptype = {'nircam': {'imaging': 'NRC_IMAGE', 'ts_imaging': 'NRC_TSIMAGE',
+        #           'wfss': 'NRC_GRISM', 'ts_wfss': 'NRC_TSGRISM'}}
+        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
+                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                   "niriss": {"imaging": "NIS_IMAGE"},
+                   "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
             outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['instrument'].lower()]\
@@ -1114,12 +1134,14 @@ class Observation():
 
         outModel[0].header['INSTRUME'] = self.params['Inst']['instrument'].upper()
         outModel[0].header['DETECTOR'] = self.detector
-        outModel[0].header['MODULE'] = self.detector[3]
 
-        channel = 'SHORT'
-        if 'LONG' in self.detector:
-            channel = 'LONG'
-        outModel[0].header['CHANNEL'] = channel
+        if self.instrument.upper() == 'NIRCAM':
+            outModel[0].header['MODULE'] = self.detector[3]
+            channel = 'SHORT'
+            if 'LONG' in self.detector:
+                channel = 'LONG'
+            outModel[0].header['CHANNEL'] = channel
+            
         outModel[0].header['FASTAXIS'] = self.fastaxis
         outModel[0].header['SLOWAXIS'] = self.slowaxis
 
@@ -1326,12 +1348,9 @@ class Observation():
         grouptable = grouptable[1:]
         return grouptable
 
-
     def crop_to_subarray(self, data):
-        print('bounds: ', self.subarray_bounds)
         return data[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
                     self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
-
 
     def get_nonlin_coeffs(self, linfile):
         # Read in non-linearity coefficients
@@ -1453,8 +1472,9 @@ class Observation():
         Be sure to adjust the dark current ramp if nframe/nskip is different
         than the nframe/nskip values that the dark was taken with.
 
-        Only RAPID darks will be re-averaged into different readout patterns
-        But a BRIGHT2 dark can be used to create a BRIGHT2 simulated ramp
+        Only RAPID, NISRAPID darks will be re-averaged into different 
+        readout patterns. But a BRIGHT2 dark can be used to create a 
+        BRIGHT2 simulated ramp
 
         Arguments:
         ----------
@@ -1485,7 +1505,8 @@ class Observation():
         # We have already guaranteed that either the readpatterns match
         # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
-        if ((darkpatt == 'RAPID') and (self.params['Readout']['readpatt'] != 'RAPID')):
+        rapids = ["RAPID", "NISRAPID"]
+        if ((darkpatt in rapids) and (self.params['Readout']['readpatt'] not in rapids)):
             deltaframe = self.params['Readout']['nskip'] + \
                          self.params['Readout']['nframe']
             frames = np.arange(0, self.params['Readout']['nframe'])
@@ -1570,36 +1591,267 @@ class Observation():
 
         return ramp
 
-    def addIPC(self, exposure):
-        # Input is always 4D
-        ints, groups, yd, xd = exposure.shape
+    #def addIPC(self, exposure):
+    #    # Input is always 4D
+    #    ints, groups, yd, xd = exposure.shape
 
-        # Prepare IPC effects
-        ipcimage = fits.getdata(self.params['Reffiles']['ipc'])
+    #    # Prepare IPC effects
+    #    ipcimage = fits.getdata(self.params['Reffiles']['ipc'])
 
-        # If the IPC kernel is designed for the
-        # removal of IPC, we need to invert it
-        if self.params['Reffiles']['invertIPC']:
-            print("Iverting IPC kernel prior to convolving with image")
-            yk, xk = ipcimage.shape
-            newkernel = 0. - ipcimage
-            newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
-            ipcimage = newkernel
+    #    # If the IPC kernel is designed for the
+    #    # removal of IPC, we need to invert it
+    #    if self.params['Reffiles']['invertIPC']:
+    #        print("Inverting IPC kernel prior to convolving with image")
+    #        yk, xk = ipcimage.shape
+    #        newkernel = 0. - ipcimage
+    #        newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
+    #        ipcimage = newkernel
 
-        # Apply the kernel to each frame of each integration
-        for integ in range(ints):
-            for group in range(groups):
-                exposure[integ, group, :, :] = s1.fftconvolve(exposure[integ, group, :, :], ipcimage, mode="same")
+    #    # Apply the kernel to each frame of each integration
+    #    for integ in range(ints):
+    #        for group in range(groups):
+    #            exposure[integ, group, :, :] = s1.fftconvolve(exposure[integ, group, :, :], ipcimage, mode="same")
+    #    return exposure
 
-        return exposure
+    def addIPC(self, data):
+        """
+        Add interpixel capacitance effects to the data. This is done by 
+        convolving the data with a kernel. The kernel is read in from the
+        file specified by self.params['Reffiles']['ipc']. The core of this
+        function was copied from the IPC correction step in the JWST
+        calibration pipeline.
+
+        Parameters:
+        -----------
+        data : obj
+            4d numpy ndarray containing the data to which the 
+            IPC effects will be added
+
+        Returns:
+        --------
+        returns : obj
+            4d numpy ndarray of the modified data
+        """
+        output_data = np.copy(data)
+        # Shape of the data, which may include reference pix
+        shape = output_data.shape
+
+        # Find the number of reference pixel rows and columns
+        # in output_data
+        if self.subarray_bounds[0] < 4:
+            left_columns = 4 - self.subarray_bounds[0]
+        else:
+            left_columns = 0
+        if self.subarray_bounds[2] > 2043:
+            right_columns = 4 - (2047 - self.subarray_bounds[2])
+        else:
+            right_columns = 0
+        if self.subarray_bounds[1] < 4:
+            bottom_rows = 4 - self.subarray_bounds[1]
+        else:
+            bottom_rows = 0
+        if self.subarray_bounds[3] > 2043:
+            top_rows = 4 - (2047 - self.subarray_bounds[3])
+        else:
+            top_rows = 0
+
+        # Get IPC kernel data
+        try:
+            # If addIPC has already been called, then the correct
+            # IPC kernel already exists, in self.kernel
+            kernel = np.copy(self.kernel)
+        except:
+            # If addIPC has not been called yet, then read in the
+            # kernel from the specified file.
+            kernel = fits.getdata(self.params['Reffiles']['ipc'])
+            # Invert the kernel if requested, to go from a kernel
+            # designed to remove IPC effects to one designed to
+            # add IPC effects
+            if self.params['Reffiles']['invertIPC']:
+                print("Iverting IPC kernel prior to convolving with image")
+                kernel = self.invert_ipc_kernel(kernel)
+            self.kernel = np.copy(kernel)
+        kshape = kernel.shape
+
+        # These axes lengths exclude reference pixels, if there are any.
+        ny = shape[-2] - (bottom_rows + top_rows)
+        nx = shape[-1] - (left_columns + right_columns)
+
+        # The temporary array temp is larger than the science part of
+        # output_data by a border (set to zero) that's about half of the
+        # kernel size, so the convolution can be done without checking for
+        # out of bounds.
+        # b_b, t_b, l_b, and r_b are the widths of the borders on the
+        # bottom, top, left, and right, respectively.
+        b_b = kshape[0] // 2
+        t_b = kshape[0] - b_b - 1
+        l_b = kshape[1] // 2
+        r_b = kshape[1] - l_b - 1
+        tny = ny + b_b + t_b
+        yoff = bottom_rows           # offset in output_data
+        tnx = nx + l_b + r_b
+        xoff = left_columns          # offset in output_data
+
+        # Loop over integrations and groups
+        for integration in range(shape[0]):
+            for group in range(shape[1]):
+        
+                # Copy the science portion (not the reference pixels) of output_data
+                # to this temporary array, then make subsequent changes in-place to
+                # output_data.
+                temp = np.zeros((tny, tnx), dtype=output_data.dtype)
+                temp[b_b:b_b + ny, l_b:l_b + nx] = \
+                    output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx].copy()
+
+                # After setting this slice to zero, we'll incrementally add to it.
+                output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] = 0.
+
+                if len(kshape) == 2:
+                    # 2-D IPC kernel.  Loop over pixels of the deconvolution kernel.
+                    # In this section, `part` has the same shape as `temp`.
+                    middle_j = kshape[0] // 2
+                    middle_i = kshape[1] // 2
+                    for j in range(kshape[0]):
+                        jstart = kshape[0] - j - 1
+                        for i in range(kshape[1]):
+                            if i == middle_i and j == middle_j:
+                                continue                # the middle pixel is done last
+                            part = kernel[j, i] * temp
+                            istart = kshape[1] - i - 1
+                            output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += \
+                                        part[jstart:jstart + ny, istart:istart + nx]
+                    # The middle pixel of the IPC kernel is expected to be the largest,
+                    # so add that last.
+                    part = kernel[middle_j, middle_i] * temp
+                    output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += \
+                                part[middle_j:middle_j + ny, middle_i:middle_i + nx]
+
+                else:
+                    # 4-D IPC kernel.  Extract a subset of the kernel:  all of the
+                    # first two axes, but only the portion of the last two axes
+                    # corresponding to the science data (i.e. possibly a subarray,
+                    # and certainly excluding reference pixels).
+                    k_temp = np.zeros((kshape[0], kshape[1], tny, tnx),
+                                      dtype=kernel.dtype)
+                    k_temp[:, :, b_b:b_b + ny, l_b:l_b + nx] = \
+                            kernel[:, :, yoff:yoff + ny, xoff:xoff + nx]
+
+                    # In this section, `part` has shape (ny, nx), which is smaller
+                    # than `temp`.
+                    middle_j = kshape[0] // 2
+                    middle_i = kshape[1] // 2
+                    for j in range(kshape[0]):
+                        jstart = kshape[0] - j - 1
+                        for i in range(kshape[1]):
+                            if i == middle_i and j == middle_j:
+                                continue                # the middle pixel is done last
+                            istart = kshape[1] - i - 1
+                            # The slice of k_temp includes different pixels for the
+                            # first or second axes within each loop, but the same slice
+                            # for the last two axes.
+                            # The slice of temp (a copy of the science data) includes
+                            # a different offset for each loop.
+                            part = k_temp[j, i, b_b:b_b + ny, l_b:l_b + nx] * \
+                                   temp[jstart:jstart + ny, istart:istart + nx]
+                            output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
+                    # Add the product for the middle pixel last.
+                    part = k_temp[middle_j, middle_i, b_b:b_b + ny, l_b:l_b + nx] * \
+                           temp[middle_j:middle_j + ny, middle_i:middle_i + nx]
+                    output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
+        print("At end of addIPC", output_data[0,:,500,500])
+        print(output_data.shape)
+        stop
+        return output_data
+
+    def invert_ipc_kernel(self, kern):
+        """
+        Invert the IPC kernel such that it goes from being used to remove
+        IPC effects from data, to being used to add IPC effects to data,
+        or vice versa.
+
+        Parameters:
+        -----------
+        kern : obj
+            numpy ndarray, either 2D or 4D, containing the kernel
+
+        Returns:
+        --------
+        returns : obj
+            numpy ndarray containing iInverted" kernel
+        """
+        shape = kern.shape
+        ys = 0
+        ye = shape[-2]
+        xs = 0
+        xe = shape[-1]
+        if shape[-1] == 2048:
+            xs = 4
+            xe = 2044
+        if shape[-2] == 2048:
+            ys = 4
+            ye = 2044
+        if len(shape) == 2:
+            subkernel = kern[ys:ye, xs:xe]
+        elif len(shape) == 4:
+            subkernel = kern[:, : , ys:ye, xs:xe]    
+
+        dims = subkernel.shape
+        # Force subkernel to be 4D to make the function cleaner
+        # Dimensions are (kernely, kernelx, detectory, detectorx)
+        if len(dims) == 2:
+            subkernel = np.expand_dims(subkernel, axis=3)
+            subkernel = np.expand_dims(subkernel, axis=4)
+            dims = subkernel.shape
+            
+        # Make sure the total signal in the kernel = 1
+        #ave = np.average(subkernel, axis=(0, 1))
+        #npix = dims[0] * dims[1]
+        #tflux = ave * npix
+        #renorm = 1. / tflux
+        #subkernel *= renorm
+
+        delta = subkernel * 0.
+        delta[nyc, nxc] = 1.
+        a1 = np.fft.fft2(subkernel, axes=(0, 1)) 
+        a2 = np.fft.fft2(delta, axes=(0, 1))
+        aout = a2 / a1
+        imout = np.fft.ifft2(aout, axes=(0, 1))
+        realout = np.real(imout)
+        imout1 = np.fft.fftshift(imout, axes=(0, 1))
+        realout1 = np.real(imout1)
+
+        # If the input kernel was 2D, make the output 2D
+        # If the input was 4D and had reference pixels, then
+        # surround the inverted kernel with reference pixels
+        if len(shape) == 2:
+            newkernel = realout1[:, :, 0, 0]
+        elif len(shape) == 4:
+            newkernel = np.copy(kern)
+            newkernel[:, :, ys:ye, xs:xe] = realout1
+
+        # Save the inverted kernel for future simulator runs
+        h0 = fits.PrimaryHDU()
+        h1 = fits.ImageHDU(newkernel)
+        h1.header["DETECTOR"] = self.detector
+        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+        hlist = fits.HDUList([h0, h1])
+        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+        hlist.writeto(outname, overwrite=True)
+        print(("Inverted IPC kernel saved to {} for future simulator "
+               "runs.".format(outname))
+        return newkernel
 
     def addCrosstalk(self, exposure):
         # Input is always 4D
         ints, groups, yd, xd = exposure.shape
         if self.params['Readout']['namp'] == 4:
-            xdet = self.detector[3:5].upper()
-            if xdet[1] == 'L':
-                xdet = xdet[0] + '5'
+            if self.instrument.upper() == 'NIRCAM':
+                xdet = self.detector[3:5].upper()
+                if xdet[1] == 'L':
+                    xdet = xdet[0] + '5'
+            else:
+                xdet = self.detector
             xtcoeffs = self.readCrossTalkFile(self.params['Reffiles']['crosstalk'], xdet)
             # Only sources on the detector will create crosstalk.
             # If signalimage is larger than full frame
@@ -2236,17 +2488,17 @@ class Observation():
 
     def checkParams(self):
         # check instrument name
-        if self.params['Inst']['instrument'].lower() not in inst_list:
+        if self.params['Inst']['instrument'].lower() not in INST_LIST:
             raise ValueError(("WARNING: instrument {} not in the list of "
                               "available instruments: {}"
-                              .format(self.params['Inst']['instrument'].lower(),inst_list)))
+                              .format(self.params['Inst']['instrument'].lower(),INST_LIST)))
 
         # check output filename - make sure it's fits
         if self.params['Output']['file'][-5:].lower() != '.fits':
             self.params['Output']['file'] += '.fits'
 
         # check mode:
-        possibleModes = modes[self.params['Inst']['instrument'].lower()]
+        possibleModes = MODES[self.params['Inst']['instrument'].lower()]
         self.params['Inst']['mode'] = self.params['Inst']['mode'].lower()
         if self.params['Inst']['mode'] in possibleModes:
             pass

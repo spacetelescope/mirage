@@ -23,7 +23,7 @@ import yaml
 from . import read_fits
 
 # Allowed instruments
-inst_list = ['nircam']
+INST_LIST = ['nircam', 'niriss', 'fgs']
 
 class DarkPrep():
 
@@ -119,14 +119,15 @@ class DarkPrep():
             self.linDark = self.linearizeDark(self.dark)
             print("Linearized dark shape: {}".format(self.linDark.data.shape))
 
-            if self.params['Readout']['readpatt'].upper() == 'RAPID':
-                print("Output is rapid, grabbing zero frame from linearized dark")
+            if self.params['Readout']['readpatt'].upper() in ['RAPID', 'NISRAPID']:
+                print(("Output is {}, grabbing zero frame from linearized dark"
+                       .format(self.params['Readout']['readpatt'].upper())))
                 self.zeroModel = read_fits.Read_fits()
                 self.zeroModel.data = self.linDark.data[:, 0, :, :]
                 self.zeroModel.sbAndRefpix = self.linDark.sbAndRefpix[:, 0, :, :]
-            elif ((self.params['Readout']['readpatt'].upper() != 'RAPID') & (self.dark.zeroframe is not None)):
+            elif ((self.params['Readout']['readpatt'].upper() not in ['RAPID', 'NISRAPID']) & (self.dark.zeroframe is not None)):
                 print("Now we need to linearize the zeroframe because the")
-                print("output readpattern is not RAPID")
+                print("output readpattern is not RAPID or NISRAPID")
                 # Now we need to linearize the zeroframe. Place it
                 # into a RampModel instance before running the
                 # pipeline steps
@@ -326,14 +327,40 @@ class DarkPrep():
                                 'linear_configfile'],
                     'Output': ['file', 'directory']}
 
-        config_files = {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                        'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                        'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                        'newRamp-dq_configfile': 'dq_init.cfg',
-                        'newRamp-sat_configfile': 'saturation.cfg',
-                        'newRamp-superbias_configfile': 'superbias.cfg',
-                        'newRamp-refpix_configfile': 'refpix.cfg',
-                        'newRamp-linear_configfile': 'linearity.cfg'}
+        #config_files = {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+        #                'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+        #                'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+        #                'newRamp-dq_configfile': 'dq_init.cfg',
+        #                'newRamp-sat_configfile': 'saturation.cfg',
+        #                'newRamp-superbias_configfile': 'superbias.cfg',
+        #                'newRamp-refpix_configfile': 'refpix.cfg',
+        #                'newRamp-linear_configfile': 'linearity.cfg'}
+
+        all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                       'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                       'newRamp-dq_configfile': 'dq_init.cfg',
+                                       'newRamp-sat_configfile': 'saturation.cfg',
+                                       'newRamp-superbias_configfile': 'superbias.cfg',
+                                       'newRamp-refpix_configfile': 'refpix.cfg',
+                                       'newRamp-linear_configfile': 'linearity.cfg'},
+                            'niriss': {'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
+                                       'Reffiles-subarray_defs': 'niriss_subarrays.list',
+                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
+                                       'newRamp-dq_configfile': 'dq_init.cfg',
+                                       'newRamp-sat_configfile': 'saturation.cfg',
+                                       'newRamp-superbias_configfile': 'superbias.cfg',
+                                       'newRamp-refpix_configfile': 'refpix.cfg',
+                                       'newRamp-linear_configfile': 'linearity.cfg'},
+                            'fgs': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                    'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                    'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                    'newRamp-dq_configfile': 'dq_init.cfg',
+                                    'newRamp-sat_configfile': 'saturation.cfg',
+                                    'newRamp-superbias_configfile': 'superbias.cfg',
+                                    'newRamp-refpix_configfile': 'refpix.cfg',
+                                    'newRamp-linear_configfile': 'linearity.cfg'}}
+        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
         for key1 in pathdict:
             for key2 in pathdict[key1]:
@@ -401,12 +428,13 @@ class DarkPrep():
         #If the input is any readout pattern other than RAPID, then
         #make sure that the output readout patten matches. Only RAPID
         #can be averaged and transformed into another readout pattern
-        if self.dark.header['READPATT'] != 'RAPID':
+        if self.dark.header['READPATT'] not in ['RAPID', 'NISRAPID']:
             if self.params['Readout']['readpatt'].upper() != self.dark.header['READPATT']:
-                print("WARNING: cannot transform input {}".format(self.dark.header['READPATT']))
-                print('integration into output {} integration.'.format(self.dark.header['READPATT'], self.params['Readout']['readpatt']))
-                print("Only RAPID inputs can be translated to a different readout pattern")
-                sys.exit()
+                print(("WARNING: cannot transform input {} integration into "
+                       "output {} integration.".format(self.dark.header['READPATT'],
+                                                       self.params['Readout']['readpatt'])))
+                raise ValueError(("Only RAPID or NISRAPID inputs can be translated to a "
+                       "different readout pattern"))
         else:
             pass
 
@@ -424,8 +452,7 @@ class DarkPrep():
             self.linDark.file = self.params['Reffiles']['linearized_darkfile']
             self.linDark.read_astropy()
         except:
-            print('WARNING: Unable to read in linearized dark ramp.')
-            sys.exit()
+            raise IOError('WARNING: Unable to read in linearized dark ramp.')
 
         #Finally, collect information about the detector, which will be needed for astrometry later
         self.detector = self.linDark.header['DETECTOR']
@@ -577,7 +604,8 @@ class DarkPrep():
     def reorderDark(self, dark):
         # Reorder the input dark ramp using the requested
         # readout pattern (nframe, nskip). If the initial
-        # dark ramp is RAPID, then save and return the 0th frame.
+        # dark ramp is RAPID or NISRAPID, then save and return
+        # the 0th frame.
 
         if self.params['Reffiles']['linearized_darkfile']:
             datatype = np.float
@@ -597,22 +625,23 @@ class DarkPrep():
             outsb = np.zeros((self.params['Readout']['nint'], self.params['Readout']['ngroup'], yd, xd))
 
         # We can only keep a zero frame around if the input dark
-        # is RAPID. Otherwise that information is lost.
+        # is RAPID or NISRAPID. Otherwise that information is lost.
         darkzero = None
         sbzero = None
-        if ((darkpatt == 'RAPID') & (dark.zeroframe is None)):
+        rapids = ['RAPID', 'NISRAPID']
+        if ((darkpatt in rapids) & (dark.zeroframe is None)):
             dark.zeroframe = dark.data[:, 0, :, :]
             print("Saving 0th frame from data to the zeroframe extension")
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
-        elif ((darkpatt != 'RAPID') & (dark.zeroframe is None)):
+        elif ((darkpatt not in rapids) & (dark.zeroframe is None)):
             print("Unable to save the zeroth frame because the input dark current ramp is not RAPID.")
             sbzero = None
-        elif ((darkpatt == 'RAPID') & (dark.zeroframe is not None)):
+        elif ((darkpatt in rapids) & (dark.zeroframe is not None)):
             # In this case we already have the zeroframe
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
-        elif ((darkpatt != 'RAPID') & (dark.zeroframe is not None)):
+        elif ((darkpatt not in rapids) & (dark.zeroframe is not None)):
             # Non RAPID dark, zeroframe is present, but
             # we can't get sbAndRefpix for the zeroth frame
             # because the pattern is not RAPID.
@@ -622,7 +651,7 @@ class DarkPrep():
         # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
 
-        if ((darkpatt == 'RAPID') and (self.params['Readout']['readpatt'] != 'RAPID')):
+        if ((darkpatt in rapids) and (self.params['Readout']['readpatt'] not in rapids)):
 
             #deltaframe = self.params['Readout']['nskip'] + self.params['Readout']['nframe']
             framesPerGroup = self.params['Readout']['nframe'] + self.params['Readout']['nskip']
@@ -640,7 +669,8 @@ class DarkPrep():
                 for i in range(self.params['Readout']['ngroup']):
                     # Average together the appropriate frames,
                     # skip the appropriate frames
-                    print('Averaging dark current ramp. Frames {}, to become group {}'.format(frames, i))
+                    print(("Averaging dark current ramp. Frames {}, to become "
+                           "group {}".format(frames, i)))
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:
@@ -672,9 +702,9 @@ class DarkPrep():
         else:
             # This check should already have been done,
             # but just to be sure...
-            print("WARNING: dark current readout pattern is {} and requested output is {}.".format(darkpatt, self.params['Readout']['readpatt']))
-            print("Cannot convert between the two.")
-            sys.exit()
+            raise ValueError(("WARNING: dark current readout pattern is {} and requested "
+                              "output is {}. Cannot convert between the two."
+                              .format(darkpatt, self.params['Readout']['readpatt'])))
 
         # Now place the reorganized dark into the data object and
         # update the appropriate metadata
@@ -876,8 +906,9 @@ class DarkPrep():
 
     def checkParams(self):
         # Check instrument name
-        if self.params['Inst']['instrument'].lower() not in inst_list:
-            print("WARNING: {} instrument not implemented within ramp simulator")
+        if self.params['Inst']['instrument'].lower() not in INST_LIST:
+            print(("WARNING: {} instrument not implemented within "
+                   "simulator".format(self.params['Inst']['instrument'])))
             sys.exit()
 
         # If user requests not to use the pipeline,
