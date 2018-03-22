@@ -1587,32 +1587,10 @@ class Observation():
         if self.runStep['crosstalk']:
             ramp = self.addCrosstalk(ramp)
 
-        if self.runStep['pixelAreaMap']:
-            ramp = self.addPAM(ramp)
-
+        # PAM correction moved to catalog_seed_image.py
+        #if self.runStep['pixelAreaMap']:
+        #    ramp = self.addPAM(ramp)
         return ramp
-
-    #def addIPC(self, exposure):
-    #    # Input is always 4D
-    #    ints, groups, yd, xd = exposure.shape
-
-    #    # Prepare IPC effects
-    #    ipcimage = fits.getdata(self.params['Reffiles']['ipc'])
-
-    #    # If the IPC kernel is designed for the
-    #    # removal of IPC, we need to invert it
-    #    if self.params['Reffiles']['invertIPC']:
-    #        print("Inverting IPC kernel prior to convolving with image")
-    #        yk, xk = ipcimage.shape
-    #        newkernel = 0. - ipcimage
-    #        newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
-    #        ipcimage = newkernel
-
-    #    # Apply the kernel to each frame of each integration
-    #    for integ in range(ints):
-    #        for group in range(groups):
-    #            exposure[integ, group, :, :] = s1.fftconvolve(exposure[integ, group, :, :], ipcimage, mode="same")
-    #    return exposure
 
     def addIPC(self, data):
         """
