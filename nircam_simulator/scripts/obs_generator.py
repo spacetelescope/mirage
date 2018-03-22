@@ -1633,10 +1633,6 @@ class Observation():
         # Shape of the data, which may include reference pix
         shape = output_data.shape
 
-        # Read in IPC kernel data
-        kernel = fits.getdata(self.params['Reffiles']['ipc'])
-        kshape = kernel.shape
-
         # Find the number of reference pixel rows and columns
         # in output_data
         if self.subarray_bounds[0] < 4:
@@ -1656,12 +1652,23 @@ class Observation():
         else:
             top_rows = 0
 
-        # Invert the kernel if requested, to go from a kernel
-        # designed to remove IPC effects to one designed to
-        # add IPC effects
-        if self.params['Reffiles']['invertIPC']:
-            print("Iverting IPC kernel prior to convolving with image")
-            kernel = self.invert_ipc_kernel(kernel)
+        # Get IPC kernel data
+        try:
+            # If addIPC has already been called, then the correct
+            # IPC kernel already exists, in self.kernel
+            kernel = np.copy(self.kernel)
+        except:
+            # If addIPC has not been called yet, then read in the
+            # kernel from the specified file.
+            kernel = fits.getdata(self.params['Reffiles']['ipc'])
+            # Invert the kernel if requested, to go from a kernel
+            # designed to remove IPC effects to one designed to
+            # add IPC effects
+            if self.params['Reffiles']['invertIPC']:
+                print("Iverting IPC kernel prior to convolving with image")
+                kernel = self.invert_ipc_kernel(kernel)
+            self.kernel = np.copy(kernel)
+        kshape = kernel.shape
 
         # These axes lengths exclude reference pixels, if there are any.
         ny = shape[-2] - (bottom_rows + top_rows)
@@ -1748,6 +1755,9 @@ class Observation():
                     part = k_temp[middle_j, middle_i, b_b:b_b + ny, l_b:l_b + nx] * \
                            temp[middle_j:middle_j + ny, middle_i:middle_i + nx]
                     output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
+        print("At end of addIPC", output_data[0,:,500,500])
+        print(output_data.shape)
+        stop
         return output_data
 
     def invert_ipc_kernel(self, kern):
@@ -1766,7 +1776,6 @@ class Observation():
         returns : obj
             numpy ndarray containing iInverted" kernel
         """
-        from numpy.linalg import inv
         shape = kern.shape
         ys = 0
         ye = shape[-2]
@@ -1783,37 +1792,51 @@ class Observation():
         elif len(shape) == 4:
             subkernel = kern[:, : , ys:ye, xs:xe]    
 
-        #subkernel = self.singular_check(subkernel)
+        dims = subkernel.shape
+        # Force subkernel to be 4D to make the function cleaner
+        # Dimensions are (kernely, kernelx, detectory, detectorx)
+        if len(dims) == 2:
+            subkernel = np.expand_dims(subkernel, axis=3)
+            subkernel = np.expand_dims(subkernel, axis=4)
+            dims = subkernel.shape
+            
+        # Make sure the total signal in the kernel = 1
+        #ave = np.average(subkernel, axis=(0, 1))
+        #npix = dims[0] * dims[1]
+        #tflux = ave * npix
+        #renorm = 1. / tflux
+        #subkernel *= renorm
 
+        delta = subkernel * 0.
+        delta[nyc, nxc] = 1.
+        a1 = np.fft.fft2(subkernel, axes=(0, 1)) 
+        a2 = np.fft.fft2(delta, axes=(0, 1))
+        aout = a2 / a1
+        imout = np.fft.ifft2(aout, axes=(0, 1))
+        realout = np.real(imout)
+        imout1 = np.fft.fftshift(imout, axes=(0, 1))
+        realout1 = np.real(imout1)
+
+        # If the input kernel was 2D, make the output 2D
+        # If the input was 4D and had reference pixels, then
+        # surround the inverted kernel with reference pixels
         if len(shape) == 2:
-            ky, kx = subkernel.shape
-            deltafunc = np.zeros((ky, kx))
-            deltafunc[ky // 2, kx // 2] = 1
-            try:
-                newsubkernel = np.matmul(inv(subkernel), deltafunc)
-            except np.linalg.linalg.LinAlgError:
-                print("WARNING: IPC kernel is singular! Can't invert!")
-                sys.exit()
+            newkernel = realout1[:, :, 0, 0]
         elif len(shape) == 4:
-            ky, kx, dety, detx = subkernel.shape
-            deltafunc = np.zeros((ky, kx))
-            deltafunc[ky // 2, kx // 2] = 1
-            newsubkernel = np.zeros((ky, kx, dety, detx))
-            for x in range(detx):
-                for y in range(dety):
-                    try:
-                        newsubkernel[:, :, y, x] = np.matmul(inv(subkernel[:, :, y, x]),
-                                                             deltafunc)
-                    except:
-                        print(("WARNING: IPC kernel is singular at (x,y) = "
-                               "({},{}). Can't invert!".format(x, y)))
-                        sys.exit()
-        newkernel = np.copy(kern)
-        if len(shape) == 2:
-            newkernel[ys:ye, xs:xe] = newsubkernel
-        elif len(shape) == 4:
-            newkernel[:, :, ys:ye, xs:xe] = newsubkernel
-                    
+            newkernel = np.copy(kern)
+            newkernel[:, :, ys:ye, xs:xe] = realout1
+
+        # Save the inverted kernel for future simulator runs
+        h0 = fits.PrimaryHDU()
+        h1 = fits.ImageHDU(newkernel)
+        h1.header["DETECTOR"] = self.detector
+        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+        hlist = fits.HDUList([h0, h1])
+        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+        hlist.writeto(outname, overwrite=True)
+        print(("Inverted IPC kernel saved to {} for future simulator "
+               "runs.".format(outname))
         return newkernel
 
     def addCrosstalk(self, exposure):
