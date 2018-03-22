@@ -1696,61 +1696,64 @@ class Observation():
         for integration in range(shape[0]):
             for group in range(shape[1]):
         
-                # Copy the science portion (not the reference pixels) of output_data
-                # to this temporary array, then make subsequent changes in-place to
-                # output_data.
+                # Copy the science portion (not the reference pixels) of
+                # output_data to this temporary array, then make
+                # subsequent changes in-place to output_data.
                 temp = np.zeros((tny, tnx), dtype=output_data.dtype)
                 temp[b_b:b_b + ny, l_b:l_b + nx] = \
                     output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx].copy()
 
-                # After setting this slice to zero, we'll incrementally add to it.
+                # After setting this slice to zero, we'll incrementally add
+                # to it.
                 output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] = 0.
 
                 if len(kshape) == 2:
-                    # 2-D IPC kernel.  Loop over pixels of the deconvolution kernel.
-                    # In this section, `part` has the same shape as `temp`.
+                    # 2-D IPC kernel.  Loop over pixels of the deconvolution
+                    # kernel. In this section, `part` has the same shape
+                    # as `temp`.
                     middle_j = kshape[0] // 2
                     middle_i = kshape[1] // 2
                     for j in range(kshape[0]):
                         jstart = kshape[0] - j - 1
                         for i in range(kshape[1]):
                             if i == middle_i and j == middle_j:
-                                continue                # the middle pixel is done last
+                                continue  # the middle pixel is done last
                             part = kernel[j, i] * temp
                             istart = kshape[1] - i - 1
                             output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += \
                                         part[jstart:jstart + ny, istart:istart + nx]
-                    # The middle pixel of the IPC kernel is expected to be the largest,
-                    # so add that last.
+                    # The middle pixel of the IPC kernel is expected to be
+                    # the largest, so add that last.
                     part = kernel[middle_j, middle_i] * temp
                     output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += \
                                 part[middle_j:middle_j + ny, middle_i:middle_i + nx]
 
                 else:
-                    # 4-D IPC kernel.  Extract a subset of the kernel:  all of the
-                    # first two axes, but only the portion of the last two axes
-                    # corresponding to the science data (i.e. possibly a subarray,
+                    # 4-D IPC kernel.  Extract a subset of the kernel:
+                    # all of the first two axes, but only the portion
+                    # of the last two axes corresponding to the science
+                    # data (i.e. possibly a subarray,
                     # and certainly excluding reference pixels).
                     k_temp = np.zeros((kshape[0], kshape[1], tny, tnx),
                                       dtype=kernel.dtype)
                     k_temp[:, :, b_b:b_b + ny, l_b:l_b + nx] = \
                             kernel[:, :, yoff:yoff + ny, xoff:xoff + nx]
 
-                    # In this section, `part` has shape (ny, nx), which is smaller
-                    # than `temp`.
+                    # In this section, `part` has shape (ny, nx), which is
+                    # smaller than `temp`.
                     middle_j = kshape[0] // 2
                     middle_i = kshape[1] // 2
                     for j in range(kshape[0]):
                         jstart = kshape[0] - j - 1
                         for i in range(kshape[1]):
                             if i == middle_i and j == middle_j:
-                                continue                # the middle pixel is done last
+                                continue   # the middle pixel is done last
                             istart = kshape[1] - i - 1
-                            # The slice of k_temp includes different pixels for the
-                            # first or second axes within each loop, but the same slice
-                            # for the last two axes.
-                            # The slice of temp (a copy of the science data) includes
-                            # a different offset for each loop.
+                            # The slice of k_temp includes different pixels
+                            # for the first or second axes within each loop,
+                            # but the same slice for the last two axes.
+                            # The slice of temp (a copy of the science data)
+                            # includes a different offset for each loop.
                             part = k_temp[j, i, b_b:b_b + ny, l_b:l_b + nx] * \
                                    temp[jstart:jstart + ny, istart:istart + nx]
                             output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
@@ -1758,9 +1761,6 @@ class Observation():
                     part = k_temp[middle_j, middle_i, b_b:b_b + ny, l_b:l_b + nx] * \
                            temp[middle_j:middle_j + ny, middle_i:middle_i + nx]
                     output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
-        print("At end of addIPC", output_data[0,:,500,500])
-        print(output_data.shape)
-        stop
         return output_data
 
     def invert_ipc_kernel(self, kern):
