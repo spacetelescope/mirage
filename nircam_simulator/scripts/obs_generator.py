@@ -1839,7 +1839,7 @@ class Observation():
         outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
         hlist.writeto(outname, overwrite=True)
         print(("Inverted IPC kernel saved to {} for future simulator "
-               "runs.".format(outname))
+               "runs.".format(outname)))
         return newkernel
 
     def addCrosstalk(self, exposure):
