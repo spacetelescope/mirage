@@ -1636,7 +1636,7 @@ class Catalog_seed():
                 astr = "0.00"
             if bstr == "0.0":
                 bstr = "0.00"
-                
+
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr

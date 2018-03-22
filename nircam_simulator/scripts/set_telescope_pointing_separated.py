@@ -173,7 +173,7 @@ def add_wcs(filename,roll=0.):
     fheader['RA_REF'] = crval1
     fheader['DEC_REF'] = crval2
     fheader['ROLL_REF'] = local_roll
-    fheader['WCSAXES'] = len(pheader['CTYPE*'])
+    fheader['WCSAXES'] = len(fheader['CTYPE*'])
     hdulist.flush()
     hdulist.close()
     logger.info('WCS info for {} complete.'.format(filename))
