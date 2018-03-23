@@ -17,6 +17,7 @@ nircam_simulator.egg-info/*
 *.yaml
 *.yaml~
 *.csv
+*.txt~
 
 # Other #
 #########
