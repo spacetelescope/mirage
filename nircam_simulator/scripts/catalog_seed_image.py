@@ -28,6 +28,7 @@ from . import read_siaf_table
 from . import set_telescope_pointing_separated as set_telescope_pointing
 from . import moving_targets
 from . import segmentation_map as segmap
+from . import get_psf
 
 inst_list = ['nircam']
 modes = {'nircam': ['nircamimaging', 'nircamengineeringimaging', 'moving_target',
@@ -1562,8 +1563,12 @@ class Catalog_seed():
             # now create the PSF image. If no PSF library is supplied
             # then webbpsf will be called to create a PSF. In that case, return
             # zeros right now for the PSF
+
+            # if self.params['Output']['Proposal_category'] == 'COM':
+            #     webbpsfimage = get_psf.create_commissioning_psf(self.params)
+
             if self.params['simSignals']['psfpath'] is None:
-                webbpsfimage = self.psfimage
+                webbpsfimage = self.psfimages
             else:
                 # case where PSF library location is specified.
                 # Read in the appropriate PSF file
