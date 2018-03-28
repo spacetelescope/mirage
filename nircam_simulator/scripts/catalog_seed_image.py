@@ -16,7 +16,7 @@ import math
 from photutils import detect_threshold, detect_sources
 from astropy.io import fits, ascii
 from astropy.table import Table
-from astropy.modeling.models import Sersic2D
+from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
 from astropy.convolution import convolve
 from asdf import AsdfFile
 import yaml
@@ -964,6 +964,10 @@ class Catalog_seed():
         yc['c0_1'] = np.cos(v3_ideal_y_angle)
         x_v2v3_to_ideal_func = Polynomial2D(1, **xc)
         y_v2v3_to_ideal_func = Polynomial2D(1, **yc)
+
+        # Shift by V2ref, V3ref
+        v2shift = Shift(self.v2_ref)
+        v3shift= Shift(self.v2_ref)
         
         #Now create a compound model for each with the appropriate
         #inverse
