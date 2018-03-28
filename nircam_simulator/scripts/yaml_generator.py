@@ -526,7 +526,10 @@ class SimInput:
         epoch_base_time = '16:44:12'
         epoch_base_time0 = deepcopy(epoch_base_time)
 
-        epoch_base_date = self.info['epoch_start_date'][0]
+        if 'epoch_start_date' in self.info.keys():
+            epoch_base_date = self.info['epoch_start_date'][0]
+        else:
+            epoch_base_date = self.info['Date'][0]
         base = Time(epoch_base_date + 'T' + epoch_base_time)
         base_date, base_time = base.iso.split()
 
@@ -564,8 +567,7 @@ class SimInput:
 
             match2 = readpatt == readpatt_def['name']
             if np.sum(match2) == 0:
-                print("WARNING!! Readout pattern {} not found in definition file.".format(readpatt))
-                sys.exit()
+                raise RuntimeError("WARNING!! Readout pattern {} not found in definition file.".format(readpatt))
 
             # Now get nframe and nskip so we know how many frames in a group
             fpg = np.int(readpatt_def['nframe'][match2][0])
@@ -574,9 +576,12 @@ class SimInput:
             nskip.append(spg)
 
             # need to find number of amps used
-            sub = self.info['Subarray'][i]
-            det = 'NRC' + self.info['detector'][i]
-            aperture = det + '_' + sub
+            if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
+                aperture = self.info['aperture']
+            else:
+                sub = self.info['Subarray'][i]
+                det = 'NRC' + self.info['detector'][i]
+                aperture = det + '_' + sub
 
             match = aperture == subarray_def['AperName']
 
@@ -703,7 +708,10 @@ class SimInput:
         fnames = []
         for i in range(len(self.info['Module'])):
             act = str(self.info['act_id'][i]).zfill(2)
-            det = self.info['detector'][i]
+            if self.info['Instrument'][i].lower() == 'niriss':
+                det ='NIS'
+            else:
+                det = self.info['detector'][i]
             mode = self.info['Mode'][i]
             dither = str(self.info['dither'][i]).zfill(2)
             onames.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}.yaml'.format(act, det, mode, dither))))
