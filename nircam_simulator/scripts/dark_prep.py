@@ -119,15 +119,15 @@ class DarkPrep():
             self.linDark = self.linearizeDark(self.dark)
             print("Linearized dark shape: {}".format(self.linDark.data.shape))
 
-            if self.params['Readout']['readpatt'].upper() in ['RAPID', 'NISRAPID']:
+            if self.params['Readout']['readpatt'].upper() in ['RAPID', 'NISRAPID', 'FGSRAPID']:
                 print(("Output is {}, grabbing zero frame from linearized dark"
                        .format(self.params['Readout']['readpatt'].upper())))
                 self.zeroModel = read_fits.Read_fits()
                 self.zeroModel.data = self.linDark.data[:, 0, :, :]
                 self.zeroModel.sbAndRefpix = self.linDark.sbAndRefpix[:, 0, :, :]
-            elif ((self.params['Readout']['readpatt'].upper() not in ['RAPID', 'NISRAPID']) & (self.dark.zeroframe is not None)):
+            elif ((self.params['Readout']['readpatt'].upper() not in ['RAPID', 'NISRAPID', 'FGSRAPID']) & (self.dark.zeroframe is not None)):
                 print("Now we need to linearize the zeroframe because the")
-                print("output readpattern is not RAPID or NISRAPID")
+                print("output readpattern is not RAPID, NISRAPID, or FGSRAPID")
                 # Now we need to linearize the zeroframe. Place it
                 # into a RampModel instance before running the
                 # pipeline steps
@@ -352,9 +352,9 @@ class DarkPrep():
                                        'newRamp-superbias_configfile': 'superbias.cfg',
                                        'newRamp-refpix_configfile': 'refpix.cfg',
                                        'newRamp-linear_configfile': 'linearity.cfg'},
-                            'fgs': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                    'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                    'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                            'fgs': {'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
+                                    'Reffiles-subarray_defs': 'guider_subarrays.list',
+                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
                                     'newRamp-dq_configfile': 'dq_init.cfg',
                                     'newRamp-sat_configfile': 'saturation.cfg',
                                     'newRamp-superbias_configfile': 'superbias.cfg',
@@ -428,12 +428,12 @@ class DarkPrep():
         #If the input is any readout pattern other than RAPID, then
         #make sure that the output readout patten matches. Only RAPID
         #can be averaged and transformed into another readout pattern
-        if self.dark.header['READPATT'] not in ['RAPID', 'NISRAPID']:
+        if self.dark.header['READPATT'] not in ['RAPID', 'NISRAPID', 'FGSRAPID']:
             if self.params['Readout']['readpatt'].upper() != self.dark.header['READPATT']:
                 print(("WARNING: cannot transform input {} integration into "
                        "output {} integration.".format(self.dark.header['READPATT'],
                                                        self.params['Readout']['readpatt'])))
-                raise ValueError(("Only RAPID or NISRAPID inputs can be translated to a "
+                raise ValueError(("Only RAPID, NISRAPID, or FGSRAPID inputs can be translated to a "
                        "different readout pattern"))
         else:
             pass
@@ -604,7 +604,7 @@ class DarkPrep():
     def reorderDark(self, dark):
         # Reorder the input dark ramp using the requested
         # readout pattern (nframe, nskip). If the initial
-        # dark ramp is RAPID or NISRAPID, then save and return
+        # dark ramp is RAPID, NISRAPID, or FGSRAPID, then save and return
         # the 0th frame.
 
         if self.params['Reffiles']['linearized_darkfile']:
@@ -625,10 +625,10 @@ class DarkPrep():
             outsb = np.zeros((self.params['Readout']['nint'], self.params['Readout']['ngroup'], yd, xd))
 
         # We can only keep a zero frame around if the input dark
-        # is RAPID or NISRAPID. Otherwise that information is lost.
+        # is RAPID, NISRAPID, or FGSRAPID. Otherwise that information is lost.
         darkzero = None
         sbzero = None
-        rapids = ['RAPID', 'NISRAPID']
+        rapids = ['RAPID', 'NISRAPID', 'FGSRAPID']
         if ((darkpatt in rapids) & (dark.zeroframe is None)):
             dark.zeroframe = dark.data[:, 0, :, :]
             print("Saving 0th frame from data to the zeroframe extension")

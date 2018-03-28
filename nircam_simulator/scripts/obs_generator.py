@@ -445,11 +445,11 @@ class Observation():
                                        , 'Reffiles-flux_cal':'niriss_zeropoint_values.out'
                                        , 'Reffiles-crosstalk':'niriss_xtalk_zeros.txt'
                                        , 'Reffiles-filtpupilcombo':'niriss_dual_wheel_list.txt'},
-                            'fgs': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
-                                    , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
-                                    , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
-                                    , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
-                                    , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}}
+                            'fgs': {'Reffiles-readpattdefs':'guider_readout_pattern.txt'
+                                    , 'Reffiles-subarray_defs':'guider_subarrays.list'
+                                    , 'Reffiles-flux_cal':'guider_zero_magnitude_values.out'
+                                    , 'Reffiles-crosstalk':'guider_xtalk_zeros.txt'
+                                    , 'Reffiles-filtpupilcombo':'guider_filter_dummy.list'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
                             
         for key1 in pathdict:
@@ -519,14 +519,14 @@ class Observation():
         # Make sure the input dark has a readout pattern
         # that is compatible with the requested output
         # readout pattern
-        rapids = ["RAPID", "NISRAPID"]
+        rapids = ["RAPID", "NISRAPID", "FGSRAPID"]
         darkpatt = self.linDark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
             (darkpatt not in rapids)):
             raise ValueError(("WARNING: Unable to convert input dark with a "
                               "readout pattern of {}, to the requested readout "
                               "pattern of {}. The readout pattern of the dark "
-                              "must be RAPID, NISRAPID or match the requested output "
+                              "must be RAPID, NISRAPID, FGSRAPID, or match the requested output "
                               "readout pattern.".format(darkpatt,
                                            self.params['Readout']['readpatt'])))
 
@@ -1476,7 +1476,7 @@ class Observation():
         Be sure to adjust the dark current ramp if nframe/nskip is different
         than the nframe/nskip values that the dark was taken with.
 
-        Only RAPID, NISRAPID darks will be re-averaged into different 
+        Only RAPID, NISRAPID, FGSRAPID darks will be re-averaged into different 
         readout patterns. But a BRIGHT2 dark can be used to create a 
         BRIGHT2 simulated ramp
 
@@ -1509,7 +1509,7 @@ class Observation():
         # We have already guaranteed that either the readpatterns match
         # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
-        rapids = ["RAPID", "NISRAPID"]
+        rapids = ["RAPID", "NISRAPID", "FGSRAPID"]
         if ((darkpatt in rapids) and (self.params['Readout']['readpatt'] not in rapids)):
             deltaframe = self.params['Readout']['nskip'] + \
                          self.params['Readout']['nframe']
