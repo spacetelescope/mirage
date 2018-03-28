@@ -321,6 +321,10 @@ class ReadAPTXML():
                         if (key == 'PrimaryDithers') and ((value is None) or (value == 'None')):
                             value = '1'
 
+                        elif (key == 'Mode') and (template_name == 'NirissExternalCalibration'):
+                            value = 'imaging'
+
+
                         exposures_dictionary[key].append(value)
 
                     # add keys that were not defined in self.APTObservationParams_keys

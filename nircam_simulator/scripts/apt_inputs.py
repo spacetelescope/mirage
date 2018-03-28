@@ -680,7 +680,7 @@ class AptInput:
                     #     value = 'None'
 
                     intab[key].append(value)
-
+        
         return intab
 
     def add_epochs(self, intab):

@@ -92,7 +92,7 @@ from . import apt_inputs
 
 
 class SimInput:
-    def __init__(self):
+    def __init__(self, instrument='NIRCam'):
         # Set the NIRCAM_SIM_DATA environment variable
         # if it's not already
         stsci_local = '/ifs/jwst/wit/nircam/nircam_simulator_data/'
@@ -109,6 +109,19 @@ class SimInput:
                 sys.exit()
 
         self.info = {}
+        self.instrument = instrument
+
+        if self.instrument.lower() == 'nircam':
+            self.psfpath = os.path.join(self.datadir, 'webbpsf_library')
+            self.psfbasename = 'nircam'
+        elif self.instrument.lower() == 'niriss':
+            self.datadir2 = '/ifs/jwst/wit/niriss/nircam_ramp_simulation_files'
+            self.reference_file_dir =  os.path.join(self.datadir2, 'reference_files')
+            self.psfpath = os.path.join(self.datadir2, 'webbpsf_files')
+            self.psfbasename = 'niriss'
+        else:
+            raise RuntimeError('Instrument {} is not supported'.format(instrument))
+
         self.input_xml = None
         self.pointing_file = None
         self.siaf = None
@@ -132,8 +145,6 @@ class SimInput:
         self.use_JWST_pipeline = True
         self.use_linearized_darks = False
         self.simdata_output_dir = './'
-        self.psfpath = '/ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library'
-        self.psfbasename = 'nircam'
         self.psfpixfrac = 0.25
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
@@ -143,17 +154,30 @@ class SimInput:
         # Prepare to find files listed as 'config'
         self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
         self.configfiles = {}
-        self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
-        self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
-        self.configfiles['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
-        self.configfiles['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
-        self.configfiles['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
-        self.configfiles['dq_init_config'] = 'dq_init.cfg'
-        self.configfiles['saturation_config'] = 'saturation.cfg'
-        self.configfiles['superbias_config'] = 'superbias.cfg'
-        self.configfiles['refpix_config'] = 'refpix.cfg'
-        self.configfiles['linearity_config'] = 'linearity.cfg'
-        self.configfiles['filter_throughput'] = 'placeholder.txt'
+        if self.instrument.lower() == 'nircam':
+            self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
+            self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
+            self.configfiles['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
+            self.configfiles['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
+            self.configfiles['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
+            self.configfiles['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles['saturation_config'] = 'saturation.cfg'
+            self.configfiles['superbias_config'] = 'superbias.cfg'
+            self.configfiles['refpix_config'] = 'refpix.cfg'
+            self.configfiles['linearity_config'] = 'linearity.cfg'
+            self.configfiles['filter_throughput'] = 'placeholder.txt'
+        elif self.instrument.lower() == 'niriss':
+            self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
+            self.configfiles['fluxcal'] = 'niriss_zeropoint_values.out'
+            self.configfiles['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
+            self.configfiles['readpatt_def_file'] = 'niriss_readout_pattern.txt'
+            self.configfiles['crosstalk'] = 'niriss_xtalk_zeros.txt'
+            self.configfiles['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles['saturation_config'] = 'saturation.cfg'
+            self.configfiles['superbias_config'] = 'superbias.cfg'
+            self.configfiles['refpix_config'] = 'refpix.cfg'
+            self.configfiles['linearity_config'] = 'linearity.cfg'
+            self.configfiles['filter_throughput'] = 'placeholder.txt'
 
     def create_inputs(self):
         # Use full paths for inputs
@@ -216,7 +240,13 @@ class SimInput:
         ipc = []
         pam = []
 
-        for det in self.info['detector']:
+        # if self.instrument.lower() == 'nircam':
+        if self.instrument.lower() == 'niriss':
+            self.info['detector'] = ['NIS']
+            # detector_labels = ['NIS']
+        detector_labels = self.info['detector']
+
+        for det in detector_labels:
             darks.append(self.get_dark(det))
             lindarks.append(self.get_lindark(det))
             superbias.append(self.get_reffile(self.superbias_list, det))
@@ -282,7 +312,7 @@ class SimInput:
         # Now go through the lists one element at a time
         # and create a yaml file for each.
         yamls = []
-        for i in range(len(self.info['detector'])):
+        for i in range(len(detector_labels)):
             file_dict = {}
             for key in self.info:
                 file_dict[key] = self.info[key][i]
@@ -291,10 +321,13 @@ class SimInput:
             # and subpixel dithers
             tot_dith = np.int(file_dict['dither'])
             primarytot = np.int(file_dict['PrimaryDithers'])
-            try:
-                subpixtot = np.int(file_dict['SubpixelPositions'])
-            except:
-                subpixtot = np.int(file_dict['SubpixelPositions'][0])
+            if file_dict['SubpixelPositions'] == 'None':
+                subpixtot = 1
+            else:
+                try:
+                    subpixtot = np.int(file_dict['SubpixelPositions'])
+                except:
+                    subpixtot = np.int(file_dict['SubpixelPositions'][0])
             primary_dither = np.ceil(1. * tot_dith / subpixtot)
             subpix_dither = tot_dith - (primary_dither * primarytot * subpixtot - subpixtot)
             file_dict['primary_dither_num'] = primary_dither
@@ -316,20 +349,27 @@ class SimInput:
         for obs in obs_ids:
             n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
             n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
+
             module = self.info['Module'][i_mod]
 
-            if module in ['A', 'B']:
-                n_det = 5
-                module = ' ' + module
-            if module == 'ALL':
-                n_det = 10
-                module = 's A and B'
-            if 'A3' in module:
+            if module != 'None':
+                if module in ['A', 'B']:
+                    n_det = 5
+                    module = ' ' + module
+                if module == 'ALL':
+                    n_det = 10
+                    module = 's A and B'
+                if 'A3' in module:
+                    n_det = 1
+                    module = ' A3'
+                if 'B4' in module:
+                    n_det = 1
+                    module = ' B4'
+            else:
+                # number of detectors
                 n_det = 1
-                module = ' A3'
-            if 'B4' in module:
-                n_det = 1
-                module = ' B4'
+                module = ' NIS'
+
 
             i_mod += n_tiles * n_det
 
@@ -733,8 +773,11 @@ class SimInput:
         Name of a dark current file to use for this detector
         """
         files = self.dark_list[detector]
-        rand_index = np.random.randint(0, len(files) - 1)
-        return files[rand_index]
+        if len(files) == 1:
+            return files[0]
+        else:
+            rand_index = np.random.randint(0, len(files) - 1)
+            return files[rand_index]
 
     def get_lindark(self, detector):
         """
@@ -750,8 +793,11 @@ class SimInput:
         Name of a linearized dark current file to use for this detector
         """
         files = self.lindark_list[detector]
-        rand_index = np.random.randint(0, len(files) - 1)
-        return files[rand_index]
+        if len(files) == 1:
+            return files[0]
+        else:
+            rand_index = np.random.randint(0, len(files) - 1)
+            return files[rand_index]
 
     def get_reffile(self, refs, detector):
         """
@@ -785,14 +831,19 @@ class SimInput:
         """
 
         # select the right filter
-        if np.int(input['detector'][-1]) < 5:
-            filtkey = 'ShortFilter'
-            pupilkey = 'ShortPupil'
-            catkey = 'sw'
+        if input['detector'] == 'NIS':
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            catkey = ''
         else:
-            filtkey = 'LongFilter'
-            pupilkey = 'LongPupil'
-            catkey = 'lw'
+            if np.int(input['detector'][-1]) < 5:
+                filtkey = 'ShortFilter'
+                pupilkey = 'ShortPupil'
+                catkey = 'sw'
+            else:
+                filtkey = 'LongFilter'
+                pupilkey = 'LongPupil'
+                catkey = 'lw'
 
         if self.use_nonstsci_names:
             outtf = False
@@ -804,9 +855,10 @@ class SimInput:
             yamlout = input['observation_id'] + '_' + input['detector'] + '_' + input[filtkey] + '.yaml'
 
         yamlout = os.path.join(self.output_dir, yamlout)
+        instrument = input['Instrument']
         with open(yamlout, 'w') as f:
             f.write('Inst:\n')
-            f.write('  instrument: {}          # Instrument name\n'.format('NIRCam'))
+            f.write('  instrument: {}          # Instrument name\n'.format(instrument))
             f.write('  mode: {}                # Observation mode (e.g. imaging, WFSS)\n'.format(input['Mode']))
             f.write('  use_JWST_pipeline: {}   # Use pipeline in data transformations\n'.format(input['use_JWST_pipeline']))
             f.write('\n')
@@ -816,12 +868,15 @@ class SimInput:
             f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
             f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
-            apunder = input['aperture'].find('_')
-            full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
+            if self.instrument.lower() == 'nircam':
+                apunder = input['aperture'].find('_')
+                full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
+            if self.instrument.lower() == 'niriss':
+                full_ap = input['aperture']
 
             scripts_path = os.path.dirname(os.path.realpath(__file__))
             modpath = os.path.split(scripts_path)[0]
-            subarray_def_file = os.path.join(modpath, 'config', 'NIRCam_subarray_definitions.list')
+            subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
             config = ascii.read(subarray_def_file)
 
             if full_ap not in config['AperName']:
@@ -851,7 +906,11 @@ class SimInput:
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  distortion_coeffs: {}        # CSV file containing distortion coefficients\n'.format(input['siaf']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
-            f.write('  invertIPC: True       # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n')
+            if instrument.lower() == 'nircam':
+                invertIPC = True
+            elif instrument.lower() == 'niriss':
+                invertIPC = False
+            f.write('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n'.format(invertIPC))
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'.format(input['pixelAreaMap']))
             f.write('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'.format(self.subarray_def_file))
@@ -868,34 +927,65 @@ class SimInput:
             f.write('  robberto:  False                         # Use Massimo Robberto type non-linearity coefficients\n')
             f.write('\n')
             f.write('cosmicRay:\n')
-            f.write('  path: /ifs/jwst/wit/witserv/data4/nrc/hilbert/simulated_data/cosmic_ray_library/               # Path to CR library\n')
+            cosmic_ray_path = '/ifs/jwst/wit/nircam/nircam_simulator_data/cosmic_ray_library'
+            f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
             f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
             f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
-            f.write('  suffix: IPC_NIRCam_{}    # Suffix of library file names\n'.format(input['detector']))
+            # temporary tweak here to make it work with NIRISS
+            if instrument.lower() == 'nircam':
+                detector_label = input['detector']
+            elif instrument.lower() == 'niriss':
+                detector_label = 'B5'
+            f.write('  suffix: IPC_NIRCam_{}    # Suffix of library file names\n'.format(detector_label))
             f.write('  seed: {}                           # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
-            f.write('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'.format(input['{}_ptsrc'.format(catkey)]))   #'point_source']))
+            if instrument.lower() == 'nircam':
+                PointSourceCatalog = input['{}_ptsrc'.format(catkey)]
+                GalaxyCatalog = input['{}_galcat'.format(catkey)]
+                ExtendedCatalog = input['{}_ext'.format(catkey)]
+                ExtendedScale = input['{}_extscl'.format(catkey)]
+                ExtendedCenter = input['{}_extcent'.format(catkey)]
+                MovingTargetList = input['{}_movptsrc'.format(catkey)]
+                MovingTargetSersic = input['{}_movgal'.format(catkey)]
+                MovingTargetExtended = input['{}_movext'.format(catkey)]
+                MovingTargetConvolveExtended = input['{}_movconv'.format(catkey)]
+                MovingTargetToTrack = input['{}_solarsys'.format(catkey)]
+                BackgroundRate = input['{}_bkgd'.format(catkey)]
+            elif instrument.lower() == 'niriss':
+                PointSourceCatalog = input['PointSourceCatalog']
+                GalaxyCatalog = input['GalaxyCatalog']
+                ExtendedCatalog = input['ExtendedCatalog']
+                ExtendedScale = input['ExtendedScale']
+                ExtendedCenter = input['ExtendedCenter']
+                MovingTargetList = input['MovingTargetList']
+                MovingTargetSersic = input['MovingTargetSersic']
+                MovingTargetExtended = input['MovingTargetExtended']
+                MovingTargetConvolveExtended = input['MovingTargetConvolveExtended']
+                MovingTargetToTrack = input['MovingTargetToTrack']
+                BackgroundRate = input['BackgroundRate']
+
+            f.write('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'.format(PointSourceCatalog))   #'point_source']))
             f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
             f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
             f.write('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
             f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
-            f.write('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies to simulate\n'.format(input['{}_galcat'.format(catkey)]))   #'galaxyListFile']))
-            f.write('  extended: {}          #Extended emission count rate image file name\n'.format(input['{}_ext'.format(catkey)]))     #'extended']))
-            f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(input['{}_extscl'.format(catkey)]))
-            f.write('  extendedCenter: {}                   #x, y pixel location at which to place the extended image if it is smaller than the output array size\n'.format(input['{}_extcent'.format(catkey)]))
+            f.write('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies to simulate\n'.format(GalaxyCatalog))   #'galaxyListFile']))
+            f.write('  extended: {}          #Extended emission count rate image file name\n'.format(ExtendedCatalog))     #'extended']))
+            f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(ExtendedScale))
+            f.write('  extendedCenter: {}                   #x, y pixel location at which to place the extended image if it is smaller than the output array size\n'.format(ExtendedCenter))
             f.write('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output image (True or False)\n')
-            f.write('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.\n'.format(input['{}_movptsrc'.format(catkey)]))   #'movingTarg']))
-            f.write('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through the field\n'.format(input['{}_movgal'.format(catkey)]))  #'movingTargSersic']))
-            f.write('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)\n'.format(input['{}_movext'.format(catkey)]))  #'movingTargExtended']))
-            f.write('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'.format(input['{}_movconv'.format(catkey)]))
-            f.write('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target" \n'.format(input['{}_solarsys'.format(catkey)]))  #'movingTargToTrack']))
+            f.write('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.\n'.format(MovingTargetList))   #'movingTarg']))
+            f.write('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through the field\n'.format(MovingTargetSersic))  #'movingTargSersic']))
+            f.write('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)\n'.format(MovingTargetExtended))  #'movingTargExtended']))
+            f.write('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'.format(MovingTargetConvolveExtended))
+            f.write('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target" \n'.format(MovingTargetToTrack))  #'movingTargToTrack']))
             f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
             f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
             f.write('  scattered:  None                          #Scattered light count rate image file\n')
             f.write('  scatteredscale: 1.0                        #Scattered light scaling factor\n')
-            f.write("  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel) or 'high','medium','low' similar to what is used in the ETC\n".format(input['{}_bkgd'.format(catkey)]))  #'bkgdrate']))
+            f.write("  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel) or 'high','medium','low' similar to what is used in the ETC\n".format(BackgroundRate))  #'bkgdrate']))
             f.write('  poissonseed: {}                  #Random number generator seed for Poisson simulation)\n'.format(np.random.randint(1, 2**32-2)))
             f.write('  photonyield: True                         #Apply photon yield in simulation\n')
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
@@ -903,7 +993,11 @@ class SimInput:
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
             f.write('  dec: {}                    # Dec of simulated pointing\n'.format(input['dec_ref']))
-            f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(input['pav3']))
+            if 'pav3' in input.keys():
+                pav3_value = input['pav3']
+            else:
+                pav3_value = input['PAV3']
+            f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(pav3_value))
             f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
             f.write('\n')
             f.write('newRamp:\n')
@@ -946,11 +1040,18 @@ class SimInput:
             f.write("  subpix_dither_type: {}  # Subpixel dither pattern name\n".format(input['SubpixelDitherType']))
             # For WFSS we need to strip out the '-Points' from
             # the number of subpixel positions entry
-            try:
-                dash = input['SubpixelPositions'].find('-')
-                val = input['SubpixelPositions'][0:dash]
-            except:
+            dash = input['SubpixelPositions'].find('-')
+            if (dash == -1):
                 val = input['SubpixelPositions']
+            else:
+                val = input['SubpixelPositions'][0:dash]
+            if val == 'None':
+                val = 1
+            # try:
+            #     dash = input['SubpixelPositions'].find('-')
+            #     val = input['SubpixelPositions'][0:dash]
+            # except:
+            #     val = input['SubpixelPositions']
             f.write("  total_subpix_dither_positions: {}  # Total number of subpixel dither positions\n".format(val))
             f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
@@ -959,16 +1060,7 @@ class SimInput:
             
     def reffile_setup(self):
         """Create lists of reference files associate with each detector"""
-        self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-        sb_dir = os.path.join(self.datadir, 'reference_files/superbias')
-        lin_dir = os.path.join(self.datadir, 'reference_files/linearity')
-        gain_dir = os.path.join(self.datadir, 'reference_files/gain')
-        sat_dir = os.path.join(self.datadir, 'reference_files/saturation')
-        ipc_dir = os.path.join(self.datadir, 'reference_files/ipc')
-        dist_dir = os.path.join(self.datadir, 'reference_files/distortion')
-        pam_dir = os.path.join(self.datadir, 'reference_files/pam')
-        rawdark_dir = os.path.join(self.datadir, 'darks/raw')
-        lindark_dir = os.path.join(self.datadir, 'darks/linearized')
+
         self.superbias_list = {}
         self.linearity_list = {}
         self.gain_list = {}
@@ -978,32 +1070,62 @@ class SimInput:
         self.pam_list = {}
         self.dark_list = {}
         self.lindark_list = {}
-        for det in self.det_list:
-            sbfiles = glob(os.path.join(sb_dir, '*fits'))
-            self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
-            linfiles = glob(os.path.join(lin_dir, '*fits'))
-            longdet = deepcopy(det)
-            if '5' in det:
-                longdet = det.replace('5', 'LONG')
-            self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
 
-            gainfiles = glob(os.path.join(gain_dir, '*fits'))
-            self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
+        if self.instrument.lower() == 'nircam':
+            self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+            sb_dir = os.path.join(self.datadir, 'reference_files/superbias')
+            lin_dir = os.path.join(self.datadir, 'reference_files/linearity')
+            gain_dir = os.path.join(self.datadir, 'reference_files/gain')
+            sat_dir = os.path.join(self.datadir, 'reference_files/saturation')
+            ipc_dir = os.path.join(self.datadir, 'reference_files/ipc')
+            dist_dir = os.path.join(self.datadir, 'reference_files/distortion')
+            pam_dir = os.path.join(self.datadir, 'reference_files/pam')
+            rawdark_dir = os.path.join(self.datadir, 'darks/raw')
+            lindark_dir = os.path.join(self.datadir, 'darks/linearized')
+            for det in self.det_list:
+                sbfiles = glob(os.path.join(sb_dir, '*fits'))
+                self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
+                linfiles = glob(os.path.join(lin_dir, '*fits'))
+                longdet = deepcopy(det)
+                if '5' in det:
+                    longdet = det.replace('5', 'LONG')
+                self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
 
-            satfiles = glob(os.path.join(sat_dir, '*fits'))
-            self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
+                gainfiles = glob(os.path.join(gain_dir, '*fits'))
+                self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
 
-            ipcfiles = glob(os.path.join(ipc_dir, '*fits'))
-            self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
+                satfiles = glob(os.path.join(sat_dir, '*fits'))
+                self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
 
-            distfiles = glob(os.path.join(dist_dir, '*asdf'))
-            self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
+                ipcfiles = glob(os.path.join(ipc_dir, '*fits'))
+                self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
 
-            pamfiles = glob(os.path.join(pam_dir, '*fits'))
-            self.pam_list[det] = [d for d in pamfiles if det in d][0]
+                distfiles = glob(os.path.join(dist_dir, '*asdf'))
+                self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
 
-            self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
-            self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
+                pamfiles = glob(os.path.join(pam_dir, '*fits'))
+                self.pam_list[det] = [d for d in pamfiles if det in d][0]
+
+                self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
+                self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
+
+        elif self.instrument.lower() == 'niriss':
+            # directory containing NIRISS reference files
+
+
+            #define NIRISS detector name (convention?)
+            det = 'NIS'
+
+            self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, '*superbias*.fits'))[0]
+            self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, '*linearity*.fits'))[0]
+            self.gain_list[det] = glob(os.path.join(self.reference_file_dir, '*gain*.fits'))[0]
+            self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, '*saturation*.fits'))[0]
+            self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+            self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, '*distortion*.asdf'))[0]
+            self.pam_list[det] = glob(os.path.join(self.reference_file_dir, '*area*.fits'))[0]
+
+            self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss_darks', '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+            self.lindark_list[det] = [None]
 
     def add_options(self, parser=None, usage=None):
         if parser is None:
