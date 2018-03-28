@@ -16,7 +16,7 @@ import math
 from photutils import detect_threshold, detect_sources
 from astropy.io import fits, ascii
 from astropy.table import Table
-from astropy.modeling.models import Sersic2D
+from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
 from astropy.convolution import convolve
 from asdf import AsdfFile
 import yaml
@@ -699,7 +699,9 @@ class Catalog_seed():
             # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+                
         # Using the requested RA,Dec of the reference pixel, along with the
         # V2,V3 of the reference pixel, and the requested roll angle of the telescope,
         # create a matrix that can be used to translate between V2,V3 and RA,Dec
@@ -728,9 +730,6 @@ class Catalog_seed():
             total_frames += (numresets * (numints - 1))
 
         frameexptimes = self.frametime * np.arange(-1,total_frames)
-        #frameexptimes = self.frametime * np.arange(-1,self.params['Readout']['ngroup']
-        #                                           * (self.params['Readout']['nframe']
-        #                                              + self.params['Readout']['nskip']))
 
         #output image dimensions
         #dims = np.array(self.dark.data[0,0,:,:].shape)
@@ -778,16 +777,6 @@ class Catalog_seed():
                 # x,y in each frame directly
                 x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                 y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
-
-            #print('x_frames: {}'.format(x_frames))
-            #print('y_frames: {}'.format(y_frames))
-
-            # If the target never falls on the detector,
-            # then move on to the next target
-            #xfdiffs = np.fabs(x_frames - (newdimsx/2))
-            #yfdiffs = np.fabs(y_frames - (newdimsy/2))
-            #if np.min(xfdiffs) > (newdimsx/2) or np.min(yfdiffs) > (newdimsy/2):
-            #    continue
 
             # If we have a point source, we can easily determine whether
             # it completely misses the detector, since we know the size
@@ -896,6 +885,101 @@ class Catalog_seed():
                     moving_segmap.segmap += indseg
         return mt_integration, moving_segmap.segmap
 
+    def simple_coord_transform(self):
+        """
+        For the case where the distortion reference file is not provided, 
+        generate a simple coordinate transform function that does not include
+        distortion
+
+        "Forward" transform = science -> ideal -> V2,V3
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        returns : astropy.modeling.Polynomial2D
+            Compound model containing the necessary functions
+            to transform coordinates assuming no distortion
+        """
+        xshift = Shift(0. - self.refpix_pos["x"])
+        yshift = Shift(0. - self.refpix_pos["y"])
+        pixelscalex = self.xsciscale
+        pixelscaley = self.ysciscale
+
+        # Science to Ideal transform
+        cx = {}
+        cx["c0_0"] = 0.
+        cx["c1_0"] = pixelscalex
+        cx["c1_1"] = 0.
+        cx["c0_1"] = 0.
+        x_sci_to_ideal_func = Polynomial2D(2, **cx)
+
+        cy = {}
+        cy["c0_0"] = 0.
+        cy["c1_0"] = 0.
+        cy["c1_1"] = 0.
+        cy["c0_1"] = pixelscaley
+        y_sci_to_ideal_func = Polynomial2D(2, **cy)
+
+        # Ideal to V2, V3 transform
+        parity = self.parity
+        v3_ideal_y_angle = self.v3yang
+
+        xc = {}
+        yc = {}
+        xc['c0_0'] = 0.
+        yc['c0_0'] = 0.
+        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
+        xc['c0_1'] = np.sin(v3_ideal_y_angle)
+        yc['c1_0'] = (0.-parity) * np.sin(v3_ideal_y_angle)
+        yc['c0_1'] = np.cos(v3_ideal_y_angle)
+        x_ideal_to_v2v3_func = Polynomial2D(1, **xc)
+        y_ideal_to_v2v3_func = Polynomial2D(1, **yc)
+
+        # Ideal to Science transform
+        cx = {}
+        cx["c0_0"] = 0.
+        cx["c1_0"] = 1./ pixelscalex
+        cx["c1_1"] = 0.
+        cx["c0_1"] = 0.
+        x_ideal_to_sci_func = Polynomial2D(2, **cx)
+
+        cy = {}
+        cy["c0_0"] = 0.
+        cy["c1_0"] = 0.
+        cy["c1_1"] = 0.
+        cy["c0_1"] = 1./ pixelscaley
+        y_ideal_to_sci_func = Polynomial2D(2, **cy)
+
+        # V2, V3 to Ideal transform
+        xc = {}
+        yc = {}
+        xc['c0_0'] = 0.
+        yc['c0_0'] = 0.
+        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
+        xc['c0_1'] = parity * (0. - np.sin(v3_ideal_y_angle))
+        yc['c1_0'] = np.sin(v3_ideal_y_angle)
+        yc['c0_1'] = np.cos(v3_ideal_y_angle)
+        x_v2v3_to_ideal_func = Polynomial2D(1, **xc)
+        y_v2v3_to_ideal_func = Polynomial2D(1, **yc)
+
+        # Shift by V2ref, V3ref
+        v2shift = Shift(self.v2_ref)
+        v3shift= Shift(self.v2_ref)
+        
+        #Now create a compound model for each with the appropriate
+        #inverse
+        sci2idl = Mapping([0,1,0,1]) | x_sci_to_ideal_func & y_sci_to_ideal_func
+        sci2idl.inverse = Mapping([0,1,0,1]) | x_ideal_to_sci_func & y_ideal_to_sci_func
+
+        idl2v2v3 = Mapping([0,1,0,1]) | x_ideal_to_v2v3_func & y_ideal_to_v2v3_func
+        idl2v2v3.inverse = Mapping([0,1,0,1]) | x_v2v3_to_ideal_func & y_v2v3_to_ideal_func
+
+        core_model = sci2idl | idl2v2v3
+        model = xshift & yshift | core_model | v2shift & v3shift
+        return model
 
     def on_detector(self,xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
@@ -929,7 +1013,7 @@ class Catalog_seed():
             status = 'off'
         return status
 
-    def getPositions(self,inx,iny,matrix,transform,pixelflag):
+    def getPositions(self, inx, iny, matrix, transform, pixelflag):
         #input a row containing x,y or ra,dec values, and figure out
         #x,y, RA, Dec, and RA string and Dec string
         try:
@@ -1022,7 +1106,7 @@ class Catalog_seed():
             meta2 = magsys
 
             meta3 = ('Point sources with non-sidereal tracking. '
-                     'File produced by ramp_simulator.py')
+                     'File produced by catalog_seed_image.py')
             meta4 = ('from run using non-sidereal moving target '
                      'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             ptsrc.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
@@ -1356,7 +1440,10 @@ class Catalog_seed():
             print("the output. PSFs will be generated by WebbPSF on the fly")
             raise NotImplementedError("Not yet implemented.")
 
-        pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'), dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
+        pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees',
+                                       'Dec_degrees', 'magnitude', 'countrate_e/s',
+                                       'counts_per_frame_e'),
+                                dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
 
         try:
             lines, pixelflag, magsys = self.readPointSourceFile(filename)
@@ -1404,11 +1491,12 @@ class Catalog_seed():
         # now offset the field center to array center for astrometric distortion corrections
         coord_transform = None
         if self.runStep['astrometric']:
-
             # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+            
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -1445,9 +1533,12 @@ class Catalog_seed():
 
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
-        pslist.write("# Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny))
+        pslist.write(("# Field center (degrees): %13.8f %14.8f y axis rotation angle "
+                      "(degrees): %f  image size: %4.4d %4.4d\n" %
+                      (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny)))
         pslist.write('#\n')
-        pslist.write("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n")
+        pslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
+                      "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
         start_time = time.time()
         times = []
@@ -1485,14 +1576,16 @@ class Catalog_seed():
 
                 # Case where point source list entries are given with RA and Dec
                 if not pixelflag:
-                    
+                     
                     # If distortion is to be included - either with or without the full set of coordinate
                     # translation coefficients
-                    if self.runStep['astrometric']:
-                        pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-                    else:
-                        # No distortion at all - "manual mode"
-                        pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                    #if self.runStep['astrometric']:
+
+                    # Same function call regardless of whether distortion file is provided or not
+                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                    #else:
+                    #    # No distortion at all - "manual mode"
+                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
                 else:
                     # Case where the point source list entry locations are given in units of pixels
@@ -1508,8 +1601,8 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix, coord_transform)
-
+                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
+                                                              coord_transform)
 
                 # Get the input magnitude of the point source
                 mag = float(values['magnitude'])
@@ -1884,20 +1977,68 @@ class Catalog_seed():
         ra_source = ra * 3600.
         dec_source = dec * 3600.
 
-        dist_between, deltaang = self.dist([self.ra, self.dec], [ra_source, dec_source])
+        #dist_between, deltaang = self.object_separation([self.ra, self.dec],
+        #                                               [ra_source, dec_source])
 
+        #simple_wcs_obj = {}
+        #simple_wcs_obj["CRPIX1"] = self.refpix_pos["x"]
+        #simple_wcs_obj["CRPIX2"] = self.refpix_pos["y"]
+        #simple_wcs_obj["CRVAL1"] =
+        #simple_wcs_obj["CRVAL2"] =
+        #simple_wcs_obj["CTYPE1"] =
+        #simple_wcs_obj["CTYPE2"] =
+        #simple_wcs_obj["CD1_1"] =
+        #simple_wcs_obj["CD1_2"] =
+        #simple_wcs_obj["CD2_1"] =
+        #simple_wcs_obj["CD2_2"] = 
+
+        #wcs_obj = astropy.wcs.WCS(header = simple_wcs_obj)
+        deltara, deltadec = self.object_separation([self.ra, self.dec],
+                                                   [ra_source, dec_source], wcs_obj)
         # Now translate to deltax and deltay if the
         # position angle is non-zero
-        tot_ang = deltaang + (0. - self.params['Telescope']['rotation'] * np.pi / 180.)
+        #tot_ang = deltaang + (0. - self.params['Telescope']['rotation'] * np.pi / 180.)
 
-        deltax = dist_between * np.sin(tot_ang) / self.pixscale[0]
-        deltay = dist_between * np.cos(tot_ang) / self.pixscale[0]
+        #deltax = dist_between * np.sin(tot_ang) / self.pixscale[0]
+        #deltay = dist_between * np.cos(tot_ang) / self.pixscale[0]
 
-        pixelx = self.refpix_pos['x'] + deltax
-        pixely = self.refpix_pos['y'] + deltay
+        #pixelx = self.refpix_pos['x'] + deltax
+        #pixely = self.refpix_pos['y'] + deltay
 
+        
+        
+        
         return pixelx, pixely
 
+    def object_separation(self, radec1, radec2, wcs):
+        """
+        Calculate the distance between two points on the sky given their
+        RA, Dec values. Also calculate the angle (east of north?) between
+        the two points.
+
+        Parameters:
+        -----------
+        radec1 : list
+            2-element list giving the RA, Dec (in decimal degrees) for 
+            the first object
+
+        radec2 : list
+            2-element list giving the RA, Dec (in decimal degrees) for
+            the second object
+
+        Returns:
+        --------
+        distance : float
+            Angular separation (in degrees) between the two objects
+
+        angle : float
+            Angle (east of north?) separating the two sources
+        """
+        c1 = SkyCoord(radec1[0]*u.degree, radec1[1]*u.degree, frame='icrs')
+        c2 = SkyCoord(radec2[0]*u.degree, radec2[1]*u.degree, frame='icrs')
+        sepra, sepdec = c1.spherical_offsets_to(c2).to_pixel(wcs)
+        return sepra, sepdec
+        
     def XYToRADec(self, pixelx, pixely, attitude_matrix, coord_transform):
         # Translate a given x, y location on the detector
         # to RA, Dec
@@ -2016,7 +2157,9 @@ class Catalog_seed():
         if self.runStep['astrometric']:
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+                
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -2079,12 +2222,15 @@ class Catalog_seed():
             if not pixelflag:
 
                 # if distortion is to be included
-                if self.runStep['astrometric']:
-                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                #if self.runStep['astrometric']:
 
-                else:
-                    # No distortion. Fall back to "manual" calculations
-                    pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                # Call is the same regardless of whether distortion reference file
+                # is given or not
+                pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+
+                #else:
+                #    # No distortion. Fall back to "manual" calculations
+                #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
             else:
                 # case where the point source list entry locations are given in units of pixels
@@ -2397,24 +2543,27 @@ class Catalog_seed():
         # now offset the field center to array center for astrometric distortion corrections
         coord_transform = None
         if self.runStep['astrometric']:
-
             # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+                
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
         # for any pixel.
         # v2, v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        # attitude_matrix = rotations.attitude(self.refpix_pos['v2'], self.refpix_pos['v3'], self.ra, self.dec, self.params['Telescope']["rotation"])
         attitude_matrix = self.getAttitudeMatrix()
 
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
-        eslist.write("# Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny))
+        eslist.write(("# Field center (degrees): %13.8f %14.8f y axis rotation angle "
+                      "(degrees): %f  image size: %4.4d %4.4d\n" %
+                      (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny)))
         eslist.write('# \n')
-        eslist.write("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n")
+        eslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
+                      "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
         # Add an index column if not present
         if 'index' in lines.colnames:
@@ -2461,11 +2610,12 @@ class Catalog_seed():
 
                     # If distortion is to be included - either with or without the full set of coordinate
                     # translation coefficients
-                    if self.runStep['astrometric']:
-                        pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-                    else:
-                        # No distortion at all - "manual mode"
-                        pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                    #if self.runStep['astrometric']:
+                    # Same function call regardless of whether distortion file is provided or not
+                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                    #else:
+                    #    # No distortion at all - "manual mode"
+                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
                 else:
                     # Case where the point source list entry locations are given in units of pixels
@@ -2481,7 +2631,8 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix, coord_transform)
+                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
+                                                              coord_transform)
 
                 # Get the input magnitude
                 try:
