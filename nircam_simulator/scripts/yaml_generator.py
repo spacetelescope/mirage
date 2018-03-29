@@ -114,11 +114,13 @@ class SimInput:
         if self.instrument.lower() == 'nircam':
             self.psfpath = os.path.join(self.datadir, 'webbpsf_library')
             self.psfbasename = 'nircam'
+            self.psfpixfrac = 0.25
         elif self.instrument.lower() == 'niriss':
             self.datadir2 = '/ifs/jwst/wit/niriss/nircam_ramp_simulation_files'
             self.reference_file_dir =  os.path.join(self.datadir2, 'reference_files')
             self.psfpath = os.path.join(self.datadir2, 'webbpsf_files')
             self.psfbasename = 'niriss'
+            self.psfpixfrac = 0.1
         else:
             raise RuntimeError('Instrument {} is not supported'.format(instrument))
 
@@ -145,7 +147,6 @@ class SimInput:
         self.use_JWST_pipeline = True
         self.use_linearized_darks = False
         self.simdata_output_dir = './'
-        self.psfpixfrac = 0.25
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1 # NIRCam should be 1
@@ -223,8 +224,9 @@ class SimInput:
             final_file = self.table_file + '_with_yaml_parameters.csv'
 
         else:
-            print("WARNING. You must include either an ascii table file of observations.")
-            print("or xml and pointing files from APT plus an ascii siaf table.")
+            print("WARNING. You must include either an ascii table file of observations")
+            print("or xml and pointing files from APT plus an ascii siaf table plus the observation list file.")
+            print('Aborted.')
             sys.exit()
 
         # For each element in the lists below, use the detector name to

@@ -1637,6 +1637,10 @@ class Catalog_seed():
             if bstr == "0.0":
                 bstr = "0.00"
 
+            if self.params['simSignals']['psfbasename'].lower() == 'niriss':
+                astr = '{:1.2f}'.format(np.float(astr))
+                bstr = '{:1.2f}'.format(np.float(bstr))
+
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr
@@ -1659,8 +1663,7 @@ class Catalog_seed():
                     else:
                         raise FileNotFoundError("PSF file {} not found.".format(psffn))
                 except:
-                    print("ERROR: Could not load PSF file {} from library".format(psffn))
-                    sys.exit()
+                    raise RuntimeError("ERROR: Could not load PSF file {} from library".format(psffn))
 
             # Normalize the total signal in the PSF as read in
             totalsignal = np.sum(webbpsfimage)

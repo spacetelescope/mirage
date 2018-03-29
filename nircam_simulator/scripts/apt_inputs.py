@@ -113,8 +113,8 @@ class AptInput:
         # Expand for detectors. Create one entry in each list for each
         # detector, rather than a single entry for 'ALL' or 'BSALL'
 
-        if np.all([True for j in obstab['Module'] if j is None]):
-            # skip step if NIRCam is not used
+        # test if Module is always 'None', i.e. when NIRCam is not used
+        if obstab['Module'].count('None') == len(obstab['Module']):
             self.exposure_tab = obstab
         else:
             self.exposure_tab = self.expand_for_detectors(obstab)

@@ -265,17 +265,21 @@ class ReadAPTXML():
         dictionary['ObservationID'].append(tup[21])
         dictionary['TileNumber'].append(tup[22])
         dictionary['APTTemplate'].append(tup[23])
+        dictionary['Instrument'].append(tup[24])
         return dictionary
 
 
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary):
-        """Read imaging template content regardless of instrument.
+        """Read imaging template content regardless of instrument. 
+        Save content to object attributes.
 
-        :param template:
-        :param template_name:
-        :param obs:
-        :param proposal_parameter_dictionary: dict
-        :return:
+        Parameters
+        ----------
+        template
+        template_name : str
+        obs
+        proposal_parameter_dictionary : dict
+
         """
 
         instrument = obs.find(self.apt + 'Instrument').text
@@ -287,7 +291,6 @@ class ReadAPTXML():
 
         for key in self.APTObservationParams_keys:
             exposures_dictionary[key] = []
-        # exposures_dictionary['Instrument'] = []
 
         # Set namespace
         ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
@@ -339,10 +342,9 @@ class ReadAPTXML():
 
         self.APTObservationParams = exposures_dictionary
 
-        print(exposures_dictionary)
+        # print(exposures_dictionary)
         return
 
-        # self.obs_tuple_list.append(tup_to_add)
 
 
     def read_imaging_template(self, template, template_name, obs, prop_params):
@@ -356,6 +358,8 @@ class ReadAPTXML():
         #     ns = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
         # elif template_name == 'NircamEngineeringImaging':
         #     ns = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
+
+        instrument = obs.find(self.apt + 'Instrument').text
 
         # Set parameters that are constant for all imaging obs
         #typeflag = template_name
@@ -419,7 +423,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, 1, template_name)
+                          i_obs + 1, 1, template_name, instrument)
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
 
