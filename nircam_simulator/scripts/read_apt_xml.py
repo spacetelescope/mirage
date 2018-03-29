@@ -1,10 +1,15 @@
 # ! /usr/bin/env python
 
+import os
 import re
 from lxml import etree
 from astropy.io import ascii
 import numpy as np
 import pprint
+
+SCRIPTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+PACKAGE_DIR = os.path.dirname(SCRIPTS_DIR)
+
 
 class ReadAPTXML():
     """Class to open and parse XML files from APT. Can read templates for
@@ -280,7 +285,7 @@ class ReadAPTXML():
         pdithtype = template.find(ns + 'PrimaryDitherType').text
 
         # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr)
+        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
 
         try:
             pdither = template.find(ns + 'PrimaryDithers').text
@@ -356,14 +361,17 @@ class ReadAPTXML():
         num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
 
         # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr)
+        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
 
         # Find filter parameters for all filter configurations within obs
         filter_configs = template.findall('.//' + ns + 'FilterConfig')
 
         for filt in filter_configs:
             sfilt = filt.find(ns + 'ShortFilter').text
-            lfilt = filt.find(ns + 'LongFilter').text
+            try:
+                lfilt = filt.find(ns + 'LongFilter').text
+            except AttributeError:
+                lfilt = 'F480M'
             rpatt = filt.find(ns + 'ReadoutPattern').text
             grps = filt.find(ns + 'Groups').text
             ints = filt.find(ns + 'Integrations').text
@@ -435,14 +443,17 @@ class ReadAPTXML():
         # num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
 
         # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr)
+        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
 
         # Find filter parameters for all filter configurations within obs
         ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
 
         for conf in ga_nircam_configs:
             sfilt = conf.find(ns + 'ShortFilter').text
-            lfilt = conf.find(ns + 'LongFilter').text
+            try:
+                lfilt = conf.find(ns + 'LongFilter').text
+            except AttributeError:
+                lfilt = 'F480M'
             rpatt = conf.find(ns + 'ReadoutPattern').text
             grps = conf.find(ns + 'Groups').text
             ints = conf.find(ns + 'Integrations').text
@@ -561,54 +572,98 @@ class ReadAPTXML():
 
         # Find the module and derive the subarrays
         mod = template.find(ns + 'Module').text
-
-        # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, None)
+        if mod == 'A':
+            mod = 'A3'
+        elif mod == 'B':
+            mod = 'B4'
 
         # Determine the sensing type, and list the pupils and filters
         # in the appropriate order
         sensing_type = obs.find('.//' + ns + 'SensingType').text
-        if sensing_type == 'Fine Phasing':
-            n_configs = 5
-            n_dithers = 2
 
-            subarrs = [subarr] * n_configs
-            mods = [mod] * n_configs
+        n_configs = 0
+        n_dithers = []
+        subarrs = []
+        mods = []
+        sw_pupils = []
+        sw_filts = []
+        lw_pupils = []
+        lw_filts = []
+        readouts = []
+        groups = []
+        integrations = []
 
-            sw_pupils = ['WLM8', 'WLP8', 'WLP8', 'WLM8', 'CLEAR']
-            sw_filts = ['F212N', 'F212N', 'WLP4', 'WLP4', 'WLP4']
-            lw_pupils = ['F405N'] * n_configs
-            lw_filts = ['F444W'] * n_configs
+        if sensing_type in ['LOS Jitter', 'Both']:
+            ########## IF WE WANT TO MODEL TARGET ACQ:
+            # n_configs += 2
+            # n_dithers += [1] * n_configs
 
-            # Find the exposure parameters for the +/- 8, + 12, and +/-4 modes
-            readouts = [r.text for r in obs.findall('.//' + ns + 'ReadoutPattern')]
-            groups = [g.text for g in obs.findall('.//' + ns + 'Groups')]
-            integrations = [i.text for i in obs.findall('.//' + ns + 'Integrations')]
-            inds = [0, 0, 1, 2, 2]
-            readouts = np.array(readouts)[inds]
-            groups = np.array(groups)[inds]
-            integrations = np.array(integrations)[inds]
+            # subarrs += ['SUB64FP1' + mod, 'SUB8FP1' + mod]
+            # mods += subarrs
 
-        elif sensing_type == 'LOS Jitter':
-            n_configs = 2
-            n_dithers = 1
+            # sw_pupils += ['CLEAR', 'CLEAR']
+            # sw_filts += ['F212N', 'F200W']
+            # lw_pupils += ['F405N'] * n_configs # default?
+            # lw_filts += ['F444W'] * n_configs # default?
 
-            subarrs = ['SUB64FP1' + mod, 'SUB8FP1' + mod]
-            mods = subarrs
+            # # Find/define the exposure parameters for the target
+            # # acquisition and LOS imaging modes
+            # readouts += ['RAPID', 'RAPID']
+            # acq_groups = obs.find('.//' + ns + 'AcqNumGroups').text
+            # LOSimg_groups = obs.find('.//' + ns + 'LosImgNumGroups').text
+            # groups += [acq_groups, LOSimg_groups]
+            # LOSimg_ints = obs.find('.//' + ns + 'LosImgNumInts').text
+            # integrations += [1, LOSimg_ints]
 
-            sw_pupils = ['CLEAR', 'CLEAR']
-            sw_filts = ['F212N', 'F200W']
-            lw_pupils = ['F405N'] * n_configs # default?
-            lw_filts = ['F444W'] * n_configs # default?
+            n_configs += 1
+            n_dithers += [1] * n_configs
+
+            subarrs += ['SUB8FP1{}'.format(mod[0])]
+            mods += [mod]
+
+            sw_pupils += ['CLEAR']
+            sw_filts += ['F200W']
+            lw_pupils += ['F405N'] * n_configs # default?
+            lw_filts += ['F444W'] * n_configs # default?
 
             # Find/define the exposure parameters for the target
             # acquisition and LOS imaging modes
-            readouts = ['RAPID', 'RAPID']
-            acq_groups = obs.find('.//' + ns + 'AcqNumGroups').text
-            LOSimg_groups = obs.find('.//' + ns + 'LosImgNumGroups').text
-            groups = [acq_groups, LOSimg_groups]
-            LOSimg_ints = obs.find('.//' + ns + 'LosImgNumInts').text
-            integrations = [1, LOSimg_ints]
+            readouts += ['RAPID']
+            groups += [obs.find('.//' + ns + 'LosImgNumGroups').text]
+            integrations += [obs.find('.//' + ns + 'LosImgNumInts').text]
+
+        if sensing_type in ['Fine Phasing', 'Both']:
+            # Deterimine what diversity of sensing
+            diversity = obs.find('.//' + ns + 'Diversity').text
+            if diversity == 'ALL':
+                n_configs_fp = 5
+                n_configs += n_configs_fp
+            elif diversity == 'ALL+187N':
+                n_configs_fp = 7
+                n_configs += n_configs_fp
+            elif diversity == 'PM8':
+                n_configs_fp = 2
+                n_configs += n_configs_fp
+
+            n_dithers += [2] * n_configs_fp
+
+            subarrs += ['FP1'] * n_configs_fp
+            mods += [mod] * n_configs_fp
+
+            sw_pupils += ['WLM8', 'WLP8', 'WLP8', 'WLM8', 'CLEAR', 'WLM8', 'WLP8'][:n_configs_fp]
+            sw_filts += ['F212N', 'F212N', 'WLP4', 'WLP4', 'WLP4', 'F187N', 'F187N'][:n_configs_fp]
+            lw_pupils += ['F405N'] * n_configs_fp
+            lw_filts += ['F444W'] * n_configs_fp
+
+            # Find the exposure parameters for the +/- 8, + 12, and +/-4 modes
+            readouts_fp = [r.text for r in obs.findall('.//' + ns + 'ReadoutPattern')]
+            groups_fp = [g.text for g in obs.findall('.//' + ns + 'Groups')]
+            integrations_fp = [i.text for i in obs.findall('.//' + ns + 'Integrations')]
+            inds = [0, 0, 1, 2, 2, 3, 3][:n_configs_fp]
+            readouts += list(np.array(readouts_fp)[inds])
+            groups += list(np.array(groups_fp)[inds])
+            integrations += list(np.array(integrations_fp)[inds])
+
 
         sensing = obs.find('.//' + self.apt + 'WavefrontSensing').text
         if sensing == 'SENSING_ONLY':
@@ -630,8 +685,10 @@ class ReadAPTXML():
                 grps = groups[i]
                 ints = integrations[i]
 
-                # Repeat for two dithers
-                for j in range(n_dithers):
+                n_dith = n_dithers[i]
+
+                # Repeat for designated number of dithers
+                for j in range(n_dith):
                     # Add all parameters to dictionary
                     tup_to_add = (pi_name, prop_id, prop_title, prop_category,
                                   science_category, typeflag, mod, subarr, pdithtype,
@@ -643,7 +700,7 @@ class ReadAPTXML():
                     self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                     self.obs_tuple_list.append(tup_to_add)
 
-        n_tiles_phasing = n_configs * n_dithers * n_repeats
+        n_tiles_phasing = sum(n_dithers) * n_repeats
 
         return n_tiles_phasing
 
@@ -669,7 +726,7 @@ class ReadAPTXML():
         expseqs = explist.findall(ns + 'ExposureSequences')
 
         # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr)
+        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
 
         # if BOTH was specified for the grism,
         # then we need to repeat the sequence of
@@ -691,7 +748,10 @@ class ReadAPTXML():
                 integrations = grismexp.find(ns + 'Integrations').text
 
                 pdithtype = template.find(ns + 'PrimaryDitherType').text
-                pdither = template.find(ns + 'PrimaryDithers').text
+                try:
+                    pdither = template.find(ns + 'PrimaryDithers').text
+                except AttributeError:
+                    pdither = 1
                 sdither = template.find(ns + 'SubpixelPositions').text
                 sdithtype = template.find(ns + 'SubpixelPositions').text
 
@@ -764,25 +824,28 @@ class ReadAPTXML():
             self.obs_tuple_list.append(tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
 
-    def check_for_aperture_override(self, obs, mod, subarr):
+    def check_for_aperture_override(self, obs, mod, subarr, i_obs):
         '''Determine if there is an aperture override'''
 
         override = obs.find('.//' + self.apt + 'FiducialPointOverride')
         if override is not None:
             mod = override.text
             if 'FULL' not in mod:
-                config = ascii.read('../config/NIRCam_subarray_definitions.list')
+                subarray_list_file = os.path.join(PACKAGE_DIR, 'config',
+                                                  'NIRCam_subarray_definitions.list')
+                config = ascii.read(subarray_list_file)
                 try:
                     i_sub = list(config['AperName']).index(mod)
                 except ValueError:
                     i_sub = [mod in name for name in np.array(config['AperName'])]
                     i_sub = np.where(i_sub)[0]
-                    if len(i_sub) > 1:
-                        raise ValueError('Unable to match \
-                            FiducialPointOverride {} to valid \
-                            aperture.'.format(mod))
+                    if len(i_sub) > 1 or len(i_sub) == 0:
+                        raise ValueError('Unable to match FiducialPointOverride {} to valid aperture in observation {}.'.format(mod, i_obs + 1))
 
-                subarr = config['Name'][i_sub][0]
+                subarr = config[i_sub]['Name']
+                if type(subarr) != np.str_: # Don't know why, but astropy tables aren't behaving
+                    subarr = subarr[0]
+
                 print('Aperture override: subarray {}'.format(subarr))
 
             return mod, subarr

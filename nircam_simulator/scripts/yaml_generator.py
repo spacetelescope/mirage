@@ -73,7 +73,7 @@ apt_inputs.py - Functions for reading and parsing xml and pointing files from AP
 HISTORY:
 
 July 2017 - V0: Initial version. Bryan Hilbert
-Feb 2018 - V1: Updates to accomodate multiple filter pairs per 
+Feb 2018 - V1: Updates to accomodate multiple filter pairs per
                observation. Launren Chambers
 
 '''
@@ -285,10 +285,13 @@ class SimInput:
             # and subpixel dithers
             tot_dith = np.int(file_dict['dither'])
             primarytot = np.int(file_dict['PrimaryDithers'])
-            try:
-                subpixtot = np.int(file_dict['SubpixelPositions'])
-            except:
-                subpixtot = np.int(file_dict['SubpixelPositions'][0])
+            if file_dict['SubpixelPositions'].upper() == 'NONE':
+                subpixtot = 1
+            else:
+                try:
+                    subpixtot = np.int(file_dict['SubpixelPositions'])
+                except:
+                    subpixtot = np.int(file_dict['SubpixelPositions'][0])
             primary_dither = np.ceil(1. * tot_dith / subpixtot)
             subpix_dither = tot_dith - (primary_dither * primarytot * subpixtot - subpixtot)
             file_dict['primary_dither_num'] = primary_dither
@@ -722,7 +725,7 @@ class SimInput:
 
     def get_lindark(self, detector):
         """
-        Return the name of a linearized dark current file to 
+        Return the name of a linearized dark current file to
         use as input based on the detector being used
 
         Parameters:
@@ -740,7 +743,7 @@ class SimInput:
     def get_reffile(self, refs, detector):
         """
         Return the appropriate reference file for detector
-        and given reference file dictionary. 
+        and given reference file dictionary.
 
         Parameters:
         -----------
@@ -764,7 +767,7 @@ class SimInput:
 
         Parameters:
         -----------
-        input -- dictionary containing all needed exposure 
+        input -- dictionary containing all needed exposure
                  information for one exposure
         """
 
@@ -811,14 +814,14 @@ class SimInput:
             config = ascii.read(subarray_def_file)
 
             if full_ap not in config['AperName']:
-                full_ap = [apername for apername, name in \
+                full_ap_new = [apername for apername, name in \
                            np.array(config['AperName', 'Name']) if \
                            (full_ap in apername) or (full_ap in name)]
-                if len(full_ap) > 1 or len(full_ap) == 0:
-                    raise ValueError('Cannot match {} with valid aperture name.'
-                                     .format(full_ap))
+                if len(full_ap_new) > 1 or len(full_ap_new) == 0:
+                    raise ValueError('Cannot match {} with valid aperture name for observation {}.'
+                                     .format(full_ap, input['obs_num']))
                 else:
-                    full_ap = full_ap[0]
+                    full_ap = full_ap_new[0]
 
             f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
             f.write('  subarray_bounds: 0, 0, 159, 159          # Coords of subarray corners. (xstart, ystart, xend, yend) Over-ridden by array_name above. Currently not used. Could be used if output saved in raw format\n')
