@@ -1723,25 +1723,11 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-            #a = round(interval * int(numperpix*xfract + 0.5) - 0.5, 1)
-            #b = round(interval * int(numperpix*yfract + 0.5) - 0.5, 1)
-            a = round(interval * int(numperpix*xfract + 0.5) - 0.5, 2)
-            b = round(interval * int(numperpix*yfract + 0.5) - 0.5, 2)
-
-            if a < 0:
-                astr = str(a)[0:5]
-            else:
-                astr = str(a)[0:4]
-            if b < 0:
-                bstr = str(b)[0:5]
-            else:
-                bstr = str(b)[0:4]
-
-            if astr == "0.0":
-                astr = "0.00"
-            if bstr == "0.0":
-                bstr = "0.00"
-
+            a_in = interval * int(numperpix*xfract + 0.5) - 0.5
+            b_in = interval * int(numperpix*yfract + 0.5) - 0.5
+            astr = "{0:.{1}f}".format(a_in, 2)
+            bstr = "{0:.{1}f}".format(b_in, 2)
+   
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr
