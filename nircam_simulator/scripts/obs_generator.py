@@ -1780,7 +1780,7 @@ class Observation():
         if len(dims) == 2:
             subkernel = np.expand_dims(subkernel, axis=3)
             subkernel = np.expand_dims(subkernel, axis=4)
-            dims = subkernel.shape
+        dims = subkernel.shape
             
         # Make sure the total signal in the kernel = 1
         #ave = np.average(subkernel, axis=(0, 1))
@@ -1790,12 +1790,15 @@ class Observation():
         #subkernel *= renorm
 
         delta = subkernel * 0.
-        delta[nyc, nxc] = 1.
+        nyc = dims[0] // 2
+        nxc = dims[1] // 2
+        delta[nyc, nxc, :, :] = 1.
+
         a1 = np.fft.fft2(subkernel, axes=(0, 1)) 
         a2 = np.fft.fft2(delta, axes=(0, 1))
         aout = a2 / a1
         imout = np.fft.ifft2(aout, axes=(0, 1))
-        realout = np.real(imout)
+        #realout = np.real(imout)
         imout1 = np.fft.fftshift(imout, axes=(0, 1))
         realout1 = np.real(imout1)
 
