@@ -2,6 +2,7 @@
 ###################
 *.pyc
 *.py~
+.pytest_cache/*
 
 # Package Stuff #
 #################
@@ -24,7 +25,6 @@ nircam_simulator.egg-info/*
 .ipynb_checkpoints/*
 nircam_simulator/examples/.ipynb_checkpoints/*
 nircam_simulator/OTECommissioning/*
-*.aptx
 *.aptbackup
 *.docx
 
@@ -34,4 +34,5 @@ ring_nebula.fits
 nircam_simulator/ClassMaps.txt
 nircam_simulator/examples/*.ipynb
 nircam_simulator/scripts/apt_inputs_OLD.py
-nircam_simulator/dev_scripts/*nircam_simulator/config/siaf_config.json
+nircam_simulator/dev_scripts/*
+nircam_simulator/config/siaf_config.json
