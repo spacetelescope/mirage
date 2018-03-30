@@ -321,7 +321,7 @@ class Catalog_seed():
                                        'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
                                        'Reffiles-filter_throughput': 'placeholder.txt'},
                             'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-flux_cal': 'guider_zero_magnitude_values.out',
+                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
                                     'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
                                     'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
                                     'Reffiles-filter_throughput': 'placeholder.txt'}}
