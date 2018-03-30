@@ -349,12 +349,6 @@ class Catalog_seed():
                                   'movingTargetExtended', 'movingTargetToTrack'],
                     'Output':['file', 'directory']}
 
-        #config_files = {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-        #                'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-        #                'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-        #                'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-        #                'Reffiles-filter_throughput': 'placeholder.txt'}
-
         all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
                                        'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
                                        'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
@@ -365,10 +359,10 @@ class Catalog_seed():
                                        'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
                                        'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
                                        'Reffiles-filter_throughput': 'placeholder.txt'},
-                            'fgs': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                    'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                    'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                    'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                            'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
+                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
+                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
+                                    'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
                                     'Reffiles-filter_throughput': 'placeholder.txt'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
@@ -3147,7 +3141,8 @@ class Catalog_seed():
                         filter_file = ("{}_niriss_throughput_nopy1.txt"
                                        .format(self.params['Readout'][usefilt].lower()))
                     elif instrm == 'fgs':
-                        raise ValueError("Filter throughputs for FGS not yet available")
+                        det = self.params['Readout']['array_name'].split('_')[0]
+                        filter_file = "{}_throughput_py.txt".format(det.lower())
                     filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
                     filter_file = os.path.join(filt_dir, filter_file)
 

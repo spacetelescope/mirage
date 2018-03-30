@@ -71,6 +71,10 @@ def unlinearize(image,coeffs,sat,lin_satmap,maxiter=10,accuracy=0.000001,robbert
     # and don't seem to be correlated with point source
     # locations.
     if i == maxiter and save_accuracy_map:
+        from astropy.io import fits
+        print(("WARNING: some pixels failed to unlinearize correctly within "
+               "the maximum number of iterations. Map of accuracy of the "
+               "unlinearized values saved to {}.".format(accuracy_file)))
         devcheck = np.copy(dev)
         devcheck[i2] = -1.
         h0 = fits.PrimaryHDU()
