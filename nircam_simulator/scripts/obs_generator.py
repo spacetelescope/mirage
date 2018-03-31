@@ -449,11 +449,11 @@ class Observation():
                                        , 'Reffiles-flux_cal':'niriss_zeropoint_values.out'
                                        , 'Reffiles-crosstalk':'niriss_xtalk_zeros.txt'
                                        , 'Reffiles-filtpupilcombo':'niriss_dual_wheel_list.txt'},
-                            'fgs': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
-                                    , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
-                                    , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
-                                    , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
-                                    , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}}
+                            'fgs': {'Reffiles-readpattdefs':'guider_readout_pattern.txt'
+                                    , 'Reffiles-subarray_defs':'guider_subarrays.list'
+                                    , 'Reffiles-flux_cal':'guider_zero_magnitude_values.out'
+                                    , 'Reffiles-crosstalk':'guider_xtalk_zeros.txt'
+                                    , 'Reffiles-filtpupilcombo':'guider_filter_dummy.list'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
                             
         for key1 in pathdict:
@@ -523,14 +523,14 @@ class Observation():
         # Make sure the input dark has a readout pattern
         # that is compatible with the requested output
         # readout pattern
-        rapids = ["RAPID", "NISRAPID"]
+        rapids = ["RAPID", "NISRAPID", "FGSRAPID"]
         darkpatt = self.linDark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
             (darkpatt not in rapids)):
             raise ValueError(("WARNING: Unable to convert input dark with a "
                               "readout pattern of {}, to the requested readout "
                               "pattern of {}. The readout pattern of the dark "
-                              "must be RAPID, NISRAPID or match the requested output "
+                              "must be RAPID, NISRAPID, FGSRAPID, or match the requested output "
                               "readout pattern.".format(darkpatt,
                                            self.params['Readout']['readpatt'])))
 
@@ -1479,7 +1479,7 @@ class Observation():
         Be sure to adjust the dark current ramp if nframe/nskip is different
         than the nframe/nskip values that the dark was taken with.
 
-        Only RAPID, NISRAPID darks will be re-averaged into different 
+        Only RAPID, NISRAPID, FGSRAPID darks will be re-averaged into different 
         readout patterns. But a BRIGHT2 dark can be used to create a 
         BRIGHT2 simulated ramp
 
@@ -1512,7 +1512,7 @@ class Observation():
         # We have already guaranteed that either the readpatterns match
         # or the dark is RAPID, so no need to worry about checking for
         # other cases here.
-        rapids = ["RAPID", "NISRAPID"]
+        rapids = ["RAPID", "NISRAPID", "FGSRAPID"]
         if ((darkpatt in rapids) and (self.params['Readout']['readpatt'] not in rapids)):
             deltaframe = self.params['Readout']['nskip'] + \
                          self.params['Readout']['nframe']
@@ -1590,32 +1590,10 @@ class Observation():
         if self.runStep['crosstalk']:
             ramp = self.addCrosstalk(ramp)
 
-        if self.runStep['pixelAreaMap']:
-            ramp = self.addPAM(ramp)
-
+        # PAM correction moved to catalog_seed_image.py
+        #if self.runStep['pixelAreaMap']:
+        #    ramp = self.addPAM(ramp)
         return ramp
-
-    #def addIPC(self, exposure):
-    #    # Input is always 4D
-    #    ints, groups, yd, xd = exposure.shape
-
-    #    # Prepare IPC effects
-    #    ipcimage = fits.getdata(self.params['Reffiles']['ipc'])
-
-    #    # If the IPC kernel is designed for the
-    #    # removal of IPC, we need to invert it
-    #    if self.params['Reffiles']['invertIPC']:
-    #        print("Inverting IPC kernel prior to convolving with image")
-    #        yk, xk = ipcimage.shape
-    #        newkernel = 0. - ipcimage
-    #        newkernel[int((yk - 1) / 2), int((xk - 1) / 2)] = 1. - (ipcimage[1, 1] - np.sum(ipcimage))
-    #        ipcimage = newkernel
-
-    #    # Apply the kernel to each frame of each integration
-    #    for integ in range(ints):
-    #        for group in range(groups):
-    #            exposure[integ, group, :, :] = s1.fftconvolve(exposure[integ, group, :, :], ipcimage, mode="same")
-    #    return exposure
 
     def addIPC(self, data):
         """
@@ -1805,7 +1783,7 @@ class Observation():
         if len(dims) == 2:
             subkernel = np.expand_dims(subkernel, axis=3)
             subkernel = np.expand_dims(subkernel, axis=4)
-            dims = subkernel.shape
+        dims = subkernel.shape
             
         # Make sure the total signal in the kernel = 1
         #ave = np.average(subkernel, axis=(0, 1))
@@ -1815,12 +1793,15 @@ class Observation():
         #subkernel *= renorm
 
         delta = subkernel * 0.
-        delta[nyc, nxc] = 1.
+        nyc = dims[0] // 2
+        nxc = dims[1] // 2
+        delta[nyc, nxc, :, :] = 1.
+
         a1 = np.fft.fft2(subkernel, axes=(0, 1)) 
         a2 = np.fft.fft2(delta, axes=(0, 1))
         aout = a2 / a1
         imout = np.fft.ifft2(aout, axes=(0, 1))
-        realout = np.real(imout)
+        #realout = np.real(imout)
         imout1 = np.fft.fftshift(imout, axes=(0, 1))
         realout1 = np.real(imout1)
 

@@ -16,7 +16,7 @@ import math
 from photutils import detect_threshold, detect_sources
 from astropy.io import fits, ascii
 from astropy.table import Table
-from astropy.modeling.models import Sersic2D
+from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
 from astropy.convolution import convolve
 from asdf import AsdfFile
 import yaml
@@ -131,6 +131,10 @@ class Catalog_seed():
         # calculate the exposure time of a single frame, based on the size of the subarray
         self.calcFrameTime()
 
+        # Read in the pixel area map, which will be needed for certain
+        # sources in the seed image
+        self.prepare_PAM()
+        
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             print('Creating signal rate image of synthetic inputs.')
@@ -143,7 +147,6 @@ class Catalog_seed():
         if self.params['Telescope']['tracking'].lower() == 'non-sidereal':
             print('Creating signal ramp of synthetic inputs')
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
-
             outapp = '_nonsidereal_target'
 
         # If non-sidereal targets are requested (KBOs, asteroids, etc,
@@ -165,12 +168,6 @@ class Catalog_seed():
                 self.seedimage = self.combineSimulatedDataSources('ramp', self.seedimage, trailed_ramp)
             self.seed_segmap += trailed_segmap
 
-
-        #TESTTESTTEST
-        hh00 = fits.PrimaryHDU(self.seedimage)
-        hhll = fits.HDUList([hh00])
-        hhll.writeto('subarr_seedim.fits',overwrite=True)
-            
         # For seed images to be dispersed in WFSS mode,
         # embed the seed image in a full frame array. The disperser
         # tool does not work on subarrays
@@ -182,6 +179,48 @@ class Catalog_seed():
         self.saveSeedImage()
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
+
+    def prepare_PAM(self):
+        """
+        Read in and prepare the pixel area map (PAM), to be used
+        during the seed creation process.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        None
+        """
+        fname = self.params['Reffiles']['pixelAreaMap']
+
+        # Read in PAM
+        try:
+            pam, header = fits.getdata(fname, header=True)
+        except:
+            raise IOError('WARNING: unable to read in {}'.format(fname))
+
+        # Crop to expected subarray
+        try:
+            pam = pam[self.subarray_bounds[1]:self.subarray_bounds[3]+1,
+                      self.subarray_bounds[0]:self.subarray_bounds[2]+1]
+        except:
+            raise ValueError("Unable to crop pixel area map to expected subarray.")
+
+        # If we are making a grism direct image, we need to embed the true pixel area
+        # map in an array of the appropriate dimension, where any pixels outside the
+        # actual aperture are set to 1.0
+        if self.params['Output']['grism_source_image']:
+            mapshape = pam.shape
+            #cannot use this: g, yd, xd = signalramp.shape
+            #need to update dimensions: self.pam = np.ones((yd, xd))
+            self.pam = np.ones(self.output_dims)
+            ys = self.coord_adjust['yoffset']
+            xs = self.coord_adjust['xoffset']
+            self.pam[ys:ys+mapshape[0], xs:xs+mapshape[1]] = np.copy(pam)
+        else:
+            self.pam = pam
 
     def pad_wfss_subarray(self, seed, seg):
         """
@@ -310,12 +349,6 @@ class Catalog_seed():
                                   'movingTargetExtended', 'movingTargetToTrack'],
                     'Output':['file', 'directory']}
 
-        #config_files = {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-        #                'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-        #                'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-        #                'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-        #                'Reffiles-filter_throughput': 'placeholder.txt'}
-
         all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
                                        'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
                                        'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
@@ -326,10 +359,10 @@ class Catalog_seed():
                                        'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
                                        'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
                                        'Reffiles-filter_throughput': 'placeholder.txt'},
-                            'fgs': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                    'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                    'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                    'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                            'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
+                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
+                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
+                                    'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
                                     'Reffiles-filter_throughput': 'placeholder.txt'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
@@ -420,6 +453,8 @@ class Catalog_seed():
                                                                        MT_tracking=tracking,
                                                                        tracking_ra_vel=ra_vel,
                                                                        tracking_dec_vel=dec_vel)
+            # Multiply by pixel area map since these sources are trailed across detector
+            mov_targs_ptsrc *= self.pam
             mov_targs_ramps.append(mov_targs_ptsrc)
             #print("Moving target segmap, min, max {}, {}".format(np.min(mt_ptsrc_segmap), np.max(mt_ptsrc_segmap)))
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
@@ -432,6 +467,8 @@ class Catalog_seed():
                                                                          MT_tracking=tracking,
                                                                          tracking_ra_vel=ra_vel,
                                                                          tracking_dec_vel=dec_vel)
+            # Multiply by pixel area map 
+            mov_targs_sersic *= self.pam
             mov_targs_ramps.append(mov_targs_sersic)
             if mov_targs_segmap is None:
                 mov_targs_segmap = np.copy(mt_galaxy_segmap)
@@ -446,6 +483,8 @@ class Catalog_seed():
                                                                    MT_tracking=tracking,
                                                                    tracking_ra_vel=ra_vel,
                                                                    tracking_dec_vel=dec_val)
+            # Multiply by pixel area map 
+            mov_targs_ext *= self.pam
             mov_targs_ramps.append(mov_targs_ext)
             if mov_targs_segmap is None:
                 mov_targs_segmap = np.copy(mt_ext_segmap)
@@ -489,7 +528,8 @@ class Catalog_seed():
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[3] - self.subarray_bounds[1] + 1) / 2.)
 
     def non_sidereal_seed(self):
-        """Create a seed EXPOSURE in the case where the instrument is tracking
+        """
+        Create a seed EXPOSURE in the case where the instrument is tracking
         a non-sidereal target
         """
 
@@ -497,9 +537,6 @@ class Catalog_seed():
         # These will be stationary in the fov
         nonsidereal_countrate, nonsidereal_segmap, self.ra_vel, self.dec_vel, vel_flag \
             = self.nonsidereal_CRImage(self.params['simSignals']['movingTargetToTrack'])
-
-        #print('nonsidereal_crimage segmap max and min:',np.max(nonsidereal_segmap),
-        #      np.min(nonsidereal_segmap))
 
         # Expand into a RAPID exposure and convert from signal rate to signals
         ns_yd, ns_xd = nonsidereal_countrate.shape
@@ -533,6 +570,9 @@ class Catalog_seed():
                                                                   tracking_ra_vel=self.ra_vel,
                                                                   tracking_dec_vel=self.dec_vel,
                                                                   trackingPixVelFlag=vel_flag)
+            # Multiply by pixel area map since these sources are trailed
+            # across detector
+            mtt_ptsrc *= self.pam
             mtt_data_list.append(mtt_ptsrc)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ptsrc_segmap)
@@ -548,6 +588,8 @@ class Catalog_seed():
                                                                         tracking_ra_vel=self.ra_vel,
                                                                         tracking_dec_vel=self.dec_vel,
                                                                         trackingPixVelFlag=vel_flag)
+            # Multiply by pixel area map 
+            mtt_galaxies *= self.pam
             mtt_data_list.append(mtt_galaxies)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_galaxies_segmap)
@@ -564,6 +606,8 @@ class Catalog_seed():
                                                               tracking_ra_vel=self.ra_vel,
                                                               tracking_dec_vel=self.dec_vel,
                                                               trackingPixVelFlag=vel_flag)
+            # Multiply by pixel area map 
+            mtt_ext *= self.pam
             mtt_data_list.append(mtt_ext)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ext_segmap)
@@ -590,16 +634,18 @@ class Catalog_seed():
 
         Arguments:
         ----------
-        file -- name of moving target catalog file
+        file : str
+            name of moving target catalog file
 
         Returns:
         --------
-        table containing moving target entries
-        pixelflag (boolean) -- If true, locations are in units of
-             pixels. If false, locations are RA, Dec
-        pixelvelflag (boolean) -- If true, moving target velocities
-             are in units of pixels/hour. If false, arcsec/hour
-        magsys -- magnitude system of the moving target magnitudes
+        returns : obj
+            Table containing moving target entries
+            pixelflag (boolean) -- If true, locations are in units of
+                pixels. If false, locations are RA, Dec
+            pixelvelflag (boolean) -- If true, moving target velocities
+                are in units of pixels/hour. If false, arcsec/hour
+            magsys -- magnitude system of the moving target magnitudes
         """
         mtlist = ascii.read(file, comment='#')
 
@@ -699,7 +745,9 @@ class Catalog_seed():
             # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+                
         # Using the requested RA,Dec of the reference pixel, along with the
         # V2,V3 of the reference pixel, and the requested roll angle of the telescope,
         # create a matrix that can be used to translate between V2,V3 and RA,Dec
@@ -728,9 +776,6 @@ class Catalog_seed():
             total_frames += (numresets * (numints - 1))
 
         frameexptimes = self.frametime * np.arange(-1,total_frames)
-        #frameexptimes = self.frametime * np.arange(-1,self.params['Readout']['ngroup']
-        #                                           * (self.params['Readout']['nframe']
-        #                                              + self.params['Readout']['nskip']))
 
         #output image dimensions
         #dims = np.array(self.dark.data[0,0,:,:].shape)
@@ -778,16 +823,6 @@ class Catalog_seed():
                 # x,y in each frame directly
                 x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                 y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
-
-            #print('x_frames: {}'.format(x_frames))
-            #print('y_frames: {}'.format(y_frames))
-
-            # If the target never falls on the detector,
-            # then move on to the next target
-            #xfdiffs = np.fabs(x_frames - (newdimsx/2))
-            #yfdiffs = np.fabs(y_frames - (newdimsy/2))
-            #if np.min(xfdiffs) > (newdimsx/2) or np.min(yfdiffs) > (newdimsy/2):
-            #    continue
 
             # If we have a point source, we can easily determine whether
             # it completely misses the detector, since we know the size
@@ -896,6 +931,101 @@ class Catalog_seed():
                     moving_segmap.segmap += indseg
         return mt_integration, moving_segmap.segmap
 
+    def simple_coord_transform(self):
+        """
+        For the case where the distortion reference file is not provided, 
+        generate a simple coordinate transform function that does not include
+        distortion
+
+        "Forward" transform = science -> ideal -> V2,V3
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        returns : astropy.modeling.Polynomial2D
+            Compound model containing the necessary functions
+            to transform coordinates assuming no distortion
+        """
+        xshift = Shift(0. - self.refpix_pos["x"])
+        yshift = Shift(0. - self.refpix_pos["y"])
+        pixelscalex = self.xsciscale
+        pixelscaley = self.ysciscale
+
+        # Science to Ideal transform
+        cx = {}
+        cx["c0_0"] = 0.
+        cx["c1_0"] = pixelscalex
+        cx["c1_1"] = 0.
+        cx["c0_1"] = 0.
+        x_sci_to_ideal_func = Polynomial2D(2, **cx)
+
+        cy = {}
+        cy["c0_0"] = 0.
+        cy["c1_0"] = 0.
+        cy["c1_1"] = 0.
+        cy["c0_1"] = pixelscaley
+        y_sci_to_ideal_func = Polynomial2D(2, **cy)
+
+        # Ideal to V2, V3 transform
+        parity = self.parity
+        v3_ideal_y_angle = self.v3yang
+
+        xc = {}
+        yc = {}
+        xc['c0_0'] = 0.
+        yc['c0_0'] = 0.
+        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
+        xc['c0_1'] = np.sin(v3_ideal_y_angle)
+        yc['c1_0'] = (0.-parity) * np.sin(v3_ideal_y_angle)
+        yc['c0_1'] = np.cos(v3_ideal_y_angle)
+        x_ideal_to_v2v3_func = Polynomial2D(1, **xc)
+        y_ideal_to_v2v3_func = Polynomial2D(1, **yc)
+
+        # Ideal to Science transform
+        cx = {}
+        cx["c0_0"] = 0.
+        cx["c1_0"] = 1./ pixelscalex
+        cx["c1_1"] = 0.
+        cx["c0_1"] = 0.
+        x_ideal_to_sci_func = Polynomial2D(2, **cx)
+
+        cy = {}
+        cy["c0_0"] = 0.
+        cy["c1_0"] = 0.
+        cy["c1_1"] = 0.
+        cy["c0_1"] = 1./ pixelscaley
+        y_ideal_to_sci_func = Polynomial2D(2, **cy)
+
+        # V2, V3 to Ideal transform
+        xc = {}
+        yc = {}
+        xc['c0_0'] = 0.
+        yc['c0_0'] = 0.
+        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
+        xc['c0_1'] = parity * (0. - np.sin(v3_ideal_y_angle))
+        yc['c1_0'] = np.sin(v3_ideal_y_angle)
+        yc['c0_1'] = np.cos(v3_ideal_y_angle)
+        x_v2v3_to_ideal_func = Polynomial2D(1, **xc)
+        y_v2v3_to_ideal_func = Polynomial2D(1, **yc)
+
+        # Shift by V2ref, V3ref
+        v2shift = Shift(self.v2_ref)
+        v3shift= Shift(self.v2_ref)
+        
+        #Now create a compound model for each with the appropriate
+        #inverse
+        sci2idl = Mapping([0,1,0,1]) | x_sci_to_ideal_func & y_sci_to_ideal_func
+        sci2idl.inverse = Mapping([0,1,0,1]) | x_ideal_to_sci_func & y_ideal_to_sci_func
+
+        idl2v2v3 = Mapping([0,1,0,1]) | x_ideal_to_v2v3_func & y_ideal_to_v2v3_func
+        idl2v2v3.inverse = Mapping([0,1,0,1]) | x_v2v3_to_ideal_func & y_v2v3_to_ideal_func
+
+        core_model = sci2idl | idl2v2v3
+        model = xshift & yshift | core_model | v2shift & v3shift
+        return model
 
     def on_detector(self,xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
@@ -929,7 +1059,7 @@ class Catalog_seed():
             status = 'off'
         return status
 
-    def getPositions(self,inx,iny,matrix,transform,pixelflag):
+    def getPositions(self, inx, iny, matrix, transform, pixelflag):
         #input a row containing x,y or ra,dec values, and figure out
         #x,y, RA, Dec, and RA string and Dec string
         try:
@@ -975,17 +1105,18 @@ class Catalog_seed():
 
         Arguments:
         ----------
-        file -- name of the file containing the tracked moving targets.
+        file : str
+            name of the file containing the tracked moving targets.
 
         Returns:
         --------
-        countrate image (2D) containing the tracked non-sidereal targets.
+        returns : obj
+            countrate image (2D) containing the tracked non-sidereal targets.
         """
         totalCRList = []
         totalSegList = []
 
         # Read in file containing targets
-        #targs,pixFlag,velFlag,magsys = self.readMTFile(self.params['simSignals']['movingTargetToTrack'])
         targs, pixFlag, velFlag, magsys = self.readMTFile(file)
 
         # We need to keep track of the proper motion of the
@@ -1022,7 +1153,7 @@ class Catalog_seed():
             meta2 = magsys
 
             meta3 = ('Point sources with non-sidereal tracking. '
-                     'File produced by ramp_simulator.py')
+                     'File produced by catalog_seed_image.py')
             meta4 = ('from run using non-sidereal moving target '
                      'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             ptsrc.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
@@ -1051,16 +1182,8 @@ class Catalog_seed():
             galaxies.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
             galaxies.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_sersic_sources.list'), format='ascii', overwrite=True)
 
-            #read in the PSF file with centered source
-            #wfe = self.params['simSignals']['psfwfe']
-            #wfegroup = self.params['simSignals']['psfwfegroup']
-            #basename = self.params['simSignals']['psfbasename'] + '_'
-            #if wfe == 0:
-            #    psfname=basename + self.params['simSignals'][usefilt].lower() + '_zero'
-            # else:
-            #    psfname=basename + self.params['Readout'][usefilt].lower() + "_" + str(wfe) + "_" + str(wfegroup)
-
             galaxyCRImage, galaxySegmap = self.makeGalaxyImage('temp_non_sidereal_sersic_sources.list', self.centerpsf)
+            galaxyCRImage *= self.pam
             totalCRList.append(galaxyCRImage)
             totalSegList.append(galaxySegmap)
 
@@ -1081,15 +1204,6 @@ class Catalog_seed():
             extended.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
             extended.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_extended_sources.list'), format='ascii', overwrite=True)
 
-            # read in the PSF file with centered source
-            # wfe = self.params['simSignals']['psfwfe']
-            # wfegroup = self.params['simSignals']['psfwfegroup']
-            # basename = self.params['simSignals']['psfbasename'] + '_'
-            # if wfe == 0:
-            #    psfname=basename + self.params['simSignals'][usefilt].lower() + '_zero'
-            # else:
-            #    psfname=basename + self.params['Readout'][usefilt].lower() + "_" + str(wfe) + "_" + str(wfegroup)
-
             extlist, extstamps = self.getExtendedSourceList('temp_non_sidereal_extended_sources.list')
 
             # translate the extended source list into an image
@@ -1098,6 +1212,8 @@ class Catalog_seed():
             # if requested, convolve the stamp images with the instrument PSF
             if self.params['simSignals']['PSFConvolveExtended']:
                 extCRImage = s1.fftconvolve(extCRImage, self.centerpsf, mode='same')
+
+            extCRImage *= self.pam
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
@@ -1111,10 +1227,8 @@ class Catalog_seed():
                     totalCRImage += totalCRList[i]
                     totalSegmap += totalSegList[i] + i
         else:
-            print("No non-sidereal countrate targets produced.")
-            print("You shouldn't be here.")
-            sys.exit()
-
+            raise ValueError(("No non-sidereal countrate targets produced."
+                              "You shouldn't be here."))
         return totalCRImage, totalSegmap, track_ra_vel, track_dec_vel, velFlag
 
     def addedSignals(self):
@@ -1176,17 +1290,10 @@ class Catalog_seed():
         # and create a countrate image of those galaxies.
         if self.runStep['galaxies'] == True:
             galaxyCRImage, galaxy_segmap = self.makeGalaxyImage(self.params['simSignals']['galaxyListFile'], self.centerpsf)
-            # Check segmentation map values. If the index numbers overlap
-            # between point sources and galaxies, then bump up the values
-            # in the galaxy list, and tell the user
-            #mingalseg = np.min(galaxy_segmap > 0)
-            #maxseg = np.max(segmentation_map)
-            #if mingalseg < maxseg:
-            #    diff = np.int(maxseg - mingalseg)
-            #    print("WARNING: index numbers in {} overlap".format(self.params['simSignals']['galaxyListFile']))
-            #    print("with those from {}".format(self.params['simSignals']['pointsource']))
-            #    print("Adding {} to the galaxy object indexes.".format(diff + 1))
-            #    galaxy_segmap[galaxy_segmap > 0] += (diff + 1)
+
+            # Multiply by the pixel area map
+            galaxyCRImage *= self.pam
+            
             # Add galaxy segmentation map to the master copy
             segmentation_map += galaxy_segmap
 
@@ -1210,17 +1317,13 @@ class Catalog_seed():
             # translate the extended source list into an image
             extimage, ext_segmap = self.makeExtendedSourceImage(extlist, extstamps)
 
-            # Check segmentation map values. If the index numbers overlap
-            # between master copy and extended sources, then bump up the values
-            # in the extended source list, and tell the user
-            #minextseg = np.min(ext_segmap > 0)
-            #maxseg = np.max(segmentation_map)
-            #if minextseg < maxseg:
-            #    diff = maxseg - minextseg
-            #    print("WARNING: index numbers in {} overlap".format(self.params['simSignals']['extended']))
-            #    print("with those from previously added sources.")
-            #    print("Adding {} to the extended object indexes.".format(diff + 1))
-            #    ext_segmap[ext_segmap > 0] += (diff + 1)
+            # If requested, convolve the extended source image with the instrument PSF
+            if self.params['simSignals']['PSFConvolveExtended']:
+                extimage = s1.fftconvolve(extimage, self.centerpsf, mode='same')
+            
+            # Multiply by the pixel area map
+            extimage *= self.pam
+            
             # Add galaxy segmentation map to the master copy
             segmentation_map += ext_segmap
 
@@ -1233,19 +1336,6 @@ class Catalog_seed():
                 hlist.writeto(extImageName, overwrite=True)
                 print("Extended object image and segmap saved as {}".format(extImageName))
 
-            #h0 = fits.PrimaryHDU(ptsrc_segmap)
-            #h1 = fits.ImageHDU(galaxy_segmap)
-            #h2 = fits.ImageHDU(ext_segmap)
-            #hl = fits.HDUList([h0, h1, h2])
-            #hl.writeto('segmaps.fits')
-            #stop
-
-
-            #convolution now done inside makeextendedsourceimage
-            #if requested, convolve the stamp images with the NIRCam PSF
-            #if self.params['simSignals']['PSFConvolveExtended']:
-            #    extimage = s1.fftconvolve(extimage, self.centerpsf, mode='same')
-
             # add the extended image to the synthetic signal rate image
             signalimage = signalimage + extimage
 
@@ -1254,27 +1344,27 @@ class Catalog_seed():
             #zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
             zodiangle = self.params['Telescope']['rotation']
             zodiacalimage, zodiacalheader = self.getImage(self.params['simSignals']['zodiacal'], arrayshape, True, zodiangle, arrayshape/2)
+
+            # Multiply by the pixel area map
+            zodiacalimage *= self.pam
+            
             signalimage = signalimage + zodiacalimage*self.params['simSignals']['zodiscale']
 
         # SCATTERED LIGHT - no rotation here.
         if self.runStep['scattered']:
-            scatteredimage, scatteredheader = self.getImage(self.params['simSignals']['scattered'], arrayshape, False, 0.0, arrayshape/2)
+            scatteredimage, scatteredheader = self.getImage(self.params['simSignals']['scattered'],
+                                                            arrayshape, False, 0.0, arrayshape/2)
+
+            # Multiply by the pixel area map
+            scatteredimage *= self.pam
+            
             signalimage = signalimage + scatteredimage*self.params['simSignals']['scatteredscale']
 
-        # CONSTANT BACKGROUND
-        signalimage = signalimage + self.params['simSignals']['bkgdrate']
-
-
-        # Save the image containing all of the added sources from the 'sky'
-        # if self.params['Output']['save_intermediates'] == True:
-        #    sourcesImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesRateImage_adu_per_sec.fits'
-        #    self.saveSingleFits(signalimage, sourcesImageName)
-        #    print("Image of added sources from the 'sky' saved as {}".format(sourcesImageName))
-
+        # CONSTANT BACKGROUND - multiply by pixel area map first
+        signalimage = signalimage + self.params['simSignals']['bkgdrate'] * self.pam
 
         # Save the final rate image of added signals
         if self.params['Output']['save_intermediates'] == True:
-            # rateImageName = self.params['Output']['file'][0:-5] + '_AddedSourcesPlusDetectorEffectsRateImage_adu_per_sec.fits'
             rateImageName = self.basename + '_AddedSources_adu_per_sec.fits'
             self.saveSingleFits(signalimage, rateImageName)
             print("Signal rate image of all added sources saved as {}".format(rateImageName))
@@ -1356,7 +1446,10 @@ class Catalog_seed():
             print("the output. PSFs will be generated by WebbPSF on the fly")
             raise NotImplementedError("Not yet implemented.")
 
-        pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'), dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
+        pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees',
+                                       'Dec_degrees', 'magnitude', 'countrate_e/s',
+                                       'counts_per_frame_e'),
+                                dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
 
         try:
             lines, pixelflag, magsys = self.readPointSourceFile(filename)
@@ -1404,11 +1497,12 @@ class Catalog_seed():
         # now offset the field center to array center for astrometric distortion corrections
         coord_transform = None
         if self.runStep['astrometric']:
-
             # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+            
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -1445,9 +1539,12 @@ class Catalog_seed():
 
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
-        pslist.write("# Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny))
+        pslist.write(("# Field center (degrees): %13.8f %14.8f y axis rotation angle "
+                      "(degrees): %f  image size: %4.4d %4.4d\n" %
+                      (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny)))
         pslist.write('#\n')
-        pslist.write("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n")
+        pslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
+                      "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
         start_time = time.time()
         times = []
@@ -1485,14 +1582,16 @@ class Catalog_seed():
 
                 # Case where point source list entries are given with RA and Dec
                 if not pixelflag:
-                    
+                     
                     # If distortion is to be included - either with or without the full set of coordinate
                     # translation coefficients
-                    if self.runStep['astrometric']:
-                        pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-                    else:
-                        # No distortion at all - "manual mode"
-                        pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                    #if self.runStep['astrometric']:
+
+                    # Same function call regardless of whether distortion file is provided or not
+                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                    #else:
+                    #    # No distortion at all - "manual mode"
+                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
                 else:
                     # Case where the point source list entry locations are given in units of pixels
@@ -1508,8 +1607,8 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix, coord_transform)
-
+                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
+                                                              coord_transform)
 
                 # Get the input magnitude of the point source
                 mag = float(values['magnitude'])
@@ -1618,29 +1717,12 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-            #a = round(interval * int(numperpix*xfract + 0.5) - 0.5, 1)
-            #b = round(interval * int(numperpix*yfract + 0.5) - 0.5, 1)
-            a = round(interval * int(numperpix*xfract + 0.5) - 0.5, 2)
-            b = round(interval * int(numperpix*yfract + 0.5) - 0.5, 2)
 
-            if a < 0:
-                astr = str(a)[0:5]
-            else:
-                astr = str(a)[0:4]
-            if b < 0:
-                bstr = str(b)[0:5]
-            else:
-                bstr = str(b)[0:4]
-
-            if astr == "0.0":
-                astr = "0.00"
-            if bstr == "0.0":
-                bstr = "0.00"
-
-            if self.params['simSignals']['psfbasename'].lower() == 'niriss':
-                astr = '{:1.2f}'.format(np.float(astr))
-                bstr = '{:1.2f}'.format(np.float(bstr))
-
+            a_in = interval * int(numperpix*xfract + 0.5) - 0.5
+            b_in = interval * int(numperpix*yfract + 0.5) - 0.5
+            astr = "{0:.{1}f}".format(a_in, 2)
+            bstr = "{0:.{1}f}".format(b_in, 2)
+   
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr
@@ -1887,20 +1969,68 @@ class Catalog_seed():
         ra_source = ra * 3600.
         dec_source = dec * 3600.
 
-        dist_between, deltaang = self.dist([self.ra, self.dec], [ra_source, dec_source])
+        #dist_between, deltaang = self.object_separation([self.ra, self.dec],
+        #                                               [ra_source, dec_source])
 
+        #simple_wcs_obj = {}
+        #simple_wcs_obj["CRPIX1"] = self.refpix_pos["x"]
+        #simple_wcs_obj["CRPIX2"] = self.refpix_pos["y"]
+        #simple_wcs_obj["CRVAL1"] =
+        #simple_wcs_obj["CRVAL2"] =
+        #simple_wcs_obj["CTYPE1"] =
+        #simple_wcs_obj["CTYPE2"] =
+        #simple_wcs_obj["CD1_1"] =
+        #simple_wcs_obj["CD1_2"] =
+        #simple_wcs_obj["CD2_1"] =
+        #simple_wcs_obj["CD2_2"] = 
+
+        #wcs_obj = astropy.wcs.WCS(header = simple_wcs_obj)
+        deltara, deltadec = self.object_separation([self.ra, self.dec],
+                                                   [ra_source, dec_source], wcs_obj)
         # Now translate to deltax and deltay if the
         # position angle is non-zero
-        tot_ang = deltaang + (0. - self.params['Telescope']['rotation'] * np.pi / 180.)
+        #tot_ang = deltaang + (0. - self.params['Telescope']['rotation'] * np.pi / 180.)
 
-        deltax = dist_between * np.sin(tot_ang) / self.pixscale[0]
-        deltay = dist_between * np.cos(tot_ang) / self.pixscale[0]
+        #deltax = dist_between * np.sin(tot_ang) / self.pixscale[0]
+        #deltay = dist_between * np.cos(tot_ang) / self.pixscale[0]
 
-        pixelx = self.refpix_pos['x'] + deltax
-        pixely = self.refpix_pos['y'] + deltay
+        #pixelx = self.refpix_pos['x'] + deltax
+        #pixely = self.refpix_pos['y'] + deltay
 
+        
+        
+        
         return pixelx, pixely
 
+    def object_separation(self, radec1, radec2, wcs):
+        """
+        Calculate the distance between two points on the sky given their
+        RA, Dec values. Also calculate the angle (east of north?) between
+        the two points.
+
+        Parameters:
+        -----------
+        radec1 : list
+            2-element list giving the RA, Dec (in decimal degrees) for 
+            the first object
+
+        radec2 : list
+            2-element list giving the RA, Dec (in decimal degrees) for
+            the second object
+
+        Returns:
+        --------
+        distance : float
+            Angular separation (in degrees) between the two objects
+
+        angle : float
+            Angle (east of north?) separating the two sources
+        """
+        c1 = SkyCoord(radec1[0]*u.degree, radec1[1]*u.degree, frame='icrs')
+        c2 = SkyCoord(radec2[0]*u.degree, radec2[1]*u.degree, frame='icrs')
+        sepra, sepdec = c1.spherical_offsets_to(c2).to_pixel(wcs)
+        return sepra, sepdec
+        
     def XYToRADec(self, pixelx, pixely, attitude_matrix, coord_transform):
         # Translate a given x, y location on the detector
         # to RA, Dec
@@ -2019,7 +2149,9 @@ class Catalog_seed():
         if self.runStep['astrometric']:
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+                
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -2082,12 +2214,15 @@ class Catalog_seed():
             if not pixelflag:
 
                 # if distortion is to be included
-                if self.runStep['astrometric']:
-                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                #if self.runStep['astrometric']:
 
-                else:
-                    # No distortion. Fall back to "manual" calculations
-                    pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                # Call is the same regardless of whether distortion reference file
+                # is given or not
+                pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+
+                #else:
+                #    # No distortion. Fall back to "manual" calculations
+                #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
             else:
                 # case where the point source list entry locations are given in units of pixels
@@ -2400,24 +2535,27 @@ class Catalog_seed():
         # now offset the field center to array center for astrometric distortion corrections
         coord_transform = None
         if self.runStep['astrometric']:
-
             # Read in the CRDS-format distortion reference file
             with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
-
+        else:
+            coord_transform = self.simple_coord_transform()
+                
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
         # for any pixel.
         # v2, v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        # attitude_matrix = rotations.attitude(self.refpix_pos['v2'], self.refpix_pos['v3'], self.ra, self.dec, self.params['Telescope']["rotation"])
         attitude_matrix = self.getAttitudeMatrix()
 
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
-        eslist.write("# Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny))
+        eslist.write(("# Field center (degrees): %13.8f %14.8f y axis rotation angle "
+                      "(degrees): %f  image size: %4.4d %4.4d\n" %
+                      (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny)))
         eslist.write('# \n')
-        eslist.write("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n")
+        eslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
+                      "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
         # Add an index column if not present
         if 'index' in lines.colnames:
@@ -2464,11 +2602,12 @@ class Catalog_seed():
 
                     # If distortion is to be included - either with or without the full set of coordinate
                     # translation coefficients
-                    if self.runStep['astrometric']:
-                        pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-                    else:
-                        # No distortion at all - "manual mode"
-                        pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                    #if self.runStep['astrometric']:
+                    # Same function call regardless of whether distortion file is provided or not
+                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                    #else:
+                    #    # No distortion at all - "manual mode"
+                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
                 else:
                     # Case where the point source list entry locations are given in units of pixels
@@ -2484,7 +2623,8 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix, coord_transform)
+                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
+                                                              coord_transform)
 
                 # Get the input magnitude
                 try:
@@ -2642,7 +2782,7 @@ class Catalog_seed():
         segmentation.ydim = newdimsy
         segmentation.initialize_map()
 
-        # Loop over the entries in the point source list
+        # Loop over the entries in the source list
         for entry, stamp in zip(extSources, extStamps):
             # adjust x, y position if the grism output image is requested
             xpos = entry['pixelx'] + deltax
@@ -2653,7 +2793,7 @@ class Catalog_seed():
             # desired counts per second in the source
             counts = entry['countrate_e/s'] # / self.frametime
 
-            # Extract the appropriate subarray from the PSF image if necessary
+            # Extract the appropriate subarray from the image if necessary
             # Assume that the brightest pixel corresponds to the peak of the source
             psfdims = stamp.shape
             nyshift, nxshift = np.array(psfdims) / 2
@@ -3001,7 +3141,8 @@ class Catalog_seed():
                         filter_file = ("{}_niriss_throughput_nopy1.txt"
                                        .format(self.params['Readout'][usefilt].lower()))
                     elif instrm == 'fgs':
-                        raise ValueError("Filter throughputs for FGS not yet available")
+                        det = self.params['Readout']['array_name'].split('_')[0]
+                        filter_file = "{}_throughput_py.txt".format(det.lower())
                     filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
                     filter_file = os.path.join(filt_dir, filter_file)
 
