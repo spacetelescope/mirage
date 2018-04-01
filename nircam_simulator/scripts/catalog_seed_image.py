@@ -1717,6 +1717,7 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
+
             a_in = interval * int(numperpix*xfract + 0.5) - 0.5
             b_in = interval * int(numperpix*yfract + 0.5) - 0.5
             astr = "{0:.{1}f}".format(a_in, 2)
@@ -1744,8 +1745,7 @@ class Catalog_seed():
                     else:
                         raise FileNotFoundError("PSF file {} not found.".format(psffn))
                 except:
-                    print("ERROR: Could not load PSF file {} from library".format(psffn))
-                    sys.exit()
+                    raise RuntimeError("ERROR: Could not load PSF file {} from library".format(psffn))
 
             # Normalize the total signal in the PSF as read in
             totalsignal = np.sum(webbpsfimage)
