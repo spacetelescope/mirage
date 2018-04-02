@@ -5,6 +5,7 @@ import re
 from lxml import etree
 from astropy.io import ascii
 import numpy as np
+from collections import OrderedDict
 import pprint
 
 SCRIPTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -36,7 +37,7 @@ class ReadAPTXML():
         # Set up dictionary of observation parameters to be populated
         ProposalParams_keys = ['PI_Name', 'Proposal_category', 'ProposalID',
                                'Science_category', 'Title']
-        ObsParams_keys = ['Module', 'Subarray',
+        ObsParams_keys = ['Module', 'Subarray', 'Instrument',
                           'PrimaryDitherType', 'PrimaryDithers', 'SubpixelPositions',
                           'SubpixelDitherType', 'CoordinatedParallel',
                           'ObservationID', 'TileNumber', 'APTTemplate']
@@ -44,10 +45,10 @@ class ReadAPTXML():
                              'ReadoutPattern', 'Groups', 'Integrations']
         OtherParams_keys = ['Mode', 'Grism']
 
-        APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
+        self.APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
             FilterParams_keys + OtherParams_keys
         self.APTObservationParams = {}
-        for key in APTObservationParams_keys:
+        for key in self.APTObservationParams_keys:
             self.APTObservationParams[key] = []
 
     def read_xml(self, infile):
@@ -131,7 +132,7 @@ class ReadAPTXML():
         i_observations = []
         obs_indices = range(len(obs_results))
         for o, i_obs in zip(obs_results, obs_indices):
-            if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC']:
+            if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC', 'NIRISS']:
                 observations.append(o)
                 i_observations.append(i_obs)
 
@@ -149,7 +150,8 @@ class ReadAPTXML():
             # Are all the templates in the XML file something that we can handle?
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
                                    'NircamEngineeringImaging', 'WfscGlobalAlignment',
-                                   'WfscCoarsePhasing', 'WfscFinePhasing']
+                                   'WfscCoarsePhasing', 'WfscFinePhasing',
+                                   'NirissExternalCalibration']
             if template_name not in known_APT_templates:
                 # If not, turn back now.
                 raise ValueError('No protocol written to read {} template.'.format(template_name))
@@ -181,10 +183,16 @@ class ReadAPTXML():
             prop_params = [pi_name, prop_id, prop_title, prop_category,
                            science_category, coordparallel, i_obs]
 
+            proposal_parameter_dictionary = {'PI_Name': pi_name, 'ProposalID': prop_id, 'Title': prop_title, 'Proposal_category': prop_category, 'Science_category': science_category, 'CoordinatedParallel': coordparallel, 'ObservationID': i_obs}
+
+
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # If template is NircamImaging or NircamEngineeringImaging
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 self.read_imaging_template(template, template_name, obs, prop_params)
+
+            elif template_name in ['NirissExternalCalibration']:
+                self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary)
 
             # If template is WFSC Commissioning
             if template_name in ['WfscCommissioning']:
@@ -262,17 +270,101 @@ class ReadAPTXML():
         dictionary['ObservationID'].append(tup[21])
         dictionary['TileNumber'].append(tup[22])
         dictionary['APTTemplate'].append(tup[23])
+        dictionary['Instrument'].append(tup[24])
         return dictionary
+
+
+    def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary):
+        """Read imaging template content regardless of instrument. 
+        Save content to object attributes.
+
+        Parameters
+        ----------
+        template
+        template_name : str
+        obs
+        proposal_parameter_dictionary : dict
+
+        """
+
+        instrument = obs.find(self.apt + 'Instrument').text
+
+        # Get proposal parameters
+        # pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
+        exposures_dictionary = OrderedDict()
+
+        for key in self.APTObservationParams_keys:
+            exposures_dictionary[key] = []
+
+        # Set namespace
+        ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
+
+        for element in template:
+            element_tag_stripped = element.tag.split(ns)[1]
+            print('{} {}'.format(element_tag_stripped, element.text))
+
+            # for NIRISS loop through exposures and collect exposure parameters
+            if (instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList'):
+                for exposure in element.findall(ns + 'Exposure'):
+                    exposure_dict = {}
+                    for exposure_parameter in exposure:
+                        parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
+                        print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
+                        exposure_dict[parameter_tag_stripped] = exposure_parameter.text
+
+                    # fill dictionary to return
+                    for key in self.APTObservationParams_keys:
+                        if key in exposure_dict.keys():
+                            value = exposure_dict[key]
+                            print(key)
+                        elif key in proposal_parameter_dictionary.keys():
+                            value = proposal_parameter_dictionary[key]
+                            print(key)
+                        elif key == 'Instrument':
+                            value = instrument
+                        else:
+                            value = str(None)
+
+                        if (key == 'PrimaryDithers') and ((value is None) or (value == 'None')):
+                            value = '1'
+
+                        elif (key == 'Mode') and (template_name == 'NirissExternalCalibration'):
+                            value = 'imaging'
+
+
+                        exposures_dictionary[key].append(value)
+
+                    # add keys that were not defined in self.APTObservationParams_keys
+                    # (to be fixed in Class.__init__ later )
+                    for key in exposure_dict.keys():
+                        if key not in self.APTObservationParams_keys:
+                            # if key not yet present, create entry
+                            if key not in exposures_dictionary.keys():
+                                exposures_dictionary[key] = [str(exposure_dict[key])]
+                            else:
+                                exposures_dictionary[key].append(str(exposure_dict[key]))
+
+        self.APTObservationParams = exposures_dictionary
+
+        # print(exposures_dictionary)
+        return
+
+
 
     def read_imaging_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
         pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
 
+
         # Set namespace
-        if template_name == 'NircamImaging':
-            ns = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
-        elif template_name == 'NircamEngineeringImaging':
-            ns = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
+        ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
+        # if template_name == 'NircamImaging':
+        #     ns = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
+        # elif template_name == 'NircamEngineeringImaging':
+        #     ns = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
+
+        instrument = obs.find(self.apt + 'Instrument').text
 
         # Set parameters that are constant for all imaging obs
         #typeflag = template_name
@@ -336,7 +428,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, 1, template_name)
+                          i_obs + 1, 1, template_name, instrument)
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
 
