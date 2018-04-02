@@ -25,14 +25,14 @@ from astropy.io import ascii as asc
 
 
 def get_siaf():
-    """Return a dictionary that holds the contents of the SIAF config
+    '''Return a dictionary that holds the contents of the SIAF config
     file.
 
     Returns
     -------
     siaf_files : dict
         A dictionary that holds the contents of the config file.
-    """
+    '''
     scripts_dir = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
     package_dir = os.path.dirname(scripts_dir)
     config_file = os.path.join(package_dir, 'config', 'siaf_config.json')
@@ -44,6 +44,9 @@ def get_siaf():
 
 
 def get_aperture_definition(aperture_name, instrument):
+    '''Parses the SIAF to get the definition of a given aperture
+    '''
+
     siaf_file = get_siaf()[instrument]
     siaf_table = asc.read(siaf_file, header_start=1)
     row_ind = list(siaf_table['AperName']).index(aperture_name)

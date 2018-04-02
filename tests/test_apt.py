@@ -1,4 +1,8 @@
-'''Define tests for pytest.
+'''Define unit tests for parsing APT templates with pytest.
+
+Authors
+-------
+    - Lauren Chambers
 
 Use
 ---
@@ -6,6 +10,7 @@ Use
     parent directory of nircam_simulator/tests/:
     >>> pytest
 '''
+
 import os
 
 from nircam_simulator.scripts import write_observationlist, yaml_generator, utils
@@ -18,6 +23,9 @@ TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)
 
 
 def test_APT():
+    '''Parse the given APT files and create a set of .yamls for each
+    instrument in the INSTRUMENTS list.
+    '''
     for instrument in INSTRUMENTS:
         # Define .pointing and .xml file locations
         pointing_file = os.path.join(TESTS_DIR, 'test_data', instrument + 'Test.pointing')
