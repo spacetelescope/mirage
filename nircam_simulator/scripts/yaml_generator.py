@@ -74,7 +74,7 @@ HISTORY:
 
 July 2017 - V0: Initial version. Bryan Hilbert
 Feb 2018 - V1: Updates to accomodate multiple filter pairs per
-               observation. Launren Chambers
+               observation. Lauren Chambers
 
 '''
 
@@ -908,7 +908,7 @@ class SimInput:
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  distortion_coeffs: {}        # CSV file containing distortion coefficients\n'.format(input['siaf']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
-            if instrument.lower() == 'nircam':
+            if instrument.lower() in ['nircam', 'wfsc']:
                 invertIPC = True
             elif instrument.lower() == 'niriss':
                 invertIPC = False
@@ -934,7 +934,7 @@ class SimInput:
             f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
             f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
             # temporary tweak here to make it work with NIRISS
-            if instrument.lower() == 'nircam':
+            if instrument.lower() in ['nircam', 'wfsc']:
                 detector_label = input['detector']
             elif instrument.lower() == 'niriss':
                 detector_label = 'B5'
@@ -942,7 +942,7 @@ class SimInput:
             f.write('  seed: {}                           # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
-            if instrument.lower() == 'nircam':
+            if instrument.lower() in ['nircam', 'wfsc']:
                 PointSourceCatalog = input['{}_ptsrc'.format(catkey)]
                 GalaxyCatalog = input['{}_galcat'.format(catkey)]
                 ExtendedCatalog = input['{}_ext'.format(catkey)]

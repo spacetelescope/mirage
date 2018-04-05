@@ -1,10 +1,11 @@
-'''Create necessary catalog files for a given proposal.
+'''Create necessary catalog files for targets in a given APT proposal.
 
-Extracts the RA and Dec of all observed targets from the pointing file,
-and checks to see if a catalog file has already been generated for
-these targets in nircam_simulator/catalogs/. If not, queries 2MASS and
-WISE for short-wave and long-wave catalogs, respectively, and writes
-new .list files.
+Extracts the RA and Dec of all observed targets from the APT .pointing
+file, and creates a catalog file that lists the sources within a
+defined radius of each of these targets in nircam_simulator/catalogs/.
+This module uses astroquery and Vizier to query 2MASS and WISE for
+short-wave (F212N) and long-wave (F480M) catalogs, respectively, and
+writes .list files.
 
 Authors
 -------
@@ -81,7 +82,7 @@ def get_target_coords(pointing_file, prop_id):
     return target_coords
 
 
-def get_sw_catalog(target_coords):
+def get_sw_catalog(target_coords, search_radius=15 * u.arcmin):
     '''Query 2MASS catalog and write out shortwave catalog file for each target
 
     Parameters
@@ -118,7 +119,7 @@ def get_sw_catalog(target_coords):
         # If not, query shortwave sources from the 2MASS catalog from Vizier
         v = Vizier(catalog='II/246/out', columns=['_RAJ2000', '_DEJ2000', 'Kmag'])
         v.ROW_LIMIT = -1
-        result = v.query_region(t, radius="1deg")
+        result = v.query_region(t, radius=search_radius)
         queried_catalog_sw = result['II/246/out']
 
         print('Queried {} 2MASS objects within {} of RA, Dec ({:.2f}, {:.2f}).'.
@@ -146,7 +147,7 @@ def get_sw_catalog(target_coords):
     return catalog_filenames_sw
 
 
-def get_lw_catalog(target_coords):
+def get_lw_catalog(target_coords, search_radius=15 * u.arcmin):
     '''Query WISE catalog and write out longwave catalog file for each target
 
     Parameters
@@ -183,7 +184,7 @@ def get_lw_catalog(target_coords):
         # If not, query longwave sources from the WISE catalog from Vizier
         v = Vizier(catalog='II/328/allwise', columns=['RAJ2000', 'DEJ2000', 'W2mag'])
         v.ROW_LIMIT = -1
-        result = v.query_region(t, radius="1deg")
+        result = v.query_region(t, radius=search_radius)
         queried_catalog_lw = result['II/328/allwise']
 
         print('Queried {} WISE objects within {} of RA, Dec ({:.2f}, {:.2f}).'.
@@ -212,6 +213,21 @@ def get_lw_catalog(target_coords):
 
 
 def get_all_catalogs(pointing_file, prop_id):
+    '''Query WISE and 2MASS catalogs and write out long- and shortwave
+    catalog files for each target in the provided APT proposal
+
+    Parameters
+    ----------
+    pointing_file : str
+        Path to APT .pointing file
+    prop_id : str
+        APT proposal ID number
+
+    Returns
+    -------
+    tuple
+        Lists of shortwave and longwave catalog filenames
+    '''
     target_coords = get_target_coords(pointing_file, prop_id)
     catalog_filenames_sw = get_sw_catalog(target_coords)
     catalog_filenames_lw = get_lw_catalog(target_coords)

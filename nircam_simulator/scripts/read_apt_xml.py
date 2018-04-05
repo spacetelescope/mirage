@@ -275,7 +275,7 @@ class ReadAPTXML():
 
 
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary):
-        """Read imaging template content regardless of instrument. 
+        """Read imaging template content regardless of instrument.
         Save content to object attributes.
 
         Parameters
@@ -494,7 +494,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name)
+                              i_obs + 1, j + 1, template_name, 'WFSC')
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -577,7 +577,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, j + 1, template_name)
+                          i_obs + 1, j + 1, template_name, 'WFSC')
 
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -644,7 +644,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name)
+                              i_obs + 1, j + 1, template_name, 'WFSC')
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -792,7 +792,7 @@ class ReadAPTXML():
                                   pdither, sdithtype, sdither, sfilt, lfilt,
                                   rpatt, grps, ints, short_pupil,
                                   long_pupil, grismval, coordparallel,
-                                  i_obs + 1, j + 1, template_name)
+                                  i_obs + 1, j + 1, template_name, 'WFSC')
 
                     self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                     self.obs_tuple_list.append(tup_to_add)
@@ -807,6 +807,8 @@ class ReadAPTXML():
 
         # Set namespace
         ns = "{http://www.stsci.edu/JWST/APT/Template/NircamWfss}"
+
+        instrument = obs.find(self.apt + 'Instrument').text
 
         mod = template.find(ns + 'Module').text
         subarr = template.find(ns + 'Subarray').text
@@ -868,7 +870,7 @@ class ReadAPTXML():
                               sdither, sfilt, lfilt, rpatt, groups,
                               integrations, short_pupil, long_pupil,
                               grismvalue, coordparallel,
-                              i_obs + 1, 1, template_name)
+                              i_obs + 1, 1, template_name, instrument)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -907,7 +909,7 @@ class ReadAPTXML():
                                      pdither, sdithtype, sdither, sfilt, lfilt,
                                      rpatt, grps, ints, short_pupil, long_pupil,
                                      grismvalue, coordparallel,
-                                     i_obs + 1, 1, template_name)
+                                     i_obs + 1, 1, template_name, instrument)
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, direct_tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
 
