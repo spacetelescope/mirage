@@ -386,11 +386,29 @@ class Catalog_seed():
         yd, xd = self.nominal_dims
         # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
         # UPDATED VERSION, 16 Sept 2017
-        colpad = 12
-        rowpad = 2
-        if ((xd <= 8) & (yd <= 8)):
-            rowpad = 3
-        self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
+        if 'nircam' in self.params['Inst']['instrument']:
+          colpad = 12
+          rowpad = 2
+          if ((xd <= 8) & (yd <= 8)):
+              rowpad = 3
+          self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
+        else:
+        # the following applies to NIRISS and Guider full frame imaging and
+        # NIRISS sub-arrays.
+        #
+        # According JDox the NIRCam full frame time is 10.73677 seconds the
+        # same as for NIRISS, but right now the change does not apply to NIRCam.
+        #
+        # note that the Guider frame time may be different for small sub-arrays
+        # less than 64 pixels square, but that needs to be confirmed.
+          colpad=12
+          if self.params['Readout']['namp'] == 4:
+            pad1=1
+            pad2=1
+          else:
+            pad1=2
+            pad2=0
+          self.frametime=(pad2+(yd/self.params['Readout']['namp']+colpad)*(xd+pad1)*0.00001
 
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
