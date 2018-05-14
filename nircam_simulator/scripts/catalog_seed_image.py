@@ -399,6 +399,7 @@ class Catalog_seed():
         # According JDox the NIRCam full frame time is 10.73677 seconds the
         # same as for NIRISS, but right now the change does not apply to NIRCam.
         #
+        #
         # note that the Guider frame time may be different for small sub-arrays
         # less than 64 pixels square, but that needs to be confirmed.
           colpad=12
