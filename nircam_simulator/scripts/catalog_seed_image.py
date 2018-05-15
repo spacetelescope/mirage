@@ -386,13 +386,13 @@ class Catalog_seed():
         yd, xd = self.nominal_dims
         # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
         # UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument']:
+        if 'nircam' in self.params['Inst']['instrument'].lower():
           colpad = 12
           rowpad = 2
           if ((xd <= 8) & (yd <= 8)):
               rowpad = 3
           self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
-        else:
+        elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
         # the following applies to NIRISS and Guider full frame imaging and
         # NIRISS sub-arrays.
         #
