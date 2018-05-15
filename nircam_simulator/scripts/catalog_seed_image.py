@@ -387,6 +387,12 @@ class Catalog_seed():
                 #sys.exit()
                 raise ValueError(("AB mag to countrate conversion failed."
                                   "magnitude = {}, photfnu = {}".format(mag, photfnu)))
+        if magsys.lower() == 'vegamag':
+            try:
+                return 10**((self.vegazeropoint - mag) / 2.5) 
+            except:
+                raise ValueError(("Vega mag to countrate conversion failed."
+                                  "magnitude = {}".format(mag)))
         if magsys.lower() == 'stmag':
             try:
                 return 10**((mag + 21.1) / -2.5) / photflam
@@ -705,8 +711,10 @@ class Catalog_seed():
         # If not, assume AB mags
         msys = 'abmag'
 
-        if 'mag' in mtlist.meta['comments'][0:4]:
-            msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
+        condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+        if condition:
+            msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
+            msys = msys.lower()
 
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
@@ -1864,10 +1872,10 @@ class Catalog_seed():
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            if 'mag' in gtab.meta['comments'][0:4]:
+            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
-
         except:
             print("WARNING: Unable to open the source list file {}".format(filename))
             sys.exit()
@@ -2108,9 +2116,10 @@ class Catalog_seed():
             # Check to see if magnitude system is specified in the comments
             # If not assume AB mags
             msys = 'abmag'
-            if 'mag' in gtab.meta['comments'][0:4]:
+            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
-
+                msys = msys.lower()
         except:
             print("WARNING: Unable to open the galaxy source list file {}".format(filename))
             sys.exit()
@@ -3016,6 +3025,7 @@ class Catalog_seed():
         # the filter
         mtch = ((self.zps['Filter'] == self.params['Readout'][usefilt]) &
                (self.zps['Module'] == module))
+        self.vegazeropoint=self.zps['VEGAMAG'][mtch][0]
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
