@@ -104,6 +104,10 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_tab = self.get_pointing_info(self.pointing_file, xmltab['ProposalID'][0])
 
+        # Check that the .xml and .pointing files agree
+        assert len(xmltab['ProposalID']) == len(pointing_tab['obs_num']),\
+            'Inconsistent table size from XML file ({}) and pointing file ({}). Something was not processed correctly in apt_inputs.'.format(len(xmltab['ProposalID']), len(pointing_tab['obs_num']))
+
         # Combine the dictionaries
         obstab = self.combine_dicts(xmltab, pointing_tab)
 
@@ -169,14 +173,15 @@ class AptInput:
             arr = np.array([item[i] for item in indict.values()])
             entry = dict(zip(keys, arr))
 
+            # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
             subpix = entry['SubpixelPositions']
-            if subpix == '0':
+            if subpix in ['0', 'NONE']:
                 subpix = [[1]]
             if subpix == '4-Point':
                 subpix = [[4]]
             if subpix == '9-Point':
                 subpix = [[9]]
-            # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
+
             primary = entry['PrimaryDithers']
             if primary == '0':
                 primary = [1]
@@ -386,6 +391,7 @@ class AptInput:
         finaltab = {}
         for key in obstab:
             finaltab[key] = []
+
         finaltab['detector'] = []
 
         n_primarydithers = len(obstab['PrimaryDithers'])
@@ -402,6 +408,13 @@ class AptInput:
                 detectors = ['A3']
             elif 'B4' in module:
                 detectors = ['B4']
+            elif 'DHSPIL' in module:
+                if module[-1] == 'A':
+                    detectors = ['A3']
+                elif module[-1] == 'B':
+                    detectors = ['B4']
+                else:
+                    ValueError('Unknown module {}'.format(module))
             else:
                 raise ValueError('Unknown module {}'.format(module))
 
@@ -413,7 +426,7 @@ class AptInput:
         return finaltab
 
     def ra_dec_update(self):
-        """ 
+        """
         Given the V2, V3 values for the reference pixels associated
         with detector apertures, calculate corresponding RA, Dec.
         """
@@ -422,6 +435,7 @@ class AptInput:
 
         aperture_ra = []
         aperture_dec = []
+
         for i in range(len(self.exposure_tab['Module'])):
 
             # First find detector
@@ -447,8 +461,7 @@ class AptInput:
                     (sub in apername) or (sub in name)
                 ]
                 if len(aperture) > 1 or len(aperture) == 0:
-                    raise ValueError('Cannot combine detector {} and subarray {}\
-                        into valid aperture name.'.format(detector, sub))
+                    raise ValueError('Cannot combine detector {} and subarray {} into valid aperture name in observation {}.'.format(detector, sub, self.exposure_tab['ObservationID'][i]))
                 else:
                     aperture = aperture[0]
 
@@ -487,7 +500,7 @@ class AptInput:
 
         Parameters:
         -----------
-        siaf -- astropy table containing SIAF-related information 
+        siaf -- astropy table containing SIAF-related information
         det -- string containing the full aperture name of interest
                (e.g. 'NRCA1_FULL')
 
@@ -498,7 +511,7 @@ class AptInput:
         match = siaf['AperName'] == det
 
         if not np.any(match):
-            raise ValueError("Aperture name {} not found in input CSV file {}.".
+            raise ValueError("Aperture name {} not in input CSV file {}.".
                              format(det, self.siaf))
         v2 = siaf[match]['V2Ref']
         v3 = siaf[match]['V3Ref']
@@ -507,7 +520,7 @@ class AptInput:
     def add_observation_info(self, intab):
         """
         Add information about each observation. Catalog names,
-        dates, PAV3 values, etc., which are retrieved from the 
+        dates, PAV3 values, etc., which are retrieved from the
         observation list yaml file.
 
         Parameters:
@@ -680,7 +693,7 @@ class AptInput:
                     #     value = 'None'
 
                     intab[key].append(value)
-        
+
         return intab
 
     def add_epochs(self, intab):

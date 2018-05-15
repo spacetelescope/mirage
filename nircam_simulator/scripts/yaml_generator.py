@@ -73,8 +73,8 @@ apt_inputs.py - Functions for reading and parsing xml and pointing files from AP
 HISTORY:
 
 July 2017 - V0: Initial version. Bryan Hilbert
-Feb 2018 - V1: Updates to accomodate multiple filter pairs per 
-               observation. Launren Chambers
+Feb 2018 - V1: Updates to accomodate multiple filter pairs per
+               observation. Lauren Chambers
 
 '''
 
@@ -323,7 +323,7 @@ class SimInput:
             # and subpixel dithers
             tot_dith = np.int(file_dict['dither'])
             primarytot = np.int(file_dict['PrimaryDithers'])
-            if file_dict['SubpixelPositions'] == 'None':
+            if file_dict['SubpixelPositions'].upper() == 'NONE':
                 subpixtot = 1
             else:
                 try:
@@ -337,7 +337,7 @@ class SimInput:
             file_dict['siaf'] = self.siaf
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
-            
+
         # Write out summary of all written yaml files
         yaml_path = os.path.join(self.output_dir, 'V*.yaml')
         #yamls = glob(yaml_path)
@@ -783,7 +783,7 @@ class SimInput:
 
     def get_lindark(self, detector):
         """
-        Return the name of a linearized dark current file to 
+        Return the name of a linearized dark current file to
         use as input based on the detector being used
 
         Parameters:
@@ -804,7 +804,7 @@ class SimInput:
     def get_reffile(self, refs, detector):
         """
         Return the appropriate reference file for detector
-        and given reference file dictionary. 
+        and given reference file dictionary.
 
         Parameters:
         -----------
@@ -828,7 +828,7 @@ class SimInput:
 
         Parameters:
         -----------
-        input -- dictionary containing all needed exposure 
+        input -- dictionary containing all needed exposure
                  information for one exposure
         """
 
@@ -882,14 +882,14 @@ class SimInput:
             config = ascii.read(subarray_def_file)
 
             if full_ap not in config['AperName']:
-                full_ap = [apername for apername, name in \
+                full_ap_new = [apername for apername, name in \
                            np.array(config['AperName', 'Name']) if \
                            (full_ap in apername) or (full_ap in name)]
-                if len(full_ap) > 1 or len(full_ap) == 0:
-                    raise ValueError('Cannot match {} with valid aperture name.'
-                                     .format(full_ap))
+                if len(full_ap_new) > 1 or len(full_ap_new) == 0:
+                    raise ValueError('Cannot match {} with valid aperture name for observation {}.'
+                                     .format(full_ap, input['obs_num']))
                 else:
-                    full_ap = full_ap[0]
+                    full_ap = full_ap_new[0]
 
             f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
             f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
@@ -908,7 +908,7 @@ class SimInput:
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  distortion_coeffs: {}        # CSV file containing distortion coefficients\n'.format(input['siaf']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
-            if instrument.lower() == 'nircam':
+            if instrument.lower() in ['nircam', 'wfsc']:
                 invertIPC = True
             elif instrument.lower() == 'niriss':
                 invertIPC = False
@@ -934,7 +934,7 @@ class SimInput:
             f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
             f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
             # temporary tweak here to make it work with NIRISS
-            if instrument.lower() == 'nircam':
+            if instrument.lower() in ['nircam', 'wfsc']:
                 detector_label = input['detector']
             elif instrument.lower() == 'niriss':
                 detector_label = 'B5'
@@ -942,7 +942,7 @@ class SimInput:
             f.write('  seed: {}                           # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
-            if instrument.lower() == 'nircam':
+            if instrument.lower() in ['nircam', 'wfsc']:
                 PointSourceCatalog = input['{}_ptsrc'.format(catkey)]
                 GalaxyCatalog = input['{}_galcat'.format(catkey)]
                 ExtendedCatalog = input['{}_ext'.format(catkey)]
@@ -1059,7 +1059,7 @@ class SimInput:
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
         return yamlout
-            
+
     def reffile_setup(self):
         """Create lists of reference files associate with each detector"""
 
