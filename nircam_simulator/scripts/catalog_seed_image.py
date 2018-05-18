@@ -1113,6 +1113,8 @@ class Catalog_seed():
             else:
                 # No distortion at all - "manual mode"
                 pixelx, pixely = self.RADecToXY_manual(ra, dec)
+            pixelx = pixelx- self.subarray_bounds[0]
+            pixely = pixely- self.subarray_bounds[1]
 
         else:
             # Case where the point source list entry locations are given in units of pixels
@@ -1122,7 +1124,7 @@ class Catalog_seed():
             pixelx = entry0
             pixely = entry1
 
-            ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, matrix, transform)
+            ra, dec, ra_str, dec_str = self.XYToRADec(pixelx+self.subarray_bounds[0], pixely+self.subarray_bounds[1], matrix, transform)
         return pixelx, pixely, ra, dec, ra_str, dec_str
 
     def nonsidereal_CRImage(self, file):
@@ -1619,6 +1621,8 @@ class Catalog_seed():
                     #else:
                     #    # No distortion at all - "manual mode"
                     #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
+                    pixelx = pixelx-self.subarray_bounds[0]
+                    pixely = pixely-self.subarray_bounds[1]
 
                 else:
                     # Case where the point source list entry locations are given in units of pixels
@@ -1634,7 +1638,7 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
+                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx+self.subarray_bounds[0], pixely+self.subarray_bounds[1], attitude_matrix,
                                                               coord_transform)
 
                 # Get the input magnitude of the point source
@@ -2249,6 +2253,8 @@ class Catalog_seed():
                 # Call is the same regardless of whether distortion reference file
                 # is given or not
                 pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                pixelx = pixelx - self.subarray_bounds[0]
+                pixely = pixely - self.subarray_bounds[1]
 
                 #else:
                 #    # No distortion. Fall back to "manual" calculations
@@ -2268,7 +2274,7 @@ class Catalog_seed():
                 pixelx = entry0
                 pixely = entry1
 
-                ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix, coord_transform)
+                ra, dec, ra_str, dec_str = self.XYToRADec(pixelx+self.subarray_bounds[0], pixely+self.subarray_bounds[1], attitude_matrix, coord_transform)
 
             # only keep the source if the peak will fall within the subarray
             if pixely > outminy and pixely < outmaxy and pixelx > outminx and pixelx < outmaxx:
@@ -2635,6 +2641,8 @@ class Catalog_seed():
                     #if self.runStep['astrometric']:
                     # Same function call regardless of whether distortion file is provided or not
                     pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
+                    pixelx = pixelx - self.subarray_bounds[0]
+                    pixely = pixely - self.subarray_bounds[1]
                     #else:
                     #    # No distortion at all - "manual mode"
                     #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
@@ -2653,7 +2661,7 @@ class Catalog_seed():
                     pixelx = entry0
                     pixely = entry1
 
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
+                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx+self.subarray_bounds[0], pixely+self.subarray_bounds[1], attitude_matrix,
                                                               coord_transform)
 
                 # Get the input magnitude
