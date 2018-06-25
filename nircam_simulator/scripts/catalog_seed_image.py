@@ -536,7 +536,7 @@ class Catalog_seed():
           else:
             pad1=2
             pad2=0
-          self.frametime=(pad2+(yd/self.params['Readout']['namp']+colpad)*(xd+pad1)*0.00001
+          self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) * (xd + pad1)) * 0.00001
 
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
