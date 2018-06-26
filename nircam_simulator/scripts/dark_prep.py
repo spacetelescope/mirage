@@ -720,10 +720,22 @@ class DarkPrep():
         return dark, sbzero
 
     def darkints(self):
-        # Check the number of integrations in the dark
-        # current file and compare with the requested
-        # number of integrations. Add/remove integrations
-        # if necessary
+        """Check the number of integrations in the dark
+        current file and compare with the requested
+        number of integrations. Add/remove integrations
+        if necessary
+
+        Parameters
+        ----------
+
+        None
+
+
+        Returns
+        -------
+
+        None
+        """
         ndarkints, ngroups, ny, nx = self.dark.data.shape
         reqints = self.params['Readout']['nint']
 
@@ -744,9 +756,25 @@ class DarkPrep():
             self.integration_copy(reqints, ndarkints)
 
     def integration_copy(self, req, darkint):
-        #use copies of integrations in the dark current input to
-        #make up integrations in the case where the output has
-        #more integrations than the input
+        """Use copies of integrations in the dark current input to
+        make up integrations in the case where the output has
+        more integrations than the input
+
+        Parameters
+        ----------
+
+        req : int
+            Requested number of dark current integrations for the output
+
+        darkint : int
+            Number of integrations in the input dark current exposure
+
+        Returns
+        -------
+
+        None
+        """
+
         ncopies = np.int((req - darkint) / darkint)
         extras = (req - darkint) % darkint
 
@@ -756,7 +784,7 @@ class DarkPrep():
             if self.dark.sbAndRefpix is not None:
                 copysb = self.dark.sbAndRefpix
             if self.dark.zeroframe is not None:
-                copyzero = self.dark.zero
+                copyzero = self.dark.zeroframe
             for i in range(ncopies):
                 self.dark.data = np.vstack((self.dark.data, copydata))
                 if self.dark.sbAndRefpix is not None:
@@ -775,18 +803,36 @@ class DarkPrep():
         self.dark.header['NINTS'] = req
 
     def dataVolumeCheck(self, obj):
-        # Make sure that the input integration has
-        # enough frames/groups to create the requested
-        # number of frames/groups of the output
+        """Make sure that the input integration has
+        enough frames/groups to create the requested
+        number of frames/groups of the output
+
+        Parameters
+        ----------
+
+        obj : read_fits object
+            Instance of read_fits class containing dark current data and info
+
+        Returns
+        -------
+
+        None
+        """
         ngroup = int(self.params['Readout']['ngroup'])
         nframe = int(self.params['Readout']['nframe'])
         nskip = int(self.params['Readout']['nskip'])
 
         inputframes = obj.data.shape[1]
         if ngroup * (nskip + nframe) > inputframes:
-            print("WARNING: Not enough frames in the input integration to create the requested number of output groups. Input has {} frames. Requested output is {} groups each created from {} frames plus skipping {} frames between groups.".format(inputframes, ngroup, nframe, nskip))
-            print("for a total of {} frames.".format(ngroup * (nframe + nskip)))
-            print("Making copies of {} dark current frames and adding them to the end of the dark current integration.".format(ngroup * (nskip + nframe) - inputframes))
+            print(("WARNING: Not enough frames in the input integration to "
+                   "create the requested number of output groups. Input has "
+                   "{} frames. Requested output is {} groups each created from "
+                   "{} frames plus skipping {} frames between groups for a total "
+                   "of {} frames."
+                   .format(inputframes, ngroup, nframe, nskip, ngroup * (nframe + nskip))))
+            print(("Making copies of {} dark current frames and adding them to "
+                   "the end of the dark current integration."
+                   .format(ngroup * (nskip + nframe) - inputframes)))
 
             # Figure out how many more frames we need,
             # in terms of how many copies of the original dark
