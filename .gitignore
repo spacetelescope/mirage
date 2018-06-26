@@ -8,7 +8,7 @@
 #################
 build/*
 dist/*
-nircam_simulator.egg-info/*
+mirage.egg-info/*
 
 # Lists and images #
 ######################
@@ -23,8 +23,8 @@ nircam_simulator.egg-info/*
 # Other #
 #########
 .ipynb_checkpoints/*
-nircam_simulator/examples/.ipynb_checkpoints/*
-nircam_simulator/OTECommissioning/*
+mirage/examples/.ipynb_checkpoints/*
+mirage/OTECommissioning/*
 *.aptbackup
 *.aptx
 *.docx
@@ -32,8 +32,8 @@ nircam_simulator/OTECommissioning/*
 # Files #
 #########
 ring_nebula.fits
-nircam_simulator/ClassMaps.txt
-nircam_simulator/examples/*.ipynb
-nircam_simulator/scripts/apt_inputs_OLD.py
-nircam_simulator/dev_scripts/*
-nircam_simulator/config/siaf_config.json
+mirage/ClassMaps.txt
+mirage/examples/*.ipynb
+mirage/scripts/apt_inputs_OLD.py
+mirage/dev_scripts/*
+mirage/config/siaf_config.json
