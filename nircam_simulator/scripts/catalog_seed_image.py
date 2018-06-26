@@ -531,12 +531,13 @@ class Catalog_seed():
         # less than 64 pixels square, but that needs to be confirmed.
           colpad=12
           if self.params['Readout']['namp'] == 4:
-            pad1=1
-            pad2=1
+              pad1 = 1
+              pad2 = 1
           else:
-            pad1=2
-            pad2=0
-          self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) * (xd + pad1)) * 0.00001
+              pad1 = 2
+              pad2 = 0
+          self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) 
+                            * (xd + pad1)) * 0.00001
 
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
