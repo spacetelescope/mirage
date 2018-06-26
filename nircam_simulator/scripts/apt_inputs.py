@@ -92,6 +92,14 @@ class AptInput:
         readxml_obj = read_apt_xml.ReadAPTXML()
         tab = readxml_obj.read_xml(self.input_xml)
 
+        # If the number of dithers is set to '3TIGHT'
+        # (currently only used in NIRCam)
+        # remove 'TIGHT' from the entries and leave
+        # only the number behind
+        tight = [True if 'TIGHT' in val else False for val in tab['PrimaryDithers']]
+        if np.any(tight):
+            tab = self.tight_dithers(tab)
+            
         # Expand the dictionary for multiple dithers. Expand such that there
         # is one entry in each list for each exposure, rather than one entry
         # for each set of dithers
@@ -170,7 +178,7 @@ class AptInput:
         # keys = np.array(indict.keys())
         keys = indict.keys()
         for i in range(len(indict['PrimaryDithers'])):
-            arr = np.array([item[i] for item in indict.values()])
+            arr = np.array([item[i] for item in indict.values()])    
             entry = dict(zip(keys, arr))
 
             # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
@@ -516,6 +524,36 @@ class AptInput:
         v2 = siaf[match]['V2Ref']
         v3 = siaf[match]['V3Ref']
         return v2, v3
+
+    def tight_dithers(self, input_dict):
+        """
+        In NIRCam, when the 'FULL' dither pattern is
+        used, it is possible to set the number of primary
+        dithers to '3TIGHT' rather than just a number 
+        (e.g. '3'). If the number of dithers is set to '3TIGHT'
+        remove 'TIGHT' from the entries and leave
+        only the number behind.
+
+        Parameters
+        ----------
+
+        input_dict : dict
+           Dictionary where each key points to a list containing
+           observation details. For example, input_dict['PrimarDither']
+           is a list of the number of primary dithers for all observations
+
+        Returns
+        -------
+
+        input_dict : dict
+            Updated dictionary where 'TIGHT' has been removed from
+            PrimaryDither list
+        """
+        inlist = input_dict['PrimaryDithers']
+        modlist = [v if 'TIGHT' not in v else v.strip('TIGHT') for v in inlist]
+        input_dict['PrimaryDithers'] = modlist
+        return input_dict
+
 
     def add_observation_info(self, intab):
         """
