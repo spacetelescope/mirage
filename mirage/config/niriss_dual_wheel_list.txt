@@ -1,0 +1,13 @@
+filter  filter_wheel  pupil_wheel
+F090W      CLEAR         F090W
+F115W      CLEAR         F115W
+F140M      CLEAR         F140M
+F150W      CLEAR         F150W
+F159M      CLEAR         F159M
+F200W      CLEAR         F200W
+F277W      F277W         CLEARP
+F356W      F356W         CLEARP
+F380M      F380M         CLEARP
+F430M      F430M         CLEARP
+F444W      F444W         CLEARP
+F580M      F480M         CLEARP

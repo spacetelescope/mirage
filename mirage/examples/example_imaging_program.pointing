@@ -1,0 +1,17 @@
+# APT Output Product
+# 
+# APT Version: Version 25.4.1 Main (Tue Oct 17 2017)
+# Date: Fri Nov 10 21:43:13 GMT 2017
+
+JWST Pointing Report for JWST Submitted Proposal 42424 (example_imaging_program.aptx)
+
+========================================
+* F115W_F356W (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCBS_FULL                1 GOODS-S-  +53.10000  -27.80000   +0.000   +0.000   +0.000   +0.000  -82.287 -496.206   -0.000   +0.000 TARGET     SCIENCE      102    552  0.000 (base)
+  1    1   1    2 NRCBS_FULL                1 GOODS-S-  +53.10000  -27.80000   +0.000   +0.000   +0.240   +0.176  -82.527 -496.030   +0.240   +0.176 SUBDITHER  SCIENCE      102      0  0.298           
+  1    1   1    3 NRCBS_FULL                1 GOODS-S-  +53.10000  -27.80000   +0.000   +0.000   +8.190   +8.190  -90.486 -488.025   +8.190   +8.190 DITHER     SCIENCE      102      0 11.288           
+  1    1   1    4 NRCBS_FULL                1 GOODS-S-  +53.10000  -27.80000   +0.000   +0.000   +8.430   +8.366  -90.726 -487.849   +8.430   +8.366 SUBDITHER  SCIENCE      102      0  0.298           
+
+

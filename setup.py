@@ -4,15 +4,15 @@ from setuptools import setup
 from setuptools import find_packages
 
 setup(
-    name='nircam_simulator',
+    name='mirage',
     version = '1.0',
-    description = 'Create simulated NIRCam data',
-    long_description = ('A tool to create simulated NIRCam exposures'
-                        'using an input dark current exposure and a'
-                        'noiseless seed image, which can be produced'
-                        'from source catalogs. Data can optionally be'
-                        'dispersed as well, to simulate wide field'
-                        'slitless data files.'),
+    description = 'Create simulated NIRCam/NIRISS/FGS data',
+    long_description = ('A tool to create simulated NIRCam, NIRISS,'
+                        'and FGS exposures using an input dark current'
+                        'exposure and a noiseless seed image, which'
+                        'can be produced from source catalogs. Data'
+                        'can optionally be dispersed as well, to'
+                        'simulate wide field slitless data files.'),
     author = 'Bryan Hilbert',
     author_email = 'hilbert@stsci.edu',
     keywords = ['astronomy'],

@@ -1,0 +1,16 @@
+#
+#
+#
+#abmag
+#List of stamp image files to read in and use to create moving targets.
+#This is the method to use in order to create moving targets of 
+#extended sources, like planets, moons, etc.
+#position can be x,y or RA,Dec. If x,y, put the word 'pixels' in the top
+#line of the file. Velocity can be in units of pix/hour or arcsec/hour.
+#If using pix/hour, place 'velocity_pixels' in the second line of the file.
+#Note that if using velocities of pix/hour, the results will not be 
+#strictly correct because in reality distortion will cause object's
+#velocities to vary in pixels/hour. Velocities in arcsec/hour will be
+#constant.
+filename    x_or_RA    y_or_Dec   magnitude pos_angle  x_or_RA_velocity y_or_Dec_velocity
+ring_nebula.fits 0.007   0.003      12.0      0.0       -0.5               -0.02

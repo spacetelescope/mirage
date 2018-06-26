@@ -1,0 +1,17 @@
+#
+#
+#
+#abmag
+#NOTE: KBOs move at about 0.5 - 4 "/hour!
+#
+#list of point sources to create as moving targets (KBOs, asteroids, etc)
+#position can be x,y or RA,Dec. If x,y, put the phrase 'position_pixels' in the top
+#line of the file. Velocity can be in units of pix/hour or arcsec/hour.
+#If using pix/hour, place 'velocity_pixels' in the second line of the file.
+#Note that if using velocities of pix/hour, the results will not be 
+#strictly correct because in reality distortion will cause object's
+#velocities to vary in pixels/hour. Velocities in arcsec/hour will be
+#constant.
+x_or_RA    y_or_Dec   magnitude  x_or_RA_velocity y_or_Dec_velocity
+53.0985     -27.8015    14           180            180
+

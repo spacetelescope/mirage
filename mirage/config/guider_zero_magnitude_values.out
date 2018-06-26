@@ -1,0 +1,5 @@
+# zero magnitude values, based on the Sirius 2014 spectrum
+# Filter       Count Rate   Mean F_lambda  Mean F_nu  Pivot Wavelength
+#             electron/sec  W/m^2/micron       Jy         Microns
+ANY  Guider1      7.196973e+11  5.818174e-10  1.214005e+03   2.501078
+ANY  Guider2      6.749752e+11  5.191312e-10  1.163080e+03   2.591652

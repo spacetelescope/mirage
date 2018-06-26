@@ -1,0 +1,27 @@
+#
+#
+# 
+#abmag
+#Columns 1 and 2 can be either x,y positions on the detector aperture (e.g.
+#0,0 is lower left corner of the full frame of the subarray used for the 
+#output) or RA,Dec location of the center of the source. If they are x,y
+#positions, make the top line of the file '# position_pixels'
+#
+#radius is the half-light radius in pixels or arcseconds. If in pixels
+#make the second line of the file '# radius_pixels
+#
+#pos_angle is the position angle of the semimajor axis, in degrees.
+#0 causes the semi-major axis to be horizontal.
+#
+#x_or_RA_velocity is the velocity in the increasing x or RA direction
+#in units of arcsec/hour. To specify units in the x-direction, place
+#'velocity_pixels' (alone) in one of the top 4 lines of the file.
+#
+#y_or_Dec_velocity is the velocity in the increasing y or Dec direction
+#in units of arcsec/hour. To specify units in the y-direction, place
+#'velocity_pixels' (alone) in one of the top 4 lines of the file.
+x_or_RA    y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude  x_or_RA_velocity y_or_Dec_velocity
+23:59:59.9986 +00:00:00.0047  1.0      0.25        20           2.0  16.000        -0.5               -0.02
+00:00:00.0003 +00:00:00.0216  1.5      0.5         79           1.2  16.000        -0.5               -0.02
+23:59:58.6185 +00:00:32.1260  1.5      0.25        0            2.0  18.000        -0.5               -0.02
+00:00:02.1327 +00:00:20.7322  1.5      0.25        70           2.0  17.000        -0.5               -0.02
