@@ -482,22 +482,35 @@ class DarkPrep():
         print('using JWST calibration pipeline.')
 
         #Run the DQ_Init step
-        linDark = DQInitStep.call(dark, config_file=self.params['newRamp']['dq_configfile'])
+        if self.runStep['badpixmask']:
+            linDark = DQInitStep.call(dark,
+                            config_file=self.params['newRamp']['dq_configfile'],
+                            override_mask = self.params['Reffiles']['badpixmask'])
+        else:
+            linDark = DQInitStep.call(dakr,
+                            config_file=self.params['newRamp']['dq_configfile'])
 
         #If the saturation map is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['saturation_lin_limit']:
-            linDark = SaturationStep.call(linDark, config_file=self.params['newRamp']['sat_configfile'], override_saturation=self.params['Reffiles']['saturation'])
+            linDark = SaturationStep.call(linDark,
+                            config_file=self.params['newRamp']['sat_configfile'],
+                            override_saturation=self.params['Reffiles']['saturation'])
         else:
-            linDark = SaturationStep.call(linDark, config_file=self.params['newRamp']['sat_configfile'])
+            linDark = SaturationStep.call(linDark,
+                                          config_file=self.params['newRamp']['sat_configfile'])
 
         # If the superbias file is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['superbias']:
-            linDark = SuperBiasStep.call(linDark, config_file=self.params['newRamp']['superbias_configfile'], override_superbias=self.params['Reffiles']['superbias'])
+            linDark = SuperBiasStep.call(linDark,
+                        config_file=self.params['newRamp']['superbias_configfile'],
+                        override_superbias=self.params['Reffiles']['superbias'])
         else:
-            linDark = SuperBiasStep.call(linDark, config_file=self.params['newRamp']['superbias_configfile'])
+            linDark = SuperBiasStep.call(linDark,
+                        config_file=self.params['newRamp']['superbias_configfile'])
 
         # Reference pixel correction
-        linDark = RefPixStep.call(linDark, config_file=self.params['newRamp']['refpix_configfile'])
+        linDark = RefPixStep.call(linDark,
+                        config_file=self.params['newRamp']['refpix_configfile'])
 
         # Save a copy of the superbias- and reference pixel-subtracted
         # dark. This will be used later to add these effects back in
@@ -512,9 +525,14 @@ class DarkPrep():
         linearoutfile = base_name[0:-5] + '_linearized_dark_current_ramp.fits'
         linearoutfile = os.path.join(self.params['Output']['directory'], linearoutfile)
         if self.runStep['linearity']:
-            linDark = LinearityStep.call(linDark, config_file=self.params['newRamp']['linear_configfile'], override_linearity=self.params['Reffiles']['linearity'], output_file=linearoutfile)
+            linDark = LinearityStep.call(linDark,
+                            config_file=self.params['newRamp']['linear_configfile'],
+                            override_linearity=self.params['Reffiles']['linearity'],
+                            output_file=linearoutfile)
         else:
-            linDark = LinearityStep.call(linDark, config_file=self.params['newRamp']['linear_configfile'], output_file=linearoutfile)
+            linDark = LinearityStep.call(linDark,
+                            config_file=self.params['newRamp']['linear_configfile'],
+                            output_file=linearoutfile)
 
         print(('Linearized dark (output directly from pipeline) '
 	       'saved as {}'.format(linearoutfile)))
@@ -720,22 +738,10 @@ class DarkPrep():
         return dark, sbzero
 
     def darkints(self):
-        """Check the number of integrations in the dark
-        current file and compare with the requested
-        number of integrations. Add/remove integrations
-        if necessary
-
-        Parameters
-        ----------
-
-        None
-
-
-        Returns
-        -------
-
-        None
-        """
+        # Check the number of integrations in the dark
+        # current file and compare with the requested
+        # number of integrations. Add/remove integrations
+        # if necessary
         ndarkints, ngroups, ny, nx = self.dark.data.shape
         reqints = self.params['Readout']['nint']
 
@@ -756,25 +762,9 @@ class DarkPrep():
             self.integration_copy(reqints, ndarkints)
 
     def integration_copy(self, req, darkint):
-        """Use copies of integrations in the dark current input to
-        make up integrations in the case where the output has
-        more integrations than the input
-
-        Parameters
-        ----------
-
-        req : int
-            Requested number of dark current integrations for the output
-
-        darkint : int
-            Number of integrations in the input dark current exposure
-
-        Returns
-        -------
-
-        None
-        """
-
+        #use copies of integrations in the dark current input to
+        #make up integrations in the case where the output has
+        #more integrations than the input
         ncopies = np.int((req - darkint) / darkint)
         extras = (req - darkint) % darkint
 
@@ -784,7 +774,7 @@ class DarkPrep():
             if self.dark.sbAndRefpix is not None:
                 copysb = self.dark.sbAndRefpix
             if self.dark.zeroframe is not None:
-                copyzero = self.dark.zeroframe
+                copyzero = self.dark.zero
             for i in range(ncopies):
                 self.dark.data = np.vstack((self.dark.data, copydata))
                 if self.dark.sbAndRefpix is not None:
@@ -803,36 +793,18 @@ class DarkPrep():
         self.dark.header['NINTS'] = req
 
     def dataVolumeCheck(self, obj):
-        """Make sure that the input integration has
-        enough frames/groups to create the requested
-        number of frames/groups of the output
-
-        Parameters
-        ----------
-
-        obj : read_fits object
-            Instance of read_fits class containing dark current data and info
-
-        Returns
-        -------
-
-        None
-        """
+        # Make sure that the input integration has
+        # enough frames/groups to create the requested
+        # number of frames/groups of the output
         ngroup = int(self.params['Readout']['ngroup'])
         nframe = int(self.params['Readout']['nframe'])
         nskip = int(self.params['Readout']['nskip'])
 
         inputframes = obj.data.shape[1]
         if ngroup * (nskip + nframe) > inputframes:
-            print(("WARNING: Not enough frames in the input integration to "
-                   "create the requested number of output groups. Input has "
-                   "{} frames. Requested output is {} groups each created from "
-                   "{} frames plus skipping {} frames between groups for a total "
-                   "of {} frames."
-                   .format(inputframes, ngroup, nframe, nskip, ngroup * (nframe + nskip))))
-            print(("Making copies of {} dark current frames and adding them to "
-                   "the end of the dark current integration."
-                   .format(ngroup * (nskip + nframe) - inputframes)))
+            print("WARNING: Not enough frames in the input integration to create the requested number of output groups. Input has {} frames. Requested output is {} groups each created from {} frames plus skipping {} frames between groups.".format(inputframes, ngroup, nframe, nskip))
+            print("for a total of {} frames.".format(ngroup * (nframe + nskip)))
+            print("Making copies of {} dark current frames and adding them to the end of the dark current integration.".format(ngroup * (nskip + nframe) - inputframes))
 
             # Figure out how many more frames we need,
             # in terms of how many copies of the original dark
@@ -1016,6 +988,7 @@ class DarkPrep():
         # and populate with True or False
         self.runStep = {}
         #self.runStep['linearity'] = self.checkRunStep(self.params['Reffiles']['linearity'])
+        self.runStep['badpixmask'] = self.checkRunStep(self.params['Reffiles']['badpixmask'])
         self.runStep['linearized_darkfile'] = self.checkRunStep(self.params['Reffiles']['linearized_darkfile'])
         self.runStep['saturation_lin_limit'] = self.checkRunStep(self.params['Reffiles']['saturation'])
         self.runStep['superbias'] = self.checkRunStep(self.params['Reffiles']['superbias'])

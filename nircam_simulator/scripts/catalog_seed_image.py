@@ -293,9 +293,9 @@ class Catalog_seed():
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print('Seed image is 4D.')
 
-        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout']['filter'] + '_seed_image.fits')
         xcent_fov = xd / 2
         ycent_fov = yd / 2
+        
         kw = {}
         kw['xcenter'] = xcent_fov
         kw['ycenter'] = ycent_fov
@@ -305,6 +305,13 @@ class Catalog_seed():
             usefilt = 'pupil'
         else:
             usefilt = 'filter'
+
+        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] + '_seed_image.fits')
+            
+        # Set FGS filter is to "N/A" in the output file
+        # as this is the value DMS looks for.
+        if self.params['Readout'][usefilt] == "NA":
+            self.params['Readout'][usefilt] = "N/A"   
         kw['filter'] = self.params['Readout'][usefilt]
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
@@ -387,12 +394,6 @@ class Catalog_seed():
                 #sys.exit()
                 raise ValueError(("AB mag to countrate conversion failed."
                                   "magnitude = {}, photfnu = {}".format(mag, photfnu)))
-        if magsys.lower() == 'vegamag':
-            try:
-                return 10**((self.vegazeropoint - mag) / 2.5) 
-            except:
-                raise ValueError(("Vega mag to countrate conversion failed."
-                                  "magnitude = {}".format(mag)))
         if magsys.lower() == 'stmag':
             try:
                 return 10**((mag + 21.1) / -2.5) / photflam
@@ -513,31 +514,11 @@ class Catalog_seed():
         yd, xd = self.nominal_dims
         # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
         # UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument'].lower():
-          colpad = 12
-          rowpad = 2
-          if ((xd <= 8) & (yd <= 8)):
-              rowpad = 3
-          self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
-        elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
-        # the following applies to NIRISS and Guider full frame imaging and
-        # NIRISS sub-arrays.
-        #
-        # According JDox the NIRCam full frame time is 10.73677 seconds the
-        # same as for NIRISS, but right now the change does not apply to NIRCam.
-        #
-        #
-        # note that the Guider frame time may be different for small sub-arrays
-        # less than 64 pixels square, but that needs to be confirmed.
-          colpad=12
-          if self.params['Readout']['namp'] == 4:
-              pad1 = 1
-              pad2 = 1
-          else:
-              pad1 = 2
-              pad2 = 0
-          self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) 
-                            * (xd + pad1)) * 0.00001
+        colpad = 12
+        rowpad = 2
+        if ((xd <= 8) & (yd <= 8)):
+            rowpad = 3
+        self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
 
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
@@ -712,10 +693,8 @@ class Catalog_seed():
         # If not, assume AB mags
         msys = 'abmag'
 
-        condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
-        if condition:
+        if 'mag' in mtlist.meta['comments'][0:4]:
             msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
-            msys = msys.lower()
 
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
@@ -1745,7 +1724,6 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-
             a_in = interval * int(numperpix*xfract + 0.5) - 0.5
             b_in = interval * int(numperpix*yfract + 0.5) - 0.5
             astr = "{0:.{1}f}".format(a_in, 2)
@@ -1773,7 +1751,8 @@ class Catalog_seed():
                     else:
                         raise FileNotFoundError("PSF file {} not found.".format(psffn))
                 except:
-                    raise RuntimeError("ERROR: Could not load PSF file {} from library".format(psffn))
+                    print("ERROR: Could not load PSF file {} from library".format(psffn))
+                    sys.exit()
 
             # Normalize the total signal in the PSF as read in
             totalsignal = np.sum(webbpsfimage)
@@ -1873,8 +1852,7 @@ class Catalog_seed():
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
-            if condition:
+            if 'mag' in gtab.meta['comments'][0:4]:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
 
@@ -2118,10 +2096,8 @@ class Catalog_seed():
             # Check to see if magnitude system is specified in the comments
             # If not assume AB mags
             msys = 'abmag'
-            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
-            if condition:
+            if 'mag' in gtab.meta['comments'][0:4]:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
-                msys = msys.lower()
 
         except:
             print("WARNING: Unable to open the galaxy source list file {}".format(filename))
@@ -3020,15 +2996,23 @@ class Catalog_seed():
             usefilt = 'pupil'
         else:
             usefilt = 'filter'
+
+        # If instrument is FGS, then force filter to be 'NA' for the purposes
+        # of constructing the correct PSF input path name. Then change to be
+        # the DMS-required "N/A" when outputs are saved
+        if self.params['Inst']['instrument'].lower() == 'fgs':
+            self.params['Readout']['filter'] = 'NA'
+            self.params['Readout']['pupil'] = 'NA'
+            
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
             raise ValueError(("WARNING: requested filter {} is not in the list of "
                    "possible filters.".format(self.params['Readout'][usefilt])))
 
         # Get the photflambda and photfnu values that go with
         # the filter
-        mtch = ((self.zps['Filter'] == self.params['Readout'][usefilt]) &
-               (self.zps['Module'] == module))
-        self.vegazeropoint=self.zps['VEGAMAG'][mtch][0]
+        mtch = ((self.zps['Detector'] == detector) &
+                (self.zps['Filter'] == self.params['Readout'][usefilt]) &
+                (self.zps['Module'] == module))
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
@@ -3056,17 +3040,26 @@ class Catalog_seed():
                                                        self.params['simSignals'][usefilt].lower() + \
                                                        '/zero/'
             else:
-                psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
-                                                         'psfxpos', 'psfypos',
-                                                         self.params['Readout'][usefilt].lower(),
-                                                         str(wfe), str(wfegroup))
+                if self.params['Inst']['instrument'].lower() != 'fgs':
+                    psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
+                                                             'psfxpos', 'psfypos',
+                                                             self.params['Readout'][usefilt].lower(),
+                                                             str(wfe), str(wfegroup))
+                else:
+                    psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, detector,
+                                                             'psfxpos', 'psfypos',
+                                                             str(wfe), str(wfegroup))
+
                 psfname = psfname.replace('psfxpos', '1024')
                 psfname = psfname.replace('psfypos', '1024')
-                pathaddition = "{}/{}/{}".format(detector,
-                                                 self.params['Readout'][usefilt].lower(),
-                                                 str(wfe))
+                if self.params['Inst']['instrument'].lower() != 'fgs':
+                    pathaddition = "{}/{}/{}".format(detector,
+                                                     self.params['Readout'][usefilt].lower(),
+                                                     str(wfe))
+                else:
+                    pathaddition = "{}/{}".format(detector, str(wfe))
+                    
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
-                #self.params['simSignals']['psfpath']=self.params['simSignals']['psfpath'] + self.params['Readout'][usefilt].lower() + '/' + str(wfe) + '/'
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
         else:
             # case where psfPath is None. In this case, create a PSF on the fly to use
@@ -3170,11 +3163,10 @@ class Catalog_seed():
                         filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
                                        .format(self.params['Readout'][usefilt].upper(), module.lower()))
                     elif instrm == 'niriss':
-                        filter_file = ("{}_niriss_throughput_nopy1.txt"
+                        filter_file = ("{}_niriss_throughput_py.txt"
                                        .format(self.params['Readout'][usefilt].lower()))
                     elif instrm == 'fgs':
-                        det = self.params['Readout']['array_name'].split('_')[0]
-                        filter_file = "{}_throughput_py.txt".format(det.lower())
+                        filter_file = "{}_throughput_py.txt".format(detector.lower())
                     filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
                     filter_file = os.path.join(filt_dir, filter_file)
 
