@@ -30,7 +30,7 @@ class DarkPrep():
     def __init__(self):
         # Locate the module files, so that we know where to look
         # for config subdirectory
-        self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
+        self.modpath = pkg_resources.resource_filename('mirage', '')
 
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,

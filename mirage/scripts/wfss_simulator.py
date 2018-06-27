@@ -10,9 +10,9 @@ Inputs:
 paramfiles - List of yaml filenames. These files should be 
              inputs to the simulator. For details on the 
              information contained in the yaml files, see
-             the readme file associated with the nircam_simulator
+             the readme file associated with the mirage
              github repo: 
-             https://github.com/spacetelescope/nircam_simulator.git
+             https://github.com/spacetelescope/mirage.git
 
 crossing_filter - Name of the crossing filter to be used in
                   conjunction with the grism. All longwave
@@ -40,11 +40,11 @@ import sys
 import argparse
 from numpy import nanmedian, isfinite
 from astropy.io import fits
-from nircam_simulator.scripts import catalog_seed_image
-from nircam_simulator.scripts import dark_prep
-from nircam_simulator.scripts import obs_generator
-from nircam_simulator.scripts import read_fits
-from nircam_simulator.scripts import yaml_update
+from mirage.scripts import catalog_seed_image
+from mirage.scripts import dark_prep
+from mirage.scripts import obs_generator
+from mirage.scripts import read_fits
+from mirage.scripts import yaml_update
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 
 nircam_filters = ['F322W2','F277W','F356W','F444W','F250M'

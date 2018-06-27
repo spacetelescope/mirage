@@ -10,8 +10,8 @@ Inputs:
 paramfile - Name of yaml file to be used as simulator input.
             For details  on the information contained in the
             yaml files, see the readme file associated with
-            the nircam_simulator github repo:
-            https://github.com/spacetelescope/nircam_simulator.git
+            the mirage github repo:
+            https://github.com/spacetelescope/mirage.git
 
 override_dark - If you wish to use a dark current file that
                 has already gone through the dark_prep step
@@ -27,10 +27,10 @@ HISTORY:
 import os
 import sys
 import argparse
-from nircam_simulator.scripts import catalog_seed_image
-from nircam_simulator.scripts import dark_prep
-from nircam_simulator.scripts import obs_generator
-from nircam_simulator.scripts import read_fits
+from mirage.scripts import catalog_seed_image
+from mirage.scripts import dark_prep
+from mirage.scripts import obs_generator
+from mirage.scripts import read_fits
 
 class ImgSim():
     def __init__(self):

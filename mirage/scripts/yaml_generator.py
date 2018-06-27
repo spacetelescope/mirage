@@ -153,7 +153,7 @@ class SimInput:
         self.tracking = 'sidereal'
 
         # Prepare to find files listed as 'config'
-        self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
+        self.modpath = pkg_resources.resource_filename('mirage', '')
         self.configfiles = {}
         if self.instrument.lower() == 'nircam':
             self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
