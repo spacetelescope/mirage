@@ -100,7 +100,12 @@ class Observation():
 
         # Get detector/channel specific values
         #self.channel_specific_dicts()
-
+        if self.instrument.lower() == 'nircam':
+            self.channel_specific_dicts()
+        elif self.instrument.lower() == 'niriss':
+            # pixel scales should be read from SIAF (?)
+            self.pixscale = [0.064746, 0.064746]
+        
         # Get the input seed image if a filename is supplied
         if type(self.seed) == type('string'):
             self.seed, self.segmap, self.seedheader = self.readSeed(self.seed)
@@ -970,7 +975,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         #get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() not in ['wfss','ts_wfss']:
+        if (self.params['Inst']['instrument'].lower() == 'nircam') and (self.params['Inst']['mode'].lower() not in ['wfss','ts_wfss']):        
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
