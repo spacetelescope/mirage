@@ -73,7 +73,7 @@ apt_inputs.py - Functions for reading and parsing xml and pointing files from AP
 HISTORY:
 
 July 2017 - V0: Initial version. Bryan Hilbert
-Feb 2018 - V1: Updates to accomodate multiple filter pairs per 
+Feb 2018 - V1: Updates to accomodate multiple filter pairs per
                observation. Lauren Chambers
 
 '''
@@ -351,6 +351,7 @@ class SimInput:
         for obs in obs_ids:
             n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
             n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
+            
             module = self.info['Module'][i_mod]
 
             if module != 'None':
@@ -371,6 +372,7 @@ class SimInput:
                 n_det = 1
                 module = ' NIS'
 
+                
             i_mod += n_tiles * n_det
 
             print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
@@ -1060,7 +1062,7 @@ class SimInput:
 
     def reffile_setup(self):
         """Create lists of reference files associate with each detector"""
-        
+
         self.superbias_list = {}
         self.linearity_list = {}
         self.gain_list = {}

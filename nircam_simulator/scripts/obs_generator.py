@@ -100,11 +100,11 @@ class Observation():
 
         # Get detector/channel specific values
         #self.channel_specific_dicts()
-        if self.instrument.lower() == 'nircam':
-            self.channel_specific_dicts()
-        elif self.instrument.lower() == 'niriss':
-            # pixel scales should be read from SIAF (?)
-            self.pixscale = [0.064746, 0.064746]
+        #if self.instrument.lower() == 'nircam':
+        #    self.channel_specific_dicts()
+        #elif self.instrument.lower() == 'niriss':
+        #    # pixel scales should be read from SIAF (?)
+        #    self.pixscale = [0.064746, 0.064746]
         
         # Get the input seed image if a filename is supplied
         if type(self.seed) == type('string'):
@@ -975,7 +975,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         #get the proper filter wheel and pupil wheel values for the header
-        if (self.params['Inst']['instrument'].lower() == 'nircam') and (self.params['Inst']['mode'].lower() not in ['wfss','ts_wfss']):        
+        if (self.params['Inst']['instrument'].lower() == 'nircam') and (self.params['Inst']['mode'].lower() not in ['wfss','ts_wfss']):
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -992,7 +992,7 @@ class Observation():
         outModel.meta.instrument.filter = fw
         outModel.meta.instrument.pupil = pw
 
-        outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type']
+        outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
         outModel.meta.dither.total_points = self.params['Output']['total_primary_dither_positions']
         outModel.meta.dither.pattern_size = 0.0
@@ -1423,7 +1423,7 @@ class Observation():
         yd, xd = frame.shape
         #self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd+1) * 10.00 * 1.e-6
         #UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrumeant'].lower():
+        if 'nircam' in self.params['Inst']['instrument'].lower():
             colpad = 12
             rowpad = 2
             if ((xd <= 8) & (yd <= 8)):

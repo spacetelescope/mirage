@@ -477,7 +477,7 @@ class AptInput:
             pointing_dec = np.float(self.exposure_tab['dec'][i])
             pointing_v2 = np.float(self.exposure_tab['v2'][i])
             pointing_v3 = np.float(self.exposure_tab['v3'][i])
-            
+
             if 'pav3' in self.exposure_tab.keys():
                 pav3 = np.float(self.exposure_tab['pav3'][i])
             else:
@@ -728,7 +728,7 @@ class AptInput:
                         value = str(obslist[key])
 
                     intab[key].append(value)
-                    
+
         return intab
 
     def add_epochs(self, intab):

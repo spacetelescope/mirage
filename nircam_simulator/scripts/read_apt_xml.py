@@ -11,6 +11,7 @@ import pprint
 SCRIPTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 PACKAGE_DIR = os.path.dirname(SCRIPTS_DIR)
 
+
 class ReadAPTXML():
     """Class to open and parse XML files from APT. Can read templates for
     NircamImaging, NircamEngineeringImaging, WfscCommissioning,
@@ -192,7 +193,7 @@ class ReadAPTXML():
 
             elif template_name in ['NirissExternalCalibration']:
                 self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary)
--
+
             # If template is WFSC Commissioning
             if template_name in ['WfscCommissioning']:
                 num_WFCgroups = self.read_commissioning_template(template, template_name, obs, prop_params)
@@ -272,6 +273,7 @@ class ReadAPTXML():
         dictionary['Instrument'].append(tup[24])
         return dictionary
 
+    
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary):
         """Read imaging template content regardless of instrument.
         Save content to object attributes.
@@ -349,10 +351,11 @@ class ReadAPTXML():
         return
 
 
-   
+
     def read_imaging_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
         pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+
 
         # Set namespace
         ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
@@ -758,6 +761,7 @@ class ReadAPTXML():
             groups += list(np.array(groups_fp)[inds])
             integrations += list(np.array(integrations_fp)[inds])
 
+            
         sensing = obs.find('.//' + self.apt + 'WavefrontSensing').text
         if sensing == 'SENSING_ONLY':
             n_repeats = 1
@@ -805,7 +809,7 @@ class ReadAPTXML():
         ns = "{http://www.stsci.edu/JWST/APT/Template/NircamWfss}"
 
         instrument = obs.find(self.apt + 'Instrument').text
-        
+
         mod = template.find(ns + 'Module').text
         subarr = template.find(ns + 'Subarray').text
         grismval = template.find(ns + 'Grism').text

@@ -521,15 +521,15 @@ class Catalog_seed():
                 rowpad = 3
             self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
         elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
-        # the following applies to NIRISS and Guider full frame imaging and
-        # NIRISS sub-arrays.
-        #
-        # According JDox the NIRCam full frame time is 10.73677 seconds the
-        # same as for NIRISS, but right now the change does not apply to NIRCam.
-        #
-        #
-        # note that the Guider frame time may be different for small sub-arrays
-        # less than 64 pixels square, but that needs to be confirmed.
+            # the following applies to NIRISS and Guider full frame imaging and
+            # NIRISS sub-arrays.
+            #
+            # According JDox the NIRCam full frame time is 10.73677 seconds the
+            # same as for NIRISS, but right now the change does not apply to NIRCam.
+            #
+            #
+            # note that the Guider frame time may be different for small sub-arrays
+            # less than 64 pixels square, but that needs to be confirmed.
             colpad = 12
             if self.params['Readout']['namp'] == 4:
                 pad1 = 1
@@ -717,7 +717,7 @@ class Catalog_seed():
         if condition:
             msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
             msys = msys.lower()
-            
+
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
     def movingTargetInputs(self, file, input_type, MT_tracking=False,
@@ -2121,7 +2121,7 @@ class Catalog_seed():
             if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
-                
+
         except:
             print("WARNING: Unable to open the galaxy source list file {}".format(filename))
             sys.exit()
