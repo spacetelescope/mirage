@@ -3376,7 +3376,7 @@ class Catalog_seed():
         try:
             self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
         except:
-            raise RuntimeError("Error: could not read in subarray definitions file.")
+            raise RuntimeError("Error: could not read in subarray definitions file: {}".format(self.params['Reffiles']['subarray_defs']))
 
     def getSubarrayBounds(self):
         # find the bounds of the requested subarray

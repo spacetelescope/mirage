@@ -1,0 +1,3 @@
+# name nframe nskip maxgroups
+FGSRAPID  1     0     800
+FGS       4     0      27
