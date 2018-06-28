@@ -99,7 +99,7 @@ class AptInput:
         tight = [True if 'TIGHT' in val else False for val in tab['PrimaryDithers']]
         if np.any(tight):
             tab = self.tight_dithers(tab)
-            
+
         # Expand the dictionary for multiple dithers. Expand such that there
         # is one entry in each list for each exposure, rather than one entry
         # for each set of dithers
@@ -178,7 +178,7 @@ class AptInput:
         # keys = np.array(indict.keys())
         keys = indict.keys()
         for i in range(len(indict['PrimaryDithers'])):
-            arr = np.array([item[i] for item in indict.values()])    
+            arr = np.array([item[i] for item in indict.values()])
             entry = dict(zip(keys, arr))
 
             # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
@@ -459,6 +459,8 @@ class AptInput:
             elif self.exposure_tab['Instrument'][i].lower() == 'niriss':
                 subarray_def_file = os.path.join(modpath, 'config', 'niriss_subarrays.list')
                 aperture = self.exposure_tab['aperture'][i]
+            else:
+                raise ValueError('Incompatible instrument: ' + self.exposure_tab['Instrument'][i])
 
             config = ascii.read(subarray_def_file)
             if aperture in config['AperName']:
@@ -529,7 +531,7 @@ class AptInput:
         """
         In NIRCam, when the 'FULL' dither pattern is
         used, it is possible to set the number of primary
-        dithers to '3TIGHT' rather than just a number 
+        dithers to '3TIGHT' rather than just a number
         (e.g. '3'). If the number of dithers is set to '3TIGHT'
         remove 'TIGHT' from the entries and leave
         only the number behind.
