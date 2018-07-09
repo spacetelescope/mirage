@@ -9,13 +9,14 @@ cosmic rays.
 
 
 import argparse, sys, glob, os
+import copy
 import pkg_resources
 import scipy.signal as s1
 import numpy as np
 import math
 from photutils import detect_threshold, detect_sources
 from astropy.io import fits, ascii
-from astropy.table import Table
+from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
 from astropy.convolution import convolve
 from asdf import AsdfFile
@@ -174,11 +175,32 @@ class Catalog_seed():
         if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
             ('FULL' not in self.params['Readout']['array_name'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
-        
+
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
+
+    def add_detector_to_zeropoints(self, detector):
+        """Manually add detector dependence to the zeropoint table for
+        NIRCam and NIRISS simualtions. This is being done as a placeholder
+        for the future, where we expect zeropoints to be detector-dependent.
+
+        Parameters:
+        -----------
+        detector : str
+            Name of detector to add to the table
+
+        Returns:
+        --------
+        Nothing
+        """
+        # Add "Detector" to the list of column names
+        base_table = copy.deepcopy(self.zps)
+        num_entries = len(self.zps)
+        det_column = Column(np.repeat(detector, num_entries), name="Detector")
+        base_table.add_column(det_column, index = 0)
+        return base_table
 
     def prepare_PAM(self):
         """
@@ -3013,6 +3035,12 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
+        # In the future we expect zeropoints to be detector dependent, as they currently
+        # are for FGS. So if we are working with NIRCAM or NIRISS, manually add a Detector key
+        # to the dictionary as a placeholder.
+        if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
+            self.zps = self.add_detector_to_zeropoints(detector)
+        
         # make sure the requested filter is allowed. For imaging, all filters are allowed.
         # In the future, other modes will be more restrictive
         if self.params['Readout']['pupil'][0].upper() == 'F':

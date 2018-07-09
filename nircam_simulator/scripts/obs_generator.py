@@ -1423,12 +1423,12 @@ class Observation():
         yd, xd = frame.shape
         #self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd+1) * 10.00 * 1.e-6
         #UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument'].lower():
+        if self.params['Inst']['instrument'].lower() == "nircam":
             colpad = 12
             rowpad = 2
             if ((xd <= 8) & (yd <= 8)):
                 rowpad = 3
-                self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
+            self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
         elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
         # the following applies to NIRISS and Guider full frame imaging and
         # NIRISS sub-arrays.
@@ -1589,7 +1589,7 @@ class Observation():
             # needs to be done and we can simply add the synthetic groups to
             # the dark current groups.
             synthetic = synthetic + dark.data[:, 0:self.params['Readout']['ngroup'], :, :]
-            print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
+            #print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
             reorder_sbandref = dark.sbAndRefpix
         return synthetic, zeroframe, reorder_sbandref
 
