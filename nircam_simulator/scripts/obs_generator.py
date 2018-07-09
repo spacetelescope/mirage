@@ -447,7 +447,7 @@ class Observation():
                                        , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'},
                             'niriss': {'Reffiles-readpattdefs':'niriss_readout_pattern.txt'
                                        , 'Reffiles-subarray_defs':'niriss_subarrays.list'
-                                       , 'Reffiles-flux_cal':'niriss_zeropoint_values.out'
+                                       , 'Reffiles-flux_cal':'niriss_zeropoints.list'
                                        , 'Reffiles-crosstalk':'niriss_xtalk_zeros.txt'
                                        , 'Reffiles-filtpupilcombo':'niriss_dual_wheel_list.txt'},
                             'fgs': {'Reffiles-readpattdefs':'guider_readout_pattern.txt'

@@ -362,7 +362,7 @@ class Catalog_seed():
                                        'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
                                        'Reffiles-filter_throughput': 'placeholder.txt'},
                             'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-flux_cal': 'niriss_zeropoint_values.out',
+                                       'Reffiles-flux_cal': 'niriss_zeropoints.list',
                                        'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
                                        'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
                                        'Reffiles-filter_throughput': 'placeholder.txt'},

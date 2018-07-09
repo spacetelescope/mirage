@@ -169,7 +169,7 @@ class SimInput:
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         elif self.instrument.lower() == 'niriss':
             self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
-            self.configfiles['fluxcal'] = 'niriss_zeropoint_values.out'
+            self.configfiles['fluxcal'] = 'niriss_zeropoints.list'
             self.configfiles['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
             self.configfiles['readpatt_def_file'] = 'niriss_readout_pattern.txt'
             self.configfiles['crosstalk'] = 'niriss_xtalk_zeros.txt'
