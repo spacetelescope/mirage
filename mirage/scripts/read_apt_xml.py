@@ -240,7 +240,7 @@ class ReadAPTXML():
             else:
                 label = '({})'.format(label)
 
-            print("Found {} exposure(s) for observation {} {}".format(n_tiles, i_obs + 1, label))
+            print("Found {} mosaic tile(s) for observation {} {}".format(n_tiles, i_obs + 1, label))
 
         return self.APTObservationParams
 
@@ -494,7 +494,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name, 'NIRCAM')
+                              i_obs + 1, j + 1, template_name, 'WFSC')
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -577,7 +577,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, j + 1, template_name, 'NIRCAM')
+                          i_obs + 1, j + 1, template_name, 'WFSC')
 
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -644,7 +644,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name, 'NIRCAM')
+                              i_obs + 1, j + 1, template_name, 'WFSC')
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -792,7 +792,7 @@ class ReadAPTXML():
                                   pdither, sdithtype, sdither, sfilt, lfilt,
                                   rpatt, grps, ints, short_pupil,
                                   long_pupil, grismval, coordparallel,
-                                  i_obs + 1, j + 1, template_name, 'NIRCAM')
+                                  i_obs + 1, j + 1, template_name, 'WFSC')
 
                     self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                     self.obs_tuple_list.append(tup_to_add)
