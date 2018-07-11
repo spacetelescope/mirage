@@ -14,7 +14,7 @@ Use
 Dependencies
 ------------
     The user must have a configuration file named ``siaf_config.json``
-    placed in nircam_simulator/config/ directory.
+    placed in mirage/config/ directory.
 """
 
 import json

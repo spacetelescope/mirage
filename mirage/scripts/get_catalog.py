@@ -2,7 +2,7 @@
 
 Extracts the RA and Dec of all observed targets from the APT .pointing
 file, and creates a catalog file that lists the sources within a
-defined radius of each of these targets in nircam_simulator/catalogs/.
+defined radius of each of these targets in mirage/catalogs/.
 This module uses astroquery and Vizier to query 2MASS and WISE for
 short-wave (F212N) and long-wave (F480M) catalogs, respectively, and
 writes .list files.
@@ -16,7 +16,7 @@ Use
     This module can be executed in a Python shell as such:
 
     ::
-        from nircam_simulator.scripts import get_catalog
+        from mirage.scripts import get_catalog
         sw_cats, lw_cats = get_catalog.get_all_catalogs(pointing_file, prop_id)
 
     Required arguments:
@@ -125,7 +125,7 @@ def get_sw_catalog(target_coords, search_radius=15 * u.arcmin):
         print('Queried {} 2MASS objects within {} of RA, Dec ({:.2f}, {:.2f}).'.
               format(len(queried_catalog_sw),'1 degree', t.ra.deg, t.dec.deg))
 
-        # Rename table columns to match nircam simulator expectations
+        # Rename table columns to match mirage's expectations
         queried_catalog_sw.rename_column('_RAJ2000', 'x_or_RA')
         queried_catalog_sw.rename_column('_DEJ2000', 'y_or_Dec')
         queried_catalog_sw.rename_column('Kmag', 'magnitude')
