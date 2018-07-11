@@ -1,22 +1,37 @@
-This repository contains code that can be used to generate
-simulated NIRCam data.
+# MIRaGe = Multi Instrument Ramp Generator
 
-Installation
-------------
+This repository contains code that can be used to generate
+simulated NIRCam, NIRISS, or FGS data. These data can be in one
+of two formats:
+
+`raw` - No calirbations applied. Detector level effects such as non-linearity,
+superbias, etc are still present.
+
+`linearized` - Detector level effects have been removed, and data have been
+linearized, but are still in ramp format, where multiple non-destructive
+reads of the detector are present.
+
+
+## Installation
 
 To install:
+
+```
 python setup.py install
+```
 
-
-Dependencies
-------------
+## Dependencies
 
 To simulate wide field slitless spectroscopy (WFSS) data:
+
 [NIRCam_Gsim][d1]: to disperse imaging data
+
 [GRISM_NIRCAM][d2]: NIRCam-specific grism configuration and sensitivity files
+
 [GRISMCONF][d3]: grism dispersion polynomials
 
 Background signals:
+
 [JWST backgrounds][d4]: Generate JWST Exposure Time Calculator-type backgrounds (zodiacal+thermal)
 
 [d1]: https://github.com/npirzkal/NIRCAM_Gsim
@@ -26,21 +41,20 @@ Background signals:
 
 
 Calibration pipeline:
+
 [JWST calibration pipeline][d5]. Necessary if using raw dark current exposures as input. Optional otherwise.
 
 [d5]: https://github.com/STScI-JWST/jwst
 
 
-Examples
---------
+## Examples
 
 See the notebooks in the "examples" subdirectory. There is one notebook
 for imaging simulations, one for WFSS simulations, and one for moving target
 (non-sidereal) simulations.
 
 
-Functionality
--------------
+## Functionality
 
 The code needed to create simulated data is split into
 four general parts:
@@ -52,7 +66,7 @@ four general parts:
 
 More details on these steps are given below:
 
-### Generate a "seed image" ###
+### Generate a "seed image"
 
 This portion of the code generates a "seed image" from
 either input source catalogs or an input large field-of-view
@@ -61,24 +75,26 @@ observation (fits file).
 The seed image is a noiseless countrate image containing
 all of the sources specified in the input catalogs. Sources
 are scaled to the requested magnitudes and placed in the
-appropriate location given the NIRCam distortion model.
+appropriate location according to the instrument distortion model.
 
 The main input to the code is a yaml file (examples are
 in the 'inputs' subdirectory). This file contains more
 information than is actually needed to run the code,
 but the information is all needed to run the entire
-NIRCam Data Simulator, so for the moment we've kept all
+data simulation process, so for the moment we've kept all
 of the inputs.
 
 
 **To use the code:**
 
 1) From the command line:
+```
 python catalog_seed_image.py myfile.yaml
+```
 
 2) Within python:
 ```
-from nircam_simulator.nircam_simulator.scripts import catalog_seed_image as csi
+from mirage.mirage.scripts import catalog_seed_image as csi
 cat = csi.Catalog_seed()
 cat.paramfile = 'myfile.yaml'
 cat.make_seed()
@@ -89,13 +105,15 @@ cat.make_seed()
 Multi-extension fits file with name ending in 'seed_image.fits', containing:
 
 Extension 0: empty
+
 Extension 1: seed image
+
 Extension 2: segmentation map
 
 Also, the seed image, segmentation map, and exposure info dictionary are available as:
 `self.seedimage`, `self.seed_segmap`, and `self.seedinfo`
 
-### Disperse the seed image ###
+### Disperse the seed image 
 
 Requires multiple imaging seed images as input. Output is a single, dispersed
 seed image that can be passed to later simulator steps just as imaging seed
@@ -116,7 +134,7 @@ t.observation()
 t.finalize(Back = background_file)
 ```
 
-### Prepare an existing dark current ramp ###
+### Prepare an existing dark current ramp 
 
 The input dark current exposure will be reorganized into the
 requested readout pattern (if possible). If the input is not
@@ -129,7 +147,7 @@ step.
 The signal associated with the superbias and reference pixels
 is saved along side the linearized dark ramp such that it
 can be added back in later, if the user requests a raw output
-ramp from the NIRCam Data Simulator.
+ramp from Mirage.
 
 **Output:**
 
@@ -144,13 +162,13 @@ python dark_prep.py myinputs.yaml
 
 **or:**
 ```
-from nircam_simulator.nircam_simluator.scripts import dark_prep
+from mirage.mirage.scripts import dark_prep
 dark = dark_prep.DarkPrep()
 dark.paramfile = 'myinputs.yaml'
 dark.prepare()
 ```
 
-### Combine the seed image with the dark ###
+### Combine the seed image with the dark
 
 This step takes as input a seed image (with associated segmentation
 map) and a linearized dark current exposure.
@@ -167,7 +185,7 @@ python obs_generator.py myinputs.yaml
 
 **or:**
 ```
-from nircam_simulator.nircam_simulator.scripts import obs_generator
+from mirage.mirage.scripts import obs_generator
 obs = obs_generator.Observation()
 obs.linDark = 'V42424024002P000000000112o_B5_F250M_uncal_linear_dark_prep_object.fits'
 obs.seed = 'V42424024002P000000000112o_B5_F250M_uncal_F250M_seed_image.fits'
@@ -177,9 +195,9 @@ obs.create()
 
 To create a simulated exposure, string together all of the steps:
 ```
-from nircam_simulator.nircam_simulator.scripts import catalog_seed_image
-from nircam_simulator.nircam_simulator.scripts import dark_prep
-from nircam_simulator.nircam_simulator.scripts import obs_generator
+from mirage.mirage.scripts import catalog_seed_image
+from mirage.mirage.scripts import dark_prep
+from mirage.mirage.scripts import obs_generator
 
 yamlfile = 'seed_catalog_test.yaml'
 cat = catalog_seed_image.Catalog_seed()
@@ -200,7 +218,7 @@ obs.paramfile = yamlfile
 obs.create()
 ```
 
-### Convenience Functions ###
+### Convenience Functions
 
 **imaging_pipeline.py** - wrapper around the three steps needed to create an
 imaging mode simulated exposure. This also works for moving target
