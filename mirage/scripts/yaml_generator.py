@@ -377,13 +377,13 @@ class SimInput:
 
     def path_defs(self):
         """Expand input files to have full paths"""
-        self.input_xml = os.path.abspath(self.input_xml)
-        self.pointing_file = os.path.abspath(self.pointing_file)
-        self.siaf = os.path.abspath(self.siaf)
-        self.output_dir = os.path.abspath(self.output_dir)
-        self.simdata_output_dir = os.path.abspath(self.simdata_output_dir)
+        self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
+        self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
+        self.siaf = os.path.abspath(os.path.expandvars(self.siaf))
+        self.output_dir = os.path.abspath(os.path.expandvars(self.output_dir))
+        self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
         if self.table_file is not None:
-            self.table_file = os.path.abspath(self.table_file)
+            self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
         self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
         self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
@@ -396,9 +396,9 @@ class SimInput:
         self.linearity_config = self.set_config(self.linearity_config, 'linearity_config')
 
         if self.observation_table is not None:
-            self.observation_table = os.path.abspath(self.observation_table)
+            self.observation_table = os.path.abspath(os.path.expandvars(self.observation_table))
         if self.crosstalk not in [None, 'config']:
-            self.crosstalk = os.path.abspath(self.crosstalk)
+            self.crosstalk = os.path.abspath(os.path.expandvars(self.crosstalk))
         elif self.crosstalk == 'config':
             self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
@@ -925,7 +925,7 @@ class SimInput:
             f.write('  robberto:  False                         # Use Massimo Robberto type non-linearity coefficients\n')
             f.write('\n')
             f.write('cosmicRay:\n')
-            cosmic_ray_path = os.path.join(self.data_dir,'cosmic_ray_library')
+            cosmic_ray_path = os.path.join(self.datadir,instrument.lower(),'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
             f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
             f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
@@ -1150,7 +1150,7 @@ class SimInput:
         parser.add_argument("--use_linearized_darks", help='True/False', action='store_true')
         parser.add_argument("--simdata_output_dir", help='Output directory for simulated exposure files', default='./')
         parser.add_argument("--psfpath", help='Directory containing PSF library',
-                            default=os.path.join(self.datadir,'webbpsf_library')
+                            default=os.path.join(self.datadir,'webbpsf_library'))
         parser.add_argument("--psfbasename", help="Basename of the files in the PSF library", default='nircam')
         parser.add_argument("--psfpixfrac", help="Subpixel centering resolution of files in PSF library", default=0.25)
         parser.add_argument("--psfwfe", help="Wavefront error value to use for PSFs", default='predicted')
