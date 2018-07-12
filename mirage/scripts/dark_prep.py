@@ -35,32 +35,23 @@ class DarkPrep():
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
-        self.env_var = 'NIRCAM_SIM_DATA'
-        self.datadir = os.environ.get(self.env_var)
-        if self.datadir is None:
-            localpath = '/ifs/jwst/wit/nircam/nircam_simulator_data'
-            local = os.path.exists(localpath)
-            if local:
-                self.datadir = localpath
-                os.environ['NIRCAM_SIM_DATA'] = localpath
-            else:
-                print(("WARNING: {} environment variable is not set."
-                       .format(self.env_var)))
-                print("This must be set to the base directory")
-                print("containing the darks, cosmic ray, PSF, etc")
-                print("input files needed for the simulation.")
-                print("This should be set correctly if you installed")
-                print("the nircam_sim_data conda package.")
-                sys.exit()
+        self.env_var = 'MIRAGE_DATA'
+        datadir = os.environ.get(self.env_var)
+        if datadir is None:
+            raise ValueError(("WARNING: {} environment variable is not set."
+                              "This must be set to the base directory"
+                              "containing the darks, cosmic ray, PSF, etc"
+                              "input files needed for the simulation."
+                              "These files must be downloaded separately"
+                              "from the Mirage package.".format(self.env_var)))
 
     def prepare(self):
         # Read in the yaml parameter file
         self.readParameterFile()
 
         # Expand locations to be full path names
-        self.expand_env_var()
-        self.filecheck()
         self.fullPaths()
+        self.filecheck()
 
         # Base name for output files
         base_name = self.params['Output']['file'].split('/')[-1]
@@ -220,14 +211,6 @@ class DarkPrep():
         self.prepDark.zero_sbAndRefpix = self.zeroModel.sbAndRefpix
         self.prepDark.header = self.linDark.header
 
-    def expand_env_var(self):
-        # Replace the environment variable name in any inputs
-        # where it is used.
-        for key1 in self.params:
-            for key2 in self.params[key1]:
-                if self.env_var in str(self.params[key1][key2]):
-                    self.params[key1][key2] = self.params[key1][key2].replace('$' + self.env_var + '/', self.datadir)
-
     def filecheck(self):
         # Make sure the requested input files exist
         # For reference files, assume first that they are located in
@@ -239,20 +222,8 @@ class DarkPrep():
                  ['Reffiles', 'superbias'],
                  ['Reffiles', 'linearity'],
                  ['Reffiles', 'saturation']]
-        #plist = [['simSignals', 'psfpath']]
-        #ilist = [['simSignals', 'pointsource'],
-        #         ['simSignals', 'galaxyListFile'],
-        #         ['simSignals', 'extended'],
-        #         ['simSignals', 'movingTargetList'],
-        #         ['simSignals', 'movingTargetSersic'],
-        #         ['simSignals', 'movingTargetExtended'],
-        #         ['simSignals', 'movingTargetToTrack']]
         for ref in rlist:
             self.ref_check(ref)
-        #for path in plist:
-        #    self.path_check(path)
-        #for inp in ilist:
-        #    self.input_check(inp)
 
     def ref_check(self, rele):
         # Check for the existence of the input reference file
@@ -260,51 +231,11 @@ class DarkPrep():
         # specified by the NIRCAM_SIM_DATA environment variable.
         rfile = self.params[rele[0]][rele[1]]
         if rfile.lower() != 'none':
-            rfile = os.path.abspath(rfile)
             c1 = os.path.isfile(rfile)
-            if c1:
-                self.params[rele[0]][rele[1]] = rfile
-            else:
-                print(("WARNING: Unable to locate the {}, {}"
-                       .format(rele[0], rele[1])))
-                print(("input file! Not present in {}"
-                       .format(rfile)))
-                sys.exit()
-
-    def path_check(self, p):
-        # Check for the existence of the input path.
-        # Assume first that the path is in relation to
-        # the directory tree specified by the NIRCAM_DATA_SIM
-        # environment variable
-        pth = self.params[p[0]][p[1]]
-        pth = os.path.abspath(pth)
-        c1 = os.path.exists(pth)
-        if c1:
-            self.params[p[0]][p[1]] = pth
-        else:
-            print("WARNING: Unable to find the requested path")
-            print("{}. Not present in directory tree".format(self.pdir))
-            print("specified by the {} environment variable.".format(self.env_var))
-            sys.exit()
-
-    def input_check(self, inparam):
-        # Check for the existence of the input file. In
-        # this case we do not check the directory tree
-        # specified by the NIRCAM_SIM_DATA environment variable.
-        # This is intended primarily for user-generated inputs like
-        # source catalogs
-        ifile = self.params[inparam[0]][inparam[1]]
-        print('ifile is', ifile)
-        if ifile.lower() != 'none':
-            ifile = os.path.abspath(ifile)
-            c = os.path.isfile(ifile)
-            if c:
-                self.params[inparam[0]][inparam[1]] = ifile
-            else:
-                print("WARNING: Unable to locate {}".format(ifile))
-                print("Specified by the {}:{} field in".format(inparam[0], inparam[1]))
-                print("the input yaml file.")
-                sys.exit()
+            if not c1:
+                raise FileNotFoundError(("WARNING: Unable to locate the {}, {} "
+                                         "input file! Not present in {}"
+                                         .format(rele[0], rele[1], rfile)))
 
     def fullPaths(self):
         # Expand all input paths to be full paths
@@ -326,15 +257,6 @@ class DarkPrep():
                                 'superbias_configfile', 'refpix_configfile',
                                 'linear_configfile'],
                     'Output': ['file', 'directory']}
-
-        #config_files = {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-        #                'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-        #                'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-        #                'newRamp-dq_configfile': 'dq_init.cfg',
-        #                'newRamp-sat_configfile': 'saturation.cfg',
-        #                'newRamp-superbias_configfile': 'superbias.cfg',
-        #                'newRamp-refpix_configfile': 'refpix.cfg',
-        #                'newRamp-linear_configfile': 'linearity.cfg'}
 
         all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
                                        'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
@@ -365,7 +287,8 @@ class DarkPrep():
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(self.params[key1][key2])
+                    #self.params[key1][key2] = os.path.abspath(self.params[key1][key2])
+                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
                 elif self.params[key1][key2].lower() == 'config':
                     cfile = config_files['{}-{}'.format(key1, key2)]
                     fpath = os.path.join(self.modpath, 'config', cfile)

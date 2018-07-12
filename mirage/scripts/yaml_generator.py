@@ -95,30 +95,26 @@ class SimInput:
     def __init__(self, instrument='NIRCam'):
         # Set the NIRCAM_SIM_DATA environment variable
         # if it's not already
-        stsci_local = '/ifs/jwst/wit/nircam/nircam_simulator_data/'
-        self.datadir = os.environ.get('NIRCAM_SIM_DATA')
+        self.env_var = 'MIRAGE_DATA'
+        self.datadir = os.environ.get(self.env_var)
         if self.datadir is None:
-            if os.path.exists(stsci_local):
-                self.datadir = stsci_local
-            else:
-                print("WARNING: NIRCAM_SIM_DATA environment variable")
-                print("has not been set, and it appears you do not")
-                print("have access to the STScI disks. You must set")
-                print("the environment variable to point at the directory")
-                print("containing the data files needed by the simulator.")
-                sys.exit()
-
+            raise ValueError(("WARNING: {} environment variable is not set."
+                              "This must be set to the base directory"
+                              "containing the darks, cosmic ray, PSF, etc"
+                              "input files needed for the simulation."
+                              "These files must be downloaded separately"
+                              "from the Mirage package.".format(self.env_var)))
         self.info = {}
         self.instrument = instrument
 
         if self.instrument.lower() == 'nircam':
-            self.psfpath = os.path.join(self.datadir, 'webbpsf_library')
+            self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
             self.psfbasename = 'nircam'
             self.psfpixfrac = 0.25
         elif self.instrument.lower() == 'niriss':
-            self.datadir2 = '/ifs/jwst/wit/niriss/nircam_ramp_simulation_files'
-            self.reference_file_dir =  os.path.join(self.datadir2, 'reference_files')
-            self.psfpath = os.path.join(self.datadir2, 'webbpsf_files')
+            #self.datadir2 = '/ifs/jwst/wit/niriss/nircam_ramp_simulation_files'
+            self.reference_file_dir =  os.path.join(self.datadir, 'niriss/reference_files')
+            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
             self.psfbasename = 'niriss'
             self.psfpixfrac = 0.1
         else:
@@ -929,7 +925,7 @@ class SimInput:
             f.write('  robberto:  False                         # Use Massimo Robberto type non-linearity coefficients\n')
             f.write('\n')
             f.write('cosmicRay:\n')
-            cosmic_ray_path = '/ifs/jwst/wit/nircam/nircam_simulator_data/cosmic_ray_library'
+            cosmic_ray_path = os.path.join(self.data_dir,'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
             f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
             f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
@@ -1075,15 +1071,15 @@ class SimInput:
 
         if self.instrument.lower() == 'nircam':
             self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-            sb_dir = os.path.join(self.datadir, 'reference_files/superbias')
-            lin_dir = os.path.join(self.datadir, 'reference_files/linearity')
-            gain_dir = os.path.join(self.datadir, 'reference_files/gain')
-            sat_dir = os.path.join(self.datadir, 'reference_files/saturation')
-            ipc_dir = os.path.join(self.datadir, 'reference_files/ipc')
-            dist_dir = os.path.join(self.datadir, 'reference_files/distortion')
-            pam_dir = os.path.join(self.datadir, 'reference_files/pam')
-            rawdark_dir = os.path.join(self.datadir, 'darks/raw')
-            lindark_dir = os.path.join(self.datadir, 'darks/linearized')
+            sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
+            lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
+            gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
+            sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
+            ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
+            dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
+            pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
+            rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
+            lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
             for det in self.det_list:
                 sbfiles = glob(os.path.join(sb_dir, '*fits'))
                 self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
@@ -1118,15 +1114,15 @@ class SimInput:
             #define NIRISS detector name (convention?)
             det = 'NIS'
 
-            self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, '*superbias*.fits'))[0]
-            self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, '*linearity*.fits'))[0]
-            self.gain_list[det] = glob(os.path.join(self.reference_file_dir, '*gain*.fits'))[0]
-            self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, '*saturation*.fits'))[0]
-            self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
-            self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, '*distortion*.asdf'))[0]
-            self.pam_list[det] = glob(os.path.join(self.reference_file_dir, '*area*.fits'))[0]
+            self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
+            self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
+            self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
+            self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
+            self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+            self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+            self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
 
-            self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss_darks', '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+            self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw', '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
             self.lindark_list[det] = [None]
 
     def add_options(self, parser=None, usage=None):
@@ -1154,7 +1150,7 @@ class SimInput:
         parser.add_argument("--use_linearized_darks", help='True/False', action='store_true')
         parser.add_argument("--simdata_output_dir", help='Output directory for simulated exposure files', default='./')
         parser.add_argument("--psfpath", help='Directory containing PSF library',
-                            default='/ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library')
+                            default=os.path.join(self.datadir,'webbpsf_library')
         parser.add_argument("--psfbasename", help="Basename of the files in the PSF library", default='nircam')
         parser.add_argument("--psfpixfrac", help="Subpixel centering resolution of files in PSF library", default=0.25)
         parser.add_argument("--psfwfe", help="Wavefront error value to use for PSFs", default='predicted')

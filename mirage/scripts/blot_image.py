@@ -25,9 +25,7 @@ class Blot():
         self.center_dec = [0.]
         self.pav3 = [0.]
         self.outfile = None
-
-        distdir = '/ifs/jwst/wit/witserv/data4/nrc/hilbert/distortion_reference_file/jwreftools/nircam/'
-        self.distfiles = glob.glob(os.path.join(distdir,'NRC*FULL_distortion.asdf'))
+        self.distfiles = glob.glob(os.path.join(self.distortion_dir,'NRC*FULL_distortion.asdf'))
 
         # Pixel scales for the NIRCam detectors
         self.nrc_scale = {'A1':(0.0311,0.0313),
@@ -227,6 +225,9 @@ class Blot():
             parser = argparse.ArgumentParser(usage=usage,description='Extract SCA-sized area from moasic')
         parser.add_argument("blotfile",help="Filename or model instance name of fits file containing mosaic.")
         #parser.add_argument("--blotmodel",help="Datamodel containing array to blot",default=None)
+        mirage_data = os.path.abspath(os.path.expandvars(self.env_var))
+        distortion_default = os.path.join(mirage_data, 'reference_files/distortion/')
+        parser.add_argument("--distortion_dir", help="Directory containing distortion reference files for the appropriate instrument.", default=distortion_default)
         parser.add_argument("--detector",help="NIRCam detectors to blot to. Multiple inputs ok. (e.g. A1 A5)",nargs='*') 
         parser.add_argument("center_ra",help="RA at the center of the extracted area",type=np.float,nargs='*')
         parser.add_argument("center_dec",help="Dec at the center of the extracted area",type=np.float,nargs='*')

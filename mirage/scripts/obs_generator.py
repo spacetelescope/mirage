@@ -51,23 +51,15 @@ class Observation():
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
-        self.env_var = 'NIRCAM_SIM_DATA'
-        self.datadir = os.environ.get(self.env_var)
-        if self.datadir is None:
-            localpath = '/ifs/jwst/wit/nircam/nircam_simulator_data'
-            local = os.path.exists(localpath)
-            if local:
-                self.datadir = localpath
-                os.environ['NIRCAM_SIM_DATA'] = localpath
-            else:
-                print(("WARNING: {} environment variable is not set."
-                       .format(self.env_var)))
-                print("This must be set to the base directory")
-                print("containing the darks, cosmic ray, PSF, etc")
-                print("input files needed for the simulation.")
-                print("This should be set correctly if you installed")
-                print("the nircam_sim_data conda package.")
-                sys.exit()
+        self.env_var = 'MIRAGE_DATA'
+        datadir = os.environ.get(self.env_var)
+        if datadir is None:
+            raise ValueError(("WARNING: {} environment variable is not set."
+                              "This must be set to the base directory"
+                              "containing the darks, cosmic ray, PSF, etc"
+                              "input files needed for the simulation."
+                              "These files must be downloaded separately"
+                              "from the Mirage package.".format(self.env_var)))
 
     def create(self):
         """MAIN FUNCTION"""
@@ -79,9 +71,8 @@ class Observation():
         self.readParameterFile()
 
         # Expand all paths in order to be more condor-friendly
-        self.expand_env_var()
-        self.filecheck()
         self.fullPaths()
+        self.filecheck()
 
         # Get the input dark if a filename is supplied
         if self.linDark is None:
@@ -310,16 +301,6 @@ class Observation():
 
         print("Observation generation complete.")
 
-    def expand_env_var(self):
-        """
-        Replace the environment variable name in any inputs
-        where it is used.
-        """
-        for key1 in self.params:
-            for key2 in self.params[key1]:
-                if self.env_var in str(self.params[key1][key2]):
-                    self.params[key1][key2] = self.params[key1][key2].replace('$'+self.env_var+'/', self.datadir)
-
     def filecheck(self):
         """
         Make sure the requested input files exist
@@ -360,11 +341,9 @@ class Observation():
         if rfile.lower() != 'none':
             rfile = os.path.abspath(rfile)
             c1 = os.path.isfile(rfile)
-            if c1:
-                self.params[rele[0]][rele[1]] = rfile
-            else:
-                raise FileNotFoundError(("WARNING: Unable to locate the "
-                                         "{}, {} input file! Not present in {}."
+            if not c1:
+                raise FileNotFoundError(("WARNING: Unable to locate the {}, {} "
+                                         "input file! Not present in {}"
                                          .format(rele[0], rele[1], rfile)))
 
     def path_check(self, p):
@@ -384,40 +363,19 @@ class Observation():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
-        pth = os.path.abspath(pth)
         c1 = os.path.exists(pth)
-        if c1:
-            self.params[p[0]][p[1]] = pth
-        else:
+        if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
-                                      "{}. Not present in directory tree specified "
-                                      "by the {} environment variable."
+                                      "{}. Not present in directory tree specified by "
+                                      "the {} environment variable."
                                       .format(pth, self.env_var)))
-
-    def input_check(self, inparam):
-        # Check for the existence of the input file. In
-        # this case we do not check the directory tree
-        # specified by the NIRCAM_SIM_DATA environment variable.
-        # This is intended primarily for user-generated inputs like
-        # source catalogs
-        ifile = self.params[inparam[0]][inparam[1]]
-        if ifile.lower() != 'none':
-            ifile = os.path.abspath(ifile)
-            c = os.path.isfile(ifile)
-            if c:
-                self.params[inparam[0]][inparam[1]] = ifile
-            else:
-                print("WARNING: Unable to locate {}".format(ifile))
-                print("Specified by the {}:{} field in".format(inparam[0], inparam[1]))
-                print("the input yaml file.")
-                sys.exit()
 
     def fullPaths(self):
         # Expand all input paths to be full paths
         # This is to allow for easier Condor-ization of
         # many runs
         pathdict = {'Reffiles':['dark', 'linearized_darkfile',
-                                'superbias',
+                                'superbias', 'badpixmask',
                                 'subarray_defs', 'readpattdefs',
                                 'linearity', 'saturation', 'gain',
                                 'pixelflat', 'illumflat',
@@ -434,11 +392,11 @@ class Observation():
                                   'movingTargetToTrack'],
                     'Output':['file', 'directory']}
 
-        config_files = {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
-                        , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
-                        , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
-                        , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
-                        , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}
+        #config_files = {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
+        #                , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
+        #                , 'Reffiles-flux_cal':'NIRCam_zeropoints.list'
+        #                , 'Reffiles-crosstalk':'xtalk20150303g0.errorcut.txt'
+        #                , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'}
 
         all_config_files = {'nircam': {'Reffiles-readpattdefs':'nircam_read_pattern_definitions.list'
                                        , 'Reffiles-subarray_defs':'NIRCam_subarray_definitions.list'
@@ -460,7 +418,7 @@ class Observation():
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(self.params[key1][key2])
+                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
                 elif self.params[key1][key2].lower() == 'config':
                     cfile = config_files['{}-{}'.format(key1, key2)]
                     fpath = os.path.join(self.modpath, 'config', cfile)
@@ -1304,9 +1262,6 @@ class Observation():
         #populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
         outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], rampexptime, n_int, n_group, n_y, n_x)
-
-
-        print('wcsaxes is {}'.format(outModel[1].header['WCSAXES']))
         outModel.writeto(filename, overwrite=True)
 
         #print("Final output integration saved to {}".format(filename))

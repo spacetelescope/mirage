@@ -56,20 +56,15 @@ class WFSSSim():
     def __init__(self):
         # Set the NIRCAM_SIM_DATA environment variable if it is not
         # set already. This is for users at STScI.
-        self.datadir = os.environ.get('NIRCAM_SIM_DATA')
+        self.env_var = 'MIRAGE_DATA'
+        self.datadir = os.environ.get(self.env_var)
         if self.datadir is None:
-            local = os.path.exists('/ifs/jwst/wit/nircam/nircam_simulator_data')
-            if local:
-                ddir = '/ifs/jwst/wit/nircam/nircam_simulator_data'
-                os.environ['NIRCAM_SIM_DATA'] = ddir
-                self.datadir = ddir
-            else:
-                print("WARNING: NIRCAM_SIM_DATA environment")
-                print("variable is not set, and it appears that")
-                print("you do not have access to the STScI")
-                print("directory where the data are located.")
-                sys.exit()
-
+            raise ValueError(("WARNING: {} environment variable is not set."
+                              "This must be set to the base directory"
+                              "containing the darks, cosmic ray, PSF, etc"
+                              "input files needed for the simulation."
+                              "These files must be downloaded separately"
+                              "from the Mirage package.".format(self.env_var)))
         self.paramfiles = None
         self.override_dark = None
         self.crossing_filter = None
@@ -98,7 +93,7 @@ class WFSSSim():
         # Create dispersed seed image from
         # the direct images
         dmode = 'mod{}_{}'.format(self.module,self.direction)
-        loc = os.path.join(self.datadir,"GRISM_NIRCAM/")
+        loc = os.path.join(self.datadir,"nircam/GRISM_NIRCAM/")
         background_file = ("{}_{}_back.fits"
                            .format(self.crossing_filter,dmode))
         disp_seed = Grism_seed(imseeds, self.crossing_filter,

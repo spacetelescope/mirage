@@ -57,23 +57,16 @@ class Catalog_seed():
         # Get the location of the NIRCAM_SIM_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
-        self.env_var = 'NIRCAM_SIM_DATA'
-        self.datadir = os.environ.get(self.env_var)
-        if self.datadir is None:
-            localpath = '/ifs/jwst/wit/nircam/nircam_simulator_data'
-            local = os.path.exists(localpath)
-            if local:
-                self.datadir = localpath
-                os.environ['NIRCAM_SIM_DATA'] = localpath
-            else:
-                print(("WARNING: {} environment variable is not set."
-                       .format(self.env_var)))
-                print("This must be set to the base directory")
-                print("containing the darks, cosmic ray, PSF, etc")
-                print("input files needed for the simulation.")
-                print("This should be set correctly if you installed")
-                print("the nircam_sim_data conda package.")
-                sys.exit()
+        self.env_var = 'MIRAGE_DATA'
+        datadir = os.environ.get(self.env_var)
+
+        if datadir is None:
+            raise ValueError(("WARNING: {} environment variable is not set."
+                              "This must be set to the base directory"
+                              "containing the darks, cosmic ray, PSF, etc"
+                              "input files needed for the simulation."
+                              "These files must be downloaded separately"
+                              "from the Mirage package.".format(self.env_var)))
 
         # if a grism signal rate image is requested, expand
         # the width and height of the signal rate image by this
@@ -105,9 +98,8 @@ class Catalog_seed():
         """MAIN FUNCTION"""
         # Read in input parameters and quality check
         self.readParameterFile()
-        self.expand_env_var()
-        self.filecheck()
         self.fullPaths()
+        self.filecheck()
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
         self.params['Output']['file'] = self.basename + self.params['Output']['file'][-5:]
@@ -398,13 +390,13 @@ class Catalog_seed():
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(self.params[key1][key2])
+                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
                 elif self.params[key1][key2].lower() == 'config':
                     cfile = config_files['{}-{}'.format(key1, key2)]
                     fpath = os.path.join(self.modpath, 'config', cfile)
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
+                    
     def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
         # Convert object magnitude to counts/sec
         if magsys.lower() == 'abmag':
@@ -2933,14 +2925,6 @@ class Catalog_seed():
             print("WARNING: unable to open {}".format(self.paramfile))
             sys.exit()
 
-    def expand_env_var(self):
-        # Replace the environment variable name in any inputs
-        # where it is used.
-        for key1 in self.params:
-            for key2 in self.params[key1]:
-                if self.env_var in str(self.params[key1][key2]):
-                    self.params[key1][key2] = self.params[key1][key2].replace('$' + self.env_var + '/', self.datadir)
-
     def checkParams(self):
         """Check input parameters for expected datatypes, values"""
         # Check instrument name
@@ -3316,8 +3300,8 @@ class Catalog_seed():
     def filecheck(self):
         # Make sure the requested input files exist
         # For reference files, assume first that they are located in
-        # the directory tree under the datadir (from the NIRCAM_SIM_DATA
-        # environment variable). If not, assume the input is a full path
+        # the directory tree under the directory specified by the MIRAGE_DATA
+        # environment variable. If not, assume the input is a full path
         # and check there.
         rlist = [['Reffiles', 'astrometric'],
                  ['Reffiles', 'distortion_coeffs']]
@@ -3337,31 +3321,48 @@ class Catalog_seed():
             self.input_check(inp)
 
     def ref_check(self, rele):
-        # Check for the existence of the input reference file
-        # Assume first that the file is in the directory tree
-        # specified by the NIRCAM_SIM_DATA environment variable.
+        """
+        Check for the existence of the input reference file
+        Assume first that the file is in the directory tree
+        specified by the MIRAGE_DATA environment variable.
+
+        Parameters:
+        -----------
+        rele -- Tuple containing the nested keys that point
+                to the refrence file of interest. These come
+                from the yaml input file
+
+        Reutrns:
+        --------
+        Nothing
+        """
         rfile = self.params[rele[0]][rele[1]]
         if rfile.lower() != 'none':
-            rfile = os.path.abspath(rfile)
             c1 = os.path.isfile(rfile)
-            if c1:
-                self.params[rele[0]][rele[1]] = rfile
-            else:
+            if not c1:
                 raise FileNotFoundError(("WARNING: Unable to locate the {}, {} "
                                          "input file! Not present in {}"
                                          .format(rele[0], rele[1], rfile)))
 
     def path_check(self, p):
-        # Check for the existence of the input path.
-        # Assume first that the path is in relation to
-        # the directory tree specified by the NIRCAM_DATA_SIM
-        # environment variable
+        """
+        Check for the existence of the input path.
+        Assume first that the path is in relation to
+        the directory tree specified by the MIRAGE_DATA
+        environment variable
+        
+        Parameters:
+        -----------
+        p -- Tuple containing the nested keys that point
+             to a directory in self.params
+
+        Returns:
+        --------
+        Nothing
+        """
         pth = self.params[p[0]][p[1]]
-        pth = os.path.abspath(pth)
         c1 = os.path.exists(pth)
-        if c1:
-            self.params[p[0]][p[1]] = pth
-        else:
+        if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
                                       "{}. Not present in directory tree specified by "
                                       "the {} environment variable."
@@ -3375,11 +3376,8 @@ class Catalog_seed():
         # source catalogs
         ifile = self.params[inparam[0]][inparam[1]]
         if ifile.lower() != 'none':
-            ifile = os.path.abspath(ifile)
             c = os.path.isfile(ifile)
-            if c:
-                self.params[inparam[0]][inparam[1]] = ifile
-            else:
+            if not c:
                 raise FileNotFoundError(("WARNING: Unable to locate {} Specified "
                                          "by the {}:{} field in the input yaml file."
                                          .format(ifile, inparam[0], inparam[1])))
