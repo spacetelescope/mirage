@@ -244,7 +244,7 @@ class DarkPrep():
         pathdict = {'Reffiles': ['dark', 'linearized_darkfile',
                                  'superbias', 'subarray_defs', 'readpattdefs',
                                  'linearity', 'saturation', 'gain', 'pixelflat',
-                                 'illumflat', 'astrometric',
+                                 'illumflat', 'astrometric', 'badpixmask',
                                  'distortion_coeffs', 'ipc', 'crosstalk',
                                  'occult', 'pixelAreaMap'],
                     'cosmicRay': ['path'],
