@@ -10,9 +10,9 @@ Inputs:
 paramfiles - List of yaml filenames. These files should be 
              inputs to the simulator. For details on the 
              information contained in the yaml files, see
-             the readme file associated with the nircam_simulator
+             the readme file associated with the mirage
              github repo: 
-             https://github.com/spacetelescope/nircam_simulator.git
+             https://github.com/spacetelescope/mirage.git
 
 crossing_filter - Name of the crossing filter to be used in
                   conjunction with the grism. All longwave
@@ -33,6 +33,7 @@ override_dark - If you wish to use a dark current file that
 
 HISTORY:
 15 November 2017 - created, Bryan Hilbert
+13 July 2018 - updated for name change to Mirage, Bryan Hilbert
 '''
 
 import os
@@ -40,11 +41,11 @@ import sys
 import argparse
 from numpy import nanmedian, isfinite
 from astropy.io import fits
-from nircam_simulator.scripts import catalog_seed_image
-from nircam_simulator.scripts import dark_prep
-from nircam_simulator.scripts import obs_generator
-from nircam_simulator.scripts import read_fits
-from nircam_simulator.scripts import yaml_update
+from mirage.scripts import catalog_seed_image
+from mirage.scripts import dark_prep
+from mirage.scripts import obs_generator
+from mirage.scripts import read_fits
+from mirage.scripts import yaml_update
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 
 nircam_filters = ['F322W2','F277W','F356W','F444W','F250M'
@@ -54,7 +55,7 @@ nircam_filters = ['F322W2','F277W','F356W','F444W','F250M'
 
 class WFSSSim():
     def __init__(self):
-        # Set the NIRCAM_SIM_DATA environment variable if it is not
+        # Set the MIRAGE_DATA environment variable if it is not
         # set already. This is for users at STScI.
         self.env_var = 'MIRAGE_DATA'
         self.datadir = os.environ.get(self.env_var)
@@ -221,7 +222,7 @@ class WFSSSim():
         Parameters:
         -----------
         file -- Name of a yaml file in the proper format
-                for the nircam_simaultor
+                for mirage
 
         Returns:
         --------

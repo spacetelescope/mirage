@@ -93,7 +93,7 @@ from . import apt_inputs
 
 class SimInput:
     def __init__(self, instrument='NIRCam'):
-        # Set the NIRCAM_SIM_DATA environment variable
+        # Set the MIRAGE_DATA environment variable
         # if it's not already
         self.env_var = 'MIRAGE_DATA'
         self.datadir = os.environ.get(self.env_var)
@@ -112,7 +112,6 @@ class SimInput:
             self.psfbasename = 'nircam'
             self.psfpixfrac = 0.25
         elif self.instrument.lower() == 'niriss':
-            #self.datadir2 = '/ifs/jwst/wit/niriss/nircam_ramp_simulation_files'
             self.reference_file_dir =  os.path.join(self.datadir, 'niriss/reference_files')
             self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
             self.psfbasename = 'niriss'
@@ -149,7 +148,7 @@ class SimInput:
         self.tracking = 'sidereal'
 
         # Prepare to find files listed as 'config'
-        self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
+        self.modpath = pkg_resources.resource_filename('mirage', '')
         self.configfiles = {}
         if self.instrument.lower() == 'nircam':
             self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'

@@ -30,9 +30,9 @@ class DarkPrep():
     def __init__(self):
         # Locate the module files, so that we know where to look
         # for config subdirectory
-        self.modpath = pkg_resources.resource_filename('nircam_simulator', '')
+        self.modpath = pkg_resources.resource_filename('mirage', '')
 
-        # Get the location of the NIRCAM_SIM_DATA environment
+        # Get the location of the MIRAGE_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
@@ -214,7 +214,7 @@ class DarkPrep():
     def filecheck(self):
         # Make sure the requested input files exist
         # For reference files, assume first that they are located in
-        # the directory tree under the datadir (from the NIRCAM_SIM_DATA
+        # the directory tree under the datadir (from the MIRAGE_DATA
         # environment variable). If not, assume the input is a full path
         # and check there.
         rlist = [['Reffiles', 'dark'],
@@ -228,7 +228,7 @@ class DarkPrep():
     def ref_check(self, rele):
         # Check for the existence of the input reference file
         # Assume first that the file is in the directory tree
-        # specified by the NIRCAM_SIM_DATA environment variable.
+        # specified by the MIRAGE_DATA environment variable.
         rfile = self.params[rele[0]][rele[1]]
         if rfile.lower() != 'none':
             c1 = os.path.isfile(rfile)

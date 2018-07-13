@@ -2,8 +2,7 @@
 
 '''
 Class that creates an integration containing multiple frames and 
-shows a source that is moving relative to the detector. Called by 
-nircam_simualtor.py. 
+shows a source that is moving relative to the detector.
 
 Arguments:
 ----------

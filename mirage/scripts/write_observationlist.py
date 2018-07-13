@@ -3,7 +3,7 @@ import re
 from lxml import etree
 import numpy as np
 import pprint
-from nircam_simulator.scripts import apt_inputs
+from mirage.scripts import apt_inputs
 from . import read_apt_xml
 
 def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=None):
@@ -77,7 +77,7 @@ def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=Non
                          'dimensions. Will not write {}'.format(yaml_file))
 
     write = ["# Observation list created by write_observationlist.py script in\n",
-             "# nircam_simulator/scripts. Note: all values except filters and\n",
+             "# mirage/scripts. Note: all values except filters and\n",
              "# observation names are default.\n\n"]
     for i_obs in range(num_obs):
         obs_number = i_observations[i_obs] + 1

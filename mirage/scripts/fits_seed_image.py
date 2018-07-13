@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-Create a nircam_simulator-format seed image from 
+Create a mirage-format seed image from 
 an input fits file. This fits file must contain a 
 valid WCS, and be distortion-free.
 
@@ -17,7 +17,7 @@ distortion model.
 The resulting image is then saved in such a format
 that it can be used as input in the obs_generator.py,
 image_simulator.py, or disperser code in the 
-nircam_simulator package. Essentially this script
+mirage package. Essentially this script
 is designed to take the place of catalog_seed_image.py
 in the case where the user has a distortion-free 
 mosaic image that they wish to break up into 
@@ -182,7 +182,7 @@ class ImgSeed:
         
         # Locate the module files, so that we know where to look
         # for config subdirectory
-        self.modpath = pkg_resources.resource_filename('nircam_simulator','')
+        self.modpath = pkg_resources.resource_filename('mirage','')
 
         # self.coords contains the factor by which the
         # nominal output array size needs to be increased
@@ -203,7 +203,7 @@ class ImgSeed:
     def read_param_file(self, file):
         '''If an input yaml file is given 
         which matches the format of the input
-        yaml files for the other nircam_simulator
+        yaml files for the other mirage
         steps, read in and set needed parameters'''
         
         if os.path.isfile(file):
@@ -369,7 +369,7 @@ class ImgSeed:
     def save_seed_image(self, model):
         '''Save the seed image in the proper
         format that it can be used in subsequent
-        steps of the nircam_simualtor'''
+        steps of mirage'''
         self.seed_image = model.data
         dim = len(self.seed_image.shape)
         if dim == 2:
