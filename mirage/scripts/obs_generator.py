@@ -216,6 +216,7 @@ class Observation():
 
         # Save the ramp if requested. This is the linear ramp,
         # ready to go into the Jump step of the pipeline
+        self.linear_output = None
         if 'linear' in self.params['Output']['datatype'].lower():
             # Output filename: append 'linear'
             try:
@@ -248,9 +249,11 @@ class Observation():
             stp.add_wcs(linearrampfile, roll=self.params['Telescope']['rotation'])
             print("Final linearized exposure saved to:")
             print("{}".format(linearrampfile))
-
+            self.linear_output = linearrampfile
+            
         # If the raw version is requested, we need to unlinearize
         # the ramp
+        self.raw_output = None
         if 'raw' in self.params['Output']['datatype'].lower():
             if self.linDark.sbAndRefpix is not None:
                 if self.params['Output']['save_intermediates']:
@@ -293,6 +296,7 @@ class Observation():
                 stp.add_wcs(rawrampfile,roll=self.params['Telescope']['rotation'])
                 print("Final raw exposure saved to")
                 print("{}".format(rawrampfile))
+                self.raw_output = rawrampfile
             else:
                 print("WARNING: raw output ramp requested, but the signal associated")
                 print("with the superbias and reference pixels is not present in")

@@ -14,20 +14,20 @@ Readout:
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
   dark: None   #Dark current integration used as the base
-  linearized_darkfile: /ifs/jwst/wit/nircam/nircam_simulator_data/darks/linearized/B5/Linearized_Dark_and_SBRefpix_NRCNRCBLONG-DARK-60090141241_1_490_SE_2016-01-09T02h46m50_uncal.fits # Linearized dark ramp to use as input. Supercedes dark above
-  badpixmask: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/badpix/NRCB5_17161_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits # If linearized dark is used, populate output DQ extensions using this file
-  superbias: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/superbias/NRCB5_superbias_from_list_of_biasfiles.list.fits  #Superbias file. Set to None or leave blank if not using
-  linearity: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/linearity/NRCBLONG_17161_LinearityCoeff_ADU0_2016-05-22_ssblinearity_v2_DMSorient.fits    #linearity correction coefficients
-  saturation: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/saturation/NRCB5_17161_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
-  gain: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
+  linearized_darkfile: $MIRAGE_DATA/nircam/darks/linearized/B5/Linearized_Dark_and_SBRefpix_NRCNRCBLONG-DARK-60090141241_1_490_SE_2016-01-09T02h46m50_uncal.fits # Linearized dark ramp to use as input. Supercedes dark above
+  badpixmask: $MIRAGE_DATA/nircam/reference_files/badpix/NRCB5_17161_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits # If linearized dark is used, populate output DQ extensions using this file
+  superbias: $MIRAGE_DATA/nircam/reference_files/superbias/NRCB5_superbias_from_list_of_biasfiles.list.fits  #Superbias file. Set to None or leave blank if not using
+  linearity: $MIRAGE_DATA/nircam/reference_files/linearity/NRCBLONG_17161_LinearityCoeff_ADU0_2016-05-22_ssblinearity_v2_DMSorient.fits    #linearity correction coefficients
+  saturation: $MIRAGE_DATA/nircam/reference_files/saturation/NRCB5_17161_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
+  gain: $MIRAGE_DATA/nircam/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
-  distortion_coeffs: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
-  ipc: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
+  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
+  distortion_coeffs: $MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
+  ipc: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
-  pixelAreaMap: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/pam/NIRCam_B5_PAM_imaging.fits #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+  pixelAreaMap: $MIRAGE_DATA/nircam/reference_files/pam/NIRCam_B5_PAM_imaging.fits #Pixel area map for the detector. Used to introduce distortion into the output ramp.
   subarray_defs:   config   #File that contains a list of all possible subarray names and coordinates
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
@@ -42,20 +42,20 @@ nonlin:
   robberto:  False                         #Use Massimo Robberto type non-linearity coefficients
 
 cosmicRay:
-  path: /ifs/jwst/wit/nircam/nircam_simulator_data/cosmic_ray_library/         #Path to CR library
+  path: $MIRAGE_DATA/nircam/cosmic_ray_library/         #Path to CR library
   library: SUNMIN    #Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)
   scale: 1.5     #Cosmic ray scaling factor
   suffix: IPC_NIRCam_B5    #Suffix of library file names
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: /ifs/jwst/wit/nircam/hilbert/python_repos/nircam_simulator/nircam_simulator/catalogs/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: /ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library/        #Path to PSF library
+  pointsource: /ifs/jwst/wit/nircam/hilbert/python_repos/mirage/mirage/catalogs/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  psfpath: $MIRAGE_DATA/nircam/webbpsf_library/        #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
   psfwfegroup: 0      #WFE realization group (0 to 4)
-  galaxyListFile: /ifs/jwst/wit/nircam/hilbert/python_repos/nircam_simulator/nircam_simulator/catalogs/seed_im_from_catalog_test_galaxies_catalog.list
+  galaxyListFile: /ifs/jwst/wit/nircam/hilbert/python_repos/mirage/mirage/catalogs/seed_im_from_catalog_test_galaxies_catalog.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
