@@ -482,22 +482,35 @@ class DarkPrep():
         print('using JWST calibration pipeline.')
 
         #Run the DQ_Init step
-        linDark = DQInitStep.call(dark, config_file=self.params['newRamp']['dq_configfile'])
+        if self.runStep['badpixmask']:
+            linDark = DQInitStep.call(dark,
+                            config_file=self.params['newRamp']['dq_configfile'],
+                            override_mask = self.params['Reffiles']['badpixmask'])
+        else:
+            linDark = DQInitStep.call(dark,
+                            config_file=self.params['newRamp']['dq_configfile'])
 
         #If the saturation map is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['saturation_lin_limit']:
-            linDark = SaturationStep.call(linDark, config_file=self.params['newRamp']['sat_configfile'], override_saturation=self.params['Reffiles']['saturation'])
+            linDark = SaturationStep.call(linDark,
+                            config_file=self.params['newRamp']['sat_configfile'],
+                            override_saturation=self.params['Reffiles']['saturation'])
         else:
-            linDark = SaturationStep.call(linDark, config_file=self.params['newRamp']['sat_configfile'])
+            linDark = SaturationStep.call(linDark,
+                                          config_file=self.params['newRamp']['sat_configfile'])
 
         # If the superbias file is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['superbias']:
-            linDark = SuperBiasStep.call(linDark, config_file=self.params['newRamp']['superbias_configfile'], override_superbias=self.params['Reffiles']['superbias'])
+            linDark = SuperBiasStep.call(linDark,
+                        config_file=self.params['newRamp']['superbias_configfile'],
+                        override_superbias=self.params['Reffiles']['superbias'])
         else:
-            linDark = SuperBiasStep.call(linDark, config_file=self.params['newRamp']['superbias_configfile'])
+            linDark = SuperBiasStep.call(linDark,
+                        config_file=self.params['newRamp']['superbias_configfile'])
 
         # Reference pixel correction
-        linDark = RefPixStep.call(linDark, config_file=self.params['newRamp']['refpix_configfile'])
+        linDark = RefPixStep.call(linDark,
+                        config_file=self.params['newRamp']['refpix_configfile'])
 
         # Save a copy of the superbias- and reference pixel-subtracted
         # dark. This will be used later to add these effects back in
@@ -512,9 +525,14 @@ class DarkPrep():
         linearoutfile = base_name[0:-5] + '_linearized_dark_current_ramp.fits'
         linearoutfile = os.path.join(self.params['Output']['directory'], linearoutfile)
         if self.runStep['linearity']:
-            linDark = LinearityStep.call(linDark, config_file=self.params['newRamp']['linear_configfile'], override_linearity=self.params['Reffiles']['linearity'], output_file=linearoutfile)
+            linDark = LinearityStep.call(linDark,
+                            config_file=self.params['newRamp']['linear_configfile'],
+                            override_linearity=self.params['Reffiles']['linearity'],
+                            output_file=linearoutfile)
         else:
-            linDark = LinearityStep.call(linDark, config_file=self.params['newRamp']['linear_configfile'], output_file=linearoutfile)
+            linDark = LinearityStep.call(linDark,
+                            config_file=self.params['newRamp']['linear_configfile'],
+                            output_file=linearoutfile)
 
         print(('Linearized dark (output directly from pipeline) '
 	       'saved as {}'.format(linearoutfile)))
@@ -812,7 +830,6 @@ class DarkPrep():
 
         obj : read_fits object
             Instance of read_fits class containing dark current data and info
-
         Returns
         -------
 
@@ -1016,6 +1033,7 @@ class DarkPrep():
         # and populate with True or False
         self.runStep = {}
         #self.runStep['linearity'] = self.checkRunStep(self.params['Reffiles']['linearity'])
+        self.runStep['badpixmask'] = self.checkRunStep(self.params['Reffiles']['badpixmask'])
         self.runStep['linearized_darkfile'] = self.checkRunStep(self.params['Reffiles']['linearized_darkfile'])
         self.runStep['saturation_lin_limit'] = self.checkRunStep(self.params['Reffiles']['saturation'])
         self.runStep['superbias'] = self.checkRunStep(self.params['Reffiles']['superbias'])

@@ -273,7 +273,7 @@ class ReadAPTXML():
         dictionary['Instrument'].append(tup[24])
         return dictionary
 
-
+    
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary):
         """Read imaging template content regardless of instrument.
         Save content to object attributes.
@@ -761,7 +761,7 @@ class ReadAPTXML():
             groups += list(np.array(groups_fp)[inds])
             integrations += list(np.array(integrations_fp)[inds])
 
-
+            
         sensing = obs.find('.//' + self.apt + 'WavefrontSensing').text
         if sensing == 'SENSING_ONLY':
             n_repeats = 1

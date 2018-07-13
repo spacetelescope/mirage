@@ -169,7 +169,7 @@ class SimInput:
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         elif self.instrument.lower() == 'niriss':
             self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
-            self.configfiles['fluxcal'] = 'niriss_zeropoint_values.out'
+            self.configfiles['fluxcal'] = 'niriss_zeropoints.list'
             self.configfiles['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
             self.configfiles['readpatt_def_file'] = 'niriss_readout_pattern.txt'
             self.configfiles['crosstalk'] = 'niriss_xtalk_zeros.txt'
@@ -351,7 +351,7 @@ class SimInput:
         for obs in obs_ids:
             n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
             n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
-
+            
             module = self.info['Module'][i_mod]
 
             if module != 'None':
@@ -372,7 +372,7 @@ class SimInput:
                 n_det = 1
                 module = ' NIS'
 
-
+                
             i_mod += n_tiles * n_det
 
             print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))

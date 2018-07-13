@@ -399,7 +399,6 @@ class AptInput:
         finaltab = {}
         for key in obstab:
             finaltab[key] = []
-
         finaltab['detector'] = []
 
         n_primarydithers = len(obstab['PrimaryDithers'])
@@ -471,7 +470,8 @@ class AptInput:
                     (sub in apername) or (sub in name)
                 ]
                 if len(aperture) > 1 or len(aperture) == 0:
-                    raise ValueError('Cannot combine detector {} and subarray {} into valid aperture name in observation {}.'.format(detector, sub, self.exposure_tab['ObservationID'][i]))
+                    raise ValueError('Cannot combine detector {} and subarray {}\
+                        into valid aperture name.'.format(detector, sub))
                 else:
                     aperture = aperture[0]
 
@@ -521,7 +521,7 @@ class AptInput:
         match = siaf['AperName'] == det
 
         if not np.any(match):
-            raise ValueError("Aperture name {} not in input CSV file {}.".
+            raise ValueError("Aperture name {} not found in input CSV file {}.".
                              format(det, self.siaf))
         v2 = siaf[match]['V2Ref']
         v3 = siaf[match]['V3Ref']
@@ -582,7 +582,6 @@ class AptInput:
             onames.append(self.obstab[observation]['Name'])
             onums.append(observation)
         onames = np.array(onames)
-
 
         OBSERVATION_LIST_FIELDS = 'Name Date PAV3 Filter PointSourceCatalog GalaxyCatalog ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList MovingTargetSersic MovingTargetExtended MovingTargetConvolveExtended MovingTargetToTrack BackgroundRate'.split()
 
@@ -729,8 +728,6 @@ class AptInput:
                         value = obslist[key].strftime('%Y-%m-%d')
                     else:
                         value = str(obslist[key])
-                    # if value is None:
-                    #     value = 'None'
 
                     intab[key].append(value)
 

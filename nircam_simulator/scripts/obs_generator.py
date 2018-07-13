@@ -99,12 +99,13 @@ class Observation():
         self.slowaxis = self.linDark.header['SLOWAXIS']
 
         # Get detector/channel specific values
-        if self.instrument.lower() == 'nircam':
-            self.channel_specific_dicts()
-        elif self.instrument.lower() == 'niriss':
-            # pixel scales should be read from SIAF (?)
-            self.pixscale = [0.064746, 0.064746]
-
+        #self.channel_specific_dicts()
+        #if self.instrument.lower() == 'nircam':
+        #    self.channel_specific_dicts()
+        #elif self.instrument.lower() == 'niriss':
+        #    # pixel scales should be read from SIAF (?)
+        #    self.pixscale = [0.064746, 0.064746]
+        
         # Get the input seed image if a filename is supplied
         if type(self.seed) == type('string'):
             self.seed, self.segmap, self.seedheader = self.readSeed(self.seed)
@@ -446,12 +447,12 @@ class Observation():
                                        , 'Reffiles-filtpupilcombo':'nircam_filter_pupil_pairings.list'},
                             'niriss': {'Reffiles-readpattdefs':'niriss_readout_pattern.txt'
                                        , 'Reffiles-subarray_defs':'niriss_subarrays.list'
-                                       , 'Reffiles-flux_cal':'niriss_zeropoint_values.out'
+                                       , 'Reffiles-flux_cal':'niriss_zeropoints.list'
                                        , 'Reffiles-crosstalk':'niriss_xtalk_zeros.txt'
                                        , 'Reffiles-filtpupilcombo':'niriss_dual_wheel_list.txt'},
                             'fgs': {'Reffiles-readpattdefs':'guider_readout_pattern.txt'
                                     , 'Reffiles-subarray_defs':'guider_subarrays.list'
-                                    , 'Reffiles-flux_cal':'guider_zero_magnitude_values.out'
+                                    , 'Reffiles-flux_cal':'guider_zeropoints.list'
                                     , 'Reffiles-crosstalk':'guider_xtalk_zeros.txt'
                                     , 'Reffiles-filtpupilcombo':'guider_filter_dummy.list'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
@@ -887,7 +888,7 @@ class Observation():
         #update various header keywords
         dims = outModel.data.shape
         dtor = radians(1.)
-        pixelsize = self.pixscale[0] / 3600.0
+        #pixelsize = self.pixscale[0] / 3600.0
 
         current_time = datetime.datetime.utcnow()
         start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
@@ -978,14 +979,19 @@ class Observation():
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
-            #grism='N/A'
         else:
             pw = self.params['Readout']['pupil']
             fw = self.params['Readout']['filter']
-            #grism = pw
+
+        # Get FGS filter/pupil in proper format
+        if fw == 'NA':
+            fw = 'N/A'
+        if pw == 'NA':
+            pw = 'N/A'
 
         outModel.meta.instrument.filter = fw
         outModel.meta.instrument.pupil = pw
+
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
         outModel.meta.dither.total_points = self.params['Output']['total_primary_dither_positions']
@@ -1130,7 +1136,7 @@ class Observation():
         #update various header keywords
         dims = outModel[1].data.shape
         dtor = radians(1.)
-        pixelsize = self.pixscale[0] / 3600.0
+        #pixelsize = self.pixscale[0] / 3600.0
 
         current_time = datetime.datetime.utcnow()
         start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
@@ -1231,6 +1237,12 @@ class Observation():
         else:
             pw = self.params['Readout']['pupil']
             fw = self.params['Readout']['filter']
+
+        # Get FGS filter/pupil in proper format
+        if fw == 'NA':
+            fw = 'N/A'
+        if pw == 'NA':
+            pw = 'N/A'
 
         outModel[0].header['FILTER'] = fw
         outModel[0].header['PUPIL'] = pw
@@ -1365,8 +1377,11 @@ class Observation():
         # Set NaN coefficients such that no correction will be made
         nans = np.isnan(nonlin[1, :, :])
         numnan = np.sum(nans)
-        print('The linearity coefficients of {} pixels are NaNs. Setting these'.format(numnan))
-        print('coefficients such that no linearity correction is made.')
+        if numnan > 0:
+            print(("The linearity coefficients of {} pixels are NaNs. "
+                   "Setting these coefficients such that no linearity "
+                   "correction is made.".format(numnan)))
+
         for i, cof in enumerate(range(nonlin.shape[0])):
             tmp = nonlin[cof, :, :]
             if i == 1:
@@ -1408,12 +1423,12 @@ class Observation():
         yd, xd = frame.shape
         #self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd+1) * 10.00 * 1.e-6
         #UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument'].lower():
-          colpad = 12
-          rowpad = 2
-          if ((xd <= 8) & (yd <= 8)):
-              rowpad = 3
-          self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
+        if self.params['Inst']['instrument'].lower() == "nircam":
+            colpad = 12
+            rowpad = 2
+            if ((xd <= 8) & (yd <= 8)):
+                rowpad = 3
+            self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
         elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
         # the following applies to NIRISS and Guider full frame imaging and
         # NIRISS sub-arrays.
@@ -1423,15 +1438,15 @@ class Observation():
         #
         # note that the Guider frame time may be different for small sub-arrays
         # less than 64 pixels square, but that needs to be confirmed.
-          colpad = 12
-          if self.params['Readout']['namp'] == 4:
-              pad1 = 1
-              pad2 = 1
-          else:
-              pad1 = 2
-              pad2 = 0
-          self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) 
-                            * (xd + pad1)) * 0.00001
+            colpad = 12
+            if self.params['Readout']['namp'] == 4:
+                pad1 = 1
+                pad2 = 1
+            else:
+                pad1 = 2
+                pad2 = 0
+            self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) 
+                              * (xd + pad1)) * 0.00001
         print('Exposure time of a single frame: ', self.frametime)
 
 
@@ -1574,7 +1589,7 @@ class Observation():
             # needs to be done and we can simply add the synthetic groups to
             # the dark current groups.
             synthetic = synthetic + dark.data[:, 0:self.params['Readout']['ngroup'], :, :]
-            print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
+            #print("Number of pixels with exactly 0 signal in synthetic: {}".format(np.sum(synthetic==0)))
             reorder_sbandref = dark.sbAndRefpix
         return synthetic, zeroframe, reorder_sbandref
 
@@ -2522,15 +2537,18 @@ class Observation():
         try:
             self.params['Readout']['ngroup'] = int(self.params['Readout']['ngroup'])
         except:
-            print("WARNING: Input value of ngroup is not an integer.")
-            sys.exit
+            raise ValueError("WARNING: Input value of ngroup is not an integer.")
 
         try:
             self.params['Readout']['nint'] = int(self.params['Readout']['nint'])
         except:
-            print("WARNING: Input value of nint is not an integer.")
-            sys.exit
+            raise ValueError("WARNING: Input value of nint is not an integer.")
 
+        # If instrument is FGS, then force filter to be 'N/A'
+        if self.params['Inst']['instrument'].lower() == 'fgs':
+            self.params['Readout']['filter'] = 'NA'
+            self.params['Readout']['pupil'] = 'NA'
+            
         # Make sure that the requested number of groups is less than or
         # equal to the maximum allowed.
         # For full frame science operations, ngroup is going to be limited
