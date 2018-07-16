@@ -122,8 +122,9 @@ def get_sw_catalog(target_coords, search_radius=15 * u.arcmin):
         result = v.query_region(t, radius=search_radius)
         queried_catalog_sw = result['II/246/out']
 
-        print('Queried {} 2MASS objects within {} of RA, Dec ({:.2f}, {:.2f}).'.
-              format(len(queried_catalog_sw),'1 degree', t.ra.deg, t.dec.deg))
+        print('Queried {} 2MASS objects within {} {} of RA, Dec ({:.2f}, {:.2f}).'.
+              format(len(queried_catalog_sw), search_radius.value,
+                     str(search_radius.unit), t.ra.deg, t.dec.deg))
 
         # Rename table columns to match mirage's expectations
         queried_catalog_sw.rename_column('_RAJ2000', 'x_or_RA')
@@ -187,8 +188,9 @@ def get_lw_catalog(target_coords, search_radius=15 * u.arcmin):
         result = v.query_region(t, radius=search_radius)
         queried_catalog_lw = result['II/328/allwise']
 
-        print('Queried {} WISE objects within {} of RA, Dec ({:.2f}, {:.2f}).'.
-              format(len(queried_catalog_lw), '1 degree', t.ra.deg, t.dec.deg))
+        print('Queried {} WISE objects within {} {} of RA, Dec ({:.2f}, {:.2f}).'.
+              format(len(queried_catalog_lw), search_radius.value,
+                     str(search_radius.unit), t.ra.deg, t.dec.deg))
 
         # Rename table columns to match nircam simulator expectations
         queried_catalog_lw.rename_column('RAJ2000', 'x_or_RA')
@@ -232,4 +234,4 @@ def get_all_catalogs(pointing_file, prop_id):
     catalog_filenames_sw = get_sw_catalog(target_coords)
     catalog_filenames_lw = get_lw_catalog(target_coords)
 
-    return catalog_filenames_sw, catalog_filenames_lw
+    return target_coords, catalog_filenames_sw, catalog_filenames_lw
