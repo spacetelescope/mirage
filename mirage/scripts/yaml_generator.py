@@ -448,23 +448,36 @@ class SimInput:
             filt = self.info[filtkey][i]
             pup = self.info[pupilkey][i]
 
-            if self.point_source[0] is not None:
+            if self.point_source[i] is not None:
                 # In here, we assume the user provided a catalog to go with each filter
                 # so now we need to find the filter for each entry and generate a list that makes sense
                 self.info['point_source'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.point_source, 'point source')))
-            if self.galaxyListFile[0] is not None:
+            else:
+                self.info['point_source'][i] = None
+            if self.galaxyListFile[i] is not None:
                 self.info['galaxyListFile'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.galaxyListFile, 'galaxy')))
-            if self.extended[0] is not None:
+            else:
+                self.info['galaxyListFile'][i] = None
+            if self.extended[i] is not None:
                 self.info['extended'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.extended, 'extended')))
-            if self.movingTarg[0] is not None:
+            else:
+                self.info['extended'][i] = None
+            if self.movingTarg[i] is not None:
                 self.info['movingTarg'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTarg, 'moving point source target')))
-            if self.movingTargSersic[0] is not None:
+            else:
+                self.info['movingTarg'][i] = None
+            if self.movingTargSersic[i] is not None:
                 self.info['movingTargSersic'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargSersic, 'moving sersic target')))
-            if self.movingTargExtended[0] is not None:
+            else:
+                self.info['movingTargSersic'][i] = None
+            if self.movingTargExtended[i] is not None:
                 self.info['movingTargExtended'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargExtended, 'moving extended target')))
-            if self.movingTargToTrack[0] is not None:
+            else:
+                self.info['movingTargExtended'][i] = None
+            if self.movingTargToTrack[i] is not None:
                 self.info['movingTargToTrack'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargToTrack, 'non-sidereal moving target')))
-
+            else:
+                self.info['movingTargToTrack'][i] = None
         if self.convolveExtended == True:
             self.info['convolveExtended'] = [True] * len(self.info['Module'])
 

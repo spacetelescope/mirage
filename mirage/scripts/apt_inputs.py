@@ -199,6 +199,27 @@ class AptInput:
                     expanded[key].append(indict[key][i])
         return expanded
 
+    def full_path(self, in_path):
+        """
+        If the input path is not None, expand
+        any environment variables and make an
+        absolute path. Return the updated path.
+
+        Parameters:
+        -----------
+        in_path : str
+            Path to be expanded
+        
+        Returns:
+        --------
+        in_path : str
+            Expanded, absolute path
+        """
+        if in_path.lower() == 'none':
+            return in_path
+        else:
+            return os.path.abspath(os.path.expandvars(in_path))
+    
     def base36encode(self, integer):
         """
         Translate a base 10 integer to base 36
@@ -644,28 +665,27 @@ class AptInput:
                 exposure = int(exp[-2:])
                 filter_config = 'FilterConfig{}'.format(exposure)
                 obslist = obslist[filter_config]
-
-                obs_sw_ptsrc.append(os.path.abspath(os.path.expandvars(obslist['SW']['PointSourceCatalog'])))
-                obs_sw_galcat.append(os.path.abspath(os.path.expandvars(obslist['SW']['GalaxyCatalog'])))
-                obs_sw_ext.append(os.path.abspath(os.path.expandvars(obslist['SW']['ExtendedCatalog'])))
+                obs_sw_ptsrc.append(self.full_path(obslist['SW']['PointSourceCatalog']))
+                obs_sw_galcat.append(self.full_path(obslist['SW']['GalaxyCatalog']))
+                obs_sw_ext.append(self.full_path(obslist['SW']['ExtendedCatalog']))
                 obs_sw_extscl.append(obslist['SW']['ExtendedScale'])
                 obs_sw_extcent.append(obslist['SW']['ExtendedCenter'])
-                obs_sw_movptsrc.append(os.path.abspath(os.path.expandvars(obslist['SW']['MovingTargetList'])))
-                obs_sw_movgal.append(os.path.abspath(os.path.expandvars(obslist['SW']['MovingTargetSersic'])))
-                obs_sw_movext.append(os.path.abspath(os.path.expandvars(obslist['SW']['MovingTargetExtended'])))
+                obs_sw_movptsrc.append(self.full_path(obslist['SW']['MovingTargetList']))
+                obs_sw_movgal.append(self.full_path(obslist['SW']['MovingTargetSersic']))
+                obs_sw_movext.append(self.full_path(obslist['SW']['MovingTargetExtended']))
                 obs_sw_movconv.append(obslist['SW']['MovingTargetConvolveExtended'])
-                obs_sw_solarsys.append(os.path.abspath(os.path.expandvars(obslist['SW']['MovingTargetToTrack'])))
+                obs_sw_solarsys.append(self.full_path(obslist['SW']['MovingTargetToTrack']))
                 obs_sw_bkgd.append(obslist['SW']['BackgroundRate'])
-                obs_lw_ptsrc.append(os.path.abspath(os.path.expandvars(obslist['LW']['PointSourceCatalog'])))
-                obs_lw_galcat.append(os.path.abspath(os.path.expandvars(obslist['LW']['GalaxyCatalog'])))
-                obs_lw_ext.append(os.path.abspath(os.path.expandvars(obslist['LW']['ExtendedCatalog'])))
+                obs_lw_ptsrc.append(self.full_path(obslist['LW']['PointSourceCatalog']))
+                obs_lw_galcat.append(self.full_path(obslist['LW']['GalaxyCatalog']))
+                obs_lw_ext.append(self.full_path(obslist['LW']['ExtendedCatalog']))
                 obs_lw_extscl.append(obslist['LW']['ExtendedScale'])
                 obs_lw_extcent.append(obslist['LW']['ExtendedCenter'])
-                obs_lw_movptsrc.append(os.path.abspath(os.path.expandvars(obslist['LW']['MovingTargetList'])))
-                obs_lw_movgal.append(os.path.abspath(os.path.expandvars(obslist['LW']['MovingTargetSersic'])))
-                obs_lw_movext.append(os.path.abspath(os.path.expandvars(obslist['LW']['MovingTargetExtended'])))
+                obs_lw_movptsrc.append(self.full_path(obslist['LW']['MovingTargetList']))
+                obs_lw_movgal.append(self.full_path(obslist['LW']['MovingTargetSersic']))
+                obs_lw_movext.append(self.full_path(obslist['LW']['MovingTargetExtended']))
                 obs_lw_movconv.append(obslist['LW']['MovingTargetConvolveExtended'])
-                obs_lw_solarsys.append(os.path.abspath(os.path.expandvars(obslist['LW']['MovingTargetToTrack'])))
+                obs_lw_solarsys.append(self.full_path(obslist['LW']['MovingTargetToTrack']))
                 obs_lw_bkgd.append(obslist['LW']['BackgroundRate'])
 
                 # Override filters if given
