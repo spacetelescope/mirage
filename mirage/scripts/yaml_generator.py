@@ -91,38 +91,14 @@ from astropy.io import ascii
 from . import apt_inputs
 
 
+ENV_VAR = 'MIRAGE_DATA'
+
 class SimInput:
-    def __init__(self, instrument='NIRCam'):
-        # Set the MIRAGE_DATA environment variable
-        # if it's not already
-        self.env_var = 'MIRAGE_DATA'
-        self.datadir = os.environ.get(self.env_var)
-        if self.datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+    def __init__(self):
         self.info = {}
-        self.instrument = instrument
-
-        if self.instrument.lower() == 'nircam':
-            self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
-            self.psfbasename = 'nircam'
-            self.psfpixfrac = 0.25
-        elif self.instrument.lower() == 'niriss':
-            self.reference_file_dir =  os.path.join(self.datadir, 'niriss/reference_files')
-            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
-            self.psfbasename = 'niriss'
-            self.psfpixfrac = 0.1
-        else:
-            raise RuntimeError('Instrument {} is not supported'.format(instrument))
-
         self.input_xml = None
         self.pointing_file = None
         self.siaf = None
-        self.reffile_setup()
         self.datatype = 'linear'
         self.output_dir = './'
         self.table_file = None
@@ -146,35 +122,7 @@ class SimInput:
         self.psfwfegroup = 0
         self.resets_bet_ints = 1 # NIRCam should be 1
         self.tracking = 'sidereal'
-
-        # Prepare to find files listed as 'config'
-        self.modpath = pkg_resources.resource_filename('mirage', '')
-        self.configfiles = {}
-        if self.instrument.lower() == 'nircam':
-            self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
-            self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
-            self.configfiles['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
-            self.configfiles['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
-            self.configfiles['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
-            self.configfiles['dq_init_config'] = 'dq_init.cfg'
-            self.configfiles['saturation_config'] = 'saturation.cfg'
-            self.configfiles['superbias_config'] = 'superbias.cfg'
-            self.configfiles['refpix_config'] = 'refpix.cfg'
-            self.configfiles['linearity_config'] = 'linearity.cfg'
-            self.configfiles['filter_throughput'] = 'placeholder.txt'
-        elif self.instrument.lower() == 'niriss':
-            self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
-            self.configfiles['fluxcal'] = 'niriss_zeropoints.list'
-            self.configfiles['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
-            self.configfiles['readpatt_def_file'] = 'niriss_readout_pattern.txt'
-            self.configfiles['crosstalk'] = 'niriss_xtalk_zeros.txt'
-            self.configfiles['dq_init_config'] = 'dq_init.cfg'
-            self.configfiles['saturation_config'] = 'saturation.cfg'
-            self.configfiles['superbias_config'] = 'superbias.cfg'
-            self.configfiles['refpix_config'] = 'refpix.cfg'
-            self.configfiles['linearity_config'] = 'linearity.cfg'
-            self.configfiles['filter_throughput'] = 'placeholder.txt'
-
+        
     def create_inputs(self):
         # Use full paths for inputs
         self.path_defs()
@@ -374,6 +322,60 @@ class SimInput:
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
+    def expand_env_var(self):
+        """ Expand the MIRAGE_DATA environment variable
+        so that reference files can be found
+
+        Parameters:
+        -----------
+        None
+
+        Rerturns:
+        ---------
+        None
+        """
+        self.datadir = os.environ.get(ENV_VAR)
+        if self.datadir is None:
+            raise ValueError(("WARNING: {} environment variable is not set."
+                              "This must be set to the base directory"
+                              "containing the darks, cosmic ray, PSF, etc"
+                              "input files needed for the simulation."
+                              "These files must be downloaded separately"
+                              "from the Mirage package.".format(ENV_VAR)))
+
+    def find_ipc_file(self, inputipc):
+        """Given a list of potential IPC kernel files for a given
+        detector, select the most appropriate one, and check to see 
+        whether the kernel needs to be inverted, in order to populate
+        the invertIPC field. This is not intended to be terribly smart.
+        The first inverted kernel found will be used. If none are found,
+        the first kernel will be used and set to be inverted.
+
+        Parameters:
+        -----------
+        inputipc : list
+           List of fits files containing IPC kernels for a single detector
+
+        Returns:
+        --------
+        (ipcfile, invstatus) : tup
+           ipcfile is the name of the IPC kernel file to use, and invstatus
+           lists whether the kernel needs to be inverted or not.
+        """
+        for ifile in inputipc:
+            kernel = fits.getdata(ifile)
+            kshape = kernel.shape
+
+            # If kernel is 4 dimensional, extract the 3x3 kernel associated
+            # with a single pixel
+            if len(kernel.shape) == 4:
+                kernel = kernel[:, :, np.int(kshape[2]/2), np.int(kshape[2]/2)]
+
+            if kernel[1,1] < 1.0:
+                return (ifile, False)
+        # If no inverted kernel was found, just return the first file
+        return (inputipc[0], True)
+
     def path_defs(self):
         """Expand input files to have full paths"""
         self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
@@ -449,19 +451,19 @@ class SimInput:
             if self.point_source[0] is not None:
                 # In here, we assume the user provided a catalog to go with each filter
                 # so now we need to find the filter for each entry and generate a list that makes sense
-                self.info['point_source'][i] = self.catalog_match(filt, pup, self.point_source, 'point source')
+                self.info['point_source'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.point_source, 'point source')))
             if self.galaxyListFile[0] is not None:
-                self.info['galaxyListFile'][i] = self.catalog_match(filt, pup, self.galaxyListFile, 'galaxy')
+                self.info['galaxyListFile'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.galaxyListFile, 'galaxy')))
             if self.extended[0] is not None:
-                self.info['extended'][i] = self.catalog_match(filt, pup, self.extended, 'extended')
+                self.info['extended'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.extended, 'extended')))
             if self.movingTarg[0] is not None:
-                self.info['movingTarg'][i] = self.catalog_match(filt, pup, self.movingTarg, 'moving point source target')
+                self.info['movingTarg'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTarg, 'moving point source target')))
             if self.movingTargSersic[0] is not None:
-                self.info['movingTargSersic'][i] = self.catalog_match(filt, pup, self.movingTargSersic, 'moving sersic target')
+                self.info['movingTargSersic'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargSersic, 'moving sersic target')))
             if self.movingTargExtended[0] is not None:
-                self.info['movingTargExtended'][i] = self.catalog_match(filt, pup, self.movingTargExtended, 'moving extended target')
+                self.info['movingTargExtended'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargExtended, 'moving extended target')))
             if self.movingTargToTrack[0] is not None:
-                self.info['movingTargToTrack'][i] = self.catalog_match(filt, pup, self.movingTargToTrack, 'non-sidereal moving target')
+                self.info['movingTargToTrack'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargToTrack, 'non-sidereal moving target')))
 
         if self.convolveExtended == True:
             self.info['convolveExtended'] = [True] * len(self.info['Module'])
@@ -509,8 +511,14 @@ class SimInput:
 
         Parameters:
         -----------
-        filter -- String name of filter element
-        cattype -- String, type of catalog (e.g. pointsource)
+        filter : str
+          Name of filter element
+        cattype : str
+          Type of catalog (e.g. pointsource)
+
+        Returns:
+        --------
+        None
         """
         print("WARNING: unable to find filter ({}) name".format(filter))
         print("in any of the given {} inputs".format(cattype))
@@ -522,9 +530,16 @@ class SimInput:
         Tell the user if more than one catalog matches the filter/pupil
 
         Parameters:
-        filter -- String name of filter element
-        cattype -- String, type of catalog (e.g. pointsource)
-        matchlist -- List of matching catalog names
+        filter : str
+          Name of filter element
+        cattype : str
+          Type of catalog (e.g. pointsource)
+        matchlist : list
+          Matching catalog names
+
+        Returns:
+        --------
+        None
         """
         print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
         print("Observation filter: {}".format(filter))
@@ -722,7 +737,7 @@ class SimInput:
     def calcFrameTime(self, xd, yd, namp):
         """
         Calculate the exposure time of a single frame of the proposed output ramp
-        based on the size of the croped dark current integration
+        based on the size of the cropped dark current integration
 
         Parameters:
         -----------
@@ -734,7 +749,30 @@ class SimInput:
         --------
         The amount of time needed, in seconds, to read out the detector
         """
-        return (xd / namp + 12.) * (yd + 1) * 10.00 * 1.e-6
+        if self.instrument == 'nircam':
+            colpad = 12
+            rowpad = 2
+            if ((xd <= 8) & (yd <= 8)):
+                rowpad = 3
+            return ((1.0 * xd / namp + colpad) * (yd + rowpad)) * 1.e-5
+        elif self.instrument in ['niriss', 'fgs']:
+            # the following applies to NIRISS and Guider full frame imaging and
+            # NIRISS sub-arrays.
+            #
+            # According JDox the NIRCam full frame time is 10.73677 seconds the
+            # same as for NIRISS, but right now the change does not apply to NIRCam.
+            #
+            #
+            # note that the Guider frame time may be different for small sub-arrays
+            # less than 64 pixels square, but that needs to be confirmed.
+            colpad = 12
+            if namp == 4:
+                pad1 = 1
+                pad2 = 1
+            else:
+                pad1 = 2
+                pad2 = 0
+            return (pad2 + (yd / namp + colpad) * (xd + pad1)) * 0.00001
 
     def make_output_names(self):
         """
@@ -903,11 +941,12 @@ class SimInput:
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  distortion_coeffs: {}        # CSV file containing distortion coefficients\n'.format(input['siaf']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
-            if instrument.lower() in ['nircam', 'wfsc']:
-                invertIPC = True
-            elif instrument.lower() == 'niriss':
-                invertIPC = False
-            f.write('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n'.format(invertIPC))
+            #if instrument.lower() in ['nircam', 'wfsc']:
+            #    invertIPC = True
+            #elif instrument.lower() == 'niriss':
+            #    invertIPC = False
+            #f.write('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n'.format(invertIPC))
+            f.write('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n'.format(False))
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'.format(input['pixelAreaMap']))
             f.write('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'.format(self.subarray_def_file))
@@ -1055,8 +1094,62 @@ class SimInput:
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
         return yamlout
 
-    def reffile_setup(self):
-        """Create lists of reference files associate with each detector"""
+    def reffile_setup(self, instrument='nircam'):
+        """Create lists of reference files associate with each detector
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        None
+        """
+
+        # Expand the MIRAGE_DATA environment variable
+        self.expand_env_var()
+
+        # Get the path to the 'MIRAGE' package
+        self.modpath = pkg_resources.resource_filename('mirage', '')
+        
+        self.instrument = instrument.lower()
+
+        # Prepare to find files listed as 'config'
+        # and set up PSF path
+        self.configfiles = {}
+        if self.instrument == 'nircam':
+            self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
+            self.psfbasename = 'nircam'
+            self.psfpixfrac = 0.25
+            self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
+            self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
+            self.configfiles['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
+            self.configfiles['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
+            self.configfiles['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
+            self.configfiles['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles['saturation_config'] = 'saturation.cfg'
+            self.configfiles['superbias_config'] = 'superbias.cfg'
+            self.configfiles['refpix_config'] = 'refpix.cfg'
+            self.configfiles['linearity_config'] = 'linearity.cfg'
+            self.configfiles['filter_throughput'] = 'placeholder.txt'
+        elif self.instrument.lower() == 'niriss':
+            self.reference_file_dir =  os.path.join(self.datadir, 'niriss/reference_files')
+            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
+            self.psfbasename = 'niriss'
+            self.psfpixfrac = 0.1
+            self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
+            self.configfiles['fluxcal'] = 'niriss_zeropoints.list'
+            self.configfiles['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
+            self.configfiles['readpatt_def_file'] = 'niriss_readout_pattern.txt'
+            self.configfiles['crosstalk'] = 'niriss_xtalk_zeros.txt'
+            self.configfiles['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles['saturation_config'] = 'saturation.cfg'
+            self.configfiles['superbias_config'] = 'superbias.cfg'
+            self.configfiles['refpix_config'] = 'refpix.cfg'
+            self.configfiles['linearity_config'] = 'linearity.cfg'
+            self.configfiles['filter_throughput'] = 'placeholder.txt'            
+        else:
+            raise RuntimeError('Instrument {} is not supported'.format(instrument))
 
         self.superbias_list = {}
         self.linearity_list = {}
@@ -1094,7 +1187,7 @@ class SimInput:
                 satfiles = glob(os.path.join(sat_dir, '*fits'))
                 self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
 
-                ipcfiles = glob(os.path.join(ipc_dir, '*fits'))
+                ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
                 self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
 
                 distfiles = glob(os.path.join(dist_dir, '*asdf'))

@@ -49,13 +49,13 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: /ifs/jwst/wit/nircam/hilbert/python_repos/mirage/mirage/catalogs/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: my_pointsources.cat #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/nircam/webbpsf_library/ #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
   psfwfegroup: 0                             #WFE realization group (0 to 9)
-  galaxyListFile: /ifs/jwst/wit/nircam/hilbert/python_repos/mirage/mirage/catalogs/seed_im_from_catalog_test_galaxies_catalog.list
+  galaxyListFile: my_galaxies.cat
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
@@ -97,12 +97,12 @@ Output:
   unsigned: True   #Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
   dmsOrient: True    #Output in DMS orientation (vs. fitswriter orientation).
   program_number: 42424    #Program Number
-  title: Supernovae and Black Holes at the Epoch of Reionization   #Program title
-  PI_Name: Lifan Wang  #Proposal PI Name
+  title: Black Holes at the Restaurant at the End of the Universe #Program title
+  PI_Name: D. Adams  #Proposal PI Name
   Proposal_category: GO  #Proposal category
   Science_category: Cosmology  #Science category
   observation_number: '002'    #Observation Number
-  observation_label: NEP #2    #User-generated observation Label
+  observation_label: Obs1    #User-generated observation Label
   visit_number: '024'    #Visit Number
   visit_group: '01'    #Visit Group
   visit_id: '42424024002'    #Visit ID

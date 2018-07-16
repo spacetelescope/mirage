@@ -523,7 +523,7 @@ class Catalog_seed():
 
     def calcFrameTime(self):
         # calculate the exposure time of a single frame of the proposed output ramp
-        # based on the size of the croped dark current integration
+        # based on the size of the cropped dark current integration
         # numint, numgrp, yd, xd = self.dark.data.shape
         yd, xd = self.nominal_dims
         # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
