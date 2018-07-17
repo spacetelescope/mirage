@@ -96,7 +96,7 @@ class AptInput:
         # (currently only used in NIRCam)
         # remove 'TIGHT' from the entries and leave
         # only the number behind
-        tight = [True if 'TIGHT' in val else False for val in tab['PrimaryDithers']]
+        tight = [True if 'TIGHT' in str(val) else False for val in tab['PrimaryDithers']]
         if np.any(tight):
             tab = self.tight_dithers(tab)
 
@@ -209,7 +209,7 @@ class AptInput:
         -----------
         in_path : str
             Path to be expanded
-        
+
         Returns:
         --------
         in_path : str
@@ -219,7 +219,7 @@ class AptInput:
             return in_path
         else:
             return os.path.abspath(os.path.expandvars(in_path))
-    
+
     def base36encode(self, integer):
         """
         Translate a base 10 integer to base 36

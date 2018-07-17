@@ -16,8 +16,8 @@ import yaml
 from lxml import etree
 import glob
 
-from nircam_simulator.scripts import write_observationlist, yaml_generator, utils
-from nircam_simulator.scripts.get_catalog import get_all_catalogs
+from mirage.scripts import write_observationlist, yaml_generator, utils
+from mirage.scripts.get_catalog import get_all_catalogs
 
 PROPOSAL_ID = '1111'
 APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
@@ -57,7 +57,7 @@ def RunAllAPTTemplates(instrument):
     yam = yaml_generator.SimInput()
     yam.input_xml = xml_file
     yam.pointing_file = pointing_file
-    yam.siaf = utils.get_siaf()['NIRCam']
+    yam.siaf = os.path.expandvars('$MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv')
     yam.output_dir = out_dir
     yam.simdata_output_dir = out_dir
     yam.observation_table = observationlist_file
@@ -83,6 +83,18 @@ def RunAllAPTTemplates(instrument):
             'The created observationlist.yaml file does not match the reference' +\
             'observationlist.yaml file. Either the APT parser is malfunctioning,' +\
             'or the reference yaml is out of date.'
+
+
+def test_environment_variable():
+    '''Ensure the MIRAGE_DATA environment variable has been set
+    '''
+    MIRAGE_DATA = os.path.expandvars('MIRAGE_DATA')
+    assert MIRAGE_DATA is not None, "MIRAGE_DATA environment variable is not " +\
+                                    "set. This must be set to the base directory" +\
+                                    " containing the darks, cosmic ray, PSF, etc" +\
+                                    " input files needed for the simulation. " +\
+                                    "These files must be downloaded separately " +\
+                                    "from the Mirage package."
 
 
 def test_RunNIRCamAPTTemplates():
