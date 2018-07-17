@@ -17,7 +17,9 @@ from lxml import etree
 import glob
 
 from mirage.scripts import write_observationlist, yaml_generator, utils
-from mirage.scripts.get_catalog import get_all_catalogs
+
+# to be set before running test
+# os.environ['MIRAGE_DATA'] = ''
 
 PROPOSAL_ID = '1111'
 APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
@@ -47,6 +49,9 @@ def RunAllAPTTemplates(instrument):
 
     # Point to appropriate output directory
     out_dir = os.path.join(TESTS_DIR, 'test_data',  instrument, 'APT_{}_out'.format(instrument))
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
 
     # Write observationlist.yaml
     observationlist_file = os.path.join(out_dir, instrument + '_observationlist.yaml')

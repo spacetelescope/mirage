@@ -21,6 +21,10 @@ mirages.egg-info/*
 *.csv
 *.txt~
 
+# exceptions
+!tests/test_data/*/*.list
+!tests/test_data/*/*.yaml
+
 # Other #
 #########
 .ipynb_checkpoints/*
