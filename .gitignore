@@ -3,12 +3,13 @@
 *.pyc
 *.py~
 .pytest_cache/*
+.cache*
 
 # Package Stuff #
 #################
 build/*
 dist/*
-nircam_simulator.egg-info/*
+mirages.egg-info/*
 
 # Lists and images #
 ######################
@@ -20,20 +21,20 @@ nircam_simulator.egg-info/*
 *.csv
 *.txt~
 
+# exceptions
+!tests/test_data/*/*.list
+!tests/test_data/*/*.yaml
+
 # Other #
 #########
 .ipynb_checkpoints/*
-nircam_simulator/examples/.ipynb_checkpoints/*
-nircam_simulator/OTECommissioning/*
+examples/.ipynb_checkpoints/*
 *.aptbackup
 *.aptx
 *.docx
 
 # Files #
 #########
-ring_nebula.fits
-nircam_simulator/ClassMaps.txt
-nircam_simulator/examples/*.ipynb
-nircam_simulator/scripts/apt_inputs_OLD.py
-nircam_simulator/dev_scripts/*
-nircam_simulator/config/siaf_config.json
+OTECommissioning/*
+dev_scripts/*
+*config.json

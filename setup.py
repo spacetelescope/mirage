@@ -4,10 +4,11 @@ from setuptools import setup
 from setuptools import find_packages
 
 setup(
-    name='nircam_simulator',
-    version = '1.0',
-    description = 'Create simulated NIRCam data',
-    long_description = ('A tool to create simulated NIRCam exposures'
+    name='mirage',
+    version = '1.1',
+    description = 'Create simulated JWST data',
+    long_description = ('A tool to create simulated NIRCam, NIRISS,'
+                        'and FGS exposures'
                         'using an input dark current exposure and a'
                         'noiseless seed image, which can be produced'
                         'from source catalogs. Data can optionally be'
