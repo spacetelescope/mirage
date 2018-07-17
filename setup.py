@@ -19,7 +19,6 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
-
 # make sure jwst is available
 try:
     import jwst
@@ -32,7 +31,6 @@ except ImportError:
     except subprocess.CalledProcessError as e:
         print(e)
         exit(1)
-
 
 
 setup(
@@ -70,8 +68,7 @@ setup(
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
         'asdf>=1.2.0',
-        # 'scipy>=0.17',
-        # 'jwst>=0.9.0',
+        'scipy>=0.17',
     ],
     include_package_data = True,
     cmdclass={
