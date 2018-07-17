@@ -3,6 +3,7 @@
 from setuptools import setup
 from setuptools import find_packages
 from setuptools.command.test import test as TestCommand
+import subprocess
 import sys
 
 class PyTest(TestCommand):
@@ -16,6 +17,20 @@ class PyTest(TestCommand):
         import pytest
         errno = pytest.main(self.test_args)
         sys.exit(errno)
+
+
+# make sure jwst is available
+try:
+    import jwst
+except ImportError:
+    try:
+        subprocess.check_call(['git', 'clone',
+                               'https://github.com/spacetelescope/jwst.git'])
+        sys.path.insert(1, 'jwst')
+        import jwst
+    except subprocess.CalledProcessError as e:
+        print(e)
+        exit(1)
 
 
 setup(
@@ -53,7 +68,7 @@ setup(
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
         # 'scipy>=0.17',
-        'jwst>=0.9.0',
+        # 'jwst>=0.9.0',
     ],
     include_package_data = True,
     cmdclass={
