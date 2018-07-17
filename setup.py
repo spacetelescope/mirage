@@ -9,7 +9,7 @@ import sys
 class PyTest(TestCommand):
     def finalize_options(self):
         TestCommand.finalize_options(self)
-        self.test_args = ['mirage/tests']
+        self.test_args = ['tests']
         self.test_suite = True
 
     def run_tests(self):
@@ -19,18 +19,6 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
-# # make sure asdf is available
-# try:
-#     import asdf
-# except ImportError:
-#     try:
-#         subprocess.check_call(['git', 'clone',
-#                                'https://github.com/spacetelescope/asdf.git'])
-#         sys.path.insert(1, 'asdf')
-#         import asdf
-#     except subprocess.CalledProcessError as e:
-#         print(e)
-#         exit(1)
 
 # make sure jwst is available
 try:
@@ -81,7 +69,7 @@ setup(
         'numpy>=1.9',
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
-        # 'asdf>=1.2.0',
+        'asdf>=1.2.0',
         # 'scipy>=0.17',
         # 'jwst>=0.9.0',
     ],
