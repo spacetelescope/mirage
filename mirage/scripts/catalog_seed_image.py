@@ -3199,7 +3199,7 @@ class Catalog_seed():
                         filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
                                        .format(self.params['Readout'][usefilt].upper(), module.lower()))
                     elif instrm == 'niriss':
-                        filter_file = ("{}_niriss_throughput_nopy1.txt"
+                        filter_file = ("{}_niriss_throughput1.txt"
                                        .format(self.params['Readout'][usefilt].lower()))
                     elif instrm == 'fgs':
                         #det = self.params['Readout']['array_name'].split('_')[0]
