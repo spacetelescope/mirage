@@ -14,11 +14,35 @@ setup(
                         'from source catalogs. Data can optionally be'
                         'dispersed as well, to simulate wide field'
                         'slitless data files.'),
-    author = 'Bryan Hilbert',
+    author = 'STScI (Hilbert, Volk, Chambers, Sahlmann et al.)',
     author_email = 'hilbert@stsci.edu',
+    url='https://github.com/spacetelescope/mirage',
     keywords = ['astronomy'],
-    classifiers = ['Programming Language :: Python'],
+    classifiers=[
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Topic :: Scientific/Engineering :: Astronomy',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+    ],
     packages = find_packages(exclude=["examples","catalogs"]),
-    install_requires = [],
-    include_package_data = True
+    package_data={'mirage': ['tests/test_data/*/*.yaml',
+                             'tests/test_data/*/*.list',
+                             'tests/test_data/*/*.xml',
+                             'tests/test_data/*/*.pointing',
+                                ]},
+    install_requires=[
+        'astropy>=1.2',
+        'numpy>=1.9',
+        'matplotlib>=1.4.3',
+        'lxml>=3.6.4',
+        'scipy>=0.17',
+        'openpyxl>=2.4'
+    ],
+    include_package_data = True,
+    cmdclass={
+        'test': PyTest,
+        # 'build_sphinx': BuildSphinx
+    },
     )
