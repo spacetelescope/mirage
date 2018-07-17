@@ -110,3 +110,9 @@ def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''
     RunAllAPTTemplates('NIRCam')
+
+
+def test_trivial():
+    assert 1==1
+
+
