@@ -27,7 +27,7 @@ except ImportError:
         subprocess.check_call(['git', 'clone',
                                'https://github.com/spacetelescope/asdf.git'])
         sys.path.insert(1, 'asdf')
-        import jwst
+        import asdf
     except subprocess.CalledProcessError as e:
         print(e)
         exit(1)
