@@ -37,8 +37,8 @@ setup(
         'numpy>=1.9',
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
-        'scipy>=0.17',
-        'openpyxl>=2.4'
+        # 'scipy>=0.17',
+        'jwst>=0.9.0',
     ],
     include_package_data = True,
     cmdclass={
