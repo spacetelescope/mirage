@@ -18,7 +18,7 @@ from mirage.scripts import imaging_simulator as im
 # os.environ['MIRAGE_DATA'] = ''
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
-def test_fgs_imaging():
+def test_niriss_imaging():
     m = im.ImgSim()
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_example.yaml')
     m.create()
