@@ -19,18 +19,18 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
-# make sure asdf is available
-try:
-    import asdf
-except ImportError:
-    try:
-        subprocess.check_call(['git', 'clone',
-                               'https://github.com/spacetelescope/asdf.git'])
-        sys.path.insert(1, 'asdf')
-        import asdf
-    except subprocess.CalledProcessError as e:
-        print(e)
-        exit(1)
+# # make sure asdf is available
+# try:
+#     import asdf
+# except ImportError:
+#     try:
+#         subprocess.check_call(['git', 'clone',
+#                                'https://github.com/spacetelescope/asdf.git'])
+#         sys.path.insert(1, 'asdf')
+#         import asdf
+#     except subprocess.CalledProcessError as e:
+#         print(e)
+#         exit(1)
 
 # make sure jwst is available
 try:
@@ -40,7 +40,7 @@ except ImportError:
         subprocess.check_call(['git', 'clone',
                                'https://github.com/spacetelescope/jwst.git'])
         sys.path.insert(1, 'jwst')
-        import jwst
+        # import jwst
     except subprocess.CalledProcessError as e:
         print(e)
         exit(1)
