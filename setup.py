@@ -67,6 +67,7 @@ setup(
         'numpy>=1.9',
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
+        'asdf>=1.2.0',
         # 'scipy>=0.17',
         # 'jwst>=0.9.0',
     ],
