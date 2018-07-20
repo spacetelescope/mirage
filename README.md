@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/spacetelescope/mirage.svg?branch=master)](https://travis-ci.org/spacetelescope/mirage)
+
 # MIRaGe = Multi Instrument Ramp Generator
 
 This repository contains code that can be used to generate
