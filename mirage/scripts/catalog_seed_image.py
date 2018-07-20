@@ -20,6 +20,7 @@ from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
 from astropy.convolution import convolve
 from asdf import AsdfFile
+from photutils.psf import FittableImageModel
 import yaml
 import time
 
@@ -1780,26 +1781,34 @@ class Catalog_seed():
                 # case where PSF library location is specified.
                 # Read in the appropriate PSF file
                 try:
+                    print("Getting PSF from EPSF model")
                     psffn = self.psfname + '_' + frag + '.fits'
                     local = os.path.isfile(psffn)
                     if local:
-                        webbpsfimage = fits.getdata(psffn)
+                        oldwebbpsfimage = fits.getdata(psffn)
+                        webbpsfimage = self.populate_epsfmodel(psffn, oversample=1)
                     else:
                         raise FileNotFoundError("PSF file {} not found.".format(psffn))
                 except:
                     raise RuntimeError("ERROR: Could not load PSF file {} from library".format(psffn))
 
             # Normalize the total signal in the PSF as read in
-            totalsignal = np.sum(webbpsfimage)
-            webbpsfimage /= totalsignal
+            #DONE IN POPULATE_EPSFMODEL
+            #totalsignal = np.sum(webbpsfimage)
+            #webbpsfimage /= totalsignal
                     
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
-            nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
+            nyshift, nxshift = np.where(oldwebbpsfimage == np.max(oldwebbpsfimage))
             nyshift = nyshift[0]
             nxshift = nxshift[0]
-
+            print("OLD nxshift, nyshift: {}, {}".format(nxshift,nyshift))
+            # Assume the center of the PSF is the center of the array
             psfdims = webbpsfimage.shape
+            nxshift = psfdims[1] // 2
+            nyshift = psfdims[0] // 2 
+            print("NEW nxshift, nyshift: {}, {}".format(nxshift,nyshift))
+            
             nx = int(xoff)
             ny = int(yoff)
             i1 = max(nx - nxshift, 0)
@@ -1814,6 +1823,8 @@ class Catalog_seed():
             # if the cutout for the psf is larger than
             # the psf array, truncate it, along with the array
             # in the source image where it will be placed
+            # This is used only for segmap now that epsf is
+            # implemented.
             if l2 > psfdims[0]:
                 l2 = psfdims[0]
                 j2 = j1 + (l2 - l1)
@@ -1832,18 +1843,30 @@ class Catalog_seed():
                 print('bad high')
 
             try:
-                psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
+                ypts, xpts = np.mgrid[j1:j2, i1:i2]
+                scaled_psf = webbpsfimage.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
+                psfimage[ypts, xpts] += scaled_psf
+                #psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
                 if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
                     noiseval += self.grism_background
-                seg.add_object_noise(webbpsfimage[l1:l2, k1:k2] * counts, j1, i1, entry['index'], noiseval)
+                #seg.add_object_noise(webbpsfimage[l1:l2, k1:k2] * counts, j1, i1, entry['index'], noiseval)
+                seg.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+
+
+                print(j1,j2,i1,i2,nx,ny,l1,l2,k1,k2,counts)
+                print(xoff,xfract,yoff,yfract)
+                print(scaled_psf.shape)
+
+                
             except:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
                 # getpointsourcelist because if the PSF is not centered
                 # in the webbpsf stamp, then the area to be pulled from
                 # the stamp may shift off of the detector.
+                print("CAUGHT IN THE EXCEPT")
                 pass
 
         return psfimage, seg.segmap
@@ -3117,6 +3140,7 @@ class Catalog_seed():
         centerpsffile = os.path.join(self.params['simSignals']['psfpath'], psfname + '_0p00_0p00.fits')
         self.centerpsf = fits.getdata(centerpsffile)
         self.centerpsf = self.cropPSF(self.centerpsf)
+        #self.centerpsf = self.populate_epsfmodel(centerpsffile, oversample=1)
 
         # normalize the PSF to a total signal of 1.0
         totalsignal = np.sum(self.centerpsf)
@@ -3297,6 +3321,35 @@ class Catalog_seed():
                               .format(self.params['Readout']['readpatt'],
                                       self.params['Reffiles']['readpattdefs'])))
 
+    def populate_epsfmodel(self, infile, oversample=1):
+        """Create an instance of EPSFModel and populate the data
+        from the given fits file. Also populate information
+        about the oversampling rate.
+
+        Parameters:
+        -----------
+        infile : str
+            Name of fits file containing PSF data
+
+        oversample : int
+            Factor by which the PSF data are oversampled
+
+        Returns:
+        --------
+        psf : obj
+            FittableImageModel instance
+        """
+        psf_data = fits.getdata(infile)
+
+        # Normalize
+        psf_data /= np.sum(psf_data)
+
+        # Create instance. Assume the PSF is centered
+        # in the array
+        psf = FittableImageModel(psf_data, oversampling=oversample)
+        #psf = EPSFModel(psf_data, oversampling=oversample)
+        return psf
+        
     def filecheck(self):
         # Make sure the requested input files exist
         # For reference files, assume first that they are located in
