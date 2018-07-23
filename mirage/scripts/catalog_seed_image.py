@@ -753,7 +753,13 @@ class Catalog_seed():
         eval_xshape = np.int(np.ceil(model.shape[1] / model.oversampling))
         eval_yshape = np.int(np.ceil(model.shape[0] / model.oversampling))
         y, x = np.mgrid[0:eval_yshape, 0:eval_xshape]
-        eval_psf = model.evaluate(x=x, y=y, flux=1., x_0=eval_xshape//2, y_0=eval_yshape//2)
+        eval_psf = model.evaluate(x=x, y=y, flux=1., x_0=eval_xshape/2, y_0=eval_yshape/2)
+        print(eval_xshape, eval_yshape, eval_xshape/2, eval_yshape/2)
+
+        h0=fits.PrimaryHDU(eval_psf)
+        hlist = fits.HDUList([h0])
+        hlist.writeto("temp_minimal_eval_psf.fits", overwrite=True)
+        
         return eval_psf
 
     def movingTargetInputs(self, file, input_type, MT_tracking=False,
@@ -2620,6 +2626,7 @@ class Catalog_seed():
             # values are within the aperture being used, so they could be within a subarray.
             # That is ok for this step where we are only looking at subpixel location.
             psf_file = self.find_subpix_psf_filename(entry['pixelx'], entry['pixely'])
+            print("For galaxy, PSF file is: {}".format(psf_file))
             psf_exists = self.file_exists(psf_file)
             if psf_exists:
                 psf_model = self.populate_epsfmodel(psf_file, oversample=1)
