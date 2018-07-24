@@ -2724,7 +2724,7 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        indexes, lines  = self.remove_outside_fov_sources(indexes, lines, pixelflag)
+        indexes, lines  = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
         print("After extended sources, max index is {}".format(self.maxindex))
 
