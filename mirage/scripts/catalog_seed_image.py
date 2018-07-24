@@ -2721,23 +2721,12 @@ class Catalog_seed():
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
 
-
-
-        
-
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
         indexes, lines  = self.remove_outside_fov_sources(indexes, lines, pixelflag)
 
-
-
-
-
-
-
-        
-        print("after extended sources, max index is {}".format(self.maxindex))
+        print("After extended sources, max index is {}".format(self.maxindex))
 
         #Loop over input lines in the source list
         all_stamps = []
