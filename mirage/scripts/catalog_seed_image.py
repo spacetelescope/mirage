@@ -20,16 +20,16 @@ from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
 from astropy.convolution import convolve
 from asdf import AsdfFile
-from photutils.psf import FittableImageModel
 import yaml
 import time
 
-from . import rotations  # this is Colin's set of rotation functions
-from . import polynomial # more of Colin's functions
-from . import read_siaf_table
-from . import set_telescope_pointing_separated as set_telescope_pointing
-from . import moving_targets
-from . import segmentation_map as segmap
+from mirage.scripts import rotations  # this is Colin's set of rotation functions
+from mirage.scripts import polynomial # more of Colin's functions
+from mirage.scripts import read_siaf_table
+from mirage.scripts import set_telescope_pointing_separated as set_telescope_pointing
+from mirage.scripts import moving_targets
+from mirage.scripts import segmentation_map as segmap
+from mirage.scripts.psf_generator import PSF
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -263,18 +263,16 @@ class Catalog_seed():
         extradiffy = ffextra - subextray
         extradiffx = ffextra - subextrax
 
-        
-        print(self.subarray_bounds)
-        print(ffextra)
-        print(subextrax, subextray)
-        print(extradiffx, extradiffy)
-        print(seeddim)
-        print(nx)
-        print(extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1)
-        
+        #print(self.subarray_bounds)
+        #print(ffextra)
+        #print(subextrax, subextray)
+        #print(extradiffx, extradiffy)
+        #print(seeddim)
+        #print(nx)
+        #print(extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1)
+
         exbounds = [extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1]
-        
-        
+
         if len(seeddim) == 2:
             padded_seed = np.zeros((nx, nx))
             padded_seed[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
@@ -735,33 +733,6 @@ class Catalog_seed():
 
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
-    def minimal_psf_evaluation(self, model):
-        """
-        Create a PSF by evaluating a FittableImageModel instance. Return an array only just
-        big enough to contain the PSF data.
-
-        Parameters:
-        -----------
-        model : obj
-            FittableImageModel instance containing the PSF model
-
-        Returns:
-        --------
-        eval_psf : ndarray
-            2D numpy array containing the evaluated PSF, with normalized signal
-        """
-        eval_xshape = np.int(np.ceil(model.shape[1] / model.oversampling))
-        eval_yshape = np.int(np.ceil(model.shape[0] / model.oversampling))
-        y, x = np.mgrid[0:eval_yshape, 0:eval_xshape]
-        eval_psf = model.evaluate(x=x, y=y, flux=1., x_0=eval_xshape/2, y_0=eval_yshape/2)
-        print(eval_xshape, eval_yshape, eval_xshape/2, eval_yshape/2)
-
-        h0=fits.PrimaryHDU(eval_psf)
-        hlist = fits.HDUList([h0])
-        hlist.writeto("temp_minimal_eval_psf.fits", overwrite=True)
-        
-        return eval_psf
-
     def movingTargetInputs(self, file, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False):
@@ -895,18 +866,14 @@ class Catalog_seed():
                 x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                 y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
 
-            # Determine the filename for the most appropriate PSF
-            psf_file = self.find_subpix_psf_filename(pixelx, pixely)
 
-            try:
-                psf_exists = self.file_exists(psf_file)
-                if psf_exists:
-                    psf_model = self.populate_epsfmodel(psf_file, oversample=1)
-                else:
-                    raise FileNotFoundError("PSF file {} not found.".format(psf_file))
-            except:
-                raise RuntimeError("ERROR: Could not load PSF file {} from library".format(psf_file))
-            
+            # Load PSF from the appropriate file given the source location
+            # Remember that this source location should be in the coordinate
+            # system of the aperture being simulated, and not include any padding
+            # for WFSS seed images.
+            psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
+                            interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
+
             # If we have a point source, we can easily determine whether
             # it completely misses the detector, since we know the size
             # of the stamp already. For galaxies and extended sources,
@@ -914,7 +881,7 @@ class Catalog_seed():
             # the stamp lands on the detector.
             status = 'on'
             if input_type == 'pointSource':
-                status = self.on_detector(x_frames, y_frames, psf_model.shape,
+                status = self.on_detector(x_frames, y_frames, psf_obj.model.shape,
                                           (newdimsx, newdimsy))
             if status == 'off':
                 continue
@@ -927,7 +894,7 @@ class Catalog_seed():
             # which contain all the info needed
 
             # Evaluate the PSF model. Place in stamp image just large enough to contain it
-            eval_psf = self.minimal_psf_evaluation(psf_model)
+            eval_psf = psf_obj.minimal_psf_evaluation()
             
             if input_type == 'pointSource':
                 stamp = eval_psf
@@ -1755,79 +1722,12 @@ class Catalog_seed():
 
         return pointSourceList
 
-    def find_subpix_psf_filename(self, xloc, yloc):
-        """Given an x, y location on the
-        detector, determine the filename for the most appropriate 
-        PSF file to use. This function only looks for the sub-pixel
-        position, and doesn't know about PSF variation across the 
-        detector. Therefore only the fractional part of (xloc, yloc)
-        is really important.
-
-        Parameters:
-        -----------
-        xloc : int
-            Column number on full detector of source location
-
-        yloc : int
-            Row number on full detector of source location
-
-        Returns:
-        --------
-        psf_filename : str
-            Name of fits file containing PSF to use
-        """
-        # Find sub-pixel offsets in position from the center of the pixel
-        xfract, xoff = np.modf(xloc)
-        yfract, yoff = np.modf(yloc)
-
-        # Resolution of PSF sub pixel positions
-        interval = self.params['simSignals']['psfpixfrac']
-        numperpix = int(1./interval)
-        
-        # Now we need to determine the proper PSF
-        # file to read in from the library
-        # This depends on the sub-pixel offsets above
-        a_in = interval * int(numperpix*xfract + 0.5) - 0.5
-        b_in = interval * int(numperpix*yfract + 0.5) - 0.5
-        astr = "{0:.{1}f}".format(a_in, 2)
-        bstr = "{0:.{1}f}".format(b_in, 2)
-   
-        # Generate the psf file name based on the center of the point source
-        # in units of fraction of a pixel
-        frag = astr + '_' + bstr
-        frag = frag.replace('-', 'm')
-        frag = frag.replace('.', 'p')
-
-        # Generate fits filename
-        psf_filename = self.psfname + '_' + frag + '.fits'
-        return psf_filename
-
-    def file_exists(self, filename):
-        """
-        Check to see if the given file exists.
-
-        Parameters:
-        -----------
-        filename : str
-            Name of file to look for
-
-        Returns:
-        --------
-        exists : bool
-            True/False
-        """
-        local = os.path.isfile(filename)
-        if local:
-            return True
-        else:
-            return False
-
     def makePointSourceImage(self, pointSources):
         dims = np.array(self.nominal_dims)
 
-        # offset that needs to be applied to the x, y positions of the
-        # source list to account for case where we make a point
-        # source image that is extra-large, to be used as a grism
+        # Offset that needs to be applied to the x, y positions of the
+        # source list to account for case where we make a
+        # seed image that is extra-large, to be used as a grism
         # direct image
         deltax = 0
         deltay = 0
@@ -1838,129 +1738,46 @@ class Catalog_seed():
         deltay = self.coord_adjust['yoffset']
         dims = np.array([newdimsy, newdimsx])
 
-        # create the empty image
+        # Create the empty image
         psfimage = np.zeros((dims[0], dims[1]))
 
-        # create empty segmentation map
+        # Create empty segmentation map
         seg = segmap.SegMap()
         seg.xdim = newdimsx
         seg.ydim = newdimsy
         seg.initialize_map()
 
         #Loop over the entries in the point source list
-        #interval = self.params['simSignals']['psfpixfrac']
-        #numperpix = int(1./interval)
         for entry in pointSources:
-            # adjust x, y position if the grism output image is requested
+            # Adjust x, y position if the grism output image is requested
             xpos = entry['pixelx'] + deltax
             ypos = entry['pixely'] + deltay
+            nx = math.floor(xpos)
+            ny = math.floor(ypos)
 
-            # desired counts per second in the point source
+            # Desired counts per second in the point source
             counts = entry['countrate_e/s'] # / self.frametime
 
-            # Determine the filename for the most appropriate PSF
-            psffn = self.find_subpix_psf_filename(entry['pixelx'], entry['pixely'])
+            # Load PSF from the appropriate file given the source location
+            # Remember that this source location should be in the coordinate
+            # system of the aperture being simulated, and not include any padding
+            # for WFSS seed images.
+            psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
+                            interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
 
-            # find sub-pixel offsets in position from the center of the pixel
-            xoff = math.floor(xpos)
-            yoff = math.floor(ypos)
-            #xfract = abs(xpos-xoff)
-            #yfract = abs(ypos-yoff)
-
-            # Now we need to determine the proper PSF
-            # file to read in from the library
-            # This depends on the sub-pixel offsets above
-            #a_in = interval * int(numperpix*xfract + 0.5) - 0.5
-            #b_in = interval * int(numperpix*yfract + 0.5) - 0.5
-            #astr = "{0:.{1}f}".format(a_in, 2)
-            #bstr = "{0:.{1}f}".format(b_in, 2)
-   
-            #generate the psf file name based on the center of the point source
-            #in units of fraction of a pixel
-            #frag = astr + '_' + bstr
-            #frag = frag.replace('-', 'm')
-            #frag = frag.replace('.', 'p')
-
-            # now create the PSF image. If no PSF library is supplied
-            # then webbpsf will be called to create a PSF. In that case, return
-            # zeros right now for the PSF
-            if self.params['simSignals']['psfpath'] is None:
-                webbpsfimage = self.psfimage
-            else:
-                # case where PSF library location is specified.
-                # Read in the appropriate PSF file
-                try:
-                    print("Getting PSF from EPSF model")
-                    #psffn = self.psfname + '_' + frag + '.fits'
-                    psf_exists = self.file_exists(psffn)
-                    if psf_exists:
-                        #oldwebbpsfimage = fits.getdata(psffn)
-                        webbpsfimage = self.populate_epsfmodel(psffn, oversample=1)
-                    else:
-                        raise FileNotFoundError("PSF file {} not found.".format(psffn))
-                except:
-                    raise RuntimeError("ERROR: Could not load PSF file {} from library".format(psffn))
-
-            # Normalize the total signal in the PSF as read in
-            #DONE IN POPULATE_EPSFMODEL
-            #totalsignal = np.sum(webbpsfimage)
-            #webbpsfimage /= totalsignal
-                    
-            # Extract the appropriate subarray from the PSF image if necessary
-            # Assume that the brightest pixel corresponds to the peak of the psf
-            #nyshift, nxshift = np.where(oldwebbpsfimage == np.max(oldwebbpsfimage))
-            #nyshift = nyshift[0]
-            #nxshift = nxshift[0]
-            #print("OLD nxshift, nyshift: {}, {}".format(nxshift,nyshift))
-            # Assume the center of the PSF is the center of the array
-            psfdims = webbpsfimage.shape
-            nxshift = psfdims[1] // 2
-            nyshift = psfdims[0] // 2 
-            #print("NEW nxshift, nyshift: {}, {}".format(nxshift,nyshift))
-            
-            nx = int(xoff)
-            ny = int(yoff)
-            i1 = max(nx - nxshift, 0)
-            i2 = min(nx + 1 + nxshift, dims[1])
-            j1 = max(ny - nyshift, 0)
-            j2 = min(ny + 1 + nyshift, dims[0])
-            k1 = nxshift - (nx - i1)
-            k2 = nxshift + (i2 - nx)
-            l1 = nyshift - (ny - j1)
-            l2 = nyshift + (j2 - ny)
-
-            # if the cutout for the psf is larger than
-            # the psf array, truncate it, along with the array
-            # in the source image where it will be placed
-            # This is used only for segmap now that epsf is
-            # implemented.
-            if l2 > psfdims[0]:
-                l2 = psfdims[0]
-                j2 = j1 + (l2 - l1)
-
-            if k2 > psfdims[1]:
-                k2 = psfdims[1]
-                i2 = i1 + (k2 - k1)
-
-            # At this point coordinates are in the final output array coordinate system, so there
-            # should be no negative values, nor values larger than the output array size
-            if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
-                print(j1, i1, l1, k1)
-                print('bad low')
-            if j2 > (dims[0] + 1) or i2 > (dims[1] + 1) or l2 > (psfdims[1] + 1) or k2 > (psfdims[1] + 1):
-                print(j2, i2, l2, k2)
-                print('bad high')
+            # Calculate the coordinate limits of the aperture/PSF stamp overlap
+            psf_ydim, psf_xdim = psf_obj.model.shape
+            (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, psf_xdim, psf_ydim,
+                                                                   newdimsx, newdimsy)
 
             try:
                 ypts, xpts = np.mgrid[j1:j2, i1:i2]
-                scaled_psf = webbpsfimage.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
+                scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
                 psfimage[ypts, xpts] += scaled_psf
-                #psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
                 if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
                     noiseval += self.grism_background
-                #seg.add_object_noise(webbpsfimage[l1:l2, k1:k2] * counts, j1, i1, entry['index'], noiseval)
                 seg.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
             except:
                 # In here we catch sources that are off the edge
@@ -1971,6 +1788,112 @@ class Catalog_seed():
                 pass
 
         return psfimage, seg.segmap
+
+    def cropped_coords(self, x_det, y_det, psfxdim, psfydim, aperturexdim, apertureydim):
+        """
+        Given the location of a source on the detector along with the size of
+        the PSF/stamp image for that object, calcuate the limits of the detector
+        coordinates onto which the object will fall.
+
+        Parameters:
+        -----------
+        x_det : flt
+            Column location of source on detector (aperture coordinate system
+            including any padding for WFSS seed image)
+        
+        y_det : flt
+            Row location of source on detector (aperture coordinate system
+            including any padding for WFSS seed image)
+
+        psfxdim : int
+            Number of columns in the PSF/stamp image that are being placed
+            onto the detector/aperture
+
+        psfydim : int
+            Number of rows in the PSF/stamp image that are being placed
+            onto the detector/aperture
+
+        aperturexdim : int
+            Number of columns in the final seed image
+
+        apertureydim : int
+            Number of rows in the final seed image
+
+        Returns:
+        --------
+        i1 : int
+            Column number on the detector/aperture corresponding to the left
+            edge of the PSF/stamp image.
+
+        i2 : int
+            Column number on the detector/aperture corresponding to the right
+            edge of the PSF/stamp image.
+
+        j1 : int
+            Row number on the detector/aperture corresponding to the bottom
+            edge of the PSF/stamp image.
+
+        j2 : int
+            Row number on the detector/aperture corresponding to the top
+            edge of the PSF/stamp image.
+
+        l1 : int
+            Column number on the PSF/stamp image corresponding to the left-most
+            column that overlaps the detector/aperture
+
+        l2 : int
+            Column number on the PSF/stamp image corresponding to the right-most
+            column that overlaps the detector/aperture
+
+        k1 : int
+            Row number on the PSF/stamp image corresponding to the bottom-most
+            row that overlaps the detector/aperture
+
+        k2 : int
+            Row number on the PSF/stamp image corresponding to the top-most
+            row that overlaps the detector/aperture
+        """
+        # Find sub-pixel offsets in position from the center of the pixel
+        nx = math.floor(x_det)
+        ny = math.floor(y_det)
+    
+        # Assume the center of the PSF is the center of the array
+        nxshift = psfxdim // 2
+        nyshift = psfydim // 2
+
+        #nx = int(xoff)
+        #ny = int(yoff)
+        i1 = max(nx - nxshift, 0)
+        i2 = min(nx + 1 + nxshift, aperturexdim)
+        j1 = max(ny - nyshift, 0)
+        j2 = min(ny + 1 + nyshift, apertureydim)
+        k1 = nxshift - (nx - i1)
+        k2 = nxshift + (i2 - nx)
+        l1 = nyshift - (ny - j1)
+        l2 = nyshift + (j2 - ny)
+        
+        # If the cutout for the psf is larger than
+        # the psf array, truncate it, along with the array
+        # in the source image where it will be placed
+        # This is used only for segmap now that epsf is
+        # implemented.
+        if l2 > psfydim:
+            l2 = psfydim
+            j2 = j1 + (l2 - l1)
+        
+        if k2 > psfxdim:
+            k2 = psfxdim
+            i2 = i1 + (k2 - k1)
+
+        # At this point coordinates are in the final output array coordinate system, so there
+        # should be no negative values, nor values larger than the output array size
+        if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
+            raise ValueError(("WARNING: Coordinates of overlap between detector aperture"
+                              "and PSF/stamp image are < 0."))
+        if j2 > (apertureydim + 1) or i2 > (aperturexdim + 1) or l2 > (psfxdim + 1) or k2 > (psfydim + 1):
+            raise ValueError(("WARNING: Coordinates of overlap between detector aperture:"
+                              "and PSF/stamp are larger than the dimensions of the image."))
+        return (i1, i2, j1, j2, k1, k2, l1, l2)
 
     def cropPSF(self, psf):
         '''take an array containing a psf and crop it such that the brightest
@@ -2261,8 +2184,7 @@ class Catalog_seed():
                 msys = msys.lower()
 
         except:
-            print("WARNING: Unable to open the galaxy source list file {}".format(filename))
-            sys.exit()
+            raise FileNotFoundError("WARNING: Unable to open the galaxy source list file {}".format(filename))
 
         return gtab, pflag, rpflag, msys
 
@@ -2343,7 +2265,7 @@ class Catalog_seed():
         if np.min(indexes) <= self.maxindex:
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
-        print("after galaxies, max index is {}".format(self.maxindex))
+        print("After galaxies, max index is {}".format(self.maxindex))
 
         # Loop over galaxy sources
         for index, source in zip(indexes, galaxylist):
@@ -2606,9 +2528,14 @@ class Catalog_seed():
             # xposang = (0-self.v3scixang) - (north_to_east_V3ang - entry['pos_angle'])
             xposang = 0. - (self.v3scixang - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
 
-            # first create the galaxy image
+            # First create the galaxy image
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], xposang*np.pi/180., entry['counts_per_frame_e'])
 
+            # Source location in the padded seed image
+            xpos = entry['pixelx'] + deltax
+            ypos = entry['pixely'] + deltay
+            nx = math.floor(xpos)
+            ny = math.floor(ypos)
 
             #-------FUTURE IMPROVEMENT-------------
             # Identify the PSF that needs to be convolved with the stamp
@@ -2621,62 +2548,25 @@ class Catalog_seed():
             #psf = self.make_psf_model(fullframex_equiv, fullframey_equiv)
             #-------FUTURE IMPROVEMENT-------------
 
-            # Determine the filename of the best PSF to use for the
-            # given sub-pixel location. Note that the entry['pixelx'] and 'pixely'
-            # values are within the aperture being used, so they could be within a subarray.
-            # That is ok for this step where we are only looking at subpixel location.
-            psf_file = self.find_subpix_psf_filename(entry['pixelx'], entry['pixely'])
-            print("For galaxy, PSF file is: {}".format(psf_file))
-            psf_exists = self.file_exists(psf_file)
-            if psf_exists:
-                psf_model = self.populate_epsfmodel(psf_file, oversample=1)
-            else:
-                raise FileNotFoundError("PSF file {} not found.".format(psf_file))
+            # Load PSF model of the appropriate PSF given the source location
+            psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
+                          interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
 
             # Evaluate the EPSF model. Place into an array just large enough for it
             # as the next step will be convolution with the galaxy stamp image
-            psf = self.minimal_psf_evaluation(psf_model)
+            psf_image = psf_obj.minimal_psf_evaluation()
 
             # convolve the galaxy with the instrument PSF
-            stamp = s1.fftconvolve(stamp, psf, mode='same')
+            stamp = s1.fftconvolve(stamp, psf_image, mode='same')
 
             # Now add the stamp to the main image
             # Extract the appropriate subarray from the galaxy image if necessary
             galdims = stamp.shape
 
-            nyshift = int(galdims[0] / 2)
-            nxshift = int(galdims[1] / 2)
-
-            nx = int(entry['pixelx'] + deltax)
-            ny = int(entry['pixely'] + deltay)
-            i1 = max(nx - nxshift, 0)
-            i2 = min(nx + 1 + nxshift, dims[1])
-            j1 = max(ny - nyshift, 0)
-            j2 = min(ny + 1 + nyshift, dims[0])
-            k1 = nxshift - (nx - i1)
-            k2 = nxshift + (i2 - nx)
-            l1 = nyshift - (ny - j1)
-            l2 = nyshift + (j2 - ny)
-
-            # If the cutout for the psf is larger than
-            # the psf array, truncate it, along with the array
-            # in the source image where it will be placed
-            if l2 > galdims[0]:
-                l2 = galdims[0]
-                j2 = j1 + (l2 - l1)
-
-            if k2 > galdims[1]:
-                k2 = galdims[1]
-                i2 = i1 + (k2 - k1)
-
-            # At this point coordinates are in the final output array coordinate system, so there
-            # should be no negative values, nor values larger than the output array size
-            if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
-                print(j1, i1, l1, k1)
-                print('bad low')
-            if j2 > (dims[0] + 1) or i2 > (dims[1] + 1) or l2 > (galdims[1] + 1) or k2 > (galdims[1] + 1):
-                print(j2, i2, l2, k2)
-                print('bad high')
+            # Calculate the coordinate limits of the aperture/PSF stamp overlap
+            galydim, galxdim = stamp.shape
+            (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, galxdim, galydim,
+                                                                   dims[1], dims[0])
 
             if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < dims[0]) and (i1 < dims[0])):
                 galimage[j1:j2, i1:i2] = galimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2]
@@ -2708,8 +2598,7 @@ class Catalog_seed():
             else:
                 print("Extended list input positions assumed to be in units of RA and Dec.")
         except:
-            print("WARNING: Unable to open the extended source list file {}".format(filename))
-            sys.exit()
+            raise FileNotFoundError("WARNING: Unable to open the extended source list file {}".format(filename))
 
         # File to save adjusted point source locations
         eoutcat = self.params['Output']['file'][0:-5] + '_extendedsources.list'
@@ -2767,7 +2656,7 @@ class Catalog_seed():
         if np.min(indexes) <= self.maxindex:
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
-        print("after extended sources, max index is {}".format(self.maxindex))
+        print("After extended sources, max index is {}".format(self.maxindex))
 
         #Loop over input lines in the source list
         all_stamps = []
@@ -2974,7 +2863,7 @@ class Catalog_seed():
             ypos = entry['pixely'] + deltay
             xoff = math.floor(xpos)
             yoff = math.floor(ypos)
-
+            
             # desired counts per second in the source
             counts = entry['countrate_e/s'] # / self.frametime
 
@@ -2982,62 +2871,27 @@ class Catalog_seed():
             # locate the correct PSF file here and read it in
             if self.params['simSignals']['PSFConvolveExtended']:
             
-                # Determine the filename of the best PSF to use for the
-                # given sub-pixel location. Note that the entry['pixelx'] and 'pixely'
-                # values are within the aperture being used, so they could be within a subarray.
-                # That is ok for this step where we are only looking at subpixel location.
-                psf_file = self.find_subpix_psf_filename(entry['pixelx'], entry['pixely'])
-                psf_exists = self.file_exists(psf_file)
-                if psf_exists:
-                    psf_model = self.populate_epsfmodel(psf_file, oversample=1)
-                else:
-                    raise FileNotFoundError("PSF file {} not found.".format(psf_file))
-
+                # Load the appropriate PSF file given the source location
+                psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
+                              interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
+                
                 # Evaluate the EPSF model. Place into an array just large enough for it
                 # as the next step will be convolution with the galaxy stamp image
-                psf = self.minimal_psf_evaluation(psf_model)
-
+                psf_image = psf_obj.minimal_psf_evaluation()
+                
                 # Convolve the galaxy with the instrument PSF
-                stamp = s1.fftconvolve(stamp, psf, mode='same')
+                stamp = s1.fftconvolve(stamp, psf_image, mode='same')
   
             # Extract the appropriate subarray from the image if necessary
             # Assume that the brightest pixel corresponds to the peak of the source
-            psfdims = stamp.shape
-            nyshift, nxshift = np.array(psfdims) / 2
-            nxshift = np.int(nxshift)
-            nyshift = np.int(nyshift)
-            nx = int(xoff)
-            ny = int(yoff)
-            i1 = max(nx - nxshift, 0)
-            i2 = min(nx + 1 + nxshift, dims[1])
-            j1 = max(ny - nyshift, 0)
-            j2 = min(ny + 1 + nyshift, dims[0])
-            k1 = nxshift - (nx - i1)
-            k2 = nxshift + (i2 - nx)
-            l1 = nyshift - (ny - j1)
-            l2 = nyshift + (j2 - ny)
+            #psfdims = stamp.shape
+            
 
-            # If the cutout for the psf is larger than
-            # the psf array, truncate it, along with the array
-            # in the source image where it will be placed
-            if l2 > psfdims[0]:
-                l2 = psfdims[0]
-                j2 = j1 + (l2 - l1)
-
-            if k2 > psfdims[1]:
-                k2 = psfdims[1]
-                i2 = i1 + (k2 - k1)
-
-            # At this point coordinates are in the final output array coordinate system, so there
-            # should be no negative values, nor values larger than the output array size
-            if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
-                print(j1, i1, l1, k1)
-                print('bad low')
-            if j2 > (dims[0] + 1) or i2 > (dims[1] + 1) or \
-               l2 > (psfdims[1] + 1) or k2 > (psfdims[1] + 1):
-                print(j2, i2, l2, k2)
-                print('bad high')
-
+            # Calculate the coordinate limits of the aperture/PSF stamp overlap
+            stampydim, stampxdim = stamp.shape
+            (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, stampxdim, stampydim,
+                                                                   dims[1], dims[0])
+                
             # Add stamp image to the extended source countrate image
             extimage[j1:j2, i1:i2] = extimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2] * counts
             # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
@@ -3076,8 +2930,7 @@ class Catalog_seed():
             self.qydict = dict(zip(instrumentfilternames, qy))
 
         except:
-            print("WARNING: Unable to read in {}.".format(self.params['Reffiles']['phot']))
-            sys.exit()
+            raise IOError("WARNING: Unable to read in {}.".format(self.params['Reffiles']['phot']))
 
     def readParameterFile(self):
         # read in the parameter file
@@ -3085,8 +2938,7 @@ class Catalog_seed():
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)
         except:
-            print("WARNING: unable to open {}".format(self.paramfile))
-            sys.exit()
+            raise IOError("WARNING: unable to open {}".format(self.paramfile))
 
     def checkParams(self):
         """Check input parameters for expected datatypes, values"""
@@ -3263,29 +3115,16 @@ class Catalog_seed():
         else:
             # case where psfPath is None. In this case, create a PSF on the fly to use
             # for adding sources
-            print("update this to include a call to WebbPSF????????")
-            self.psfimage = np.zeros((5, 5), dtype=np.float32)
-            sum1 = 0
-            for i in range(5):
-                for j in range(5):
-                    self.psfimage[i, j] = (0.02**(abs((i - 2))) * (0.02**abs(j - 2)))
-                    sum1 = sum1 + self.psfimage[i, j]
-            self.psfimage = self.psfimage / sum1
-            self.psfname = None
-
-        # Read in the 'central' PSF file. This is the file that
-        # has the PSF centered on the pixel. This will be used
-        # if there are sersic or extended sources that need to
-        # be convolved with the NIRCam PSF before adding
-        #centerpsffile = os.path.join(self.params['simSignals']['psfpath'], psfname + '_0p00_0p00.fits')
-        #self.centerpsf = fits.getdata(centerpsffile)
-        #self.centerpsf = self.cropPSF(self.centerpsf)
-        #self.centerpsf = self.populate_epsfmodel(centerpsffile, oversample=1)
-
-        # normalize the PSF to a total signal of 1.0
-        # DONE IN EPSFMODEL
-        #totalsignal = np.sum(self.centerpsf)
-        #self.centerpsf /= totalsignal
+            raise IOError("WARNING: no PSF library path given.")
+            #print("update this to include a call to WebbPSF????????")
+            #self.psfimage = np.zeros((5, 5), dtype=np.float32)
+            #sum1 = 0
+            #for i in range(5):
+            #    for j in range(5):
+            #        self.psfimage[i, j] = (0.02**(abs((i - 2))) * (0.02**abs(j - 2)))
+            #        sum1 = sum1 + self.psfimage[i, j]
+            #self.psfimage = self.psfimage / sum1
+            #self.psfname = None
 
         # ASTROMETRY
         # Read in the distortion coefficients file if present. These will provide a more exact
@@ -3462,35 +3301,6 @@ class Catalog_seed():
                               .format(self.params['Readout']['readpatt'],
                                       self.params['Reffiles']['readpattdefs'])))
 
-    def populate_epsfmodel(self, infile, oversample=1):
-        """Create an instance of EPSFModel and populate the data
-        from the given fits file. Also populate information
-        about the oversampling rate.
-
-        Parameters:
-        -----------
-        infile : str
-            Name of fits file containing PSF data
-
-        oversample : int
-            Factor by which the PSF data are oversampled
-
-        Returns:
-        --------
-        psf : obj
-            FittableImageModel instance
-        """
-        psf_data = fits.getdata(infile)
-
-        # Normalize
-        psf_data /= np.sum(psf_data)
-
-        # Create instance. Assume the PSF is centered
-        # in the array
-        psf = FittableImageModel(psf_data, oversampling=oversample)
-        #psf = EPSFModel(psf_data, oversampling=oversample)
-        return psf
-        
     def filecheck(self):
         # Make sure the requested input files exist
         # For reference files, assume first that they are located in
