@@ -734,7 +734,7 @@ class Catalog_seed():
 
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
-    def basicGetImage(self, filename):
+    def basic_get_image(self, filename):
         """
         Read in image from a fits file
         
@@ -919,7 +919,7 @@ class Catalog_seed():
                 stamp = self.centerpsf
 
             elif input_type == 'extended':
-                stamp, header = self.basicGetImage(entry['filename'])
+                stamp, header = self.basic_get_image(entry['filename'])
                 if entry['pos_angle'] != 0.:
                     stamp = self.basicRotateImage(stamp, entry['pos_angle'])
 
