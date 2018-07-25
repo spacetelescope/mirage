@@ -10,6 +10,7 @@
 build/*
 dist/*
 mirages.egg-info/*
+*egg-info
 
 # Lists and images #
 ######################
@@ -32,6 +33,7 @@ examples/.ipynb_checkpoints/*
 *.aptbackup
 *.aptx
 *.docx
+mirage/scripts/#get_catalog.py#
 
 # Files #
 #########
