@@ -20,7 +20,7 @@ import yaml
 from . import set_telescope_pointing_separated as stp
 from . import unlinearize
 from . import read_fits
-
+from .utils import calc_frame_time
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -138,8 +138,12 @@ class Observation():
             temp_frame = self.seed[0, :, :]
         elif seeddim == 2:
             temp_frame = self.seed
-        self.calcFrameTime(temp_frame)
-
+        tmpy, tmpx = temp_frame.shape
+        #self.calcFrameTime(temp_frame)
+        self.frametime = calc_frame_time(self.instrument, self.params['Readout']['array_name'],
+                                         tmpx, tmpy, self.params['Readout']['namp'])
+        print("Frametime is {}".format(self.frametime))
+        
         # Calculate the rate of cosmic ray hits expected per frame
         self.getCRrate()
 
@@ -1375,39 +1379,6 @@ class Observation():
             except:
                 segmap = None
         return seed, segmap, seedheader
-
-    def calcFrameTime(self, frame):
-        #calculate the exposure time of a single frame of the proposed output ramp
-        #based on the size of the croped dark current integration
-        yd, xd = frame.shape
-        #self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd+1) * 10.00 * 1.e-6
-        #UPDATED VERSION, 16 Sept 2017
-        if self.params['Inst']['instrument'].lower() == "nircam":
-            colpad = 12
-            rowpad = 2
-            if ((xd <= 8) & (yd <= 8)):
-                rowpad = 3
-            self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
-        elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
-        # the following applies to NIRISS and Guider full frame imaging and
-        # NIRISS sub-arrays.
-        #
-        # According JDox the NIRCam full frame time is 10.73677 seconds the
-        # same as for NIRISS, but right now the change does not apply to NIRCam.
-        #
-        # note that the Guider frame time may be different for small sub-arrays
-        # less than 64 pixels square, but that needs to be confirmed.
-            colpad = 12
-            if self.params['Readout']['namp'] == 4:
-                pad1 = 1
-                pad2 = 1
-            else:
-                pad1 = 2
-                pad2 = 0
-            self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) 
-                              * (xd + pad1)) * 0.00001
-        print('Exposure time of a single frame: ', self.frametime)
-
 
     def getSubarrayBounds(self):
         # Find the bounds of the requested subarray
