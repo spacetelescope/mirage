@@ -29,6 +29,7 @@ from . import read_siaf_table
 from . import set_telescope_pointing_separated as set_telescope_pointing
 from . import moving_targets
 from . import segmentation_map as segmap
+from .utils import calc_frame_time
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -122,8 +123,11 @@ class Catalog_seed():
                                                           self.coord_adjust['x']])).astype(np.int)
 
         # calculate the exposure time of a single frame, based on the size of the subarray
-        self.calcFrameTime()
-
+        #self.calcFrameTime()
+        self.frametime = calc_frame_time(self.params['Inst']['instrument'], self.params['Readout']['array_name'],
+                                         self.nominal_dims[0], self.nominal_dims[1], self.params['Readout']['namp'])
+        print("Frametime is {}".format(self.frametime))
+        
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
         self.prepare_PAM()
@@ -520,39 +524,6 @@ class Catalog_seed():
                 for i in range(1, len(mov_targs_ramps)):
                     mov_targs_integration += mov_targs_ramps[0]
         return mov_targs_integration, mov_targs_segmap
-
-    def calcFrameTime(self):
-        # calculate the exposure time of a single frame of the proposed output ramp
-        # based on the size of the cropped dark current integration
-        # numint, numgrp, yd, xd = self.dark.data.shape
-        yd, xd = self.nominal_dims
-        # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
-        # UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument'].lower():
-            colpad = 12
-            rowpad = 2
-            if ((xd <= 8) & (yd <= 8)):
-                rowpad = 3
-            self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
-        elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
-            # the following applies to NIRISS and Guider full frame imaging and
-            # NIRISS sub-arrays.
-            #
-            # According JDox the NIRCam full frame time is 10.73677 seconds the
-            # same as for NIRISS, but right now the change does not apply to NIRCam.
-            #
-            #
-            # note that the Guider frame time may be different for small sub-arrays
-            # less than 64 pixels square, but that needs to be confirmed.
-            colpad = 12
-            if self.params['Readout']['namp'] == 4:
-                pad1 = 1
-                pad2 = 1
-            else:
-                pad1 = 2
-                pad2 = 0
-            self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad) 
-                              * (xd + pad1)) * 0.00001
 
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
