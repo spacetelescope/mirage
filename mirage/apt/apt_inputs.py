@@ -659,11 +659,18 @@ class AptInput:
                 obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
                 obs_pav3.append(obslist['PAV3'])
 
-                # Then, match up with the filter configuration using the exposure
-                # number
-                exposure = int(exp[-2:])
-                filter_config = 'FilterConfig{}'.format(exposure)
-                obslist = obslist[filter_config]
+                # Determine if this is a newly-generated yaml that
+                # include separate FilterConfig# keys
+                obstab_keys = self.obstab['Observation1'].keys()
+                filter_configs = any(['FilterConfig' in k for k in  obstab_keys])
+                if filter_configs:
+                    # If so, match up with the filter configuration using
+                    # the exposure number
+                    exposure = int(exp[-2:])
+                    filter_config = 'FilterConfig{}'.format(exposure)
+                    obslist = obslist[filter_config]
+
+                # Read parameters from yaml
                 obs_sw_ptsrc.append(self.full_path(obslist['SW']['PointSourceCatalog']))
                 obs_sw_galcat.append(self.full_path(obslist['SW']['GalaxyCatalog']))
                 obs_sw_ext.append(self.full_path(obslist['SW']['ExtendedCatalog']))

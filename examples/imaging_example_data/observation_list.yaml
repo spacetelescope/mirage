@@ -5,7 +5,7 @@
 #Observation dates should be in the format: YYYY-MM-DD
 #Roll angle is PAV3, which is available from the
 #JWST General Target Visibility Tool (GTVT)
-#Roll angles and dates are not checked against the 
+#Roll angles and dates are not checked against the
 #GTVT and do not need to agree with the tool's outputs
 #
 #For multiple observations that you want taken back-to-back,
@@ -17,8 +17,8 @@ Observation1:
   PAV3: 0.
   SW:
     Filter: F115W
-    PointSourceCatalog: ../catalogs/seed_im_from_catalog_test_ptsrc_catalog.list
-    GalaxyCatalog: ../catalogs/seed_im_from_catalog_test_galaxies_catalog.list
+    PointSourceCatalog: imaging_example_data/seed_im_from_catalog_test_ptsrc_catalog.list
+    GalaxyCatalog: imaging_example_data/seed_im_from_catalog_test_galaxies_catalog.list
     ExtendedCatalog: None
     ExtendedScale: 1.0
     ExtendedCenter: 1024,1024
@@ -30,8 +30,8 @@ Observation1:
     BackgroundRate: 0.5
   LW:
     Filter: F356W
-    PointSourceCatalog: ../catalogs/seed_im_from_catalog_test_ptsrc_catalog_filter2.list
-    GalaxyCatalog: ../catalogs/seed_im_from_catalog_test_galaxies_catalog_filter2.list
+    PointSourceCatalog: imaging_example_data/seed_im_from_catalog_test_ptsrc_catalog_filter2.list
+    GalaxyCatalog: imaging_example_data/seed_im_from_catalog_test_galaxies_catalog_filter2.list
     ExtendedCatalog: None
     ExtendedScale: 1.0
     ExtendedCenter: 1024,1024
