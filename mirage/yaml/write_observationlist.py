@@ -1,10 +1,24 @@
-# Generate observation list files based on default values and APT output files
+"""Generate observation list files based on default values and APT
+output files
+
+Authors
+-------
+    - Lauren Chambers
+
+Use
+---
+    ::
+        from mirage.yaml import write_observationlist
+        write_observationlist.write_yaml(xml_file, pointing_file,
+            yaml_file, ps_cat_sw, ps_cat_lw)
+"""
 import re
+
 from lxml import etree
 import numpy as np
-import pprint
-from mirage.scripts import apt_inputs
-from . import read_apt_xml
+
+from ..apt import read_apt_xml
+
 
 def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=None):
     # Define "default" values (probably should be changed eventually)
@@ -76,8 +90,8 @@ def write_yaml(xml_file, pointing_file, yaml_file, ps_cat_sw=None, ps_cat_lw=Non
         raise ValueError('Not all provided parameters have compatible '
                          'dimensions. Will not write {}'.format(yaml_file))
 
-    write = ["# Observation list created by write_observationlist.py script in\n",
-             "# mirage/scripts. Note: all values except filters and\n",
+    write = ["# Observation list created by write_observationlist.py  in\n",
+             "# mirage/yaml. Note: all values except filters and\n",
              "# observation names are default.\n\n"]
     for i_obs in range(num_obs):
         obs_number = i_observations[i_obs] + 1

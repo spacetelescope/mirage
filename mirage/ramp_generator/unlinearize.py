@@ -9,11 +9,12 @@ input ramp.
 import sys
 import numpy as np
 
+
 def unlinearize(image,coeffs,sat,lin_satmap,maxiter=10,accuracy=0.000001,robberto=False
                 ,save_accuracy_map=False,accuracy_file='unlinearize_no_convergence.fits'):
     # Insert non-linearity into the linear synthetic sources
 
-    # If the sizes of the satmap or coeffs are different than 
+    # If the sizes of the satmap or coeffs are different than
     # the data, return an error
     if sat.shape != image.shape[-2:]:
         print("WARNING: image y,x shape is {},".format(image.shape[-2:]))
@@ -24,15 +25,15 @@ def unlinearize(image,coeffs,sat,lin_satmap,maxiter=10,accuracy=0.000001,robbert
     # RATHER THAN BEING CREATED HERE. THIS IS BECAUSE THE SUPERBIAS
     # AND REFPIX SIGNALS MUST BE SUBTRACTED BEFORE LINEARIZING
     # THE ORIGINAL RAW SATURATION MAP
-    # Sat is the original saturation map data for non-linear ramps. 
-    # Translate to saturation maps for the linear ramps here so 
+    # Sat is the original saturation map data for non-linear ramps.
+    # Translate to saturation maps for the linear ramps here so
     # that we can pay attention only to non-saturated pixels in
     # the input linear image. Do this by applying the standard
     # linearity correction to the saturation map
     #lin_satmap = nonLinFunc(sat,coeffs,sat)
 
-    # Find pixels with "good" signals, to have the nonlin applied. 
-    # Negative pix or pix with signals above the requested max 
+    # Find pixels with "good" signals, to have the nonlin applied.
+    # Negative pix or pix with signals above the requested max
     # value will not be changed.
     x = np.copy(image)
     i1 = np.where((image > 0.) & (image < lin_satmap))
@@ -42,16 +43,16 @@ def unlinearize(image,coeffs,sat,lin_satmap,maxiter=10,accuracy=0.000001,robbert
     numhigh = np.where(image >= lin_satmap)
     i = 0
 
-    # Initial run of the nonlin function - when calling the 
-    # non-lin function, give the original satmap for the 
+    # Initial run of the nonlin function - when calling the
+    # non-lin function, give the original satmap for the
     # non-linear signal values
     val = nonLinFunc(image,coeffs,sat)
     val[i2]=1.
 
-    if robberto:            
+    if robberto:
         x = image * val
     else:
-        x[i1] = (image[i1]+image[i1]/val[i1]) / 2. 
+        x[i1] = (image[i1]+image[i1]/val[i1]) / 2.
         while i < maxiter:
             i=i+1
             val = nonLinFunc(x,coeffs,sat)
@@ -64,10 +65,10 @@ def unlinearize(image,coeffs,sat,lin_satmap,maxiter=10,accuracy=0.000001,robbert
             val1[i2] = 1.
             x[i1] = x[i1] + (image[i1]-val[i1])/val1[i1]
 
-    # If we max out the number of iterations, 
-    # save the array of accuracy values. Spot 
-    # checks reveal the pix that don't meet the 
-    # accuracy reqs are randomly located on the detector, 
+    # If we max out the number of iterations,
+    # save the array of accuracy values. Spot
+    # checks reveal the pix that don't meet the
+    # accuracy reqs are randomly located on the detector,
     # and don't seem to be correlated with point source
     # locations.
     if i == maxiter and save_accuracy_map:
@@ -80,7 +81,7 @@ def unlinearize(image,coeffs,sat,lin_satmap,maxiter=10,accuracy=0.000001,robbert
         h0 = fits.PrimaryHDU()
         h1 = fits.ImageHDU(devcheck)
         hl = fits.HDUList([h0,h1])
-        hl.writeto(accuracy_file,overwrite=True)           
+        hl.writeto(accuracy_file,overwrite=True)
     return x
 
 
@@ -115,7 +116,7 @@ def nonLinDeriv(image,coeffs,limits):
     if len(image.shape) == 3:
         bady = 1
         badx = 2
-        
+
     bad = np.where(values > limits)
     values[bad] = limits[bad[bady],bad[badx]]
     ncoeff = coeffs.shape[0]

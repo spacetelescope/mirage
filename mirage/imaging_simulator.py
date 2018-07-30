@@ -26,12 +26,13 @@ HISTORY:
 '''
 
 import os
-import sys
 import argparse
-from mirage.scripts import catalog_seed_image
-from mirage.scripts import dark_prep
-from mirage.scripts import obs_generator
-from mirage.scripts import read_fits
+
+from .seed_image import catalog_seed_image
+from .dark import dark_prep
+from .ramp_generator import obs_generator
+from .utils import read_fits
+
 
 class ImgSim():
     def __init__(self):

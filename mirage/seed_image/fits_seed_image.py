@@ -1,87 +1,87 @@
 #! /usr/bin/env python
 
 '''
-Create a mirage-format seed image from 
-an input fits file. This fits file must contain a 
+Create a mirage-format seed image from
+an input fits file. This fits file must contain a
 valid WCS, and be distortion-free.
 
-This code will extract a sub-image from the input 
+This code will extract a sub-image from the input
 fits file. The subimage is centered at the input
-RA and Dec (crop_center_ra, crop_center_dec) and 
+RA and Dec (crop_center_ra, crop_center_dec) and
 its size is determined by the aperture input.
 
 The extracted sub-image is then blotted onto the
-requested NIRCam detector's FOV, including the 
+requested NIRCam detector's FOV, including the
 distortion model.
 
 The resulting image is then saved in such a format
 that it can be used as input in the obs_generator.py,
-image_simulator.py, or disperser code in the 
+image_simulator.py, or disperser code in the
 mirage package. Essentially this script
 is designed to take the place of catalog_seed_image.py
-in the case where the user has a distortion-free 
-mosaic image that they wish to break up into 
+in the case where the user has a distortion-free
+mosaic image that they wish to break up into
 NIRCam images.
 
 Another way to use this code would be for an input
 fits image of some extended object that the user
 wishes to distort according to the NIRCam distortion
-model. This distorted file can then be placed in 
-an extended object catalog which will be used by 
-the catalog_seed_image.py step. In this method, 
+model. This distorted file can then be placed in
+an extended object catalog which will be used by
+the catalog_seed_image.py step. In this method,
 multiple extended objets could be distorted and
-added to the same frame. 
+added to the same frame.
 
 Inputs:
 mosaicfile: The name of the fits file containing the
             distortion-free image to be blotted. The code
-            currently assumes that the mosaicfile is 
+            currently assumes that the mosaicfile is
             oriented north-up.
 
 From here, there are two ways to call fits_seed_image.py
 
-1. parameter file: a yaml input file matching the format 
+1. parameter file: a yaml input file matching the format
    (optional)      required by other steps of the nircam
                    data simulator
 
 2. Manual inputs:
-   aperture - 
-              aperture name matching an entry in the   
+   aperture -
+              aperture name matching an entry in the
               subarray definition file (e.g. NRCB5_FULL)
 
-   crop_center_ra, crop_center_dec - 
+   crop_center_ra, crop_center_dec -
               The RA and Dec at the center of the sub-image
               to crop from mosaicfile. This, in combination
               with the array size (determined from aperture)
               define the sub-image to use.
 
-   blot_center_ra, blot_center_dec - 
+   blot_center_ra, blot_center_dec -
               The RA and Dec at the center of the blotted
               sub-image. If these are equal to crop_center_ra
               and dec, then the center of the cropped image
               will remain at the center of the blotted image.
 
-   blot_pav3 - 
-              Position angle of the blotted image. 
+   blot_pav3 -
+              Position angle of the blotted image.
 
-   subarray_defs - 
+   subarray_defs -
               Name of the ascii file containing the definitions
               of the possible subarrays. By setting this value
-              equal to 'config', the code will use the 
+              equal to 'config', the code will use the
               subarray definition file packaged with the
               NIRCam data simulator.
 
    flux_cal_file -
-              Ascii file listing the zeropoints for all 
+              Ascii file listing the zeropoints for all
               NIRCam filters. By setting this value equal
-              to 'config', the code will use the flux 
-              calibration file that is packaged with the 
+              to 'config', the code will use the flux
+              calibration file that is packaged with the
               NIRCam data simulator. This information is
               used only to populate the PHOTFLAM, PHOTFNU,
               and PHOTPLAM header keywords.
 
-   filter - 
-              The NIRCam filter to use. This is used to 
+   filter -
+              The NIRCam filter to use. This is used to
               select the appropriate row from the flux
               calibration file.
 
@@ -93,7 +93,7 @@ From here, there are two ways to call fits_seed_image.py
               If the pupil value does not start with 'F'
               (e.g. F405N), then it is ignored.
 
-   grism_source_image - 
+   grism_source_image -
               True/False. If you intend to send the seed
               image output to the disperser software, then
               set this value to True. The output image will
@@ -106,7 +106,7 @@ From here, there are two ways to call fits_seed_image.py
    outfile -
               Name of the file to contain the output seed
               image.
-                   
+
    outdir -
               Directory in which to place outfile
 
@@ -115,8 +115,8 @@ self.seedimage, self.seed_segmap, self.seedinfo
 contain the seed (countrate) image, the associated
 segmentation map, and header information required
 by subsequent steps of the nircam data simulator.
-The segmentation map is only used in the case where 
-the seed image is dispersed by a call to the 
+The segmentation map is only used in the case where
+the seed image is dispersed by a call to the
 disperser software.
 
 Example calls:
@@ -147,14 +147,15 @@ s.crop_and_blot()
 
 import os
 import sys
-import pkg_resources
 import argparse
+
+import yaml
+import pkg_resources
 import numpy as np
 from math import radians
 from astropy.io import fits, ascii
-import yaml
-from . import crop_mosaic
-from . import blot_image
+
+from . import crop_mosaic, blot_image
 
 config_files = {'subarray_defs':'NIRCam_subarray_definitions.list',
                 'flux_cal':'NIRCam_zeropoints.list'}
@@ -179,7 +180,7 @@ class ImgSeed:
         self.outdir = './'
         self.grism_direct_factor = np.sqrt(2.)
 
-        
+
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage','')
@@ -189,7 +190,7 @@ class ImgSeed:
         # (used for WFSS mode), as well as the coordinate
         # offset between the nominal output array coordinates,
         # and those of the expanded array. These are needed
-        # mostly for WFSS observations, where the nominal output  
+        # mostly for WFSS observations, where the nominal output
         # array will not sit centered in the expanded output image.
         self.coords = {'x':1.,'xoffset':0.,'y':1.,'yoffset':0.}
 
@@ -198,14 +199,14 @@ class ImgSeed:
         if paramfile is not None:
             self.read_param_file(paramfile)
 
-        
+
 
     def read_param_file(self, file):
-        '''If an input yaml file is given 
+        '''If an input yaml file is given
         which matches the format of the input
         yaml files for the other mirage
         steps, read in and set needed parameters'''
-        
+
         if os.path.isfile(file):
             with open(file,'r') as f:
                 params = yaml.load(f)
@@ -252,19 +253,19 @@ class ImgSeed:
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
-        
-        
+
+
     def aperture_info(self, apname):
         '''
         Return basic information on the reuqested
-        aperture. This information comes from the 
+        aperture. This information comes from the
         subarray defintion file in the config
         directory
         '''
         # Read in the subarray definition file
         print(self.subarray_defs)
         self.read_subarray_definition_file(self.subarray_defs)
-        
+
         # Find the matching entry in the definition file
         if self.aperture in self.subdict['AperName']:
             mtch = self.aperture == self.subdict['AperName']
@@ -281,10 +282,10 @@ class ImgSeed:
                    .format(apname)))
             print("to be present in subarray definition file.")
             sys.exit()
-            
+
 
     def read_subarray_definition_file(self, file):
-        '''Read in the file that contains a list 
+        '''Read in the file that contains a list
         of subarray names and positions on the detector
         '''
         try:
@@ -294,12 +295,12 @@ class ImgSeed:
             print(file)
             sys.exit()
 
-        
+
     def crop_and_blot(self):
         '''Extract an area of the input fits
         file that is slightly larger than the
         FOV, and use the JWST pipeline version
-        of blot to resample to the correct 
+        of blot to resample to the correct
         pixel scale and introduce the proper
         distortion'''
 
@@ -314,7 +315,7 @@ class ImgSeed:
                 self.channel = 'long'
             else:
                 self.channel = 'short'
-        
+
         # Get information on the aperture
         self.aperture_info(self.aperture)
         xstart = self.array['xstart']
@@ -386,10 +387,10 @@ class ImgSeed:
         if dot == -1:
             dot = len(self.outfile)
         self.basename = os.path.join(self.outdir,
-                                     self.outfile[0:dot])            
+                                     self.outfile[0:dot])
         self.seed_file = self.basename + '_' \
                       + self.filter + '_seed_image.fits'
-            
+
         xcent_fov = xd / 2
         ycent_fov = yd / 2
         kw = {}
@@ -404,7 +405,7 @@ class ImgSeed:
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
         kw['PHOTPLAM'] = self.pivot * 1.e4 #put into angstroms
-        kw['NOMXDIM'] = self.array['xend'] - self.array['xstart'] + 1 
+        kw['NOMXDIM'] = self.array['xend'] - self.array['xstart'] + 1
         kw['NOMYDIM'] = self.array['yend'] - self.array['ystart'] + 1
         kw['NOMXSTRT'] = self.coords['xoffset'] + 1
         kw['NOMXEND'] = self.coords['xoffset'] + kw['NOMXDIM']
@@ -426,7 +427,7 @@ class ImgSeed:
             if image2type is not None:
                 h2.header['EXTNAME'] = image2type
 
-        # If a keyword dictionary is provided, put the 
+        # If a keyword dictionary is provided, put the
         # keywords into the 0th and 1st extension headers
         if key_dict is not None:
             for key in key_dict:
@@ -439,7 +440,7 @@ class ImgSeed:
             hdulist = fits.HDUList([h0,h1,h2])
         hdulist.writeto(name,overwrite=True)
 
-        
+
     def grism_coord_adjust(self):
         # Calculate the factors by which to expand the
         # output array size, as well as the coordinate
@@ -458,7 +459,7 @@ class ImgSeed:
                                         * (self.subarray_bounds[3] -
                                            self.subarray_bounds[1]+1) / 2.)
 
-        
+
 
     def add_options(self, parser = None, usage = None):
         if parser is None:

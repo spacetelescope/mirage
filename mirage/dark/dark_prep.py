@@ -14,16 +14,19 @@ input files for the refactored simulator...
 
 import sys
 import os
-import pkg_resources
 import argparse
 from math import floor
+
+import yaml
+import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
-import yaml
-from . import read_fits
+
+from ..utils import read_fits
 
 # Allowed instruments
 INST_LIST = ['nircam', 'niriss', 'fgs']
+
 
 class DarkPrep():
 

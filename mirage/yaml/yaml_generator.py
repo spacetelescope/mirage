@@ -80,18 +80,21 @@ Feb 2018 - V1: Updates to accomodate multiple filter pairs per
 
 import sys
 import os
-import pkg_resources
+import argparse
 from glob import glob
 from copy import deepcopy
-import argparse
+
+import pkg_resources
 import numpy as np
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
-from astropy.io import ascii
-from . import apt_inputs
+from astropy.io import ascii, fits
+
+from ..apt import apt_inputs
 
 
 ENV_VAR = 'MIRAGE_DATA'
+
 
 class SimInput:
     def __init__(self):
@@ -122,7 +125,7 @@ class SimInput:
         self.psfwfegroup = 0
         self.resets_bet_ints = 1 # NIRCam should be 1
         self.tracking = 'sidereal'
-        
+
     def create_inputs(self):
         # Use full paths for inputs
         self.path_defs()
@@ -294,7 +297,7 @@ class SimInput:
         for obs in obs_ids:
             n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
             n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
-            
+
             module = self.info['Module'][i_mod]
 
             if module != 'None':
@@ -315,7 +318,7 @@ class SimInput:
                 n_det = 1
                 module = ' NIS'
 
-                
+
             i_mod += n_tiles * n_det
 
             print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
@@ -345,7 +348,7 @@ class SimInput:
 
     def find_ipc_file(self, inputipc):
         """Given a list of potential IPC kernel files for a given
-        detector, select the most appropriate one, and check to see 
+        detector, select the most appropriate one, and check to see
         whether the kernel needs to be inverted, in order to populate
         the invertIPC field. This is not intended to be terribly smart.
         The first inverted kernel found will be used. If none are found,
@@ -922,8 +925,8 @@ class SimInput:
             if self.instrument.lower() == 'niriss':
                 full_ap = input['aperture']
 
-            scripts_path = os.path.dirname(os.path.realpath(__file__))
-            modpath = os.path.split(scripts_path)[0]
+            yaml_path = os.path.dirname(os.path.realpath(__file__))
+            modpath = os.path.split(yaml_path)[0]
             subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
             config = ascii.read(subarray_def_file)
 
@@ -1124,7 +1127,7 @@ class SimInput:
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
-        
+
         self.instrument = instrument.lower()
 
         # Prepare to find files listed as 'config'
@@ -1160,7 +1163,7 @@ class SimInput:
             self.configfiles['superbias_config'] = 'superbias.cfg'
             self.configfiles['refpix_config'] = 'refpix.cfg'
             self.configfiles['linearity_config'] = 'linearity.cfg'
-            self.configfiles['filter_throughput'] = 'placeholder.txt'            
+            self.configfiles['filter_throughput'] = 'placeholder.txt'
         else:
             raise RuntimeError('Instrument {} is not supported'.format(instrument))
 

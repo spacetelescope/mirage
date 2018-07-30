@@ -27,7 +27,7 @@ from astropy.io import ascii as asc
 def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     """Calculate the readout time for a single frame
     of a given size and number of amplifiers. Note that for
-    NIRISS and FGS, the fast readout direction is opposite to 
+    NIRISS and FGS, the fast readout direction is opposite to
     that in NIRCam, so we switch xdim and ydim so that we can
     keep a single equation.
 
@@ -47,7 +47,7 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
 
     ydim : int
         Number of rows in the frame
-    
+
     amps : int
         Number of amplifiers used to read out the frame
 
@@ -100,7 +100,7 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             fullpad = 0
 
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
-            
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.
@@ -110,8 +110,8 @@ def get_siaf():
     siaf_files : dict
         A dictionary that holds the contents of the config file.
     '''
-    scripts_dir = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-    package_dir = os.path.dirname(scripts_dir)
+    utils_dir = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+    package_dir = os.path.dirname(utils_dir)
     config_file = os.path.join(package_dir, 'config', 'siaf_config.json')
 
     with open(config_file, 'r') as config_file:

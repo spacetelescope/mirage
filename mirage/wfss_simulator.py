@@ -7,11 +7,11 @@ combine the 4 stages of the simulator
 into a single script.
 
 Inputs:
-paramfiles - List of yaml filenames. These files should be 
-             inputs to the simulator. For details on the 
+paramfiles - List of yaml filenames. These files should be
+             inputs to the simulator. For details on the
              information contained in the yaml files, see
              the readme file associated with the mirage
-             github repo: 
+             github repo:
              https://github.com/spacetelescope/mirage.git
 
 crossing_filter - Name of the crossing filter to be used in
@@ -21,10 +21,10 @@ crossing_filter - Name of the crossing filter to be used in
 module - Name of the NIRCam module to use for the simulation.
          Can be 'A' or 'B'
 
-direction - Dispersion direction. Can be along rows ('R') or 
+direction - Dispersion direction. Can be along rows ('R') or
             along columns ('C')
 
-override_dark - If you wish to use a dark current file that 
+override_dark - If you wish to use a dark current file that
                 has already gone through the dark_prep step
                 of the pipeline and wish to use that for the
                 simulation, set override_dark equal to the
@@ -39,18 +39,20 @@ HISTORY:
 import os
 import sys
 import argparse
+
 from numpy import nanmedian, isfinite
 from astropy.io import fits
-from mirage.scripts import catalog_seed_image
-from mirage.scripts import dark_prep
-from mirage.scripts import obs_generator
-from mirage.scripts import read_fits
-from mirage.scripts import yaml_update
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 
-nircam_filters = ['F322W2','F277W','F356W','F444W','F250M'
-                  ,'F300M','F335M','F360M','F410M','F430M'
-                  ,'F323N','F405N','F466N','F470N']
+from .seed_image import catalog_seed_image
+from .dark import dark_prep
+from .ramp_generator import obs_generator
+from .utils import read_fits
+from .yaml import yaml_update
+
+nircam_filters = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
+                  'F335M', 'F360M', 'F410M', 'F430M', 'F323N', 'F405N',
+                  'F466N', 'F470N']
 
 
 class WFSSSim():
@@ -80,7 +82,7 @@ class WFSSSim():
     def create(self):
         # Make sure inputs are correct
         self.check_inputs()
-        
+
         # Loop over the yaml files and create
         # a direct seed image for each
         imseeds = []
@@ -106,9 +108,9 @@ class WFSSSim():
         # Get gain map
         gainfile = cat.params['Reffiles']['gain']
         gain, gainheader = self.read_gain_file(gainfile)
-        
+
         # Disperser output is always full frame. Crop to the
-        # requested subarray if necessary       
+        # requested subarray if necessary
         if cat.params['Readout']['array_name'] not in self.fullframe_apertures:
             print("Subarray bounds: {}".format(cat.subarray_bounds))
             print("Dispersed seed image size: {}".format(disp_seed.final.shape))
@@ -122,7 +124,7 @@ class WFSSSim():
             segbounds = [cat.subarray_bounds[0] + dx, cat.subarray_bounds[1] + dy,
                          cat.subarray_bounds[2] + dx, cat.subarray_bounds[3] + dy]
             cat.seed_segmap = self.crop_to_subarray(cat.seed_segmap, segbounds)
-            
+
         # Convert seed image to ADU/sec to be consistent
         # with other simulator outputs
         disp_seed.final /= gain
@@ -167,7 +169,7 @@ class WFSSSim():
         y.outname = ("wfss_dispersed_{}_{}.yaml"
                      .format(dmode,self.crossing_filter))
         y.run()
-        
+
         # Combine into final observation
         obs = obs_generator.Observation()
         obs.linDark = obslindark
@@ -177,7 +179,7 @@ class WFSSSim():
         obs.paramfile = y.outname
         obs.create()
 
-        
+
     def read_dark_product(self,file):
         # Read in dark product that was produced
         # by dark_prep.py
@@ -202,7 +204,7 @@ class WFSSSim():
             self.invalid('crossing_filter',self.crossing_filter)
         else:
             self.crossing_filter = self.crossing_filter.upper()
-        
+
         if self.override_dark is not None:
             avail = os.path.isfile(self.override_dark)
             if avail == False:
@@ -214,7 +216,7 @@ class WFSSSim():
             print("WARNING: self.paramfiles must be a list")
             print("of 2 or more yaml files.")
             sys.exit()
-        
+
     def read_param_file(self, file):
         """
         Read in yaml simulator parameter file
@@ -238,7 +240,7 @@ class WFSSSim():
     def read_gain_file(self, file):
         """
         Read in CRDS-formatted gain reference file
-        
+
         Paramters:
         ----------
         file -- Name of gain reference file
@@ -255,7 +257,7 @@ class WFSSSim():
             raise IOError("WARNING: Unable to open gain file: {}".format(file))
 
         mngain = nanmedian(image)
-            
+
         # Set pixels with a gain value of 0 equal to mean
         image[image == 0] = mngain
         # Set any pixels with non-finite values equal to mean
@@ -272,7 +274,7 @@ class WFSSSim():
         -----------
         data -- 2d numpy array. Full frame image. (2048 x 2048)
         bounds -- 4-element list containing the full frame indices that
-                  define the position of the subarray. 
+                  define the position of the subarray.
                   [xstart, ystart, xend, yend]
 
         Returns:
@@ -288,13 +290,13 @@ class WFSSSim():
         print(valid)
         print(bounds)
         print(yl, xl)
-        
+
         if all(valid):
             return data[bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
         else:
             raise ValueError(("WARNING: subarray bounds are outside the "
                               "dimensions of the input array."))
-        
+
     def read_subarr_defs(self, subfile):
         # read in the file that contains a list of subarray
         # names and positions on the detector
@@ -335,7 +337,7 @@ class WFSSSim():
 
 if __name__ == '__main__':
 
-    usagestring = 'USAGE: wfss_simualtor.py file1.yaml file2.yaml --crossing_filter F444W --direction R --module A' 
+    usagestring = 'USAGE: wfss_simualtor.py file1.yaml file2.yaml --crossing_filter F444W --direction R --module A'
 
     obs = WFSSSim()
     parser = obs.add_options(usage = usagestring)

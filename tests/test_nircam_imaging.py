@@ -14,7 +14,7 @@ Use
 import os
 import pytest
 
-from mirage.scripts import imaging_simulator as im
+from mirage import imaging_simulator as im
 
 # os.environ['MIRAGE_DATA'] = ''
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRCam')

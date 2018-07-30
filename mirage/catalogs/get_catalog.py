@@ -16,7 +16,7 @@ Use
     This module can be executed in a Python shell as such:
 
     ::
-        from mirage.scripts import get_catalog
+        from mirage.catalogs import get_catalog
         sw_cats, lw_cats = get_catalog.get_all_catalogs(pointing_file, prop_id)
 
     Required arguments:
@@ -35,7 +35,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astroquery.vizier import Vizier
 
-from . import apt_inputs
+from ..apt import apt_inputs
 
 SCRIPTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 PACKAGE_DIR = os.path.dirname(SCRIPTS_DIR)

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-Class that creates an integration containing multiple frames and 
+Class that creates an integration containing multiple frames and
 shows a source that is moving relative to the detector.
 
 Arguments:
@@ -11,7 +11,7 @@ xframes -- list of x-coordinate pixel position of target
            in each frame
 yframes -- list of y-coordinate pixel position of target
            in each frame
-frametime -- exposure time in seconds corresponding to one 
+frametime -- exposure time in seconds corresponding to one
              detector readout (varies with subarray size)
 outx -- x-dimension size of the output aperture (2048 for
         full-frame)
@@ -28,10 +28,10 @@ Author:
 Bryan Hilbert
 '''
 
-from astropy.io import fits
-import numpy as np
 import sys
 
+import numpy as np
+from astropy.io import fits
 
 class MovingTarget():
 
@@ -51,7 +51,7 @@ class MovingTarget():
                    in each frame
         yframes -- list of y-coordinate pixel position of target
                    in each frame
-        frametime -- exposure time in seconds corresponding to one 
+        frametime -- exposure time in seconds corresponding to one
                      detector readout (varies with subarray size)
         outx -- x-dimension size of the output aperture (2048 for
                 full-frame)
@@ -63,7 +63,7 @@ class MovingTarget():
         3D array containing the signal of the source in each frame
         of the integration
         """
-        
+
         # Make sure subsampling factor is an integer
         self.subsampx = np.int(self.subsampx)
         self.subsampy = np.int(self.subsampy)
@@ -169,7 +169,7 @@ class MovingTarget():
                                                 secPerPix)
 
             outputframe0 = np.copy(outputframe1)
-            
+
             # Put the output frames back to the original resolution
             resampled = self.resample(outputframe1, self.subsampx, self.subsampy)
             resampylen, resampxlen = resampled.shape
@@ -186,7 +186,7 @@ class MovingTarget():
                 diffind = (mnx + resampxlen) - outx
                 maxfullx = outx
                 maxrex -= diffind
-            outfull[i-1, mny:maxfully, mnx:maxfullx] = resampled[0:maxrey, 0:maxrex]   
+            outfull[i-1, mny:maxfully, mnx:maxfullx] = resampled[0:maxrey, 0:maxrex]
         return outfull
 
     def resample(self, frame, sampx, sampy):
@@ -221,7 +221,7 @@ class MovingTarget():
 
         Arguments:
         ----------
-        center -- coordinate (in full aperture coords of the center of the 
+        center -- coordinate (in full aperture coords of the center of the
                   stamp image.
         len_stamp -- Size of the stamp image
         len_out -- Size of the full aperture image
@@ -231,7 +231,7 @@ class MovingTarget():
         x and y coordinates corresponding to the beginning and ending
         (i.e. top and bottom for y-dimension, or left and right for x-
         dimension) of the stamp image on the full frame aperture, as
-        well as the beginning and ending coordinates within the stamp 
+        well as the beginning and ending coordinates within the stamp
         image that fall onto the full frame aperture.
         """
         outxmin = center - len_stamp/2
@@ -303,7 +303,7 @@ class MovingTarget():
         inframe -- 2D array representing the image
         source -- 2D stamp image containing the source
         xbounds -- 2-element list containing the starting and ending x-dimension
-                   coordinates of the source (i.e. location corresponding to the 
+                   coordinates of the source (i.e. location corresponding to the
                    beginning and ending of the frame)
         ybounds -- 2-element list containing the starting and ending y-dimension
                    coordinates of the source
@@ -327,7 +327,7 @@ class MovingTarget():
 
             # If any of the coordinates are set to NaN, then the stamp image is completely off
             # the output frame and it shouldn't be added
-            if np.all(np.isfinite(outcoords)):       
+            if np.all(np.isfinite(outcoords)):
                 dist = np.sqrt((xlist[i]-xlist[i-1])**2 + (ylist[i]-ylist[i-1])**2)
                 inframe[outymin:outymax, outxmin:outxmax] += (source[stampymin:stampymax, stampxmin:stampxmax]*secperpix*dist)
         return inframe
@@ -343,8 +343,8 @@ class MovingTarget():
                  (e.g. factorx=2 will break each pixel into 2 pixels
                   in the x dimension)
         factory -- factor in the y-dimension to subsample the image
-        
-        Setting factorx = 2, factory = 2 will break each pixel in the 
+
+        Setting factorx = 2, factory = 2 will break each pixel in the
         original image into a 2x2 grid of pixels
 
         Returns:
@@ -353,7 +353,7 @@ class MovingTarget():
         """
         ydim, xdim = image.shape
         substamp = np.zeros((ydim*factory, xdim*factorx))
-        
+
         for i in range(xdim):
             for j in range(ydim):
                 substamp[factory*j:factory*(j+1), factorx*i:factorx*(i+1)] = image[j, i]
@@ -362,7 +362,7 @@ class MovingTarget():
     def equidistantXY(self,xstart, ystart, xend, yend, dist):
         """
         Return a list of x,y positions that are equidistant
-        between the beginning and ending positions, with 
+        between the beginning and ending positions, with
         a distance of dist pixels between them
 
         Arguments:
@@ -379,7 +379,7 @@ class MovingTarget():
         deltax = xend - xstart
         deltay = yend - ystart
         ang = np.arctan2(deltay, deltax)
-        
+
         dx = np.cos(ang) * dist
         dy = np.sin(ang) * dist
 
@@ -403,7 +403,7 @@ class MovingTarget():
         if ylen == 0:
             ys = np.zeros(xlen) + ystart
 
-        return xs, ys 
+        return xs, ys
 
     def radecPerFrame(self, ra0, dec0, ravel, decvel, time):
         """
@@ -428,15 +428,15 @@ class MovingTarget():
 
     def xyPerFrame(self, velocity, time, ang, x0, y0):
         """
-        Generate list of x,y positions for a source given an 
+        Generate list of x,y positions for a source given an
         initial position, velocity, and velocity angle
 
         Arguments:
         ----------
-        velocity -- Velocity of source 
+        velocity -- Velocity of source
         time -- List of times at which we want to find positions
-        ang -- Angle (in radians) at which source is traveling. 
-               An ang of zero corresponds to moving along the +x axis. 
+        ang -- Angle (in radians) at which source is traveling.
+               An ang of zero corresponds to moving along the +x axis.
                An ang of np.pi/2 corresponds to moveing along the +y axis.
         x0 -- Initial x coordinate of source
         y0 -- Initial y coordinate of source
@@ -451,5 +451,5 @@ class MovingTarget():
         # x,y in each frame
         xs = x0 + ratex*time
         ys = y0 + ratey*time
-        
+
         return xs,ys

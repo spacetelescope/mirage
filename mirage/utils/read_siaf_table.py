@@ -1,17 +1,16 @@
-import numpy as np
-from astropy.io import ascii
-from astropy.modeling.models import Polynomial2D,Shift
-import sys
-
-#t = ascii.read("NIRCam_SIAF_2016-09-29.csv",header_start=1)
-
-"""
-Based on SIAF transforms PATHS
+"""Based on SIAF transforms PATHS
 NIRCAM
 ------
 science --> ideal --> V2,V3
 V2,V3 --> ideal --> science
 """
+import sys
+
+import numpy as np
+from astropy.modeling.models import Polynomial2D, Shift
+
+
+#t = ascii.read("NIRCam_SIAF_2016-09-29.csv",header_start=1)
 
 def get_siaf_transform(row, aperture, from_system, to_system, degree):
     """
@@ -23,7 +22,7 @@ def get_siaf_transform(row, aperture, from_system, to_system, degree):
     ----------
     aperture: str
         Name of aperture on NIRCam, composed of the detector name followed
-        by an underscore and the subarray name. (e.g. "NRCA1_FULL", 
+        by an underscore and the subarray name. (e.g. "NRCA1_FULL",
         "NRCB5_SUB160")
     from_system : str
         Starting system (e.g. "science", "ideal")
@@ -49,7 +48,7 @@ def get_siaf_transform(row, aperture, from_system, to_system, degree):
     #t = ascii.read("NIRCam_SIAF_2016-09-29.csv",header_start=1)
     #t = ascii.read(coefffile,header_start=1)
 
-    #from_system and to_system are very limited. Can only be "ideal" for the 
+    #from_system and to_system are very limited. Can only be "ideal" for the
     #distortion-free coords, and "science" for distorted coords
     from_system = from_system.lower()
     if from_system not in ['ideal','science']:
@@ -61,7 +60,7 @@ def get_siaf_transform(row, aperture, from_system, to_system, degree):
         print("Requested to_system of {} not recognized.".format(to_system))
         sys.exit()
 
-    #Generate the string corresponding to the requested coefficient labels 
+    #Generate the string corresponding to the requested coefficient labels
     if from_system == 'ideal' and to_system == 'science':
         label = 'Idl2Sci'
         from_units = 'arcsec'
@@ -79,13 +78,12 @@ def get_siaf_transform(row, aperture, from_system, to_system, degree):
     #row = t[match]
 
     #Get the coefficients for "science" to "ideal" transformation (and back)
-    #"science" is distorted pixels. "ideal" is undistorted arcsec from the 
-    #the reference pixel location. 
+    #"science" is distorted pixels. "ideal" is undistorted arcsec from the
+    #the reference pixel location.
 
     #we need the parity value, which describes the relationship between the
     #v2,v3 coordinate system and the science pixel coordinate system
     parity = row['VIdlParity'].data[0]
-
 
     #Then create the model for the transformation
     X_cols = [c for c in row.colnames if label+'X' in c]
@@ -135,10 +133,9 @@ def to_model(coeffs, degree=5):
     return Polynomial2D(degree, **c)
 
 
-
 def get_siaf_v2v3_transform(row,aperture,from_system='v2v3',to_system='v2v3'):
     """
-    Generate transformation model to go to/from V2/V3 from 
+    Generate transformation model to go to/from V2/V3 from
     undistorted angular distnaces from the reference pixel ("ideal")
     """
     #read in csv file of coefficients
@@ -150,7 +147,7 @@ def get_siaf_v2v3_transform(row,aperture,from_system='v2v3',to_system='v2v3'):
 
     if from_system != 'v2v3' and to_system != 'v2v3':
         print("WARNING, either from_system or to_system must be 'v2v3'")
-        sys.exit()    
+        sys.exit()
 
     #Find the row that matches the requested aperture
     #match = t['AperName'] == aperture
@@ -162,7 +159,7 @@ def get_siaf_v2v3_transform(row,aperture,from_system='v2v3',to_system='v2v3'):
     #Then create the model for the transformation
     parity = row['VIdlParity'].data[0]
     v3_ideal_y_angle = row['V3IdlYAngle'].data[0] * np.pi / 180.
-    
+
     #print("parity and angle are {}, {}".format(parity,v3_ideal_y_angle))
 
     X_model, Y_model = v2v3_model(from_system,to_system,parity,v3_ideal_y_angle)
@@ -197,7 +194,6 @@ def v2v3_model(from_sys, to_sys, par, angle):
     #0,0 coeff should never be used.
     xc['c0_0'] = 0
     yc['c0_0'] = 0
-    
 
     #print("coeffs for v2v3 transform:")
     #for key in xc:
@@ -216,7 +212,7 @@ def get_refpix(row):
     yref = row['YSciRef'].data[0]
     return Shift(-xref) & Shift(-yref)
 
-    
+
 def get_v2v3ref(row):
     #Return v2 and v3 at the reference location
     #These are arcsec in the SIAF file. Convert to degrees

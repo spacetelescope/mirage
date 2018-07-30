@@ -7,34 +7,33 @@ noiseless countrate image containing only sources. No noise, no
 cosmic rays.
 '''
 
-
-import argparse, sys, glob, os
+import argparse
+import sys
+import glob
+import os
 import copy
+
+import math
+import yaml
+import time
 import pkg_resources
+from asdf import AsdfFile
 import scipy.signal as s1
 import numpy as np
-import math
-from photutils import detect_threshold, detect_sources
+from photutils import detect_sources
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
-from astropy.convolution import convolve
-from asdf import AsdfFile
-import yaml
-import time
 
-from . import rotations  # this is Colin's set of rotation functions
-from . import polynomial # more of Colin's functions
-from . import read_siaf_table
-from . import set_telescope_pointing_separated as set_telescope_pointing
 from . import moving_targets
 from . import segmentation_map as segmap
-from .utils import calc_frame_time
+from ..utils import rotations, polynomial, read_siaf_table, utils
+from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
          'niriss': ["imaging"],
-         'fgs': ["imaging"]}  
+         'fgs': ["imaging"]}
 TRACKING_LIST = ['sidereal','non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
                'niriss': 'NIS',
@@ -124,14 +123,14 @@ class Catalog_seed():
 
         # calculate the exposure time of a single frame, based on the size of the subarray
         #self.calcFrameTime()
-        self.frametime = calc_frame_time(self.params['Inst']['instrument'], self.params['Readout']['array_name'],
+        self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'], self.params['Readout']['array_name'],
                                          self.nominal_dims[0], self.nominal_dims[1], self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
-        
+
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
         self.prepare_PAM()
-        
+
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             print('Creating signal rate image of synthetic inputs.')
@@ -243,7 +242,7 @@ class Catalog_seed():
     def pad_wfss_subarray(self, seed, seg):
         """
         WFSS seed images that are to go into the disperser
-        must be full frame (or larger). The disperser cannot 
+        must be full frame (or larger). The disperser cannot
         work on subarray images. So embed the subarray seed image
         in a full-frame sized array.
 
@@ -266,7 +265,7 @@ class Catalog_seed():
         extradiffy = ffextra - subextray
         extradiffx = ffextra - subextrax
 
-        
+
         print(self.subarray_bounds)
         print(ffextra)
         print(subextrax, subextray)
@@ -274,10 +273,10 @@ class Catalog_seed():
         print(seeddim)
         print(nx)
         print(extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1)
-        
+
         exbounds = [extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1]
-        
-        
+
+
         if len(seeddim) == 2:
             padded_seed = np.zeros((nx, nx))
             padded_seed[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
@@ -291,7 +290,7 @@ class Catalog_seed():
         else:
             raise ValueError("Seed image is not 2D or 4D. It should be.")
         return padded_seed, padded_seg
-        
+
     def saveSeedImage(self):
         # Create the grism direct image or ramp to be saved
         arrayshape = self.seedimage.shape
@@ -313,7 +312,7 @@ class Catalog_seed():
 
         xcent_fov = xd / 2
         ycent_fov = yd / 2
-        
+
         kw = {}
         kw['xcenter'] = xcent_fov
         kw['ycenter'] = ycent_fov
@@ -325,11 +324,11 @@ class Catalog_seed():
             usefilt = 'filter'
 
         self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] + '_seed_image.fits')
-            
+
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
         if self.params['Readout'][usefilt] == "NA":
-            self.params['Readout'][usefilt] = "N/A"   
+            self.params['Readout'][usefilt] = "N/A"
         kw['filter'] = self.params['Readout'][usefilt]
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
@@ -350,7 +349,7 @@ class Catalog_seed():
             kw['NOMXEND'] = kw['NOMXSTRT'] + self.ffsize - 1
             kw['NOMYSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
             kw['NOMYEND'] = kw['NOMYSTRT'] + self.ffsize - 1
-        
+
         kw['GRISMPAD'] = self.grism_direct_factor
         self.seedinfo = kw
         self.saveSingleFits(self.seedimage, self.seed_file, key_dict=kw, image2=self.seed_segmap, image2type='SEGMAP')
@@ -400,7 +399,7 @@ class Catalog_seed():
                     fpath = os.path.join(self.modpath, 'config', cfile)
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-                    
+
     def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
         # Convert object magnitude to counts/sec
         if magsys.lower() == 'abmag':
@@ -492,7 +491,7 @@ class Catalog_seed():
                                                                          MT_tracking=tracking,
                                                                          tracking_ra_vel=ra_vel,
                                                                          tracking_dec_vel=dec_vel)
-            # Multiply by pixel area map 
+            # Multiply by pixel area map
             mov_targs_sersic *= self.pam
             mov_targs_ramps.append(mov_targs_sersic)
             if mov_targs_segmap is None:
@@ -508,7 +507,7 @@ class Catalog_seed():
                                                                    MT_tracking=tracking,
                                                                    tracking_ra_vel=ra_vel,
                                                                    tracking_dec_vel=dec_vel)
-            # Multiply by pixel area map 
+            # Multiply by pixel area map
             mov_targs_ext *= self.pam
             mov_targs_ramps.append(mov_targs_ext)
             if mov_targs_segmap is None:
@@ -600,7 +599,7 @@ class Catalog_seed():
                                                                         tracking_ra_vel=self.ra_vel,
                                                                         tracking_dec_vel=self.dec_vel,
                                                                         trackingPixVelFlag=vel_flag)
-            # Multiply by pixel area map 
+            # Multiply by pixel area map
             mtt_galaxies *= self.pam
             mtt_data_list.append(mtt_galaxies)
             if mtt_data_segmap is None:
@@ -618,7 +617,7 @@ class Catalog_seed():
                                                               tracking_ra_vel=self.ra_vel,
                                                               tracking_dec_vel=self.dec_vel,
                                                               trackingPixVelFlag=vel_flag)
-            # Multiply by pixel area map 
+            # Multiply by pixel area map
             mtt_ext *= self.pam
             mtt_data_list.append(mtt_ext)
             if mtt_data_segmap is None:
@@ -708,12 +707,12 @@ class Catalog_seed():
     def basic_get_image(self, filename):
         """
         Read in image from a fits file
-        
+
         Parameters:
         -----------
         filename : str
             Name of fits file to be read in
-        
+
         Returns:
         --------
         data : obj
@@ -724,7 +723,7 @@ class Catalog_seed():
         """
         data, header = fits.getdata(filename, header=True)
         return data, header
-        
+
     def movingTargetInputs(self, file, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False):
@@ -781,7 +780,7 @@ class Catalog_seed():
                 coord_transform = dist_file.tree['model']
         else:
             coord_transform = self.simple_coord_transform()
-                
+
         # Using the requested RA,Dec of the reference pixel, along with the
         # V2,V3 of the reference pixel, and the requested roll angle of the telescope,
         # create a matrix that can be used to translate between V2,V3 and RA,Dec
@@ -835,7 +834,7 @@ class Catalog_seed():
         print("{} sources in original input catalog {}.".format(len(mtlist), file))
         indexes, mtlist  = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
         print("{} sources in filtered input catalog.".format(len(mtlist)))
-        
+
         for index, entry in zip(indexes, mtlist):
             # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.getPositions(
@@ -976,7 +975,7 @@ class Catalog_seed():
 
     def simple_coord_transform(self):
         """
-        For the case where the distortion reference file is not provided, 
+        For the case where the distortion reference file is not provided,
         generate a simple coordinate transform function that does not include
         distortion
 
@@ -1057,7 +1056,7 @@ class Catalog_seed():
         # Shift by V2ref, V3ref
         v2shift = Shift(self.v2_ref)
         v3shift= Shift(self.v2_ref)
-        
+
         #Now create a compound model for each with the appropriate
         #inverse
         sci2idl = Mapping([0,1,0,1]) | x_sci_to_ideal_func & y_sci_to_ideal_func
@@ -1336,7 +1335,7 @@ class Catalog_seed():
 
             # Multiply by the pixel area map
             galaxyCRImage *= self.pam
-            
+
             # Add galaxy segmentation map to the master copy
             segmentation_map += galaxy_segmap
 
@@ -1363,10 +1362,10 @@ class Catalog_seed():
             # If requested, convolve the extended source image with the instrument PSF
             if self.params['simSignals']['PSFConvolveExtended']:
                 extimage = s1.fftconvolve(extimage, self.centerpsf, mode='same')
-            
+
             # Multiply by the pixel area map
             extimage *= self.pam
-            
+
             # Add galaxy segmentation map to the master copy
             segmentation_map += ext_segmap
 
@@ -1390,7 +1389,7 @@ class Catalog_seed():
 
             # Multiply by the pixel area map
             zodiacalimage *= self.pam
-            
+
             signalimage = signalimage + zodiacalimage*self.params['simSignals']['zodiscale']
 
         # SCATTERED LIGHT - no rotation here.
@@ -1400,7 +1399,7 @@ class Catalog_seed():
 
             # Multiply by the pixel area map
             scatteredimage *= self.pam
-            
+
             signalimage = signalimage + scatteredimage*self.params['simSignals']['scatteredscale']
 
         # CONSTANT BACKGROUND - multiply by pixel area map first
@@ -1431,7 +1430,7 @@ class Catalog_seed():
         else:
             raise ValueError(("WARNING: from_sys of {} and to_sys of {} not "
                               "a valid transformation.".format(from_sys, to_sys)))
-            
+
         # get the coefficients, return as list
         X_cols = [c for c in row.colnames if label + 'X' in c]
         Y_cols = [c for c in row.colnames if label + 'Y' in c]
@@ -1545,7 +1544,7 @@ class Catalog_seed():
                 coord_transform = dist_file.tree['model']
         else:
             coord_transform = self.simple_coord_transform()
-            
+
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -1557,7 +1556,7 @@ class Catalog_seed():
         #Include the effects of a requested grism_direct image, and also keep sources that
         #will only partially fall on the subarray
         #pixel coords here can still be negative and kept if the grism image is being made
-        
+
         # First, coord limits for just the subarray
         miny = 0
         maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
@@ -1722,7 +1721,7 @@ class Catalog_seed():
         return pointSourceList
 
     def remove_outside_fov_sources(self, index, source, pixflag, delta_pixels):
-        """Filter out entries in the source catalog that are located well outside the field of 
+        """Filter out entries in the source catalog that are located well outside the field of
         view of the detector. This can be a fairly rough cut. We just need to remove sources
         that are very far from the detector.
 
@@ -1735,7 +1734,7 @@ class Catalog_seed():
             astropy Table containing catalog information
 
         pixflag : bool
-            Flag indicating whether catalog positions are given in units of 
+            Flag indicating whether catalog positions are given in units of
             pixels (True), or RA, Dec (False)
 
         delta_pixels : int
@@ -1748,7 +1747,7 @@ class Catalog_seed():
         index : list
             List of filtered index numbers corresponding to sources
             within or close to the field of view
-        
+
         source : Table
             astropy Table containing filtered list of sources
         """
@@ -1763,7 +1762,7 @@ class Catalog_seed():
             maxx = self.ra + delta_degrees
             miny = self.dec - delta_degrees
             maxy = self.dec + delta_degrees
-            
+
         x = source['x_or_RA']
         y = source['y_or_Dec']
         good = ((x > minx) & (x < maxx) & (y > miny) & (y < maxy))
@@ -1820,7 +1819,7 @@ class Catalog_seed():
             b_in = interval * int(numperpix*yfract + 0.5) - 0.5
             astr = "{0:.{1}f}".format(a_in, 2)
             bstr = "{0:.{1}f}".format(b_in, 2)
-   
+
             #generate the psf file name based on the center of the point source
             #in units of fraction of a pixel
             frag = astr + '_' + bstr
@@ -1848,7 +1847,7 @@ class Catalog_seed():
             # Normalize the total signal in the PSF as read in
             totalsignal = np.sum(webbpsfimage)
             webbpsfimage /= totalsignal
-                    
+
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
             nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
@@ -1935,7 +1934,7 @@ class Catalog_seed():
         -----------
         filename : str
             Filename of catalog file to be read in
-        
+
         Returns:
         --------
         gtab : Table
@@ -2098,7 +2097,7 @@ class Catalog_seed():
         #simple_wcs_obj["CD1_1"] =
         #simple_wcs_obj["CD1_2"] =
         #simple_wcs_obj["CD2_1"] =
-        #simple_wcs_obj["CD2_2"] = 
+        #simple_wcs_obj["CD2_2"] =
 
         #wcs_obj = astropy.wcs.WCS(header = simple_wcs_obj)
         deltara, deltadec = self.object_separation([self.ra, self.dec],
@@ -2113,9 +2112,9 @@ class Catalog_seed():
         #pixelx = self.refpix_pos['x'] + deltax
         #pixely = self.refpix_pos['y'] + deltay
 
-        
-        
-        
+
+
+
         return pixelx, pixely
 
     def object_separation(self, radec1, radec2, wcs):
@@ -2127,7 +2126,7 @@ class Catalog_seed():
         Parameters:
         -----------
         radec1 : list
-            2-element list giving the RA, Dec (in decimal degrees) for 
+            2-element list giving the RA, Dec (in decimal degrees) for
             the first object
 
         radec2 : list
@@ -2146,7 +2145,7 @@ class Catalog_seed():
         c2 = SkyCoord(radec2[0]*u.degree, radec2[1]*u.degree, frame='icrs')
         sepra, sepdec = c1.spherical_offsets_to(c2).to_pixel(wcs)
         return sepra, sepdec
-        
+
     def XYToRADec(self, pixelx, pixely, attitude_matrix, coord_transform):
         # Translate a given x, y location on the detector
         # to RA, Dec
@@ -2269,7 +2268,7 @@ class Catalog_seed():
                 coord_transform = dist_file.tree['model']
         else:
             coord_transform = self.simple_coord_transform()
-                
+
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -2658,7 +2657,7 @@ class Catalog_seed():
                 coord_transform = dist_file.tree['model']
         else:
             coord_transform = self.simple_coord_transform()
-                
+
         # Using the requested RA, Dec of the reference pixel, along with the
         # V2, V3 of the reference pixel, and the requested roll angle of the telescope
         # create a matrix that can be used to translate between V2, V3 and RA, Dec
@@ -3033,7 +3032,7 @@ class Catalog_seed():
            self.params['Inst']['mode'] in ['wfss','ts_wfss']:
             raise ValueError(("WARNING: wfss observations with non-sidereal "
                               "targets not yet supported."))
-        
+
         # Set nframe and nskip according to the values in the
         # readout pattern definition file
         self.read_pattern_check()
@@ -3104,7 +3103,7 @@ class Catalog_seed():
         # to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
-        
+
         # make sure the requested filter is allowed. For imaging, all filters are allowed.
         # In the future, other modes will be more restrictive
         if self.params['Readout']['pupil'][0].upper() == 'F':
@@ -3118,7 +3117,7 @@ class Catalog_seed():
         if self.params['Inst']['instrument'].lower() == 'fgs':
             self.params['Readout']['filter'] = 'NA'
             self.params['Readout']['pupil'] = 'NA'
-            
+
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
             raise ValueError(("WARNING: requested filter {} is not in the list of "
                    "possible filters.".format(self.params['Readout'][usefilt])))
@@ -3174,7 +3173,7 @@ class Catalog_seed():
                                                      str(wfe))
                 else:
                     pathaddition = "{}/{}".format(detector, str(wfe))
-                    
+
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
         else:
@@ -3430,7 +3429,7 @@ class Catalog_seed():
         Assume first that the path is in relation to
         the directory tree specified by the MIRAGE_DATA
         environment variable
-        
+
         Parameters:
         -----------
         p -- Tuple containing the nested keys that point

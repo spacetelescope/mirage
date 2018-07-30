@@ -5,16 +5,19 @@ Blot an image back to some input WCSs.
 
 Use in conjunction with crop_mosaic.py
 '''
-import sys, os
-from copy import copy
+import sys
+import os
 import glob
+from copy import copy
+
+import gwcs
 from astropy.io import fits
 from jwst import datamodels
-import gwcs
 from jwst.outlier_detection import outlier_detection
 from jwst.assign_wcs import AssignWcsStep
 from jwst.datamodels import container
-from . import set_telescope_pointing_separated as stp
+
+from ..utils import set_telescope_pointing_separated as stp
 
 
 class Blot():
@@ -73,7 +76,7 @@ class Blot():
                           'B5':-0.008844}
 
     def blot(self):
-        
+
         # Make sure detector, ra, dec, and roll have same number
         # of elements
         if ((len(self.detector) != len(self.center_ra)) | \
@@ -87,7 +90,7 @@ class Blot():
         if type(self.blotfile) == str:
             input_mod = datamodels.ImageModel(self.blotfile)
             outbase = self.blotfile
-            
+
             # Create a GWCS object from the input file's header
             #input_header = fits.getheader(self.blotfile)
             #transform = gwcs.utils.make_fitswcs_transform(header)
@@ -101,7 +104,7 @@ class Blot():
             self.blotfile.save('temp.fits')
             self.blotfile = 'temp.fits'
             outbase = 'mosaic'
-            
+
         else:
             print('WARNING: unrecognized type for blotfile')
             sys.exit()
@@ -126,22 +129,22 @@ class Blot():
         # Name of temporary file output for set_telescope_pointing
         # to work on
         shellname = 'temp_wcs_container.fits'
-        
+
         blist = []
         for (det,ra,dec,roll) in \
             zip(self.detector,self.center_ra,\
                 self.center_dec,self.pav3):
-            # get detector-specific info 
+            # get detector-specific info
             v2ref,v3ref,v3ang = self.get_siaf_info(det)
 
             # create datamodel with appropriate metadata
             bmodel = self.make_model(det,ra,dec,v2ref,v3ref,v3ang,parity,input_pav3,filter,pupil)
             #shellname = 'wcs_model_to_blot_to_{}_{}_{}_{}.fits'.format(det,ra,dec,roll)
             bmodel.save(shellname,overwrite=True)
-            
+
             #tmpname = 'wcs_model_to_blot_to_BASEMODEL_{}_{}_{}_{}.fits'.format(det,ra,dec,roll)
             #bmodel.save(tmpname,overwrite=True)
-            
+
             # use set_telescope_pointing to compute local roll
             # angle and PC matrix
             stp.add_wcs(shellname,roll=roll)
@@ -158,10 +161,10 @@ class Blot():
 
             # Add to the list of data model instances to blot to
             blist.append(bmodel)
-            
+
         #place the model instances to blot to in a ModelContainer
         blot_list = container.ModelContainer(blist)
-        
+
         #blot the image to each of the WCSs in the blot_list
         pars = {'sinscl':1.0, 'interp':'poly5'}
         reffiles = {}
@@ -174,7 +177,7 @@ class Blot():
         #    if self.outfile is None:
         #        self.outfile = 'blotted_from_{}_to_{}_{}_{}_{}.fits'.format(outbase,det,ra,dec,roll)
         #    bltted.save(self.outfile)
-        
+
 
     def get_siaf_info(self,detname):
         # get v2,v3 reference values and y3yangle for a given detector
@@ -199,7 +202,7 @@ class Blot():
         blot_to.meta.wcsinfo.cunit2 = 'deg'
         blot_to.meta.wcsinfo.ra_ref = raval
         blot_to.meta.wcsinfo.dec_ref = decval
-        blot_to.meta.wcsinfo.roll_ref = rollval 
+        blot_to.meta.wcsinfo.roll_ref = rollval
         blot_to.meta.wcsinfo.wcsaxes = 2
         blot_to.meta.wcsinfo.v2_ref = v2
         blot_to.meta.wcsinfo.v3_ref = v3
@@ -228,7 +231,7 @@ class Blot():
         mirage_data = os.path.abspath(os.path.expandvars(self.env_var))
         distortion_default = os.path.join(mirage_data, 'reference_files/distortion/')
         parser.add_argument("--distortion_dir", help="Directory containing distortion reference files for the appropriate instrument.", default=distortion_default)
-        parser.add_argument("--detector",help="NIRCam detectors to blot to. Multiple inputs ok. (e.g. A1 A5)",nargs='*') 
+        parser.add_argument("--detector",help="NIRCam detectors to blot to. Multiple inputs ok. (e.g. A1 A5)",nargs='*')
         parser.add_argument("center_ra",help="RA at the center of the extracted area",type=np.float,nargs='*')
         parser.add_argument("center_dec",help="Dec at the center of the extracted area",type=np.float,nargs='*')
         parser.add_argument("pav3",help="Position angle for outputs to use when blotting",nargs='*')

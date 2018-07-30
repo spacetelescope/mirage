@@ -4,8 +4,7 @@
 test to combine crop_mosaic.py and blot_image.py
 '''
 
-import crop_mosaic
-import blot_image
+from . import crop_mosaic, blot_image
 
 crop = crop_mosaic.Extraction()
 crop.mosaicfile = 'goodss_candels_udf_wfc3_f105w_010mas_test_drz.fits'

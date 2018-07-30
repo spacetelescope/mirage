@@ -5,27 +5,29 @@ Convert a signal rate seed image into a signal ramp.
 Add cosmic rays, poisson noise, etc.
 '''
 
-import sys, os
-import pkg_resources
+import sys
+import os
 import random
 import copy
 from math import radians
 import datetime
+
+import yaml
+import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 from astropy.table import Table
 from astropy.time import Time, TimeDelta
-import scipy.signal as s1
-import yaml
-from . import set_telescope_pointing_separated as stp
+
 from . import unlinearize
-from . import read_fits
-from .utils import calc_frame_time
+from ..utils import read_fits, utils
+from ..utils import set_telescope_pointing_separated as stp
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
          "niriss": ["imaging"],
          "fgs": ["imaging"]}
+
 
 class Observation():
     def __init__(self):
@@ -34,7 +36,7 @@ class Observation():
         self.segmap = None
         self.seedheader = None
         self.seedunits = 'ADU/sec'
-        
+
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -96,7 +98,7 @@ class Observation():
         #elif self.instrument.lower() == 'niriss':
         #    # pixel scales should be read from SIAF (?)
         #    self.pixscale = [0.064746, 0.064746]
-        
+
         # Get the input seed image if a filename is supplied
         if type(self.seed) == type('string'):
             self.seed, self.segmap, self.seedheader = self.readSeed(self.seed)
@@ -128,7 +130,7 @@ class Observation():
             raise ValueError(("'units' keyword not present in header of "
                              "seed image. Unable to determine whether the "
                              "seed image is in units of ADU or electrons."))
-                
+
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
         seeddim = len(self.seed.shape)
@@ -140,10 +142,10 @@ class Observation():
             temp_frame = self.seed
         tmpy, tmpx = temp_frame.shape
         #self.calcFrameTime(temp_frame)
-        self.frametime = calc_frame_time(self.instrument, self.params['Readout']['array_name'],
+        self.frametime = utils.calc_frame_time(self.instrument, self.params['Readout']['array_name'],
                                          tmpx, tmpy, self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
-        
+
         # Calculate the rate of cosmic ray hits expected per frame
         self.getCRrate()
 
@@ -254,7 +256,7 @@ class Observation():
             print("Final linearized exposure saved to:")
             print("{}".format(linearrampfile))
             self.linear_output = linearrampfile
-            
+
         # If the raw version is requested, we need to unlinearize
         # the ramp
         self.raw_output = None
@@ -360,7 +362,7 @@ class Observation():
         Assume first that the path is in relation to
         the directory tree specified by the MIRAGE_DATA
         environment variable
-        
+
         Parameters:
         -----------
         p -- Tuple containing the nested keys that point
@@ -422,7 +424,7 @@ class Observation():
                                     , 'Reffiles-crosstalk':'guider_xtalk_zeros.txt'
                                     , 'Reffiles-filtpupilcombo':'guider_filter_dummy.list'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-                            
+
         for key1 in pathdict:
             for key2 in pathdict[key1]:
                 if self.params[key1][key2].lower() not in ['none', 'config']:
@@ -869,7 +871,7 @@ class Observation():
             if 'LONG' in self.detector:
                 channel = 'LONG'
             outModel.meta.instrument.channel = channel
-                
+
         outModel.meta.instrument.detector = self.detector
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
@@ -899,7 +901,7 @@ class Observation():
 
         outModel.meta.target.catalog_name = 'UNKNOWN'
         outModel.meta.coordinates.reference_frame = 'ICRS'
-        
+
         outModel.meta.wcsinfo.wcsaxes = 2
         outModel.meta.wcsinfo.crval1 = self.ra
         outModel.meta.wcsinfo.crval2 = self.dec
@@ -1120,7 +1122,7 @@ class Observation():
             if 'LONG' in self.detector:
                 channel = 'LONG'
             outModel[0].header['CHANNEL'] = channel
-            
+
         outModel[0].header['FASTAXIS'] = self.fastaxis
         outModel[0].header['SLOWAXIS'] = self.slowaxis
 
@@ -1443,8 +1445,8 @@ class Observation():
         Be sure to adjust the dark current ramp if nframe/nskip is different
         than the nframe/nskip values that the dark was taken with.
 
-        Only RAPID, NISRAPID, FGSRAPID darks will be re-averaged into different 
-        readout patterns. But a BRIGHT2 dark can be used to create a 
+        Only RAPID, NISRAPID, FGSRAPID darks will be re-averaged into different
+        readout patterns. But a BRIGHT2 dark can be used to create a
         BRIGHT2 simulated ramp
 
         Arguments:
@@ -1561,7 +1563,7 @@ class Observation():
 
     def addIPC(self, data):
         """
-        Add interpixel capacitance effects to the data. This is done by 
+        Add interpixel capacitance effects to the data. This is done by
         convolving the data with a kernel. The kernel is read in from the
         file specified by self.params['Reffiles']['ipc']. The core of this
         function was copied from the IPC correction step in the JWST
@@ -1570,7 +1572,7 @@ class Observation():
         Parameters:
         -----------
         data : obj
-            4d numpy ndarray containing the data to which the 
+            4d numpy ndarray containing the data to which the
             IPC effects will be added
 
         Returns:
@@ -1641,7 +1643,7 @@ class Observation():
         # Loop over integrations and groups
         for integration in range(shape[0]):
             for group in range(shape[1]):
-        
+
                 # Copy the science portion (not the reference pixels) of
                 # output_data to this temporary array, then make
                 # subsequent changes in-place to output_data.
@@ -1739,7 +1741,7 @@ class Observation():
         if len(shape) == 2:
             subkernel = kern[ys:ye, xs:xe]
         elif len(shape) == 4:
-            subkernel = kern[:, : , ys:ye, xs:xe]    
+            subkernel = kern[:, : , ys:ye, xs:xe]
 
         dims = subkernel.shape
         # Force subkernel to be 4D to make the function cleaner
@@ -1748,7 +1750,7 @@ class Observation():
             subkernel = np.expand_dims(subkernel, axis=3)
             subkernel = np.expand_dims(subkernel, axis=4)
         dims = subkernel.shape
-            
+
         # Make sure the total signal in the kernel = 1
         #ave = np.average(subkernel, axis=(0, 1))
         #npix = dims[0] * dims[1]
@@ -1761,7 +1763,7 @@ class Observation():
         nxc = dims[1] // 2
         delta[nyc, nxc, :, :] = 1.
 
-        a1 = np.fft.fft2(subkernel, axes=(0, 1)) 
+        a1 = np.fft.fft2(subkernel, axes=(0, 1))
         a2 = np.fft.fft2(delta, axes=(0, 1))
         aout = a2 / a1
         imout = np.fft.ifft2(aout, axes=(0, 1))
@@ -2091,7 +2093,7 @@ class Observation():
                 # Increment poisson seed value so that the next frame doesn't have identical
                 # noise
                 self.params['simSignals']['poissonseed'] += 1
-                
+
                 # Create the frame by adding the delta signal
                 # and poisson noise associated with the delta signal
                 # to the previous frame
@@ -2268,8 +2270,8 @@ class Observation():
             negatives = copy.deepcopy(signalgain)
             negatives[neg] = signalgain[neg]
             signalgain[neg] = 0.
-        
-        # Add poisson noise    
+
+        # Add poisson noise
         newimage = np.random.poisson(signalgain,signalgain.shape).astype(np.float)
 
         if np.nanmin(signalgain) < 0.:
@@ -2462,7 +2464,7 @@ class Observation():
         # Check that readout patterns of input dark and requested output
         # are compatible
         self.readpattern_compatible()
-        
+
         # Make sure ngroup and nint are integers
         try:
             self.params['Readout']['ngroup'] = int(self.params['Readout']['ngroup'])
@@ -2478,7 +2480,7 @@ class Observation():
         if self.params['Inst']['instrument'].lower() == 'fgs':
             self.params['Readout']['filter'] = 'NA'
             self.params['Readout']['pupil'] = 'NA'
-            
+
         # Make sure that the requested number of groups is less than or
         # equal to the maximum allowed.
         # For full frame science operations, ngroup is going to be limited

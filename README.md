@@ -96,7 +96,7 @@ python catalog_seed_image.py myfile.yaml
 
 2) Within python:
 ```
-from mirage.mirage.scripts import catalog_seed_image as csi
+from mirage.seed_image import catalog_seed_image as csi
 cat = csi.Catalog_seed()
 cat.paramfile = 'myfile.yaml'
 cat.make_seed()
@@ -164,7 +164,7 @@ python dark_prep.py myinputs.yaml
 
 **or:**
 ```
-from mirage.mirage.scripts import dark_prep
+from mirage.dark import dark_prep
 dark = dark_prep.DarkPrep()
 dark.paramfile = 'myinputs.yaml'
 dark.prepare()
@@ -183,11 +183,11 @@ The ramp is then reorganized into the requested readout
 pattern and added to the dark current ramp.
 
 **To use:**
-python obs_generator.py myinputs.yaml
+`python obs_generator.py myinputs.yaml`
 
 **or:**
 ```
-from mirage.mirage.scripts import obs_generator
+from mirage.ramp_generator import obs_generator
 obs = obs_generator.Observation()
 obs.linDark = 'V42424024002P000000000112o_B5_F250M_uncal_linear_dark_prep_object.fits'
 obs.seed = 'V42424024002P000000000112o_B5_F250M_uncal_F250M_seed_image.fits'
@@ -197,9 +197,9 @@ obs.create()
 
 To create a simulated exposure, string together all of the steps:
 ```
-from mirage.mirage.scripts import catalog_seed_image
-from mirage.mirage.scripts import dark_prep
-from mirage.mirage.scripts import obs_generator
+from mirage.seed_image import catalog_seed_image
+from mirage.dark import dark_prep
+from mirage.ramp_generator import obs_generator
 
 yamlfile = 'seed_catalog_test.yaml'
 cat = catalog_seed_image.Catalog_seed()

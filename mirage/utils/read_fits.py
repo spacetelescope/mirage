@@ -5,9 +5,9 @@ Module for reading in a given fits file using either RampModel
 or astropy, packaging information into a common format,
 and returning
 
-metadata needed within the simulator (these need to be in 
+metadata needed within the simulator (these need to be in
 a common format regardless of read-in method). Other meta
-data can stay in whatever format produced when it is read 
+data can stay in whatever format produced when it is read
 in, under the assmption that it will be written using the
 same format
 
@@ -21,6 +21,10 @@ exptype = exposure.type EXP_TYPE
 detector - instrument.detector DETECTOR
 instrument - instrument.name INSTRUME
 '''
+import numpy as np
+from astropy.io import fits
+from jwst.datamodels import RampModel
+
 
 class Read_fits():
     def __init__(self):
@@ -36,14 +40,14 @@ class Read_fits():
         self.translate['INSTRUME'] = 'instrument.name'
         self.translate['FASTAXIS'] = 'subarray.fastaxis'
         self.translate['SLOWAXIS'] = 'subarray.slowaxis'
-        
+
     def rampmodel_to_obj(self):
         # convert a RampModel instance to a read_fits object
         self.data = self.model.data
         self.zeroframe = self.model.zeroframe
         self.sbAndRefpix = None
         self.zero_sbAndRefpix = None
-        
+
         self.header = {}
         for key in self.translate:
             try:
@@ -51,11 +55,8 @@ class Read_fits():
             except:
                 self.header[key] = None
 
-        
     def read_astropy(self):
-        from astropy.io import fits
-        import numpy as np
-        
+
         h = fits.open(self.file)
 
         self.data = None
@@ -72,24 +73,21 @@ class Read_fits():
                 self.sbAndRefpix = h[i].data
             if name == 'ZEROSBANDREFPIX':
                 self.zero_sbAndRefpix = h[i].data
-                
+
         #to match what happens with the RampModel version,
         #populate any of the remaining None extensions with
         #arrays of zeros
         #if self.zeroframe is None:
         #    self.zeroframe = np.zeros((ngroup,ny,nx),dtype=np.float)
-            
+
         self.header = {}
         for key in self.translate:
             try:
                 self.header[key] = h[0].header[key]
             except:
                 self.header[key] = None
-                
-                
+
     def read_datamodel(self):
-        from jwst.datamodels import RampModel
-        import numpy as np
 
         h = RampModel(self.file)
 
@@ -101,7 +99,7 @@ class Read_fits():
 
         #Currently a bug in level1bmodel when zeroframe is
         #not present and a cube of zeros is returned
-        #If the datamodel returns a default zeroframe of all 
+        #If the datamodel returns a default zeroframe of all
         #zeros, then set it to None here
         #self.zeroframe = h.zeroframe
         if np.all(h.zeroframe == 0):
@@ -110,9 +108,9 @@ class Read_fits():
             self.zeroframe = None
         else:
             self.zeroframe = h.zeroframe
-        
+
         self.sbAndRefpix = None
-            
+
         self.header = {}
         for key in self.translate:
             try:
@@ -120,14 +118,11 @@ class Read_fits():
             except:
                 self.header[key] = None
 
-                
     def insert_into_datamodel(self,subfile):
         #read in a dummy/substitute file as a datamodel,
         #and insert the data and self.header metadata
         #into it
-        from jwst.datamodels import RampModel #Level1bModel
-        import numpy as np
-        
+
         h = RampModel(subfile)
         h.data = self.data
         try:

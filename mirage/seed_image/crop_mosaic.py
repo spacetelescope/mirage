@@ -6,9 +6,10 @@ This extracted area can then be blotted to match NIRCam distorion
 and then used as an input to the ramp simulator.
 '''
 
-from astropy.io import fits
 import argparse
+
 import numpy as np
+from astropy.io import fits
 
 class Extraction():
 
@@ -48,7 +49,7 @@ class Extraction():
         # Add buffer
         xlen += self.buffer
         ylen += self.buffer
-        
+
         # This assumes full frame!!! Need some buffer to account for distortion
         #nominal_size = 2897. + 300. #300 pixel buffer
         #self.nx = np.absolute(np.int(nominal_size * outscale_x / self.mosaic_scale_x))
@@ -64,7 +65,7 @@ class Extraction():
 
         delta_x = delta_ra * self.mosaic_scale_x
         delta_y = delta_dec * self.mosaic_scale_y
-        
+
         centerx = mosaic_x_ref + delta_x
         centery = mosaic_y_ref + delta_y
 
@@ -77,7 +78,7 @@ class Extraction():
         print("Coords of center of cropped area",intcenterx,intcentery)
         print("X-min, X-max coords:",intcenterx-nx_over_2,intcenterx+nx_over_2)
         print("Y-min, Y-max coords:",intcentery-ny_over_2,intcentery+ny_over_2)
-        
+
         crop = mosaic[0].data[intcentery-ny_over_2:intcentery+ny_over_2,intcenterx-nx_over_2:intcenterx+nx_over_2]
 
         # save extracted area - tests show saving with fits is much much
@@ -87,7 +88,7 @@ class Extraction():
 
         # Place into a data model to prepare for blotting
         self.cropped = self.populate_datamodel(crop)
-        
+
         # Save only if outfile is not None
         if self.outfile is not None:
             #self.outfile = 'cropped_from_'+self.mosaicfile+'_ra_'+str(self.center_ra)+'_dec_'+str(self.center_dec)+'.fits'

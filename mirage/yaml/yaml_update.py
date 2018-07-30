@@ -7,7 +7,7 @@ and output the updated yaml file.
 
 This is meant primarily for WFSS observations, where
 WFSS yaml files are needed for the initial seed
-image generation, but then later, when running the 
+image generation, but then later, when running the
 observation generator,
 
 quantites that need to be updated:
@@ -19,6 +19,7 @@ grism_source_image
 '''
 import sys
 import yaml
+
 
 class YamlUpdate():
     def __init__(self):
@@ -49,7 +50,7 @@ class YamlUpdate():
         indata['Output']['file'] = self.raw_outfile
         indata['Output']['grism_source_image'] = False
         return indata
-                            
+
 
     def run(self):
         # Read in yaml contents

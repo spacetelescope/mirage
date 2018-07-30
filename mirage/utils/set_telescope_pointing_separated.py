@@ -71,7 +71,6 @@ import sys
 
 import astropy.io.fits as fits
 import numpy as np
-from numpy import cos, sin
 #from jwst.lib.engdb_tools import (
 #    ENGDB_BASE_URL,
 #    ENGDB_Service,
@@ -115,7 +114,7 @@ def add_wcs(filename,roll=0.):
         v3ref = float(fheader['V3_REF'])
         v3idlyang = float(fheader['V3I_YANG'])
         vparity = int(fheader['VPARITY'])
-        
+
 
     # ##########################################
     # WARNINGWARNINGWARNINGWARNINGWARNINGWARNING
@@ -180,15 +179,15 @@ def add_wcs(filename,roll=0.):
 
 
 def m_v_to_siaf(ya, v3, v2, vidlparity):  # This is a 321 rotation
-    mat = np.array([[cos(v3)*cos(v2),
-                    cos(v3)*sin(v2),
-                    sin(v3)],
-                   [-cos(ya)*sin(v2)+sin(ya)*sin(v3)*cos(v2),
-                    cos(ya)*cos(v2)+sin(ya)*sin(v3)*sin(v2),
-                    -sin(ya)*cos(v3)],
-                   [-sin(ya)*sin(v2)-cos(ya)*sin(v3)*cos(v2),
-                    sin(ya)*cos(v2)-cos(ya)*sin(v3)*sin(v2),
-                    cos(ya)*cos(v3)]])
+    mat = np.array([[np.cos(v3)*np.cos(v2),
+                    np.cos(v3)*np.sin(v2),
+                    np.sin(v3)],
+                   [-np.cos(ya)*np.sin(v2)+np.sin(ya)*np.sin(v3)*np.cos(v2),
+                    np.cos(ya)*np.cos(v2)+np.sin(ya)*np.sin(v3)*np.sin(v2),
+                    -np.sin(ya)*np.cos(v3)],
+                   [-np.sin(ya)*np.sin(v2)-np.cos(ya)*np.sin(v3)*np.cos(v2),
+                    np.sin(ya)*np.cos(v2)-np.cos(ya)*np.sin(v3)*np.sin(v2),
+                    np.cos(ya)*np.cos(v3)]])
     pmat = np.array([[0., vidlparity, 0.],
                      [0., 0., 1.],
                      [1., 0., 0.]])
@@ -290,9 +289,9 @@ def calc_wcs(v2ref, v3ref, v3idlyang, vidlparity,
     v3_ra, v3_dec = vector_to_ra_dec(m_eci2v[2])
 
     # The V3PA @ V1 is given by
-    y = cos(v3_dec) * sin(v3_ra-v1_ra)
-    x = sin(v3_dec) * cos(v1_dec) - \
-        cos(v3_dec) * sin(v1_dec) * cos((v3_ra - v1_ra))
+    y = np.cos(v3_dec) * np.sin(v3_ra-v1_ra)
+    x = np.sin(v3_dec) * np.cos(v1_dec) - \
+        np.cos(v3_dec) * np.sin(v1_dec) * np.cos((v3_ra - v1_ra))
     V3PA = np.arctan2(y, x)
 
     m_eci2siaf = np.dot(m_v_to_siaf(v3idlyang * D2R,
@@ -314,9 +313,9 @@ def calc_wcs(v2ref, v3ref, v3idlyang, vidlparity,
     # The Y axis of the aperture is given by
     vy_ra, vy_dec = vector_to_ra_dec(myeci)
     # The VyPA @ xref,yref is given by
-    y = cos(vy_dec) * sin(vy_ra-vaper_ra)
-    x = sin(vy_dec) * cos(vaper_dec) - \
-        cos(vy_dec) * sin(vaper_dec) * cos((vy_ra - vaper_ra))
+    y = np.cos(vy_dec) * np.sin(vy_ra-vaper_ra)
+    x = np.sin(vy_dec) * np.cos(vaper_dec) - \
+        np.cos(vy_dec) * np.sin(vaper_dec) * np.cos((vy_ra - vaper_ra))
     vypa = np.arctan2(y, x)
     wcsinfo = (vaper_ra*R2D, vaper_dec*R2D, vypa*R2D)
     vinfo = (v1_ra*R2D, v1_dec*R2D, V3PA*R2D)
@@ -514,15 +513,15 @@ def compute_local_roll(pa_v3, ra_ref, dec_ref, v2_ref, v3_ref):
     dec_ref = np.deg2rad(dec_ref)
     pa_v3 = np.deg2rad(pa_v3)
 
-    M = np.array([[cos(ra_ref) * cos(dec_ref),
-                   -sin(ra_ref) * cos(pa_v3) + cos(ra_ref) * sin(dec_ref) * sin(pa_v3),
-                   -sin(ra_ref) * sin(pa_v3) - cos(ra_ref) * sin(dec_ref) * cos(pa_v3)],
-                  [sin(ra_ref) * cos(dec_ref),
-                   cos(ra_ref) * cos(pa_v3) + sin(ra_ref) * sin(dec_ref) * sin(pa_v3),
-                   cos(ra_ref) * sin(pa_v3) - sin(ra_ref) * sin(dec_ref) * cos(pa_v3)],
-                   [sin(dec_ref),
-                    -cos(dec_ref) * sin(pa_v3),
-                    cos(dec_ref) * cos(pa_v3)]
+    M = np.array([[np.cos(ra_ref) * np.cos(dec_ref),
+                   -np.sin(ra_ref) * np.cos(pa_v3) + np.cos(ra_ref) * np.sin(dec_ref) * np.sin(pa_v3),
+                   -np.sin(ra_ref) * np.sin(pa_v3) - np.cos(ra_ref) * np.sin(dec_ref) * np.cos(pa_v3)],
+                  [np.sin(ra_ref) * np.cos(dec_ref),
+                   np.cos(ra_ref) * np.cos(pa_v3) + np.sin(ra_ref) * np.sin(dec_ref) * np.sin(pa_v3),
+                   np.cos(ra_ref) * np.sin(pa_v3) - np.sin(ra_ref) * np.sin(dec_ref) * np.cos(pa_v3)],
+                   [np.sin(dec_ref),
+                    -np.cos(dec_ref) * np.sin(pa_v3),
+                    np.cos(dec_ref) * np.cos(pa_v3)]
                   ])
 
     return _roll_angle_from_matrix(M, v2, v3)

@@ -41,19 +41,18 @@ Feb 2018  - V1: Updated to work for multiple filter pairs per observation
 
 '''
 import os
-import sys
 import re
-import collections
 import argparse
-from lxml import etree
-from astropy.table import Table, Column
+
+from astropy.table import Table
 from astropy.io import ascii
 import numpy as np
 import yaml
-import pprint
-from . import rotations
-from . import set_telescope_pointing_separated as set_telescope_pointing
+
 from . import read_apt_xml
+from ..utils import rotations
+from ..utils import set_telescope_pointing_separated as set_telescope_pointing
+
 
 class AptInput:
     """Summary
