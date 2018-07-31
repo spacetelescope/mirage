@@ -49,13 +49,13 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: my_pointsources.cat #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: movingtarget_example_data/moving_point_sources_seedtest.list #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/nircam/webbpsf_library/        #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
   psfwfegroup: 0                             #WFE realization group (0 to 9)
-  galaxyListFile: my_galaxies.cat
+  galaxyListFile: movingtarget_example_data/moving_galaxies.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
@@ -64,7 +64,7 @@ simSignals:
   movingTargetSersic: None  #ascii file containing a list of 2D sersic profiles to have moving through the field
   movingTargetExtended: None      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
   movingTargetConvolveExtended: True       #convolve the extended moving targets with PSF before adding.
-  movingTargetToTrack: moving_target_to_track.cat #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+  movingTargetToTrack: movingtarget_example_data/moving_target_to_track.cat #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
   zodiacal:  None                          #Zodiacal light count rate image file
   zodiscale:  1.0                            #Zodi scaling factor
   scattered:  None                          #Scattered light count rate image file
@@ -79,7 +79,7 @@ Telescope:
   dec: -27.8                   #Dec of simulated pointing
   rotation: 0.0                #y axis rotation (degrees E of N)
   tracking: non-sidereal       #sidereal or non-sidereal
-  
+
 newRamp:
   dq_configfile: config
   sat_configfile: config
@@ -89,7 +89,7 @@ newRamp:
 
 Output:
   file: V12345024002P000000000112o_B5_F250M_movingtarget_uncal.fits   #Output filename
-  directory: ./   # Directory in which to place output files
+  directory: ./movingtarget_example_data/   # Directory in which to place output files
   datatype: linear # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
   format: DMS          #Output file format Options: DMS, SSR(not yet implemented)
   save_intermediates: False   #Save intermediate products separately (point source image, etc)
