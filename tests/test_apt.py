@@ -18,7 +18,7 @@ import yaml
 from lxml import etree
 import pytest
 
-from mirage.scripts import write_observationlist, yaml_generator, utils
+from mirage.yaml import write_observationlist, yaml_generator
 
 # to be set before running test
 # os.environ['MIRAGE_DATA'] = ''

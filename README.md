@@ -16,44 +16,43 @@ reads of the detector are present.
 
 ## Installation
 
-To install:
+To install `mirage`, first clone the repository:
+`git clone https://github.com/spacetelescope/mirage.git`
 
+Then, install the package:
 ```
-python setup.py install
+cd mirage
+pip install .
 ```
 
 ## Dependencies
 
 To simulate wide field slitless spectroscopy (WFSS) data:
 
-[NIRCam_Gsim][d1]: to disperse imaging data
-
-[GRISM_NIRCAM][d2]: NIRCam-specific grism configuration and sensitivity files
-
-[GRISMCONF][d3]: grism dispersion polynomials
+* [NIRCam_Gsim][d1]: to disperse imaging data
+* [GRISM_NIRCAM][d2]: NIRCam-specific grism configuration and sensitivity files
+* [GRISMCONF][d3]: grism dispersion polynomials
 
 Background signals:
 
-[JWST backgrounds][d4]: Generate JWST Exposure Time Calculator-type backgrounds (zodiacal+thermal)
+* [JWST backgrounds][d4]: Generate JWST Exposure Time Calculator-type backgrounds (zodiacal+thermal)
+
+Calibration pipeline:
+
+* [JWST calibration pipeline][d5]. Necessary if using raw dark current exposures as input. Optional otherwise.
 
 [d1]: https://github.com/npirzkal/NIRCAM_Gsim
 [d2]: https://github.com/npirzkal/GRISM_NIRCAM
 [d3]: https://github.com/npirzkal/GRISMCONF
 [d4]: https://github.com/spacetelescope/jwst_backgrounds
-
-
-Calibration pipeline:
-
-[JWST calibration pipeline][d5]. Necessary if using raw dark current exposures as input. Optional otherwise.
-
 [d5]: https://github.com/STScI-JWST/jwst
 
 
 ## Examples
 
-See the notebooks in the "examples" subdirectory. There is one notebook
-for imaging simulations, one for WFSS simulations, and one for moving target
-(non-sidereal) simulations.
+See the notebooks in the `examples` subdirectory. There are notebooks
+for imaging simulations, WFSS simulations, moving target
+(non-sidereal) simulations, and simulations of OTE commissioning.
 
 
 ## Functionality
@@ -64,7 +63,7 @@ four general parts:
 1. Generate a "seed image"
 2. (OPTIONAL) to create WFSS data, disperse the seed image
 3. Prepare an existing dark current ramp
-4. Combine the seed image with the dark 
+4. Combine the seed image with the dark
 
 More details on these steps are given below:
 
@@ -72,7 +71,7 @@ More details on these steps are given below:
 
 This portion of the code generates a "seed image" from
 either input source catalogs or an input large field-of-view
-observation (fits file). 
+observation (fits file).
 
 The seed image is a noiseless countrate image containing
 all of the sources specified in the input catalogs. Sources
@@ -96,7 +95,7 @@ python catalog_seed_image.py myfile.yaml
 
 2) Within python:
 ```
-from mirage.mirage.scripts import catalog_seed_image as csi
+from mirage.seed_image import catalog_seed_image as csi
 cat = csi.Catalog_seed()
 cat.paramfile = 'myfile.yaml'
 cat.make_seed()
@@ -115,7 +114,7 @@ Extension 2: segmentation map
 Also, the seed image, segmentation map, and exposure info dictionary are available as:
 `self.seedimage`, `self.seed_segmap`, and `self.seedinfo`
 
-### Disperse the seed image 
+### Disperse the seed image
 
 Requires multiple imaging seed images as input. Output is a single, dispersed
 seed image that can be passed to later simulator steps just as imaging seed
@@ -136,7 +135,7 @@ t.observation()
 t.finalize(Back = background_file)
 ```
 
-### Prepare an existing dark current ramp 
+### Prepare an existing dark current ramp
 
 The input dark current exposure will be reorganized into the
 requested readout pattern (if possible). If the input is not
@@ -164,7 +163,7 @@ python dark_prep.py myinputs.yaml
 
 **or:**
 ```
-from mirage.mirage.scripts import dark_prep
+from mirage.dark import dark_prep
 dark = dark_prep.DarkPrep()
 dark.paramfile = 'myinputs.yaml'
 dark.prepare()
@@ -183,11 +182,11 @@ The ramp is then reorganized into the requested readout
 pattern and added to the dark current ramp.
 
 **To use:**
-python obs_generator.py myinputs.yaml
+`python obs_generator.py myinputs.yaml`
 
 **or:**
 ```
-from mirage.mirage.scripts import obs_generator
+from mirage.ramp_generator import obs_generator
 obs = obs_generator.Observation()
 obs.linDark = 'V42424024002P000000000112o_B5_F250M_uncal_linear_dark_prep_object.fits'
 obs.seed = 'V42424024002P000000000112o_B5_F250M_uncal_F250M_seed_image.fits'
@@ -197,9 +196,9 @@ obs.create()
 
 To create a simulated exposure, string together all of the steps:
 ```
-from mirage.mirage.scripts import catalog_seed_image
-from mirage.mirage.scripts import dark_prep
-from mirage.mirage.scripts import obs_generator
+from mirage.seed_image import catalog_seed_image
+from mirage.dark import dark_prep
+from mirage.ramp_generator import obs_generator
 
 yamlfile = 'seed_catalog_test.yaml'
 cat = catalog_seed_image.Catalog_seed()
@@ -212,9 +211,9 @@ d.prepare()
 
 obs = obs_generator.Observation()
 obs.linDark = d.prepDark
-obs.seed = cat.seedimage 
-obs.segmap = cat.seed_segmap 
-obs.seedheader = cat.seedinfo 
+obs.seed = cat.seedimage
+obs.segmap = cat.seed_segmap
+obs.seedheader = cat.seedinfo
 #obs.seed = 'V42424024002P000000000112o_B5_F250M_uncal_F250M_seed_image.fits'
 obs.paramfile = yamlfile
 obs.create()
@@ -222,13 +221,13 @@ obs.create()
 
 ### Convenience Functions
 
-**imaging_pipeline.py** - wrapper around the three steps needed to create an
+**`imaging_pipeline.py`** - wrapper around the three steps needed to create an
 imaging mode simulated exposure. This also works for moving target
 simulations. Example use shown in the imaging notebook.
 
-**wfss_pipeline.py** - wrapper around the steps needed to create an WFSS
+**`wfss_pipeline.py`** - wrapper around the steps needed to create an WFSS
 simulated exposure. Example use shown in the WFSS notebook.
 
-**yaml_generator.py** - Beginning with an Astronomer's Proposal Tool (APT) file,
+**`yaml_generator.py`** - Beginning with an Astronomer's Proposal Tool (APT) file,
 create the yaml files necessary to simulate the entire proposal. Example use
 shown in the imaging and WFSS notebooks.
