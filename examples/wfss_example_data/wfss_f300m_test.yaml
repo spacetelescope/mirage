@@ -9,7 +9,7 @@ Readout:
   nint: 1          #Number of integrations per exposure
   resets_bet_ints: 1 #Number of detector resets between integrations
   array_name: NRCB5_FULL    #Name of array (FULL, SUB160, SUB64P, etc)
-  filter: F410M       #Filter of simulated data (F090W, F322W2, etc)
+  filter: F300M       #Filter of simulated data (F090W, F322W2, etc)
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
@@ -49,13 +49,13 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: my_pointsources.cat #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: imaging_example_data/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/nircam/webbpsf_library/ #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
   psfwfegroup: 0                             #WFE realization group (0 to 9)
-  galaxyListFile: my_galaxies.cat
+  galaxyListFile: imaging_example_data/seed_im_from_catalog_test_galaxies_catalog.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
@@ -79,7 +79,7 @@ Telescope:
   dec: -27.8                   #Dec of simulated pointing
   rotation: 0.0                #y axis rotation (degrees E of N)
   tracking: sidereal           #sidereal or non-sidereal
-  
+
 newRamp:
   dq_configfile: config
   sat_configfile: config
@@ -88,8 +88,8 @@ newRamp:
   linear_configfile: config
 
 Output:
-  file: V42424024002P000000000112o_B5_F410M_seed_uncal.fits   #Output filename
-  directory: ./   # Directory in which to place output files
+  file: V42424024002P000000000112o_B5_F300M_seed_uncal.fits   #Output filename
+  directory: ./wfss_example_data/   # Directory in which to place output files
   datatype: linear,raw # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
   format: DMS          #Output file format Options: DMS, SSR(not yet implemented)
   save_intermediates: False   #Save intermediate products separately (point source image, etc)
@@ -98,11 +98,11 @@ Output:
   dmsOrient: True    #Output in DMS orientation (vs. fitswriter orientation).
   program_number: 42424    #Program Number
   title: Black Holes at the Restaurant at the End of the Universe #Program title
-  PI_Name: D. Adams  #Proposal PI Name
+  PI_Name: D. Adams #Proposal PI Name
   Proposal_category: GO  #Proposal category
   Science_category: Cosmology  #Science category
   observation_number: '002'    #Observation Number
-  observation_label: Obs1   #User-generated observation Label
+  observation_label: Obs1    #User-generated observation Label
   visit_number: '024'    #Visit Number
   visit_group: '01'    #Visit Group
   visit_id: '42424024002'    #Visit ID
