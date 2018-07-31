@@ -36,7 +36,7 @@ except ImportError:
 
 setup(
     name='mirage',
-    version='1.1.2',
+    version='2.0.0',
     description='Create simulated JWST data',
     long_description=('A tool to create simulated NIRCam, NIRISS,'
                         'and FGS exposures'
