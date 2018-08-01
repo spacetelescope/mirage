@@ -1199,9 +1199,12 @@ class Catalog_seed():
             meta4 = ('from run using non-sidereal moving target '
                      'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             ptsrc.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
-            ptsrc.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_point_sources.list'), format='ascii', overwrite=True)
 
-            ptsrc = self.getPointSourceList('temp_non_sidereal_point_sources.list')
+            temp_ptsrc_filename = os.path.join(self.params['Output']['directory'],
+                                               'temp_non_sidereal_point_sources.list')
+            ptsrc.write(temp_ptsrc_filename, format='ascii', overwrite=True)
+
+            ptsrc = self.getPointSourceList(temp_ptsrc_filename)
             ptsrcCRImage, ptsrcCRSegmap = self.makePointSourceImage(ptsrc)
             totalCRList.append(ptsrcCRImage)
             totalSegList.append(ptsrcCRSegmap)
@@ -2694,7 +2697,7 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        indexes, lines  = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
+        indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
         print("After extended sources, max index is {}".format(self.maxindex))
 

@@ -55,7 +55,7 @@ simSignals:
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
   psfwfegroup: 0                             #WFE realization group (0 to 9)
-  galaxyListFile: movingtarget_example_data/moving_galaxies.list
+  galaxyListFile: movingtarget_example_data/moving_target_extended.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
