@@ -52,8 +52,8 @@ class CreatePSFLibrary:
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
     fov_pixels: int
-        The field of view in pixels used by WebbPSF when creating the PSFs. Default
-        is 1000 pixels.
+        The field of view in undersampled detector pixels used by WebbPSF when
+        creating the PSFs. Default is 101 pixels.
 
     oversample: int
         The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
