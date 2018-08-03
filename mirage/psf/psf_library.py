@@ -1,5 +1,6 @@
 import os
 import itertools
+
 import webbpsf
 import numpy as np
 import astropy.convolution
@@ -29,12 +30,12 @@ class CreatePSFLibrary:
 
     Parameters:
     -----------
-    instrument:
+    instrument: str
         The name of the instrument you want to run. Can be any capitalization. Can
         only run 1 instrument at a time. Right now this is only set up for NIRCam,
         NIRISS, and FGS (they are 2048x2048)
 
-    filters:
+    filters: str or list
         Which filter(s) you want to create a library for.
 
         Can be a string of 1 filter name, a list of filter names (as strings), or
@@ -42,7 +43,7 @@ class CreatePSFLibrary:
         attribute of webbpsf.INSTR(). Spelling/capitalization must match what
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
-    detectors:
+    detectors: str or list
         Which detector(s) you want to create a library for.
 
         Can be a string of 1 detector name, a list of detector names (as strings), or
@@ -50,30 +51,30 @@ class CreatePSFLibrary:
         attribute of webbpsf.INSTR(). Spelling/capitalization must match what
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
-    fov_pixels:
+    fov_pixels: int
         The field of view in pixels used by WebbPSF when creating the PSFs. Default
         is 1000 pixels.
 
-    oversample:
+    oversample: int
         The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
 
-    num_psfs:
+    num_psfs: int
         The total number of fiducial PSFs to be created and saved in the files. This
         number must be a square number. Default is 16.
         E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
 
-    save:
+    save: bool
         True/False boolean if you want to save your file
 
-    fileloc:
+    fileloc: str
         Where to save your file if "save" keyword is set to True. Default of None
         will save in the current directory
 
-    filename:
+    filename: str
         The name to save your current file under if "save" keyword is set to True.
         Default of None will save it as "INSTRNAME_FILTERNAME.fits"
 
-    overwrite:
+    overwrite: bool
         True/False boolean to overwrite the output file if it already exists.
 
 
