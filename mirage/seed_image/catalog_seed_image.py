@@ -30,6 +30,7 @@ from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from .psf_generator import PSF
+from .psf_selection import PSFCollection
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -128,6 +129,14 @@ class Catalog_seed():
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
         self.prepare_PAM()
+
+        # Read in the PSF library file corresponding to the detector and filter
+        if self.params['Inst']['pupil'].upper() == 'CLEAR':
+            filt = self.params['Inst']['filter']
+        else:
+            filt = self.params['Inst']['pupil']
+        self.psf_library = PSFCollection(self.params['Inst']['instrument'], filt,
+                                         self.params['simSignals']['psfpath'])
         
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
@@ -1765,6 +1774,22 @@ class Catalog_seed():
             # Remember that this source location should be in the coordinate
             # system of the aperture being simulated, and not include any padding
             # for WFSS seed images.
+
+            # UPDATED FOR NEW PSF LIBRARY---------------------------------
+
+
+            # Separate the coordinates of the PSF into rounded integer and fractional pixels
+            subpixx, integx = np.modf(entry['pixelx'])
+            subpixy, integy = np.modf(entry['pixely'])
+
+            # Interpolate the oversampled PSF to the nearest whole pixel
+            # This creates self.psf_library.at_location which contains 2d interpolated PSF
+            self.psf_library.position_interpolation(integx, integy, interp_method_maybe)
+
+            # Populate a fittableImageModel instance with the interpolated PSF
+            psf_obj = self.psf_library.populate_epsfmodel()
+
+            # FOR USE WITH OLD PSF LIBRARY---------------------------------
             psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
                             interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
 
@@ -1775,7 +1800,16 @@ class Catalog_seed():
 
             try:
                 ypts, xpts = np.mgrid[j1:j2, i1:i2]
+
+
+                # FOR USE WITH OLD PSF LIBRARY
                 scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
+
+                # FOR USE WITH NEW PSF LIBRARY
+                scaled_psf = psf_obj.something.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos??, y_0=ypos??)
+
+
+                
                 psfimage[ypts, xpts] += scaled_psf
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
