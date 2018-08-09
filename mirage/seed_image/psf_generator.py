@@ -9,8 +9,10 @@ import numpy as np
 from astropy.io import fits
 from photutils.psf import FittableImageModel
 
+
 class PSF():
-    def __init__(self, x_position, y_position, psf_base, interval=0.25, oversampling=1):
+    def __init__(self, x_position, y_position, psf_base,
+        interval=0.25, oversampling=1):
         """
         Populate FittableImageModel instance with data from the appropriate PSF file
 
@@ -51,14 +53,12 @@ class PSF():
                                    .format(psf_filename))
         else:
             raise FileNotFoundError("PSF file {} not found.".format(psf_filename))
-        
-        
 
     def find_subpix_psf_filename(self, xloc, yloc, basename):
         """Given an x, y location on the
-        detector, determine the filename for the most appropriate 
+        detector, determine the filename for the most appropriate
         PSF file to use. This function only looks for the sub-pixel
-        position, and doesn't know about PSF variation across the 
+        position, and doesn't know about PSF variation across the
         detector. Therefore only the fractional part of (xloc, yloc)
         is really important.
 
@@ -81,16 +81,16 @@ class PSF():
 
         # Resolution of PSF sub pixel positions
         #interval = self.params['simSignals']['psfpixfrac']
-        numperpix = int(1./self.interval)
-        
+        numperpix = int(1. / self.interval)
+
         # Now we need to determine the proper PSF
         # file to read in from the library
         # This depends on the sub-pixel offsets above
-        a_in = self.interval * int(numperpix*xfract + 0.5) - 0.5
-        b_in = self.interval * int(numperpix*yfract + 0.5) - 0.5
+        a_in = self.interval * int(numperpix * xfract + 0.5) - 0.5
+        b_in = self.interval * int(numperpix * yfract + 0.5) - 0.5
         astr = "{0:.{1}f}".format(a_in, 2)
         bstr = "{0:.{1}f}".format(b_in, 2)
-   
+
         # Generate the psf file name based on the center of the point source
         # in units of fraction of a pixel
         frag = astr + '_' + bstr
@@ -100,10 +100,10 @@ class PSF():
         # Generate fits filename
         psf_filename = basename + '_' + frag + '.fits'
         return psf_filename
-        
+
     def minimal_psf_evaluation(self):
         """
-        Create a PSF by evaluating a FittableImageModel instance. Return 
+        Create a PSF by evaluating a FittableImageModel instance. Return
         an array only just big enough to contain the PSF data.
 
         Parameters:
@@ -120,14 +120,14 @@ class PSF():
         eval_yshape = np.int(np.ceil(self.model.shape[0] / self.model.oversampling))
         y, x = np.mgrid[0:eval_yshape, 0:eval_xshape]
         eval_psf = self.model.evaluate(x=x, y=y, flux=1.,
-                                           x_0=eval_xshape/2,
-                                           y_0=eval_yshape/2)
+                                            x_0=eval_xshape / 2,
+                                            y_0=eval_yshape / 2)
 
         # For testing
         #h0=fits.PrimaryHDU(eval_psf)
         #hlist = fits.HDUList([h0])
         #hlist.writeto("temp_minimal_eval_psf.fits", overwrite=True)
-        
+
         return eval_psf
 
     def populate_epsfmodel(self, infile, oversample=1):
