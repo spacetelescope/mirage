@@ -104,8 +104,9 @@ class Catalog_seed():
                                      self.params['Output']['file'][0:-5].split('/')[-1])
         self.params['Output']['file'] = self.basename + self.params['Output']['file'][-5:]
 
-        self.readSubarrayDefinitionFile()
-        self.checkParams()
+        # self.readSubarrayDefinitionFile()
+        self.check_params()
+        self.get_siaf_information()
         self.getSubarrayBounds()
         self.instrument_specific_dicts(self.params['Inst']['instrument'].lower())
 
@@ -196,6 +197,11 @@ class Catalog_seed():
         det_column = Column(np.repeat(detector, num_entries), name="Detector")
         base_table.add_column(det_column, index = 0)
         return base_table
+
+    def get_siaf_information(self, instrument, aperture):
+        """Use pysiaf to get aperture info
+        """
+        self.siaf = pysiaf.Siaf(instrument)[aperture]
 
     def prepare_PAM(self):
         """
@@ -3007,7 +3013,7 @@ class Catalog_seed():
             print("WARNING: unable to open {}".format(self.paramfile))
             sys.exit()
 
-    def checkParams(self):
+    def check_params(self):
         """Check input parameters for expected datatypes, values"""
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in INST_LIST:
@@ -3021,7 +3027,7 @@ class Catalog_seed():
         else:
             raise ValueError(("WARNING: unrecognized mode {} for {}. Must be one of: {}"
                    .format(self.params['Inst']['mode'],
-                           self.params['Inst']['instrument'],possibleModes)))
+                           self.params['Inst']['instrument'], possibleModes)))
 
         # Check telescope tracking entry
         self.params['Telescope']['tracking'] = self.params['Telescope']['tracking'].lower()
@@ -3087,9 +3093,6 @@ class Catalog_seed():
         if self.params['simSignals']['galaxyListFile'] == 'None':
             print('No galaxy catalog provided in yaml file.')
 
-        # create table that will contain filters/quantum yield/and vegamag=15 countrates
-        # self.makeFilterTable()
-
         # Read in list of zeropoints/photflam/photfnu
         self.zps = ascii.read(self.params['Reffiles']['flux_cal'])
 
@@ -3101,14 +3104,14 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-        # In the future we expect zeropoints to be detector dependent, as they currently
-        # are for FGS. So if we are working with NIRCAM or NIRISS, manually add a Detector key
-        # to the dictionary as a placeholder.
+        # In the future we expect zeropoints to be detector dependent, as they
+        # currently are for FGS. So if we are working with NIRCAM or NIRISS,
+        # manually add a Detector key to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
 
-        # make sure the requested filter is allowed. For imaging, all filters are allowed.
-        # In the future, other modes will be more restrictive
+        # Make sure the requested filter is allowed. For imaging, all filters
+        # are allowed. In the future, other modes will be more restrictive
         if self.params['Readout']['pupil'][0].upper() == 'F':
             usefilt = 'pupil'
         else:
@@ -3122,15 +3125,16 @@ class Catalog_seed():
             self.params['Readout']['pupil'] = 'NA'
 
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
-            raise ValueError(("WARNING: requested filter {} is not in the list of "
-                   "possible filters.".format(self.params['Readout'][usefilt])))
+            raise ValueError(("WARNING: requested filter {} is not in the list"
+                              " of possible filters."
+                              .format(self.params['Readout'][usefilt])))
 
         # Get the photflambda and photfnu values that go with
         # the filter
         mtch = ((self.zps['Detector'] == detector) &
                 (self.zps['Filter'] == self.params['Readout'][usefilt]) &
                 (self.zps['Module'] == module))
-        self.vegazeropoint=self.zps['VEGAMAG'][mtch][0]
+        self.vegazeropoint = self.zps['VEGAMAG'][mtch][0]
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
@@ -3216,30 +3220,6 @@ class Catalog_seed():
                 raise FileNotFoundError(("WARNING: Input distortion coefficients file {} "
                                          "does not exist."
                                          .format(self.params['Reffiles']['distortion_coeffs'])))
-
-            # read in coefficients for the forward 'science' to 'ideal' coordinate transformation.
-            # 'science' is in units of distorted pixels, while 'ideal' is the undistorted
-            # angular distance from the reference pixel
-            ap_name = self.params['Readout']['array_name']
-
-            self.x_sci2idl, self.y_sci2idl, self.v2_ref, self.v3_ref, \
-                self.parity, self.v3yang, self.xsciscale, self.ysciscale, \
-                self.v3scixang = self.getDistortionCoefficients(distortionTable,
-                                                                'science', 'ideal', ap_name)
-
-            #Generate the coordinate transform for V2, V3 to 'ideal'
-            siaf = ascii.read(self.params['Reffiles']['distortion_coeffs'], header_start=1, format='csv')
-
-            match = siaf['AperName'] == ap_name
-            if not np.any(match):
-                raise ValueError("Aperture name {} not found in input CSV file.".format(ap_name))
-
-            siaf_row = siaf[match]
-
-            self.v2v32idlx, self.v2v32idly = read_siaf_table.\
-                                             get_siaf_v2v3_transform(siaf_row,
-                                                                     ap_name,
-                                                                     to_system='ideal')
 
         #convert the input RA and Dec of the pointing position into floats
         #check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -3343,6 +3323,31 @@ class Catalog_seed():
         #    except:
         #        print("WARNING: unable to convert {} to string. This is required.".format(self.params['Output'][quality]))
         #        sys.exit()
+
+    def get_siaf_info(self):
+        """Load SIAF information for the given instrument and aperture"""
+            aperture = self.params['Readout']['array_name']
+            self.siaf = pysiaf.Siaf(self.params['Inst']['instrument'])[aperture]
+
+            # How many of the terms below do we actually need?
+            # pysiaf should do a lot of calculations without us needing these..
+            self.v2_ref = self.siaf.V2Ref
+            self.v3_ref = self.siaf.V3Ref
+            self.parity = self.siaf.VIdlParity
+            self.v3yang = self.siaf.V3IdlYAngle
+            self.v3scixang = self.siaf.V3SciXAngle
+            self.xsciscale = self.siaf.XSciScale
+            self.ysciscale = self.siaf.YSciScale
+
+            # self.x_sci2idl, self.y_sci2idl,
+            # =self.getDistortionCoefficients(distortionTable,'science', 'ideal',ap_name)
+
+            # self.v2v32idlx, self.v2v32idly = read_siaf_table.\
+            #                                 get_siaf_v2v3_transform(siaf_row,
+            #                                                         ap_name,
+            #                                                         to_system='ideal')
+
+
 
     def checkRunStep(self, filename):
         # check to see if a filename exists in the parameter file.
