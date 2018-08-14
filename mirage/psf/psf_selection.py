@@ -33,6 +33,12 @@ class PSFCollection:
         --------
         None
         """
+        print("*********************NOTE*********************")
+        print("We still need to clear up the x/y direction")
+        print('ambiguity when Shannon gets back, and update')
+        print("the code accordingly. At the moment x's and y's are interchanged in places.")
+        print("*********************NOTE*********************")
+
         library_file = self.get_library_file(instrument, filtername, library_path)
 
         try:
@@ -163,9 +169,11 @@ class PSFCollection:
         if min(distances) == 0:
             num_nearest = 1
 
+        x_loc_index = np.array(self.x_index)
+        y_loc_index = np.array(self.y_index)
         match_index = ranking[0:num_nearest]
-        x_nearest = x_psfs[match_index]
-        y_nearest = y_psfs[match_index]
+        x_nearest = x_loc_index[match_index]
+        y_nearest = y_loc_index[match_index]
         result = (x_nearest, y_nearest, distances[match_index])
         return result
 
@@ -272,9 +280,9 @@ class PSFCollection:
         eval_xshape = np.int(np.ceil(model.shape[1] / model.oversampling))
         eval_yshape = np.int(np.ceil(model.shape[0] / model.oversampling))
         y, x = np.mgrid[0:eval_yshape, 0:eval_xshape]
-        eval_psf = self.model.evaluate(x=x, y=y, flux=1.,
-                                       x_0=eval_xshape / 2 + deltax,
-                                       y_0=eval_yshape / 2 + deltay)
+        eval_psf = model.evaluate(x=x, y=y, flux=1.,
+                                  x_0=(eval_xshape + 1) / 2 + deltax,
+                                  y_0=(eval_yshape + 1) / 2 + deltay)
         return eval_psf
 
     def populate_epsfmodel(self, psf_data):
@@ -304,7 +312,11 @@ class PSFCollection:
 
     def position_interpolation(self, x, y, method="spline", idw_number_nearest=4, idw_alpha=-2):
         """Interpolate the PSF library to construct the PSF at a
-        a given location on the detector.
+        a given location on the detector. Note that the coordinate system used
+        in this case has (0.0, 0.0) centered in the lower left pixel. (0.5, 0.5)
+        corresponds to the upper right corner of that pixel, and (-0.5, -0.5) the
+        lower left corner. This is important more for when the FittableImageModel
+        that is returned here is evaluated.
 
         Parameters:
         -----------
