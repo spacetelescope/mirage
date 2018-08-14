@@ -125,7 +125,10 @@ class Catalog_seed():
                                                           self.coord_adjust['x']])).astype(np.int)
 
         # calculate the exposure time of a single frame, based on the size of the subarray
-        self.calcFrameTime()
+        self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'],
+                                               self.params['Readout']['array_name'], self.nominal_dims[0],
+                                               self.nominal_dims[1], self.params['Readout']['namp'])
+        print("Frametime is {}".format(self.frametime))
 
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
@@ -204,6 +207,26 @@ class Catalog_seed():
         det_column = Column(np.repeat(detector, num_entries), name="Detector")
         base_table.add_column(det_column, index=0)
         return base_table
+
+    def basic_get_image(self, filename):
+        """
+        Read in image from a fits file
+
+         Parameters:
+        -----------
+        filename : str
+            Name of fits file to be read in
+
+         Returns:
+        --------
+        data : obj
+            numpy array of data within file
+
+        header : obj
+            Header from 0th extension of data file
+        """
+        data, header = fits.getdata(filename, header=True)
+        return data, header
 
     def prepare_PAM(self):
         """
@@ -520,39 +543,6 @@ class Catalog_seed():
                     mov_targs_integration += mov_targs_ramps[0]
         return mov_targs_integration, mov_targs_segmap
 
-    def calcFrameTime(self):
-        # calculate the exposure time of a single frame of the proposed output ramp
-        # based on the size of the cropped dark current integration
-        # numint, numgrp, yd, xd = self.dark.data.shape
-        yd, xd = self.nominal_dims
-        # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
-        # UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument'].lower():
-            colpad = 12
-            rowpad = 2
-            if ((xd <= 8) & (yd <= 8)):
-                rowpad = 3
-            self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
-        elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
-            # the following applies to NIRISS and Guider full frame imaging and
-            # NIRISS sub-arrays.
-            #
-            # According JDox the NIRCam full frame time is 10.73677 seconds the
-            # same as for NIRISS, but right now the change does not apply to NIRCam.
-            #
-            #
-            # note that the Guider frame time may be different for small sub-arrays
-            # less than 64 pixels square, but that needs to be confirmed.
-            colpad = 12
-            if self.params['Readout']['namp'] == 4:
-                pad1 = 1
-                pad2 = 1
-            else:
-                pad1 = 2
-                pad2 = 0
-            self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad)
-                              * (xd + pad1)) * 0.00001
-
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
         # offsets between the nominal output array and the input lists if the observation being
@@ -834,6 +824,15 @@ class Catalog_seed():
         moving_segmap.ydim = newdimsy
         moving_segmap.initialize_map()
 
+        # Check the source list and remove any sources that are well outside the
+        # field of view of the detector. These sources cause the coordinate
+        # conversion to hang.
+        print(("Stripping out sources with initial positions that are more than 4096 pixels from"
+               " the detector."))
+        print("{} sources in original input catalog {}.".format(len(mtlist), file))
+        indexes, mtlist = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
+        print("{} sources in filtered input catalog.".format(len(mtlist)))
+
         for index, entry in zip(indexes, mtlist):
             # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.getPositions(
@@ -898,7 +897,7 @@ class Catalog_seed():
                 stamp = eval_psf
 
             elif input_type == 'extended':
-                stamp, header = self.basicGetImage(entry['filename'])
+                stamp, header = self.basic_get_image(entry['filename'])
                 if entry['pos_angle'] != 0.:
                     stamp = self.basicRotateImage(stamp, entry['pos_angle'])
 
@@ -1598,6 +1597,12 @@ class Catalog_seed():
 
         start_time = time.time()
         times = []
+
+        # Check the source list and remove any sources that are well outside the
+        # field of view of the detector. These sources cause the coordinate
+        # conversion to hang.
+        indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
+
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
             try:
@@ -1717,6 +1722,49 @@ class Catalog_seed():
             #    sys.exit()
 
         return pointSourceList
+
+    def remove_outside_fov_sources(self, index, source, pixflag, delta_pixels):
+        """Filter out entries in the source catalog that are located well outside the field of
+        view of the detector. This can be a fairly rough cut. We just need to remove sources
+        that are very far from the detector.
+         Parameters:
+        -----------
+        index : list
+            List of index numbers corresponding to the sources
+         source : Table
+            astropy Table containing catalog information
+         pixflag : bool
+            Flag indicating whether catalog positions are given in units of
+            pixels (True), or RA, Dec (False)
+         delta_pixels : int
+            Number of columns/rows outside of the nominal detector size (2048x2048)
+            to keep sources in the source list. (e.g. delta_pixels=2048 will keep all
+            sources located at -2048 to 4096.)
+         Returns:
+        --------
+        index : list
+            List of filtered index numbers corresponding to sources
+            within or close to the field of view
+         source : Table
+            astropy Table containing filtered list of sources
+        """
+        if pixflag:
+            minx = 0 - delta_pixels
+            maxx = 2 * delta_pixels
+            miny = 0 - delta_pixels
+            maxy = 2 * delta_pixels
+        else:
+            delta_degrees = (delta_pixels * self.pixscale[0]) / 3600.
+            minx = self.ra - delta_degrees
+            maxx = self.ra + delta_degrees
+            miny = self.dec - delta_degrees
+            maxy = self.dec + delta_degrees
+        x = source['x_or_RA']
+        y = source['y_or_Dec']
+        good = ((x > minx) & (x < maxx) & (y > miny) & (y < maxy))
+        filtered_sources = source[good]
+        filtered_indexes = index[good]
+        return filtered_indexes, filtered_sources
 
     def makePointSourceImage(self, pointSources):
         dims = np.array(self.nominal_dims)
@@ -1937,7 +1985,25 @@ class Catalog_seed():
         return psf[nyshift - ydist:nyshift + ydist + 1, nxshift - xdist:nxshift + xdist + 1]
 
     def readPointSourceFile(self, filename):
-        # Read in the point source list
+        """Read in the point source catalog file
+
+         Parameters:
+        -----------
+        filename : str
+            Filename of catalog file to be read in
+
+         Returns:
+        --------
+        gtab : Table
+            astropy Table containing catalog
+
+         pflag : bool
+            Flag indicating units of source locations. True for detector
+            pixels, False for RA, Dec
+
+         msys : str
+            Magnitude system of the source brightnesses (e.g. 'abmag')
+        """
         try:
             gtab = ascii.read(filename)
             # Look at the header lines to see if inputs
