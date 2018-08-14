@@ -124,7 +124,10 @@ class Catalog_seed():
                                                           self.coord_adjust['x']])).astype(np.int)
 
         # calculate the exposure time of a single frame, based on the size of the subarray
-        self.calcFrameTime()
+        self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'],
+                                               self.params['Readout']['array_name'], self.nominal_dims[0],
+                                               self.nominal_dims[1], self.params['Readout']['namp'])
+        print("Frametime is {}".format(self.frametime))
 
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
@@ -234,6 +237,26 @@ class Catalog_seed():
         det_column = Column(np.repeat(detector, num_entries), name="Detector")
         base_table.add_column(det_column, index=0)
         return base_table
+
+    def basic_get_image(self, filename):
+        """
+        Read in image from a fits file
+
+         Parameters:
+        -----------
+        filename : str
+            Name of fits file to be read in
+
+         Returns:
+        --------
+        data : obj
+            numpy array of data within file
+
+        header : obj
+            Header from 0th extension of data file
+        """
+        data, header = fits.getdata(filename, header=True)
+        return data, header
 
     def prepare_PAM(self):
         """
@@ -558,39 +581,6 @@ class Catalog_seed():
                 for i in range(1, len(mov_targs_ramps)):
                     mov_targs_integration += mov_targs_ramps[i]
         return mov_targs_integration, mov_targs_segmap
-
-    def calcFrameTime(self):
-        # calculate the exposure time of a single frame of the proposed output ramp
-        # based on the size of the cropped dark current integration
-        # numint, numgrp, yd, xd = self.dark.data.shape
-        yd, xd = self.nominal_dims
-        # self.frametime = (xd/self.params['Readout']['namp'] + 12.) * (yd + 1) * 10.00 * 1.e-6
-        # UPDATED VERSION, 16 Sept 2017
-        if 'nircam' in self.params['Inst']['instrument'].lower():
-            colpad = 12
-            rowpad = 2
-            if ((xd <= 8) & (yd <= 8)):
-                rowpad = 3
-            self.frametime = ((1.0 * xd / self.params['Readout']['namp'] + colpad) * (yd + rowpad)) * 1.e-5
-        elif self.params['Inst']['instrument'].lower() in ['niriss', 'fgs']:
-            # the following applies to NIRISS and Guider full frame imaging and
-            # NIRISS sub-arrays.
-            #
-            # According JDox the NIRCam full frame time is 10.73677 seconds the
-            # same as for NIRISS, but right now the change does not apply to NIRCam.
-            #
-            #
-            # note that the Guider frame time may be different for small sub-arrays
-            # less than 64 pixels square, but that needs to be confirmed.
-            colpad = 12
-            if self.params['Readout']['namp'] == 4:
-                pad1 = 1
-                pad2 = 1
-            else:
-                pad1 = 2
-                pad2 = 0
-            self.frametime = (pad2 + (yd / self.params['Readout']['namp'] + colpad)
-                              * (xd + pad1)) * 0.00001
 
     def calcCoordAdjust(self):
         # Calculate the factors by which to expand the output array size, as well as the coordinate
@@ -1017,7 +1007,7 @@ class Catalog_seed():
                 stamp = eval_psf
 
             elif input_type == 'extended':
-                stamp, header = self.basicGetImage(entry['filename'])
+                stamp, header = self.basic_get_image(entry['filename'])
                 if entry['pos_angle'] != 0.:
                     stamp = self.basicRotateImage(stamp, entry['pos_angle'])
 
@@ -1986,7 +1976,25 @@ class Catalog_seed():
         return psf[nyshift - ydist:nyshift + ydist + 1, nxshift - xdist:nxshift + xdist + 1]
 
     def readPointSourceFile(self, filename):
-        # Read in the point source list
+        """Read in the point source catalog file
+
+         Parameters:
+        -----------
+        filename : str
+            Filename of catalog file to be read in
+
+         Returns:
+        --------
+        gtab : Table
+            astropy Table containing catalog
+
+         pflag : bool
+            Flag indicating units of source locations. True for detector
+            pixels, False for RA, Dec
+
+         msys : str
+            Magnitude system of the source brightnesses (e.g. 'abmag')
+        """
         try:
             gtab = ascii.read(filename)
             # Look at the header lines to see if inputs
