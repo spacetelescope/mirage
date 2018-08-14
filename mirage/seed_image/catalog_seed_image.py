@@ -29,7 +29,7 @@ from . import moving_targets
 from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
-from .psf_generator import PSF
+# from .psf_generator import PSF
 from .psf_selection import PSFCollection
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
