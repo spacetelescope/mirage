@@ -30,7 +30,7 @@ from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 # from .psf_generator import PSF
-from .psf_selection import PSFCollection
+from ..psf.psf_selection import PSFCollection
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -135,11 +135,11 @@ class Catalog_seed():
         self.prepare_PAM()
 
         # Read in the PSF library file corresponding to the detector and filter
-        if self.params['Inst']['pupil'].upper() == 'CLEAR':
-            filt = self.params['Inst']['filter']
+        if self.params['Readout']['pupil'].upper() == 'CLEAR':
+            filt = self.params['Readout']['filter']
         else:
-            filt = self.params['Inst']['pupil']
-        self.psf_library = PSFCollection(self.params['Inst']['instrument'], filt,
+            filt = self.params['Readout']['pupil']
+        self.psf_library = PSFCollection(self.params['Inst']['instrument'], self._detector, filt,
                                          self.params['simSignals']['psfpath'])
 
         # For imaging mode, generate the countrate image using the catalogs
@@ -1205,11 +1205,11 @@ class Catalog_seed():
         if len(ptsrc_rows) > 0:
             ptsrc = targs[ptsrc_rows]
             if pixFlag:
-                meta0 = 'position_pixel'
+                meta0 = 'position_pixels'
             else:
                 meta0 = ''
             if velFlag:
-                meta1 = 'velocity_pixel'
+                meta1 = 'velocity_pixels'
             else:
                 meta1 = ''
             meta2 = magsys
@@ -1232,11 +1232,11 @@ class Catalog_seed():
         if len(galaxy_rows) > 0:
             galaxies = targs[galaxy_rows]
             if pixFlag:
-                meta0 = 'position_pixel'
+                meta0 = 'position_pixels'
             else:
                 meta0 = ''
             if velFlag:
-                meta1 = 'velocity_pixel'
+                meta1 = 'velocity_pixels'
             else:
                 meta1 = ''
             meta2 = magsys
@@ -1256,11 +1256,11 @@ class Catalog_seed():
             extended = targs[extended_rows]
 
             if pixFlag:
-                meta0 = 'position_pixel'
+                meta0 = 'position_pixels'
             else:
                 meta0 = ''
             if velFlag:
-                meta1 = 'velocity_pixel'
+                meta1 = 'velocity_pixels'
             else:
                 meta1 = ''
             meta2 = magsys
@@ -1489,11 +1489,13 @@ class Catalog_seed():
 
         # If a PSF library is specified, then just get the dimensions from one of the files
         if self.params['simSignals']['psfpath'] is not None:
-            h = fits.open(psflibfiles[0])
-            edgex = h[0].header['NAXIS1'] / 2 - 1
-            edgey = h[0].header['NAXIS2'] / 2 - 1
+            #h = fits.open(psflibfiles[0])
+            #edgex = h[0].header['NAXIS1'] / 2 - 1
+            #edgey = h[0].header['NAXIS2'] / 2 - 1
+            edgex = self.psf_library.psf_x_dim // 2
+            edgey = self.psf_library.psf_y_dim // 2
             self.psfhalfwidth = np.array([edgex, edgey])
-            h.close()
+            #h.close()
         else:
             # if no PSF library is specified, then webbpsf will be creating the PSF on the
             # fly. In this case, we assume webbpsf's default output size of 301x301 pixels?
@@ -1824,7 +1826,7 @@ class Catalog_seed():
 
             # Interpolate the oversampled PSF to the nearest whole pixel
             # This creates a 2d interpolated PSF
-            psf_integer_iterp = self.psf_library.position_interpolation(integx, integy, method='idw')
+            psf_integer_interp = self.psf_library.position_interpolation(integx, integy, method='idw')
 
             # FOR USE WITH OLD PSF LIBRARY---------------------------------
             # psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
@@ -1844,8 +1846,8 @@ class Catalog_seed():
 
                 # FOR USE WITH NEW PSF LIBRARY
                 scaled_psf = psf_integer_interp.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos, y_0=ypos)
-
                 psfimage[ypts, xpts] += scaled_psf
+
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
                 if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
@@ -1930,15 +1932,15 @@ class Catalog_seed():
         ny = math.floor(y_det)
 
         # Assume the center of the PSF is the center of the array
-        nxshift = psfxdim // 2
-        nyshift = psfydim // 2
+        nxshift = np.int(psfxdim) // 2
+        nyshift = np.int(psfydim) // 2
 
         # nx = int(xoff)
         # ny = int(yoff)
         i1 = max(nx - nxshift, 0)
-        i2 = min(nx + 1 + nxshift, aperturexdim)
+        i2 = min(nx + 1 + nxshift, np.int(aperturexdim))
         j1 = max(ny - nyshift, 0)
-        j2 = min(ny + 1 + nyshift, apertureydim)
+        j2 = min(ny + 1 + nyshift, np.int(apertureydim))
         k1 = nxshift - (nx - i1)
         k2 = nxshift + (i2 - nx)
         l1 = nyshift - (ny - j1)
@@ -2252,12 +2254,12 @@ class Catalog_seed():
             pflag = False
             rpflag = False
             try:
-                if 'position_pixel' in gtab.meta['comments'][0:4]:
+                if 'position_pixels' in gtab.meta['comments'][0:4]:
                     pflag = True
             except:
                 pass
             try:
-                if 'radius_pixel' in gtab.meta['comments'][0:4]:
+                if 'radius_pixels' in gtab.meta['comments'][0:4]:
                     rpflag = True
             except:
                 pass
@@ -3117,6 +3119,9 @@ class Catalog_seed():
         aper_name = self.params['Readout']['array_name']
         try:
             detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
+            self._detector = detector
+            if self.params['Inst']['instrument'].lower() == 'nircam':
+                self._detector = "NRC" + self._detector
             module = detector[0]
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
@@ -3158,51 +3163,51 @@ class Catalog_seed():
         # PSF: generate the name of the PSF file to use
         # if the psf path has been left blank or set to 'None'
         # then assume the user does not want to add point sources
-        if self.params['simSignals']['psfpath'] is not None:
-            if self.params['simSignals']['psfpath'][-1] != '/':
-                self.params['simSignals']['psfpath'] = self.params['simSignals']['psfpath'] + '/'
+        # if self.params['simSignals']['psfpath'] is not None:
+        #    if self.params['simSignals']['psfpath'][-1] != '/':
+        #        self.params['simSignals']['psfpath'] = self.params['simSignals']['psfpath'] + '/'
 
-            wfe = self.params['simSignals']['psfwfe']
-            if wfe not in WFE_OPTIONS:
-                raise ValueError(("WARNING: invalid wavefront error (psfwfe) input: {}"
-                                  "psfwfe must be one of: {}".format(wfe, WFE_OPTIONS)))
-            wfegroup = self.params['simSignals']['psfwfegroup']
-            if wfegroup not in WFEGROUP_OPTIONS:
-                raise ValueError(("WARNING: invalid wavefront group (psfwfegroup) "
-                                  "value: {}. psfwfegroup must be one of: {}"
-                                  .format(wfegroup, WFEGROUP_OPTIONS)))
-            basename = self.params['simSignals']['psfbasename'] + '_'
-            if wfe == 0:
-                psfname = basename + self.params['simSignals'][usefilt].lower() + '_zero'
-                self.params['simSignals']['psfpath'] = self.params['simSignals']['psfpath'] + \
-                    self.params['simSignals'][usefilt].lower() + '/zero/'
-            else:
-                if self.params['Inst']['instrument'].lower() != 'fgs':
-                    psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
-                                                             'psfxpos', 'psfypos',
-                                                             self.params['Readout'][usefilt].lower(),
-                                                             str(wfe), str(wfegroup))
-                else:
-                    psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, detector,
-                                                          'psfxpos', 'psfypos',
-                                                          str(wfe), str(wfegroup))
+        #    wfe = self.params['simSignals']['psfwfe']
+        #   if wfe not in WFE_OPTIONS:
+        #        raise ValueError(("WARNING: invalid wavefront error (psfwfe) input: {}"
+        #                          "psfwfe must be one of: {}".format(wfe, WFE_OPTIONS)))
+        #    wfegroup = self.params['simSignals']['psfwfegroup']
+        #    if wfegroup not in WFEGROUP_OPTIONS:
+        #        raise ValueError(("WARNING: invalid wavefront group (psfwfegroup) "
+        #                          "value: {}. psfwfegroup must be one of: {}"
+        #                          .format(wfegroup, WFEGROUP_OPTIONS)))
+        #    basename = self.params['simSignals']['psfbasename'] + '_'
+        #    if wfe == 0:
+        #        psfname = basename + self.params['simSignals'][usefilt].lower() + '_zero'
+        #        self.params['simSignals']['psfpath'] = self.params['simSignals']['psfpath'] + \
+        #            self.params['simSignals'][usefilt].lower() + '/zero/'
+        #    else:
+        #        if self.params['Inst']['instrument'].lower() != 'fgs':
+        #            psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
+        #                                                     'psfxpos', 'psfypos',
+        #                                                     self.params['Readout'][usefilt].lower(),
+        #                                                     str(wfe), str(wfegroup))
+        #        else:
+        #            psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, detector,
+        #                                                  'psfxpos', 'psfypos',
+        #                                                  str(wfe), str(wfegroup))
 
-                psfname = psfname.replace('psfxpos', '1024')
-                psfname = psfname.replace('psfypos', '1024')
-                if self.params['Inst']['instrument'].lower() != 'fgs':
-                    pathaddition = "{}/{}/{}".format(detector,
-                                                     self.params['Readout'][usefilt].lower(),
-                                                     str(wfe))
-                else:
-                    pathaddition = "{}/{}".format(detector, str(wfe))
+        #        psfname = psfname.replace('psfxpos', '1024')
+        #        psfname = psfname.replace('psfypos', '1024')
+        #        if self.params['Inst']['instrument'].lower() != 'fgs':
+        #            pathaddition = "{}/{}/{}".format(detector,
+        #                                             self.params['Readout'][usefilt].lower(),
+        #                                             str(wfe))
+        #        else:
+        #            pathaddition = "{}/{}".format(detector, str(wfe))
 
-                self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'],
-                                                                    pathaddition)
-                self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
-        else:
+        #        self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'],
+        #                                                            pathaddition)
+        #        self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
+        #else:
             # case where psfPath is None. In this case, create a PSF on the fly to use
             # for adding sources
-            raise IOError("WARNING: no PSF library path given.")
+        #    raise IOError("WARNING: no PSF library path given.")
             # print("update this to include a call to WebbPSF????????")
             # self.psfimage = np.zeros((5, 5), dtype=np.float32)
             # sum1 = 0
