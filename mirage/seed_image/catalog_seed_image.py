@@ -978,8 +978,8 @@ class Catalog_seed():
             # Remember that this source location should be in the coordinate
             # system of the aperture being simulated, and not include any padding
             # for WFSS seed images.
-            psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
-                          interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
+            # psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
+            #              interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
 
             # If we have a point source, we can easily determine whether
             # it completely misses the detector, since we know the size
@@ -988,7 +988,8 @@ class Catalog_seed():
             # the stamp lands on the detector.
             status = 'on'
             if input_type == 'pointSource':
-                status = self.on_detector(x_frames, y_frames, psf_obj.model.shape,
+                psf_dimensions = (self.psf_library.psf_x_dim, self.psf_library.psf_y_dim)
+                status = self.on_detector(x_frames, y_frames, psf_dimensions,
                                           (newdimsx, newdimsy))
             if status == 'off':
                 continue
@@ -1000,8 +1001,15 @@ class Catalog_seed():
             # we can call moving_targets.py and feed it these things,
             # which contain all the info needed
 
-            # Evaluate the PSF model. Place in stamp image just large enough to contain it
-            eval_psf = psf_obj.minimal_psf_evaluation()
+            # Interpolate the PSF from the library to create the PSF at the integer pixel location
+            # close to the requested location on the detector (use floor so we know how the
+            # residual sub-pixel distance is related to the integer.
+            subpix_x, int_x = np.modf(entry['pixelx'] + self.subarray_bounds[0])
+            subpix_y, int_y = np.modf(entry['pixely'] + self.subarray_bounds[1])
+            psf_integer_interp = self.psf_library.position_interpolation(int_x, int_y, method='idw')
+            # Sub-pixel location interpolation is handled within the FittableImageModel instance
+            eval_psf = self.psf_library.minimal_psf_evaluation(psf_integer_interp, deltax=subpix_x,
+                                                               deltay=subpix_y)
 
             if input_type == 'pointSource':
                 stamp = eval_psf
@@ -1800,23 +1808,22 @@ class Catalog_seed():
 
             # UPDATED FOR NEW PSF LIBRARY---------------------------------
 
-            # Separate the coordinates of the PSF into rounded integer and fractional pixels
-            subpixx, integx = np.modf(entry['pixelx'])
-            subpixy, integy = np.modf(entry['pixely'])
+            # Separate the coordinates of the PSF into rounded integer and fractional pixels.
+            # Work in full frame coordinates. Adjust if simulating a subarray.
+            subpix_x, integx = np.modf(entry['pixelx'] + self.subarray_bounds[0])
+            subpix_y, integy = np.modf(entry['pixely'] + self.subarray_bounds[1])
 
             # Interpolate the oversampled PSF to the nearest whole pixel
-            # This creates self.psf_library.at_location which contains 2d interpolated PSF
-            self.psf_library.position_interpolation(integx, integy, interp_method_maybe)
-
-            # Populate a fittableImageModel instance with the interpolated PSF
-            psf_obj = self.psf_library.populate_epsfmodel()
+            # This creates a 2d interpolated PSF
+            psf_integer_iterp = self.psf_library.position_interpolation(integx, integy, method='idw')
 
             # FOR USE WITH OLD PSF LIBRARY---------------------------------
-            psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
-                          interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
+            # psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
+            #              interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
 
             # Calculate the coordinate limits of the aperture/PSF stamp overlap
-            psf_ydim, psf_xdim = psf_obj.model.shape
+            # psf_ydim, psf_xdim = psf_obj.model.shape
+            psf_xdim, psf_ydim = (self.psf_library.psf_x_dim, self.psf_library.psf_y_dim)
             (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, psf_xdim, psf_ydim,
                                                                    newdimsx, newdimsy)
 
@@ -1824,10 +1831,10 @@ class Catalog_seed():
                 ypts, xpts = np.mgrid[j1:j2, i1:i2]
 
                 # FOR USE WITH OLD PSF LIBRARY
-                scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
+                # scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
 
                 # FOR USE WITH NEW PSF LIBRARY
-                scaled_psf = psf_obj.something.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos??, y_0=ypos??)
+                scaled_psf = psf_integer_interp.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos, y_0=ypos)
 
                 psfimage[ypts, xpts] += scaled_psf
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
@@ -2513,24 +2520,15 @@ class Catalog_seed():
             nx = math.floor(xpos)
             ny = math.floor(ypos)
 
-            # -------FUTURE IMPROVEMENT-------------
-            # Identify the PSF that needs to be convolved with the stamp
-            # First translate the given pixel coordinates, which are for the subarray
-            # being simulated, into full frame coordinates
-            # fullframex_equiv, fullframey_equiv = utils.subarray_to_full_coords(entry['pixelx'], entry['pixely'])
-
-            # Using the full frame coordinates, choose/interpolate to find the most
-            # appropriate PSF for the galaxy location.
-            # psf = self.make_psf_model(fullframex_equiv, fullframey_equiv)
-            # -------FUTURE IMPROVEMENT-------------
-
-            # Load PSF model of the appropriate PSF given the source location
-            psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
-                          interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
-
+            # For the purposes of PSF interpolation, use the source location in full-frame coordinates
+            subpix_x, int_x = np.modf(entry['pixelx'] + self.subarray_bounds[0])
+            subpix_y, int_y = np.modf(entry['pixely'] + self.subarray_bounds[1])
+            psf_integer_interp = self.psf_library.position_interpolation(int_x, int_y, method='idw')
+            # Sub-pixel location interpolation is handled within the FittableImageModel instance
             # Evaluate the EPSF model. Place into an array just large enough for it
             # as the next step will be convolution with the galaxy stamp image
-            psf_image = psf_obj.minimal_psf_evaluation()
+            psf_image = self.psf_library.minimal_psf_evaluation(psf_integer_interp, deltax=subpix_x,
+                                                                deltay=subpix_y)
 
             # convolve the galaxy with the instrument PSF
             stamp = s1.fftconvolve(stamp, psf_image, mode='same')
@@ -2779,14 +2777,15 @@ class Catalog_seed():
             # If the stamp needs to be convolved with the NIRCam PSF,
             # locate the correct PSF file here and read it in
             if self.params['simSignals']['PSFConvolveExtended']:
-
-                # Load the appropriate PSF file given the source location
-                psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
-                              interval=self.params['simSignals']['psfpixfrac'], oversampling=1)
-
+                # For the purposes of PSF interpolation, use the source location in full-frame coordinates
+                subpix_x, int_x = np.modf(entry['pixelx'] + self.subarray_bounds[0])
+                subpix_y, int_y = np.modf(entry['pixely'] + self.subarray_bounds[1])
+                psf_integer_interp = self.psf_library.position_interpolation(int_x, int_y, method='idw')
+                # Sub-pixel location interpolation is handled within the FittableImageModel instance
                 # Evaluate the EPSF model. Place into an array just large enough for it
                 # as the next step will be convolution with the galaxy stamp image
-                psf_image = psf_obj.minimal_psf_evaluation()
+                psf_image = self.psf_library.minimal_psf_evaluation(psf_integer_interp, deltax=subpix_x,
+                                                                    deltay=subpix_y)
 
                 # Convolve the galaxy with the instrument PSF
                 stamp = s1.fftconvolve(stamp, psf_image, mode='same')
