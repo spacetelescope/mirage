@@ -47,6 +47,9 @@ class PSFCollection:
                    .format(library_file)))
 
         # Get some basic information about the library
+        self.psf_y_dim, self.psf_x_dim = self.library.shape[-2:]
+        self.psf_x_dim /= self.library_info['OVERSAMP']
+        self.psf_y_dim /= self.library_info['OVERSAMP']
         self.num_psfs = self.library_info['NUM_PSFS']
         self.x_det = []
         self.y_det = []
@@ -241,6 +244,39 @@ class PSFCollection:
             interp_functions.append(xlist)
         return interp_functions
 
+    def minimal_psf_evaluation(self, model, deltax=0., deltay=0.):
+        """
+        Create a PSF by evaluating a FittableImageModel instance. Return
+        an array only just big enough to contain the PSF data.
+
+         Parameters:
+        -----------
+        model : obj
+            FittableImageModel instance containing the PSF model
+
+        deltax : float
+            Offset in the x-direction, in units of nominal pixels, to
+            shift the interpolated PSF within the output (interpolated)
+            frame.
+
+        deltay : float
+            Offset in the y-direction, in units of nominal pixels, to
+            shift the interpolated PSF within the output (interpolated)
+            frame.
+
+         Returns:
+        --------
+        eval_psf : ndarray
+            2D numpy array containing the evaluated PSF, with normalized signal
+        """
+        eval_xshape = np.int(np.ceil(model.shape[1] / model.oversampling))
+        eval_yshape = np.int(np.ceil(model.shape[0] / model.oversampling))
+        y, x = np.mgrid[0:eval_yshape, 0:eval_xshape]
+        eval_psf = self.model.evaluate(x=x, y=y, flux=1.,
+                                       x_0=eval_xshape / 2 + deltax,
+                                       y_0=eval_yshape / 2 + deltay)
+        return eval_psf
+
     def populate_epsfmodel(self, psf_data):
         """Create an instance of EPSFModel and populate the data
         from the given fits file. Also populate information
@@ -262,12 +298,6 @@ class PSFCollection:
         # Create instance. Assume the PSF is centered
         # in the array
         oversample = self.library_info['OVERSAMP']
-
-        print(type(psf_data))
-        print(psf_data.shape)
-        print(oversample)
-        stop
-
         psf = FittableImageModel(psf_data, oversampling=oversample)
         # psf = EPSFModel(psf_data, oversampling=oversample)
         return psf
@@ -315,8 +345,8 @@ class PSFCollection:
             raise ValueError(("{} interpolation method not supported."
                               .format(method)))
 
-        # Place resulting PSF in instance of FittableImageModel (or EPSFModel)
-        self.psf = self.populate_epsfmodel(interp_psf)
+        # Return resulting PSF in instance of FittableImageModel (or EPSFModel)
+        return self.populate_epsfmodel(interp_psf)
 
     def select_detector(self, det_name, input_file):
         """Given a PSF library, select only the PSFs associated with a
