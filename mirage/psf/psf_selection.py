@@ -33,12 +33,6 @@ class PSFCollection:
         --------
         None
         """
-        print("*********************NOTE*********************")
-        print("We still need to clear up the x/y direction")
-        print('ambiguity when Shannon gets back, and update')
-        print("the code accordingly. At the moment x's and y's are interchanged in places.")
-        print("*********************NOTE*********************")
-
         library_file = self.get_library_file(instrument, filtername, library_path)
 
         try:
@@ -62,14 +56,13 @@ class PSFCollection:
         self.x_index = []
         self.y_index = []
         for num in range(self.num_psfs):
-            xval, yval = literal_eval(self.library_info['DET_XY' + str(num)])
+            yval, xval = literal_eval(self.library_info['DET_XY' + str(num)])
             self.x_det.append(xval)
             self.y_det.append(yval)
-            xi, yi = literal_eval(self.library_info['DET_IJ' + str(num)])
+            yi, xi = literal_eval(self.library_info['DET_IJ' + str(num)])
             self.x_index.append(xi)
             self.y_index.append(yi)
         self.interpolator = self.create_interpolator()
-        print("check_over_x_y_order_in_all_functions")
 
     def create_interpolator(self, interp_type='interp2d'):
         """Create an interpolator function for the detector-dependent
@@ -244,8 +237,8 @@ class PSFCollection:
         # Need to loop over the pixels and produce an interpolating function
         # for each.
         for ypix in range(psf_ydim):
+            xlist = []
             for xpix in range(psf_xdim):
-                xlist = []
                 pixeldata = self.library[:, :, ypix, xpix]
                 interp2d_fncn = interp2d(xs, ys, pixeldata, kind='linear')
                 xlist.append(interp2d_fncn)
