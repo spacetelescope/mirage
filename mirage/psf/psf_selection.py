@@ -281,8 +281,8 @@ class PSFCollection:
         eval_yshape = np.int(np.ceil(model.shape[0] / model.oversampling))
         y, x = np.mgrid[0:eval_yshape, 0:eval_xshape]
         eval_psf = model.evaluate(x=x, y=y, flux=1.,
-                                  x_0=(eval_xshape + 1) / 2 + deltax,
-                                  y_0=(eval_yshape + 1) / 2 + deltay)
+                                  x_0=(eval_xshape - 1) / 2 + deltax,
+                                  y_0=(eval_yshape - 1) / 2 + deltay)
         return eval_psf
 
     def populate_epsfmodel(self, psf_data):
