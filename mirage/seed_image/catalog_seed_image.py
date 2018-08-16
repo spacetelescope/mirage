@@ -30,6 +30,7 @@ from . import moving_targets
 from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
+from ..utils import siaf_interface
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -101,10 +102,10 @@ class Catalog_seed():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        # self.readSubarrayDefinitionFile()
+        self.readSubarrayDefinitionFile()
         self.check_params()
-        self.get_siaf_information(siaf_inst, self.params['Inst']['array_name'])
-        self.getSubarrayBounds()
+        self.get_siaf_information(siaf_inst, self.params['Readout']['array_name'])
+        self.get_subarray_info()
         # self.instrument_specific_dicts(self.params['Inst']['instrument'].lower())
 
         # If the output is a direct image to be dispersed, expand the size
@@ -210,12 +211,13 @@ class Catalog_seed():
         self.ffsize = self.siaf.XDetSize
 
         # Subarray boundaries in full frame coordinates
-        self.subarray_bounds = [self.subdict['xstart'].data[mtch][0], self.subdict['ystart'].data[mtch][0], self.subdict['xend'].data[mtch][0], self.subdict['yend'].data[mtch][0]]
-        self.subarray_bounds = self.siaf.corners('det', rederive=True) but this is not quite right
-
+        # self.subarray_bounds = [self.subdict['xstart'].data[mtch][0], self.subdict['ystart'].data[mtch][0], self.subdict['xend'].data[mtch][0], self.subdict['yend'].data[mtch][0]]
+        xcorner, ycorner = siaf_interface.sci_subarray_corners(instrument, aperture)
+        self.subarray_bounds = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
         # x, y pixel values of the reference location
         #self.refpix_pos = {'x': self.siaf.XSciRef, 'y': self.siaf.YSciRef,
         #                   'v2': self.siaf.V2Ref, 'v3': self.siaf.V3Ref}
+        print("subarray_bounds are: {}".format(self.subarray_bounds))
 
     def prepare_PAM(self):
         """
@@ -991,7 +993,7 @@ class Catalog_seed():
                     moving_segmap.segmap += indseg
         return mt_integration, moving_segmap.segmap
 
-    def simple_coord_transform(self):
+    # def simple_coord_transform(self):
         """
         For the case where the distortion reference file is not provided,
         generate a simple coordinate transform function that does not include
@@ -1009,83 +1011,83 @@ class Catalog_seed():
             Compound model containing the necessary functions
             to transform coordinates assuming no distortion
         """
-        xshift = Shift(0. - self.siaf.XSciRef)
-        yshift = Shift(0. - self.siaf.YSciRef)
-        pixelscalex = self.xsciscale
-        pixelscaley = self.ysciscale
+    #    xshift = Shift(0. - self.siaf.XSciRef + 1)
+    #    yshift = Shift(0. - self.siaf.YSciRef + 1)
+    #    pixelscalex = self.xsciscale
+    #    pixelscaley = self.ysciscale
 
-        # Science to Ideal transform
-        cx = {}
-        cx["c0_0"] = 0.
-        cx["c1_0"] = pixelscalex
-        cx["c1_1"] = 0.
-        cx["c0_1"] = 0.
-        x_sci_to_ideal_func = Polynomial2D(2, **cx)
+    #    # Science to Ideal transform
+    #    cx = {}
+    #    cx["c0_0"] = 0.
+    #    cx["c1_0"] = pixelscalex
+    #    cx["c1_1"] = 0.
+    #    cx["c0_1"] = 0.
+    #    x_sci_to_ideal_func = Polynomial2D(2, **cx)
 
-        cy = {}
-        cy["c0_0"] = 0.
-        cy["c1_0"] = 0.
-        cy["c1_1"] = 0.
-        cy["c0_1"] = pixelscaley
-        y_sci_to_ideal_func = Polynomial2D(2, **cy)
+    #    cy = {}
+    #    cy["c0_0"] = 0.
+    #    cy["c1_0"] = 0.
+    #    cy["c1_1"] = 0.
+    #    cy["c0_1"] = pixelscaley
+    #    y_sci_to_ideal_func = Polynomial2D(2, **cy)
 
-        # Ideal to V2, V3 transform
-        parity = self.parity
-        v3_ideal_y_angle = self.v3yang
+    #    # Ideal to V2, V3 transform
+    #    parity = self.parity
+    #    v3_ideal_y_angle = self.v3yang
 
-        xc = {}
-        yc = {}
-        xc['c0_0'] = 0.
-        yc['c0_0'] = 0.
-        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
-        xc['c0_1'] = np.sin(v3_ideal_y_angle)
-        yc['c1_0'] = (0.-parity) * np.sin(v3_ideal_y_angle)
-        yc['c0_1'] = np.cos(v3_ideal_y_angle)
-        x_ideal_to_v2v3_func = Polynomial2D(1, **xc)
-        y_ideal_to_v2v3_func = Polynomial2D(1, **yc)
+    #    xc = {}
+    #    yc = {}
+    #    xc['c0_0'] = 0.
+    #    yc['c0_0'] = 0.
+    #    xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
+    #    xc['c0_1'] = np.sin(v3_ideal_y_angle)
+    #    yc['c1_0'] = (0.-parity) * np.sin(v3_ideal_y_angle)
+    #    yc['c0_1'] = np.cos(v3_ideal_y_angle)
+    #    x_ideal_to_v2v3_func = Polynomial2D(1, **xc)
+    #    y_ideal_to_v2v3_func = Polynomial2D(1, **yc)
 
-        # Ideal to Science transform
-        cx = {}
-        cx["c0_0"] = 0.
-        cx["c1_0"] = 1./ pixelscalex
-        cx["c1_1"] = 0.
-        cx["c0_1"] = 0.
-        x_ideal_to_sci_func = Polynomial2D(2, **cx)
+    #    # Ideal to Science transform
+    #    cx = {}
+    #    cx["c0_0"] = 0.
+    #    cx["c1_0"] = 1./ pixelscalex
+    #    cx["c1_1"] = 0.
+    #    cx["c0_1"] = 0.
+    #    x_ideal_to_sci_func = Polynomial2D(2, **cx)
 
-        cy = {}
-        cy["c0_0"] = 0.
-        cy["c1_0"] = 0.
-        cy["c1_1"] = 0.
-        cy["c0_1"] = 1./ pixelscaley
-        y_ideal_to_sci_func = Polynomial2D(2, **cy)
+    #    cy = {}
+    #    cy["c0_0"] = 0.
+    #    cy["c1_0"] = 0.
+    #    cy["c1_1"] = 0.
+    #    cy["c0_1"] = 1./ pixelscaley
+    #    y_ideal_to_sci_func = Polynomial2D(2, **cy)
 
-        # V2, V3 to Ideal transform
-        xc = {}
-        yc = {}
-        xc['c0_0'] = 0.
-        yc['c0_0'] = 0.
-        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
-        xc['c0_1'] = parity * (0. - np.sin(v3_ideal_y_angle))
-        yc['c1_0'] = np.sin(v3_ideal_y_angle)
-        yc['c0_1'] = np.cos(v3_ideal_y_angle)
-        x_v2v3_to_ideal_func = Polynomial2D(1, **xc)
-        y_v2v3_to_ideal_func = Polynomial2D(1, **yc)
+    #    # V2, V3 to Ideal transform
+    #    xc = {}
+    #    yc = {}
+    #    xc['c0_0'] = 0.
+    #    yc['c0_0'] = 0.
+    #    xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
+    #    xc['c0_1'] = parity * (0. - np.sin(v3_ideal_y_angle))
+    #    yc['c1_0'] = np.sin(v3_ideal_y_angle)
+    #    yc['c0_1'] = np.cos(v3_ideal_y_angle)
+    #    x_v2v3_to_ideal_func = Polynomial2D(1, **xc)
+    #    y_v2v3_to_ideal_func = Polynomial2D(1, **yc)
 
-        # Shift by V2ref, V3ref
-        v2shift = Shift(self.v2_ref)
-        v3shift= Shift(self.v2_ref)
+    #    # Shift by V2ref, V3ref
+    #    v2shift = Shift(self.v2_ref)
+    #    v3shift= Shift(self.v2_ref)
 
-        #Now create a compound model for each with the appropriate
-        #inverse
-        sci2idl = Mapping([0,1,0,1]) | x_sci_to_ideal_func & y_sci_to_ideal_func
-        sci2idl.inverse = Mapping([0,1,0,1]) | x_ideal_to_sci_func & y_ideal_to_sci_func
+    #    #Now create a compound model for each with the appropriate
+    #    #inverse
+    #    sci2idl = Mapping([0,1,0,1]) | x_sci_to_ideal_func & y_sci_to_ideal_func
+    #    sci2idl.inverse = Mapping([0,1,0,1]) | x_ideal_to_sci_func & y_ideal_to_sci_func
 
-        idl2v2v3 = Mapping([0,1,0,1]) | x_ideal_to_v2v3_func & y_ideal_to_v2v3_func
-        idl2v2v3.inverse = Mapping([0,1,0,1]) | x_v2v3_to_ideal_func & y_v2v3_to_ideal_func
+    #    idl2v2v3 = Mapping([0,1,0,1]) | x_ideal_to_v2v3_func & y_ideal_to_v2v3_func
+    #    idl2v2v3.inverse = Mapping([0,1,0,1]) | x_v2v3_to_ideal_func & y_v2v3_to_ideal_func
 
-        core_model = sci2idl | idl2v2v3
-        model = xshift & yshift | core_model | v2shift & v3shift
-        return model
+    #    core_model = sci2idl | idl2v2v3
+    #    model = xshift & yshift | core_model | v2shift & v3shift
+    #    return model
 
     def on_detector(self,xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
@@ -1856,6 +1858,8 @@ class Catalog_seed():
                 # Read in the appropriate PSF file
                 try:
                     psffn = self.psfname + '_' + frag + '.fits'
+                    print(xpos, ypos, psffn)
+                    stop
                     local = os.path.isfile(psffn)
                     if local:
                         webbpsfimage = fits.getdata(psffn)
@@ -2093,10 +2097,12 @@ class Catalog_seed():
             # deltapixelx, deltapixely = coord_transform.inverse(pixelv2-self.refpix_pos['v2'], pixelv3-self.refpix_pos['v3'])
         #    pixelx, pixely = coord_transform.inverse(pixelv2, pixelv3)
 
-        loc2_v2, loc2_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
-        pixelx, pixely = aperture.tel_to_sci(loc_v2, loc_v3)
+        loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
+        pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
 
-        return pixelx, pixely
+        # Subtact 1 from the  calculated pixel values because SIAF works in a 1-indexed
+        # coordinate system
+        return pixelx - 1, pixely - 1
 
     #def RADecToXY_manual(self, ra, dec):
         # In this case, the sources are provided as an RA, Dec list,
@@ -2195,7 +2201,9 @@ class Catalog_seed():
         #    ra = self.ra + deltara
         #    dec = self.dec + deltadec
 
-        loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx, pixely)
+        # Add 1 to the input pixel values because SIAF works in a 1-indexed
+        # coordinate system
+        loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
         ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
 
         # Translate the RA/Dec floats to strings
@@ -2267,8 +2275,8 @@ class Catalog_seed():
         maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
         minx = 0
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
-        ny = self.subarray_bounds[3] - self.subarray_bounds[1]
-        nx = self.subarray_bounds[2] - self.subarray_bounds[0]
+        ny = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
+        nx = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
 
         #Expand the limits if a grism direct image is being made
         if self.params['Output']['grism_source_image'] == True:
@@ -3116,9 +3124,11 @@ class Catalog_seed():
             # line with other instrument formats
             # detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
             # module = detector[0]
-            detector = self.params['Inst']['array_name'].split('_')[0]
+            detector = aper_name.split('_')[0]
+            shortdetector = detector
             if self.params["Inst"]["instrument"].lower() == 'nircam':
                 module = detector[3]
+                shortdetector = detector[3:]
             elif self.params["Inst"]["instrument"].lower() == 'niriss':
                 module = detector[0]
             elif self.params["Inst"]["instrument"].lower() == 'fgs':
@@ -3186,23 +3196,23 @@ class Catalog_seed():
                                                        '/zero/'
             else:
                 if self.params['Inst']['instrument'].lower() != 'fgs':
-                    psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
+                    psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, shortdetector,
                                                              'psfxpos', 'psfypos',
                                                              self.params['Readout'][usefilt].lower(),
                                                              str(wfe), str(wfegroup))
                 else:
-                    psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, detector,
+                    psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, shortdetector,
                                                              'psfxpos', 'psfypos',
                                                              str(wfe), str(wfegroup))
 
                 psfname = psfname.replace('psfxpos', '1024')
                 psfname = psfname.replace('psfypos', '1024')
                 if self.params['Inst']['instrument'].lower() != 'fgs':
-                    pathaddition = "{}/{}/{}".format(detector,
+                    pathaddition = "{}/{}/{}".format(shortdetector,
                                                      self.params['Readout'][usefilt].lower(),
                                                      str(wfe))
                 else:
-                    pathaddition = "{}/{}".format(detector, str(wfe))
+                    pathaddition = "{}/{}".format(shortdetector, str(wfe))
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
@@ -3481,27 +3491,24 @@ class Catalog_seed():
                    "Setting to {}".format(value, typ, default)))
             return default
 
-    # def readSubarrayDefinitionFile(self):
+    def readSubarrayDefinitionFile(self):
         # read in the file that contains a list of subarray names and positions on the detector
 
-    #    try:
-    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-    #    except:
-    #        raise RuntimeError("Error: could not read in subarray definitions file: {}".format(self.params['Reffiles']['subarray_defs']))
+        try:
+            self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
+        except:
+            raise RuntimeError("Error: could not read in subarray definitions file: {}".format(self.params['Reffiles']['subarray_defs']))
 
-    def getSubarrayBounds(self):
+    def get_subarray_info(self):
         # find the bounds of the requested subarray
         if self.params['Readout']['array_name'] in self.subdict['AperName']:
             mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
-            # self.subarray_bounds = [self.subdict['xstart'].data[mtch][0], self.subdict['ystart'].data[mtch][0], self.subdict['xend'].data[mtch][0], self.subdict['yend'].data[mtch][0]]
-            # self.refpix_pos = {'x':self.subdict['refpix_x'].data[mtch][0], 'y':self.subdict['refpix_y'][mtch][0], 'v2':self.subdict['refpix_v2'].data[mtch][0], 'v3':self.subdict['refpix_v3'].data[mtch][0]}
-
             namps = self.subdict['num_amps'].data[mtch][0]
             if namps != 0:
                 self.params['Readout']['namp'] = namps
             else:
                 if ((self.params['Readout']['namp'] == 1) or
-                    (self.params['Readout']['namp'] == 4)):
+                   (self.params['Readout']['namp'] == 4)):
                     print(("CAUTION: Aperture {} can be used with either "
                            "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
                     print("or a 4-amp readout. The difference is a factor of 4 in")
