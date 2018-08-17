@@ -1028,11 +1028,7 @@ class Catalog_seed():
 
             # If distortion is to be included - either with or without the full set of coordinate
             # translation coefficients
-            #if self.runStep['astrometric']:
             pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
-            # else:
-                # No distortion at all - "manual mode"
-            #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
         else:
             # Case where the point source list entry locations are given in units of pixels
@@ -2137,16 +2133,7 @@ class Catalog_seed():
             # case where point source list entries are given with RA and Dec
             if not pixelflag:
 
-                # if distortion is to be included
-                #if self.runStep['astrometric']:
-
-                # Call is the same regardless of whether distortion reference file
-                # is given or not
                 pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
-
-                #else:
-                #    # No distortion. Fall back to "manual" calculations
-                #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
             else:
                 # case where the point source list entry locations are given in units of pixels
@@ -2510,14 +2497,7 @@ class Catalog_seed():
                 # Case where point source list entries are given with RA and Dec
                 if not pixelflag:
 
-                    # If distortion is to be included - either with or without the full set of coordinate
-                    # translation coefficients
-                    #if self.runStep['astrometric']:
-                    # Same function call regardless of whether distortion file is provided or not
                     pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
-                    #else:
-                    #    # No distortion at all - "manual mode"
-                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
 
                 else:
                     # Case where the point source list entry locations are given in units of pixels
