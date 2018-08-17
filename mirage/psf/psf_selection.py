@@ -56,10 +56,10 @@ class PSFCollection:
         self.x_index = []
         self.y_index = []
         for num in range(self.num_psfs):
-            yval, xval = literal_eval(self.library_info['DET_XY' + str(num)])
+            yval, xval = literal_eval(self.library_info['DET_YX' + str(num)])
             self.x_det.append(xval)
             self.y_det.append(yval)
-            yi, xi = literal_eval(self.library_info['DET_IJ' + str(num)])
+            yi, xi = literal_eval(self.library_info['DET_JI' + str(num)])
             self.x_index.append(xi)
             self.y_index.append(yi)
         self.interpolator = self.create_interpolator()
