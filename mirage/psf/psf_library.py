@@ -12,8 +12,8 @@ class CreatePSFLibrary:
     Class Description:
     -----------------
     Class to create a PSF library in the following format:
-        For a given instrument, 1 file per filter in the form [SCA, i, j, x, y] where
-        (i,j) is the PSF position on the detector grid (integer positions) and (x,y)
+        For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
+        (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
         is the 2D PSF.
 
     This class must be run separately for each instrument.
@@ -219,8 +219,8 @@ class CreatePSFLibrary:
         """
         This method creates the following:
 
-        For a given instrument, 1 file per filter in the form [SCA, i, j, x, y] where
-        (i,j) is the PSF position on the detector grid (integer positions) and (x,y)
+        For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
+        (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
         is the 2D PSF.
 
         All variables needed to run this method are defined during the creation for the
@@ -229,7 +229,7 @@ class CreatePSFLibrary:
         Returns:
         -------
         This saves out the library files if requested and then returns a list of all the
-        hdulist objects created (each in the form of [SCA, i, j, x, y], 1 per filter
+        hdulist objects created (each in the form of [SCA, j, i, y, x], 1 per filter
         requested).
 
         """
@@ -250,8 +250,8 @@ class CreatePSFLibrary:
         """
         This method is called in the create_files() method
 
-        For a given instrument, 1 file per filter in the form [SCA, i, j, x, y] where
-        (i,j) is the PSF position on the detector grid (integer positions) and (x,y)
+        For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
+        (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
         is the 2D PSF.
 
         Parameters filter_list and detector_list are defined in the create_files method
@@ -259,7 +259,7 @@ class CreatePSFLibrary:
         Returns:
         -------
         This saves out the library files if requested and then returns a list of all the
-        hdulist objects created (each in the form of [SCA, i, j, x, y], 1 per filter
+        hdulist objects created (each in the form of [SCA, j, i, y, x], 1 per filter
         requested).
 
         """
@@ -276,7 +276,7 @@ class CreatePSFLibrary:
             self.webb.options['output_mode'] = 'Oversampled Image'
             self.webb.filter = filt
 
-            # Create an array to fill ([SCA, i, j, x, y])
+            # Create an array to fill ([SCA, j, i, y, x])
             psf_size = self.fov_pixels * self.oversample
             psf_arr = np.empty((len(detector_list), self.length, self.length, psf_size, psf_size))
 
@@ -288,7 +288,7 @@ class CreatePSFLibrary:
 
                 # For each of the 9 locations on the detector (loc = tuple = (x,y))
                 for (i, j), loc in zip(self.ij_list, self.location_list):
-                    self.webb.detector_position = loc  # (X,Y)
+                    self.webb.detector_position = loc  # (X,Y) - line 286 in webbpsf_core
 
                     # Create PSF
                     psf = self.webb.calc_psf(fov_pixels=self.fov_pixels, oversample=self.oversample)
@@ -297,7 +297,7 @@ class CreatePSFLibrary:
                     psf_conv = astropy.convolution.convolve(psf[0].data, kernel)
 
                     # Add PSF to 5D array
-                    psf_arr[k, i, j, :, :] = psf_conv
+                    psf_arr[k, j, i, :, :] = psf_conv
 
             # Write header
             header = fits.Header()
@@ -311,10 +311,10 @@ class CreatePSFLibrary:
             header["FOVPIXEL"] = (self.fov_pixels, "Field of view in pixels (full array)")
             header["OVERSAMP"] = (self.oversample, "Oversampling factor for FFTs in computation")
 
-            for k, ij in enumerate(self.ij_list):
-                header["DET_IJ{}".format(k)] = (str(ij), "The #{} PSF's (i,j) detector position".format(k))
-                header["DET_XY{}".format(k)] = (str(self.location_list[k]),
-                                                "The #{} PSF's (x,y) detector pixel position".format(k))
+            for k, ij in enumerate(self.ij_list):  # these were originally written out in (i,j) and (x,y)
+                header["DET_JI{}".format(k)] = (str((ij[1], ij[0])), "The #{} PSF's (j,i) detector position".format(k))
+                header["DET_YX{}".format(k)] = (str((self.location_list[k][1], self.location_list[k][0])),
+                                                "The #{} PSF's (y,x) detector pixel position".format(k))
 
             header["NUM_PSFS"] = (self.num_psfs, "The total number of fiducial PSFs")
 
@@ -334,11 +334,11 @@ class CreatePSFLibrary:
             header["DATAVERS"] = (psf[0].header["DATAVERS"], "WebbPSF reference data files version ")
 
             # Add descriptor for how the file was made
-            header["COMMENT"] = "For a given instrument, 1 file per filter in the form [SCA, i, j, x, y]"
-            header["COMMENT"] = "where (i,j) is the PSF position on the detector grid (integer "
-            header["COMMENT"] = "positions) and (x,y) is the 2D PSF. The order of the detectors can be "
+            header["COMMENT"] = "For a given instrument, 1 file per filter in the form [SCA, j, i, y, x]"
+            header["COMMENT"] = "where (j,i) is the PSF position on the detector grid (integer "
+            header["COMMENT"] = "positions) and (y,x) is the 2D PSF. The order of the detectors can be "
             header["COMMENT"] = "found under the  header DETNAME* keywords and the order of the fiducial "
-            header["COMMENT"] = "PSFs ((i,j) and (x,y)) under the header DET_IJ*/DET_XY* keywords"
+            header["COMMENT"] = "PSFs ((j,i) and (y,x)) under the header DET_JI*/DET_YX* keywords"
 
             # Add header labels
             header.insert("INSTRUME", ('', ''))
