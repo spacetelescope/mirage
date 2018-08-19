@@ -1,3 +1,10 @@
+""" Generate "PSF Library" files to run with MIRAGE.
+
+Authors
+-------
+    - Shannon Osborne
+"""
+
 import os
 import itertools
 
@@ -35,7 +42,7 @@ class CreatePSFLibrary:
         only run 1 instrument at a time. Right now this is only set up for NIRCam,
         NIRISS, and FGS (they are 2048x2048)
 
-    filters: str or list
+    filters: str or list, optional
         Which filter(s) you want to create a library for.
 
         Can be a string of 1 filter name, a list of filter names (as strings), or
@@ -43,7 +50,7 @@ class CreatePSFLibrary:
         attribute of webbpsf.INSTR(). Spelling/capitalization must match what
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
-    detectors: str or list
+    detectors: str or list, optional
         Which detector(s) you want to create a library for.
 
         Can be a string of 1 detector name, a list of detector names (as strings), or
@@ -51,30 +58,30 @@ class CreatePSFLibrary:
         attribute of webbpsf.INSTR(). Spelling/capitalization must match what
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
-    fov_pixels: int
+    fov_pixels: int, optional
         The field of view in undersampled detector pixels used by WebbPSF when
         creating the PSFs. Default is 101 pixels.
 
-    oversample: int
+    oversample: int, optional
         The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
 
-    num_psfs: int
+    num_psfs: int, optional
         The total number of fiducial PSFs to be created and saved in the files. This
         number must be a square number. Default is 16.
         E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
 
-    save: bool
+    save: bool, optional
         True/False boolean if you want to save your file
 
-    fileloc: str
+    fileloc: str, optional
         Where to save your file if "save" keyword is set to True. Default of None
         will save in the current directory
 
-    filename: str
+    filename: str, optional
         The name to save your current file under if "save" keyword is set to True.
         Default of None will save it as "INSTRNAME_FILTERNAME.fits"
 
-    overwrite: bool
+    overwrite: bool, optional
         True/False boolean to overwrite the output file if it already exists.
 
 
@@ -97,6 +104,49 @@ class CreatePSFLibrary:
 
     nrca_short_detectors = ['NRCA1', 'NRCA2', 'NRCA3', 'NRCA4', 'NRCB1', 'NRCB2', 'NRCB3', 'NRCB4']
     nrca_long_detectors = ['NRCA5', 'NRCB5']
+
+    def __init__(self, instrument, filters="all", detectors="all",
+                 fov_pixels=101, oversample=5, num_psfs=16, save=True,
+                 fileloc=None, filename=None, overwrite=True):
+
+        # Pull correct capitalization of instrument name
+        webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
+                             "MIRI": "MIRI", "FGS": "FGS"}
+
+        self.instr = webbpsf_name_dict[instrument.upper()]
+
+        # Create instance of instrument in WebbPSF (same as webbpsf.instr)
+        self.webb = getattr(webbpsf, self.instr)()
+
+        # Set the filters and detectors based on the inputs
+        self.filter_input = filters
+        self.detector_input = detectors
+
+        self.filter_list = self._set_filters()
+        self.detector_list = self._set_detectors()
+
+        # Set the locations on the detector of the fiducial PSFs
+        self.ij_list, self.location_list = self._set_psf_locations(num_psfs)
+
+        # For NIRCam: Check if filters/detectors match in terms of if they are longwave/shortwave
+        # The "all" case will be updated later
+        if self.instr == "NIRCam" and (self.filter_input, self.detector_input) != ("all", "all"):
+            for det in self.detector_list:
+                if "5" in det:
+                    [self._raise_value_error("short filter", det, filt) for filt in
+                     self.filter_list if filt in CreatePSFLibrary.nrca_short_filters]
+
+                else:
+                    [self._raise_value_error("long filter", det, filt) for filt in
+                     self.filter_list if filt in CreatePSFLibrary.nrca_long_filters]
+
+        # Set PSF attributes
+        self.fov_pixels = fov_pixels
+        self.oversample = oversample
+        self.save = save
+        self.overwrite = overwrite
+        self.fileloc = fileloc
+        self.filename = filename
 
     def _set_filters(self):
         """ Get the list of filters to create PSF library files for """
@@ -172,48 +222,6 @@ class CreatePSFLibrary:
         location_list = list(itertools.product(self.loc_list, self.loc_list))  # list of tuples
 
         return ij_list, location_list
-
-    def __init__(self, instrument, filters="all", detectors="all", fov_pixels=101, oversample=5, num_psfs=16,
-                 save=True, fileloc=None, filename=None, overwrite=True):
-
-        # Pull correct capitalization of instrument name
-        webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
-                             "MIRI": "MIRI", "FGS": "FGS"}
-
-        self.instr = webbpsf_name_dict[instrument.upper()]
-
-        # Create instance of instrument in WebbPSF (same as webbpsf.instr)
-        self.webb = getattr(webbpsf, self.instr)()
-
-        # Set the filters and detectors based on the inputs
-        self.filter_input = filters
-        self.detector_input = detectors
-
-        self.filter_list = self._set_filters()
-        self.detector_list = self._set_detectors()
-
-        # Set the locations on the detector of the fiducial PSFs
-        self.ij_list, self.location_list = self._set_psf_locations(num_psfs)
-
-        # For NIRCam: Check if filters/detectors match in terms of if they are longwave/shortwave
-        # The "all" case will be updated later
-        if self.instr == "NIRCam" and (self.filter_input, self.detector_input) != ("all", "all"):
-            for det in self.detector_list:
-                if "5" in det:
-                    [self._raise_value_error("short filter", det, filt) for filt in
-                     self.filter_list if filt in CreatePSFLibrary.nrca_short_filters]
-
-                else:
-                    [self._raise_value_error("long filter", det, filt) for filt in
-                     self.filter_list if filt in CreatePSFLibrary.nrca_long_filters]
-
-        # Set PSF attributes
-        self.fov_pixels = fov_pixels
-        self.oversample = oversample
-        self.save = save
-        self.overwrite = overwrite
-        self.fileloc = fileloc
-        self.filename = filename
 
     def create_files(self):
         """
