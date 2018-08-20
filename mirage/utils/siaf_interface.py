@@ -22,6 +22,40 @@ import numpy as np
 
 import pysiaf
 from pysiaf import iando
+from ..utils import rotations
+from ..utils import set_telescope_pointing_separated as set_telescope_pointing
+
+
+def get_siaf_information(instrument, aperture, ra, dec, telescope_roll):
+    """Use pysiaf to get aperture information
+
+    Parameters:
+    -----------
+    instrument : str
+        Instrument name.
+
+    aperture : str
+        Aperture name (e.g. "NRCA1_FULL")
+
+    Returns:
+    --------
+    None
+    """
+    siaf = pysiaf.Siaf(instrument)[aperture]
+    local_roll = set_telescope_pointing.compute_local_roll(telescope_roll,
+                                                           ra, dec, siaf.V2Ref,
+                                                           siaf.V3Ref)
+    # Create attitude_matrix
+    att_matrix = rotations.attitude(siaf.V2Ref, siaf.V3Ref, ra, dec, local_roll)
+
+    # Get full frame size
+    fullframesize = siaf.XDetSize
+
+    # Subarray boundaries in full frame coordinates
+    xcorner, ycorner = sci_subarray_corners(instrument, aperture)
+    subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
+    return siaf, local_roll, att_matrix, fullframesize, subarray_boundaries
+
 
 def sci_subarray_corners(instrument, aperture_name, verbose=False):
     """Return the two opposing aperture corners in the SIAF Science frame of the full-frame SCA.

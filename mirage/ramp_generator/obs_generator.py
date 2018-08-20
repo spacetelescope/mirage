@@ -20,7 +20,7 @@ from astropy.table import Table
 from astropy.time import Time, TimeDelta
 
 from . import unlinearize
-from ..utils import read_fits, utils
+from ..utils import read_fits, utils, siaf_interface
 from ..utils import set_telescope_pointing_separated as stp
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
@@ -106,8 +106,11 @@ class Observation():
         # Some basic checks on the inputs to make sure
         # the script won't have to abort due to bad inputs
         # self.checkParams()
-        self.readSubarrayDefinitionFile()
-        self.getSubarrayBounds()
+        self.subdict = utils.read_subarray_definition_file(self.params['Reffiles']['subarray_defs'])
+       # self.readSubarrayDefinitionFile()
+        self.params = utils.get_subarray_info(self.params, self.subdict)
+
+        #self.getSubarrayBounds()
         self.checkParams()
 
         # Read in cosmic ray library files if
@@ -133,17 +136,18 @@ class Observation():
 
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
-        seeddim = len(self.seed.shape)
-        if seeddim == 4:
-            temp_frame = self.seed[0, 0, :, :]
-        elif seeddim == 3:
-            temp_frame = self.seed[0, :, :]
-        elif seeddim == 2:
-            temp_frame = self.seed
-        tmpy, tmpx = temp_frame.shape
+        #seeddim = len(self.seed.shape)
+        #if seeddim == 4:
+        #    temp_frame = self.seed[0, 0, :, :]
+        #elif seeddim == 3:
+        #    temp_frame = self.seed[0, :, :]
+        #elif seeddim == 2:
+        #    temp_frame = self.seed
+        #tmpy, tmpx = temp_frame.shape
+        tmpy, tmpx = self.seed.shape[-2:]
         #self.calcFrameTime(temp_frame)
         self.frametime = utils.calc_frame_time(self.instrument, self.params['Readout']['array_name'],
-                                         tmpx, tmpy, self.params['Readout']['namp'])
+                                               tmpx, tmpy, self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
 
         # Calculate the rate of cosmic ray hits expected per frame
@@ -389,7 +393,7 @@ class Observation():
                                 'subarray_defs', 'readpattdefs',
                                 'linearity', 'saturation', 'gain',
                                 'pixelflat', 'illumflat',
-                                'astrometric', 'distortion_coeffs',
+                                'astrometric',
                                 'ipc', 'crosstalk', 'occult',
                                 'filtpupilcombo', 'pixelAreaMap',
                                 'flux_cal'],
@@ -443,13 +447,13 @@ class Observation():
         except:
             raise IOError("WARNING: unable to open {}".format(self.paramfile))
 
-    def readSubarrayDefinitionFile(self):
-        # Read in the file that contains a list of subarray
-        # names and positions on the detector
-        try:
-            self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-        except:
-            raise IOError("Error: could not read in subarray definitions file.")
+    #def readSubarrayDefinitionFile(self):
+    #    # Read in the file that contains a list of subarray
+    #    # names and positions on the detector
+    #    try:
+    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
+    #    except:
+    #        raise IOError("Error: could not read in subarray definitions file.")
 
     def readSaturationFile(self):
         # Read in saturation map
@@ -557,45 +561,70 @@ class Observation():
                 apply += (cof[i, :, :] * data**i)
         return apply
 
-    def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
-        # From the table of distortion coefficients,
-        # get the coeffs that correspond to the requested
-        # transformation and return as a list for x and another for y
-        match = table['AperName'] == aperture
-        if np.any(match) == False:
-            raise ValueError(("Aperture name {} not found in input CSV "
-                              "file.".format(aperture)))
+    #def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
+    #    # From the table of distortion coefficients,
+    #    # get the coeffs that correspond to the requested
+    #    # transformation and return as a list for x and another for y
 
-        row = table[match]
+    #    if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
+    #        table = ascii.read(self.params['Reffiles']['distortion_coeffs'],
+    #                           header_start=1, format='csv')
 
-        if ((from_sys == 'science') & (to_sys == 'ideal')):
-            label = 'Sci2Idl'
-        elif ((from_sys == 'ideal') & (to_sys == 'science')):
-            label = 'Idl2Sci'
-        else:
-            raise ValueError(("WARNING: from_sys of {} and to_sys of {} not a "
-                              "valid transformation.".format(from_sys, to_sys)))
+    #    match = table['AperName'] == aperture
+    #    if np.any(match) == False:
+    #        raise ValueError(("Aperture name {} not found in input CSV "
+    #                          "file.".format(aperture)))
 
-        # Get the coefficients, return as list
-        X_cols = [c for c in row.colnames if label+'X' in c]
-        Y_cols = [c for c in row.colnames if label+'Y' in c]
-        x_coeffs = [row[c].data[0] for c in X_cols]
-        y_coeffs = [row[c].data[0] for c in Y_cols]
+    #    row = table[match]
 
-        # Also get the V2, V3 values of the reference pixel
-        v2ref = row['V2Ref'].data[0]
-        v3ref = row['V3Ref'].data[0]
+    #    if ((from_sys == 'science') & (to_sys == 'ideal')):
+    #        label = 'Sci2Idl'
+    #    elif ((from_sys == 'ideal') & (to_sys == 'science')):
+    #        label = 'Idl2Sci'
+    #    else:
+    #        raise ValueError(("WARNING: from_sys of {} and to_sys of {} not a "
+    #                          "valid transformation.".format(from_sys, to_sys)))
 
-        # Get parity and V3 Y angle info
-        parity = row['VIdlParity'].data[0]
-        yang = row['V3IdlYAngle'].data[0]
-        v3scixang = row['V3SciXAngle'].data[0]
+    #    # Get the coefficients, return as list
+    #    X_cols = [c for c in row.colnames if label+'X' in c]
+    #    Y_cols = [c for c in row.colnames if label+'Y' in c]
+    #    x_coeffs = [row[c].data[0] for c in X_cols]
+    #    y_coeffs = [row[c].data[0] for c in Y_cols]
 
-        # Get pixel scale info - not used but needs to be in output
-        xsciscale = row['XSciScale'].data[0]
-        ysciscale = row['YSciScale'].data[0]
+    #    # Also get the V2, V3 values of the reference pixel
+    #    v2ref = row['V2Ref'].data[0]
+    #    v3ref = row['V3Ref'].data[0]
 
-        return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
+    #    # Get parity and V3 Y angle info
+    #    parity = row['VIdlParity'].data[0]
+    #    yang = row['V3IdlYAngle'].data[0]
+    #    v3scixang = row['V3SciXAngle'].data[0]
+
+    #    # Get pixel scale info - not used but needs to be in output
+    #    xsciscale = row['XSciScale'].data[0]
+    #    ysciscale = row['YSciScale'].data[0]
+
+    #    return v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
+
+    #def get_distortion_coefficients(self):
+        """Get distortion-related information from the siaf. These values are
+        not available inside distortion reference files.
+
+        Parameters:
+        -----------
+        none
+
+        Returns:
+        --------
+        none
+        """
+    #    self.v2_ref = self.siaf.V2Ref
+    #    self.v3_ref = self.siaf.V3Ref
+    #    self.parity = self.siaf.VIdlParity
+    #    self.v3yang = self.siaf.V3IdlYAngle
+    #    self.xsciscale = self.siaf.XSciScale
+    #    self.ysciscale = self.siaf.YSciScale
+    #    self.v3scixang = self.siaf.V3SciXAngle
 
     def get_nonlinearity_coeffs(self):
         if self.params['Reffiles']['linearity'] is not None:
@@ -905,18 +934,18 @@ class Observation():
         outModel.meta.wcsinfo.wcsaxes = 2
         outModel.meta.wcsinfo.crval1 = self.ra
         outModel.meta.wcsinfo.crval2 = self.dec
-        outModel.meta.wcsinfo.crpix1 = self.refpix_pos['x']+1.
-        outModel.meta.wcsinfo.crpix2 = self.refpix_pos['y']+1.
+        outModel.meta.wcsinfo.crpix1 = self.siaf.XSciRef
+        outModel.meta.wcsinfo.crpix2 = self.siaf.YSciRef
         outModel.meta.wcsinfo.ctype1 = 'RA---TAN'
         outModel.meta.wcsinfo.ctype2 = 'DEC--TAN'
         outModel.meta.wcsinfo.cunit1 = 'deg'
         outModel.meta.wcsinfo.cunit2 = 'deg'
-        outModel.meta.wcsinfo.v2_ref = self.v2_ref
-        outModel.meta.wcsinfo.v3_ref = self.v3_ref
-        outModel.meta.wcsinfo.vparity = self.parity
-        outModel.meta.wcsinfo.v3yangle = self.v3yang
-        outModel.meta.wcsinfo.cdelt1 = self.xsciscale / 3600.
-        outModel.meta.wcsinfo.cdelt2 = self.ysciscale / 3600.
+        outModel.meta.wcsinfo.v2_ref = self.siaf.V2Ref
+        outModel.meta.wcsinfo.v3_ref = self.siaf.V3Ref
+        outModel.meta.wcsinfo.vparity = self.siaf.VIdlParity
+        outModel.meta.wcsinfo.v3yangle = self.siaf.V3IdlYAngle
+        outModel.meta.wcsinfo.cdelt1 = self.siaf.XSciScale / 3600.
+        outModel.meta.wcsinfo.cdelt2 = self.siaf.YSciScale / 3600.
         outModel.meta.wcsinfo.roll_ref = self.local_roll
         outModel.meta.target.ra = self.ra
         outModel.meta.target.dec = self.dec
@@ -1160,14 +1189,13 @@ class Observation():
         outModel[1].header['CTYPE2'] = 'DEC--TAN'
         outModel[1].header['CUNIT1'] = 'deg'
         outModel[1].header['CUNIT2'] = 'deg'
-        outModel[1].header['V2_REF'] = self.v2_ref
-        outModel[1].header['V3_REF'] = self.v3_ref
-        outModel[1].header['VPARITY'] = self.parity
-        outModel[1].header['V3I_YANG'] = self.v3yang
-        outModel[1].header['CDELT1'] = self.xsciscale / 3600.
-        outModel[1].header['CDELT2'] = self.ysciscale / 3600.
+        outModel[1].header['V2_REF'] = self.siaf.V2Ref
+        outModel[1].header['V3_REF'] = self.siaf.V3Ref
+        outModel[1].header['VPARITY'] = self.siaf.VIdlParity
+        outModel[1].header['V3I_YANG'] = self.siaf.V3IdlYAngle
+        outModel[1].header['CDELT1'] = self.siaf.XSciScale / 3600.
+        outModel[1].header['CDELT2'] = self.siaf.YSciScale / 3600.
         outModel[1].header['ROLL_REF'] = self.local_roll
-
         outModel[0].header['TARG_RA'] = self.ra #not correct
         outModel[0].header['TARG_DEC'] = self.dec #not correct
 
@@ -1389,30 +1417,30 @@ class Observation():
             self.subarray_bounds = [self.subdict['xstart'].data[mtch][0], self.subdict['ystart'].data[mtch][0], self.subdict['xend'].data[mtch][0], self.subdict['yend'].data[mtch][0]]
             self.refpix_pos = {'x':self.subdict['refpix_x'].data[mtch][0], 'y':self.subdict['refpix_y'][mtch][0], 'v2':self.subdict['refpix_v2'].data[mtch][0], 'v3':self.subdict['refpix_v3'].data[mtch][0]}
 
-            namps = self.subdict['num_amps'].data[mtch][0]
-            if namps != 0:
-                self.params['Readout']['namp'] = namps
-            else:
-                if ((self.params['Readout']['namp'] == 1) or (self.params['Readout']['namp'] == 4)):
-                    print(("CAUTION: Aperture {} can be used with either "
-                           "a 1-amp"
-                           .format(self.subdict['AperName'].data[mtch][0])))
-                    print("or a 4-amp readout. The difference is a factor of 4 in")
-                    print(("readout time. You have requested {} amps."
-                           .format(self.params['Readout']['namp'])))
-                else:
-                    print(("WARNING: {} requires the number of amps to "
-                           "be 1 or 4. You have requested {}."
-                           .format(self.params['Readout']['array_name']
-                                   , self.params['Readout']['namp'])))
-                    sys.exit()
+            #namps = self.subdict['num_amps'].data[mtch][0]
+            #if namps != 0:
+            #    self.params['Readout']['namp'] = namps
+            #else:
+            #    if ((self.params['Readout']['namp'] == 1) or (self.params['Readout']['namp'] == 4)):
+            #        print(("CAUTION: Aperture {} can be used with either "
+            #               "a 1-amp"
+            #               .format(self.subdict['AperName'].data[mtch][0])))
+            #        print("or a 4-amp readout. The difference is a factor of 4 in")
+            #        print(("readout time. You have requested {} amps."
+            #               .format(self.params['Readout']['namp'])))
+            #    else:
+            #        print(("WARNING: {} requires the number of amps to "
+            #               "be 1 or 4. You have requested {}."
+            #               .format(self.params['Readout']['array_name']
+            #                       , self.params['Readout']['namp'])))
+            #        sys.exit()
 
-        else:
-            print(("WARNING: subarray name {} not found in the subarray "
-                   "dictionary {}."
-                   .format(self.params['Readout']['array_name']
-                           , self.params['Reffiles']['subarray_defs'])))
-            sys.exit()
+        #else:
+        #    print(("WARNING: subarray name {} not found in the subarray "
+        #           "dictionary {}."
+        #           .format(self.params['Readout']['array_name']
+        #                   , self.params['Reffiles']['subarray_defs'])))
+        #    sys.exit()
 
 
     def getCRrate(self):
@@ -2511,7 +2539,7 @@ class Observation():
         self.runStep['pixelflat'] = self.checkRunStep(self.params['Reffiles']['pixelflat'])
         self.runStep['illuminationflat'] = self.checkRunStep(self.params['Reffiles']['illumflat'])
         self.runStep['astrometric'] = self.checkRunStep(self.params['Reffiles']['astrometric'])
-        self.runStep['distortion_coeffs'] = self.checkRunStep(self.params['Reffiles']['distortion_coeffs'])
+        # self.runStep['distortion_coeffs'] = self.checkRunStep(self.params['Reffiles']['distortion_coeffs'])
         self.runStep['ipc'] = self.checkRunStep(self.params['Reffiles']['ipc'])
         self.runStep['crosstalk'] = self.checkRunStep(self.params['Reffiles']['crosstalk'])
         self.runStep['occult'] = self.checkRunStep(self.params['Reffiles']['occult'])
@@ -2580,16 +2608,16 @@ class Observation():
         #transform from RA, Dec to x, y than the astrometric distortion reference file above.
         #The file above can be off by ~20 pixels in the corners of the array. This file will give
         #exact answers
-        if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
-            distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],
-                                         header_start=1, format='csv')
-        else:
-            print(("WARNING: Input distortion coefficients file {} "
-                   "does not exist."
-                   .format(self.params['Reffiles']['distortion_coeffs'])))
-            sys.exit()
+        #if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
+        #    distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'],
+        #                                 header_start=1, format='csv')
+        #else:
+        #    print(("WARNING: Input distortion coefficients file {} "
+        #           "does not exist."
+        #           .format(self.params['Reffiles']['distortion_coeffs'])))
+        #    sys.exit()
 
-        self.x_sci2idl, self.y_sci2idl, self.v2_ref, self.v3_ref, self.parity, self.v3yang, self.xsciscale, self.ysciscale, self.v3scixang = self.getDistortionCoefficients(distortionTable, 'science', 'ideal', ap_name)
+        #self.x_sci2idl, self.y_sci2idl, self.v2_ref, self.v3_ref, self.parity, self.v3yang, self.xsciscale, self.ysciscale, self.v3scixang = self.getDistortionCoefficients(distortionTable, 'science', 'ideal', ap_name)
 
         # Convert the input RA and Dec of the pointing position into floats
         # check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -2612,10 +2640,23 @@ class Observation():
                    .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
 
+        # Get SIAF-realted information and subarray bounds
+        siaf_inst = self.params['Inst']['instrument']
+        if siaf_inst.lower() == 'nircam':
+            siaf_inst = 'NIRCam'
+        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+                                                                       self.params['Readout']['array_name'],
+                                                                       self.ra, self.dec,
+                                                                       self.params['Telescope']['rotation'])
+
+        # Get distortion-related information to be used to populate the output
+        # file header
+        #self.get_distortion_coefficients()
         # From the pointing info above, calculate the local roll angle
         # This is used only when saving the output
-        self.local_roll = stp.compute_local_roll(
-            self.params['Telescope']['rotation'], self.ra, self.dec, self.v2_ref, self.v3_ref)
+        # self.local_roll = stp.compute_local_roll(
+        #    self.params['Telescope']['rotation'], self.ra, self.dec, self.v2_ref, self.v3_ref)
 
         # Check that the various scaling factors are floats and
         # within a reasonable range

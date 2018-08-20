@@ -22,7 +22,7 @@ import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 
-from ..utils import read_fits
+from ..utils import read_fits, utils, siaf_interface
 
 # Allowed instruments
 INST_LIST = ['nircam', 'niriss', 'fgs']
@@ -68,11 +68,18 @@ class DarkPrep():
         self.checkParams()
 
         # Read in the subarray definition file
-        self.readSubarrayDefinitionFile()
+        self.subdict = utils.read_subarray_definition_file(self.params['Reffiles']['subarray_defs'])
+        self.params = utils.get_subarray_info(self.params, self.subdict)
 
-        # Define the subarray bounds from param file
-        self.getSubarrayBounds()
-
+        # Get the subarray boundaries from pysiaf
+        siaf_inst = self.params['Inst']['instrument']
+        if siaf_inst.lower() == 'nircam':
+            siaf_inst = 'NIRCam'
+        self.siaf, junk0, junk1, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+                                                                       self.params['Readout']['array_name'],
+                                                                       0.0, 0.0,
+                                                                       self.params['Telescope']['rotation'])
         # Read in the input dark current frame
         if not self.runStep['linearized_darkfile']:
             self.getBaseDark()
@@ -248,7 +255,7 @@ class DarkPrep():
                                  'superbias', 'subarray_defs', 'readpattdefs',
                                  'linearity', 'saturation', 'gain', 'pixelflat',
                                  'illumflat', 'astrometric', 'badpixmask',
-                                 'distortion_coeffs', 'ipc', 'crosstalk',
+                                 'ipc', 'crosstalk',
                                  'occult', 'pixelAreaMap'],
                     'cosmicRay': ['path'],
                     'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
@@ -839,13 +846,13 @@ class DarkPrep():
             print("WARNING: subarray name {} not found in the subarray dictionary {}.".format(self.params['Readout']['array_name'], self.params['Reffiles']['subarray_defs']))
             sys.exit()
 
-    def readSubarrayDefinitionFile(self):
-        #read in the file that contains a list of subarray names and positions on the detector
-        try:
-            self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-        except:
-            print("Error: could not read in subarray definitions file.")
-            sys.exit()
+    #def readSubarrayDefinitionFile(self):
+    #    #read in the file that contains a list of subarray names and positions on the detector
+    #    try:
+    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
+    #    except:
+    #        print("Error: could not read in subarray definitions file.")
+    #        sys.exit()
 
     def readParameterFile(self):
         #read in the parameter file

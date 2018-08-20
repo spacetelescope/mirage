@@ -99,15 +99,10 @@ class Catalog_seed():
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
         self.params['Output']['file'] = self.basename + self.params['Output']['file'][-5:]
-        siaf_inst = self.params['Inst']['instrument']
-        if siaf_inst.lower() == 'nircam':
-            siaf_inst = 'NIRCam'
-        self.readSubarrayDefinitionFile()
+        self.subdict = utils.read_subarray_definition_file(self.params['Reffiles']['subarray_defs'])
         self.check_params()
-        self.get_siaf_information(siaf_inst, self.params['Readout']['array_name'])
-        self.get_subarray_info()
+        self.params = utils.get_subarray_info(self.params, self.subdict)
         self.coord_transform = self.read_distortion_reffile()
-        # self.instrument_specific_dicts(self.params['Inst']['instrument'].lower())
 
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
@@ -197,35 +192,35 @@ class Catalog_seed():
         base_table.add_column(det_column, index = 0)
         return base_table
 
-    def get_siaf_information(self, instrument, aperture):
-        """Use pysiaf to get aperture information
+    #def get_siaf_information(self, instrument, aperture):
+    #    """Use pysiaf to get aperture information
 
-        Parameters:
-        -----------
-        instrument : str
-            Instrument name.
+    #    Parameters:
+    #    -----------
+    #    instrument : str
+    #        Instrument name.
 
-        aperture : str
-            Aperture name (e.g. "NRCA1_FULL")
+    #    aperture : str
+    #        Aperture name (e.g. "NRCA1_FULL")
 
-        Returns:
-        --------
-        None
-        """
-        self.siaf = pysiaf.Siaf(instrument)[aperture]
-        self.local_roll = set_telescope_pointing.compute_local_roll(self.params['Telescope']['rotation'],
-                                                                    self.ra, self.dec, self.siaf.V2Ref,
-                                                                    self.siaf.V3Ref)
-        # Create attitude_matrix
-        self.attitude_matrix = rotations.attitude(self.siaf.V2Ref, self.siaf.V3Ref, self.ra, self.dec,
-                                                  self.local_roll)
+    #    Returns:
+    #    --------
+    #    None
+    #    """
+    #    self.siaf = pysiaf.Siaf(instrument)[aperture]
+    #    self.local_roll = set_telescope_pointing.compute_local_roll(self.params['Telescope']['rotation'],
+    #                                                                self.ra, self.dec, self.siaf.V2Ref,
+    #                                                                self.siaf.V3Ref)
+    #    # Create attitude_matrix
+    #    self.attitude_matrix = rotations.attitude(self.siaf.V2Ref, self.siaf.V3Ref, self.ra, self.dec,
+    #                                              self.local_roll)
 
-        # Get full frame size
-        self.ffsize = self.siaf.XDetSize
+    #    # Get full frame size
+    #    self.ffsize = self.siaf.XDetSize
 
-        # Subarray boundaries in full frame coordinates
-        xcorner, ycorner = siaf_interface.sci_subarray_corners(instrument, aperture)
-        self.subarray_bounds = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
+    #    # Subarray boundaries in full frame coordinates
+    #    xcorner, ycorner = siaf_interface.sci_subarray_corners(instrument, aperture)
+    #    self.subarray_bounds = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
 
     def prepare_PAM(self):
         """
@@ -1317,51 +1312,51 @@ class Catalog_seed():
 
         return signalimage, segmentation_map
 
-    def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
-        '''from the table of distortion coefficients, get the coeffs that correspond
-        to the requested transformation and return as a list for x and another for y
-        '''
-        match = table['AperName'] == aperture
-        if np.any(match) == False:
-            raise ValueError("Aperture name {} not found in input CSV file.".format(aperture))
+    #def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
+    #    '''from the table of distortion coefficients, get the coeffs that correspond
+    #    to the requested transformation and return as a list for x and another for y
+    #    '''
+    #    match = table['AperName'] == aperture
+    #    if np.any(match) == False:
+    #        raise ValueError("Aperture name {} not found in input CSV file.".format(aperture))
 
-        row = table[match]
+    #    row = table[match]
 
-        if ((from_sys == 'science') & (to_sys == 'ideal')):
-            label = 'Sci2Idl'
-        elif ((from_sys == 'ideal') & (to_sys == 'science')):
-            label = 'Idl2Sci'
-        else:
-            raise ValueError(("WARNING: from_sys of {} and to_sys of {} not "
-                              "a valid transformation.".format(from_sys, to_sys)))
+    #    if ((from_sys == 'science') & (to_sys == 'ideal')):
+    #        label = 'Sci2Idl'
+    #    elif ((from_sys == 'ideal') & (to_sys == 'science')):
+    #        label = 'Idl2Sci'
+    #    else:
+    #        raise ValueError(("WARNING: from_sys of {} and to_sys of {} not "
+    #                          "a valid transformation.".format(from_sys, to_sys)))
 
-        # get the coefficients, return as list
-        X_cols = [c for c in row.colnames if label + 'X' in c]
-        Y_cols = [c for c in row.colnames if label + 'Y' in c]
-        x_coeffs = [row[c].data[0] for c in X_cols]
-        y_coeffs = [row[c].data[0] for c in Y_cols]
+    #    # get the coefficients, return as list
+    #    X_cols = [c for c in row.colnames if label + 'X' in c]
+    #    Y_cols = [c for c in row.colnames if label + 'Y' in c]
+    #    x_coeffs = [row[c].data[0] for c in X_cols]
+    #    y_coeffs = [row[c].data[0] for c in Y_cols]
 
-        # Strip off masked coefficients, where the column exists but there
-        # is no corresponding coefficient in the SIAF
-        x_coeffs = [c for c in x_coeffs if np.isfinite(c)]
-        y_coeffs = [c for c in y_coeffs if np.isfinite(c)]
-        #x_coeffs = [c if np.isfinite(c) else 0. for c in x_coeffs]
-        #y_coeffs = [c if np.isfinite(c) else 0. for c in y_coeffs]
+    #    # Strip off masked coefficients, where the column exists but there
+    #    # is no corresponding coefficient in the SIAF
+    #    x_coeffs = [c for c in x_coeffs if np.isfinite(c)]
+    #    y_coeffs = [c for c in y_coeffs if np.isfinite(c)]
+    #    #x_coeffs = [c if np.isfinite(c) else 0. for c in x_coeffs]
+    #    #y_coeffs = [c if np.isfinite(c) else 0. for c in y_coeffs]
 
-        # Also get the V2, V3 values of the reference pixel
-        v2ref = row['V2Ref'].data[0]
-        v3ref = row['V3Ref'].data[0]
+    #    # Also get the V2, V3 values of the reference pixel
+    #    v2ref = row['V2Ref'].data[0]
+    #    v3ref = row['V3Ref'].data[0]
 
-        # Get parity and V3 Y angle info
-        parity = row['VIdlParity'].data[0]
-        yang = row['V3IdlYAngle'].data[0]
-        v3scixang = row['V3SciXAngle'].data[0]
+    #    # Get parity and V3 Y angle info
+    #    parity = row['VIdlParity'].data[0]
+    #    yang = row['V3IdlYAngle'].data[0]
+    #    v3scixang = row['V3SciXAngle'].data[0]
 
-        # Get pixel scale info - not used but needs to be in output
-        xsciscale = row['XSciScale'].data[0]
-        ysciscale = row['YSciScale'].data[0]
+    #    # Get pixel scale info - not used but needs to be in output
+    #    xsciscale = row['XSciScale'].data[0]
+    #    ysciscale = row['YSciScale'].data[0]
 
-        return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
+    #    return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
 
     def getPointSourceList(self, filename):
         # read in the list of point sources to add, and adjust the
@@ -2994,18 +2989,27 @@ class Catalog_seed():
         # make sure the rotation angle is a float
         try:
             self.params['Telescope']["rotation"] = float(self.params['Telescope']["rotation"])
-        except:
+        except ValueError:
             print(("ERROR: bad rotation value {}, setting to zero."
                    .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
+
+        siaf_inst = self.params['Inst']['instrument']
+        if siaf_inst.lower() == 'nircam':
+            siaf_inst = 'NIRCam'
+        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+                                                                       self.params['Readout']['array_name'],
+                                                                       self.ra, self.dec,
+                                                                       self.params['Telescope']['rotation'])
 
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']
 
-        try:
+        if np.isreal(self.params['simSignals']['bkgdrate']):
             self.params['simSignals']['bkgdrate'] = float(self.params['simSignals']['bkgdrate'])
-        except ValueError:
+        else:
             if self.params['simSignals']['bkgdrate'].lower() in bkgdrate_options:
                 print(("Calculating background rate using jwst_background "
                        "based on {} level".format(self.params['simSignals']['bkgdrate'])))
@@ -3213,39 +3217,39 @@ class Catalog_seed():
                    "Setting to {}".format(value, typ, default)))
             return default
 
-    def readSubarrayDefinitionFile(self):
-        # read in the file that contains a list of subarray names and positions on the detector
+    #def read_subarray_definition_file(self):
+    #    # read in the file that contains a list of subarray names and positions on the detector
 
-        try:
-            self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-        except:
-            raise RuntimeError("Error: could not read in subarray definitions file: {}".format(self.params['Reffiles']['subarray_defs']))
+    #    try:
+    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
+    #    except:
+    #        raise RuntimeError(("Error: could not read in subarray definitions file: {}"
+    #                            .format(self.params['Reffiles']['subarray_defs'])))
 
-    def get_subarray_info(self):
-        # find the bounds of the requested subarray
-        if self.params['Readout']['array_name'] in self.subdict['AperName']:
-            mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
-            namps = self.subdict['num_amps'].data[mtch][0]
-            if namps != 0:
-                self.params['Readout']['namp'] = namps
-            else:
-                if ((self.params['Readout']['namp'] == 1) or
-                   (self.params['Readout']['namp'] == 4)):
-                    print(("CAUTION: Aperture {} can be used with either "
-                           "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
-                    print("or a 4-amp readout. The difference is a factor of 4 in")
-                    print(("readout time. You have requested {} amps."
-                           .format(self.params['Readout']['namp'])))
-                else:
-                    raise ValueError(("WARNING: {} requires the number of amps "
-                                      "to be 1 or 4. You have requested {}."
-                                      .format(self.params['Readout']['array_name'],
-                                              self.params['Readout']['namp'])))
-        else:
-            raise ValueError(("WARNING: subarray name {} not found in the "
-                              "subarray dictionary {}."
-                              .format(self.params['Readout']['array_name'],
-                                      self.params['Reffiles']['subarray_defs'])))
+    #def get_subarray_info(self):
+    #    # Find aperture-specific information from the subarray information config file
+    #    if self.params['Readout']['array_name'] in self.subdict['AperName']:
+    #        mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
+    #        namps = self.subdict['num_amps'].data[mtch][0]
+    #        if namps != 0:
+    #            self.params['Readout']['namp'] = namps
+    #        else:
+    #            if ((self.params['Readout']['namp'] == 1) or
+    #               (self.params['Readout']['namp'] == 4)):
+    #                print(("CAUTION: Aperture {} can be used with either "
+    #                       "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
+    #                print("or a 4-amp readout. The difference is a factor of 4 in")
+    #                print(("readout time. You have requested {} amps."
+    #                       .format(self.params['Readout']['namp'])))
+    #            else:
+    #                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
+    #                                  "'Readout':'namp' in the input yaml file to one of these values."
+    #                                  .format(self.params['Readout']['array_name'])))
+    #    else:
+    #        raise ValueError(("WARNING: subarray name {} not found in the "
+    #                          "subarray dictionary {}."
+    #                          .format(self.params['Readout']['array_name'],
+    #                                  self.params['Reffiles']['subarray_defs'])))
 
     def read_filter_throughput(self, file):
         '''Read in the ascii file containing the filter

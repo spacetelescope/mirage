@@ -1,3 +1,5 @@
-AperName Name Detector Filter xstart ystart xend yend num_amps refpix_x refpix_y refpix_v2 refpix_v3
-FGS1_FULL       FULL        GUIDER1     ANY        0      0 2047 2047    4   1023.5   1023.5   207.19    -697.500
-FGS2_FULL       FULL        GUIDER2     ANY        0      0 2047 2047    4   1023.5   1023.5   24.43     -697.500
+# Definitions of available FGS subarrays.
+#
+AperName        Name   num_amps
+FGS1_FULL       FULL      4
+FGS2_FULL       FULL      4
