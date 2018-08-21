@@ -110,6 +110,7 @@ setup(
         'scipy>=0.17',
         'photutils==0.4.0',
         'pysiaf',
+        'pytest<=3.6'
     ],
     include_package_data=True,
     cmdclass={
