@@ -24,7 +24,7 @@ env:
     global:
         - MAIN_CMD='python setup.py'
         - CONDA_CHANNELS='http://ssb.stsci.edu/astroconda'
-        - CONDA_DEPENDENCIES='pytest sphinx'
+        - CONDA_DEPENDENCIES='pytest=3.6'
         - PIP_DEPENDENCIES=''
         - PYTHON_VERSION=3.6
         - NUMPY_VERSION=stable
@@ -45,20 +45,18 @@ matrix:
         # build sphinx documentation with warnings
 #        - os: linux
 #          env: SETUP_CMD='build_sphinx'
-#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+#               CONDA_DEPENDENCIES='sphinx'
 #               PIP_DEPENDENCIES='sphinx_rtd_theme stsci_rtd_theme sphinx-automodapi'
 
         # PEP8 check with flake8 (only once, i.e. "os: linux")
         - os: linux
           env: MAIN_CMD='flake8 --count'
-               SETUP_CMD='pysiaf' TEST_CMD='flake8 --version'
-               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+               SETUP_CMD='mirage'
 
     allow_failures:
         # PEP8 will fail for numerous reasons. Ignore it.
         - env: MAIN_CMD='flake8 --count'
-               SETUP_CMD='pysiaf' TEST_CMD='flake8 --version'
-               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+               SETUP_CMD='mirage'
 
 install:
     - git clone git://github.com/astropy/ci-helpers.git
