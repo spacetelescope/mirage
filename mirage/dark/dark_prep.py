@@ -3,13 +3,24 @@
 '''
 Module for preparing a given dark current exposure for
 integration with a ramp of simulated sources created
-using (e.g.) catalog_seed_image.py. This is part of the
-refactored ramp_simulator.py
+using (e.g.) catalog_seed_image.py.
 
-For the moment, just keep the same yaml input file
-as is used for catalog_seed_image.py and ramp_simulator.py.
-I'm still not sure if it is worth breaking out into 3 separate
-input files for the refactored simulator...
+Authors:
+--------
+
+    - Bryan Hilbert, Kevin Volk
+
+Use:
+----
+
+    This module can be imported as such:
+
+    ::
+
+        from mirage.dark.dark_prep import DarkPrep
+        dark = DarkPrep()
+        dark.paramfile = 'my_parameters.yaml'
+        dark.prepare()
 '''
 
 import sys
@@ -49,6 +60,9 @@ class DarkPrep():
                               "from the Mirage package.".format(self.env_var)))
 
     def check_params(self):
+        """Check for acceptible values for the input parameters in the
+        yaml file.
+        """
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in INST_LIST:
             print(("WARNING: {} instrument not implemented within "
@@ -154,15 +168,38 @@ class DarkPrep():
                                          "This file is needed to run the pipeline."))
 
     def check_run_step(self, filename):
-        # Check to see if a filename exists in the parameter file.
+        """Check to see if a filename exists in the parameter file
+        or if it is set to none.
+
+        Parameters:
+        -----------
+        filename : str
+            Name of the entry in the yaml file
+
+        Returns:
+        --------
+        state : bool
+            True if entry is a filename, False if it is non or empty
+        """
         if ((len(filename) == 0) or (filename.lower() == 'none')):
             return False
         else:
             return True
 
     def crop_dark(self, model):
-        # Cut the dark current array down to the size dictated
-        # by the subarray bounds
+        """Cut the dark current array down to the size dictated
+        by the subarray bounds
+
+        Parameters:
+        -----------
+        model : obj
+            read_fits object holding dark current as well as superbias and refpix signal
+
+        Returns:
+        --------
+        model : obj
+            read_fits object with cropped data arrays
+        """
         modshape = model.data.shape
         yd = modshape[-2]
         xd = modshape[-1]
@@ -279,12 +316,11 @@ class DarkPrep():
 
         Parameters
         ----------
+        obj : obj
+            Instance of read_fits class containing dark current data and other info
 
-        obj : read_fits object
-            Instance of read_fits class containing dark current data and info
         Returns
         -------
-
         None
         """
         ngroup = int(self.params['Readout']['ngroup'])
@@ -337,11 +373,12 @@ class DarkPrep():
         obj.header['NGROUPS'] = ngroup * (nskip + nframe)
 
     def filecheck(self):
-        # Make sure the requested input files exist
-        # For reference files, assume first that they are located in
-        # the directory tree under the datadir (from the MIRAGE_DATA
-        # environment variable). If not, assume the input is a full path
-        # and check there.
+        """Make sure the requested input files exist
+        or reference files, assume first that they are located in
+        the directory tree under the datadir (from the MIRAGE_DATA
+        environment variable). If not, assume the input is a full path
+        and check there.
+        """
         rlist = [['Reffiles', 'dark'],
                  ['Reffiles', 'linearized_darkfile'],
                  ['Reffiles', 'superbias'],
@@ -351,9 +388,9 @@ class DarkPrep():
             self.ref_check(ref)
 
     def full_paths(self):
-        # Expand all input paths to be full paths
-        # This is to allow for easier Condor-ization of
-        # many runs
+        """Expand all input paths to be full paths
+        This is to allow for easier Condor-ization of
+        many runs"""
         pathdict = {'Reffiles': ['dark', 'linearized_darkfile',
                                  'superbias', 'subarray_defs', 'readpattdefs',
                                  'linearity', 'saturation', 'gain', 'pixelflat',
@@ -408,8 +445,8 @@ class DarkPrep():
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
 
     def get_base_dark(self):
-        # Read in the dark current ramp that will serve as the
-        # base for the simulated ramp
+        """Read in the dark current ramp that will serve as the
+        base for the simulated ramp"""
 
         # First make sure that the file exists
         local = os.path.isfile(self.params['Reffiles']['dark'])
@@ -485,7 +522,6 @@ class DarkPrep():
 
         Parameters
         ----------
-
         req : int
             Requested number of dark current integrations for the output
 
@@ -494,7 +530,6 @@ class DarkPrep():
 
         Returns
         -------
-
         None
         """
 
@@ -527,10 +562,21 @@ class DarkPrep():
         self.dark.header['NINTS'] = req
 
     def linearize_dark(self, darkobj):
-        # Beginning with the input dark current ramp, run the dq_init, saturation, superbias
-        # subtraction, refpix and nonlin pipeline steps in order to produce a linearized
-        # version of the ramp. This will be used when combining the dark ramp with the
-        # simulated signal ramp.
+        """Beginning with the input dark current ramp, run the dq_init, saturation, superbias
+        subtraction, refpix and nonlin pipeline steps in order to produce a linearized
+        version of the ramp. This will be used when combining the dark ramp with the
+        simulated signal ramp.
+
+        Parameters:
+        -----------
+        darkobj : obj
+            Instance of read_fits class containing dark current data and info
+
+        Returns:
+        --------
+        linDarkObj : obj
+            Modified read_fits instance with linearized dark current data
+        """
         from jwst.dq_init import DQInitStep
         from jwst.saturation import SaturationStep
         from jwst.superbias import SuperBiasStep
@@ -611,6 +657,8 @@ class DarkPrep():
         return linDarkobj
 
     def prepare(self):
+        """MAIN FUNCTION"""
+
         # Read in the yaml parameter file
         self.read_parameter_file()
 
@@ -785,7 +833,8 @@ class DarkPrep():
         self.prepDark.header = self.linDark.header
 
     def read_linear_dark(self):
-        # Read in the linearized version of the dark current ramp
+        """Read in the linearized version of the dark current ramp
+        using the read_fits class"""
         try:
             print(('Reading in linearized dark current ramp from {}'
                    .format(self.params['Reffiles']['linearized_darkfile'])))
@@ -802,7 +851,7 @@ class DarkPrep():
         self.slowaxis = self.linDark.header['SLOWAXIS']
 
     def read_parameter_file(self):
-        # Read in the parameter file
+        """Read in the yaml parameter file"""
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)
@@ -811,8 +860,8 @@ class DarkPrep():
             sys.exit()
 
     def readpattern_check(self):
-        '''check the readout pattern that's entered and set nframe and nskip
-           accordingly'''
+        """Check the readout pattern that's entered and set the number of averaged frames
+        as well as the number of skipped frames per group"""
         self.params['Readout']['readpatt'] = self.params['Readout']['readpatt'].upper()
 
         # Read in readout pattern definition file
@@ -841,9 +890,20 @@ class DarkPrep():
             sys.exit()
 
     def ref_check(self, rele):
-        # Check for the existence of the input reference file
-        # Assume first that the file is in the directory tree
-        # specified by the MIRAGE_DATA environment variable.
+        """Check for the existence of the input reference file
+        Assume first that the file is in the directory tree
+        specified by the MIRAGE_DATA environment variable.
+
+        Parameters:
+        -----------
+        rele : tup
+            Keywords needed to access a given entry in self.params from the
+            input yaml file
+
+        Returns:
+        --------
+        None
+        """
         rfile = self.params[rele[0]][rele[1]]
         if rfile.lower() != 'none':
             c1 = os.path.isfile(rfile)
@@ -853,11 +913,26 @@ class DarkPrep():
                                          .format(rele[0], rele[1], rfile)))
 
     def reorder_dark(self, dark):
-        # Reorder the input dark ramp using the requested
-        # readout pattern (nframe, nskip). If the initial
-        # dark ramp is RAPID, NISRAPID, or FGSRAPID, then save and return
-        # the 0th frame.
+        """Reorder the input dark ramp using the requested
+        readout pattern (nframe, nskip). If the initial
+        dark ramp is RAPID, NISRAPID, or FGSRAPID, then save and return
+        the 0th frame.
 
+        Parameters:
+        -----------
+        dark : obj
+            Instance of read_fits class containing dark current data and info
+
+        Returns:
+        --------
+        dark : obj
+            Instance of read_fits class where dark data have been reordered to match
+            the requested readout pattern
+
+        sbzero : numpy.ndarray
+            Zeroth frame data from the dark current data. This is saved separately
+            because averaging for non-RAPID readout patterns will destroy the frame
+        """
         if self.params['Reffiles']['linearized_darkfile']:
             datatype = np.float
         else:

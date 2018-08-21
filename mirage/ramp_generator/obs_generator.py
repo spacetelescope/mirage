@@ -1,9 +1,31 @@
 #! /usr/bin/env python
 
-'''
-Convert a signal rate seed image into a signal ramp.
-Add cosmic rays, poisson noise, etc.
-'''
+"""
+Create a final simulated exposure.
+
+This module contains code that will combine a seed image and a
+dark current exposure into a final simulated exposure. Cosmic rays,
+Poisson noise, and other detector effects are addded. This is the
+final step when creating simulated data with Mirage. It can be run
+after catalog_Seed_image.py and dark_prep.py
+
+Authors:
+--------
+
+    - Bryan Hilbert, Kevin Volk
+
+Use:
+----
+
+    This module can be imported as such:
+
+    ::
+
+        from mirage.ramp_generator.obs_generator import Observation
+        ob = Observation()
+        ob.paramfile = 'my_parameters.yaml'
+        ob.create()
+"""
 
 import sys
 import os
