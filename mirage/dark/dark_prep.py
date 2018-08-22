@@ -65,44 +65,38 @@ class DarkPrep():
         """
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in INST_LIST:
-            print(("WARNING: {} instrument not implemented within "
-                   "simulator".format(self.params['Inst']['instrument'])))
-            sys.exit()
+            raise ValueError(("WARNING: {} instrument not implemented within "
+                              "simulator".format(self.params['Inst']['instrument'])))
 
         # If user requests not to use the pipeline,
         # make sure the input is a linearized dark, and not
         # a raw dark
         if self.params['Inst']['use_JWST_pipeline'] is False:
             if self.params['Reffiles']['linearized_darkfile'] is None:
-                print("WARNING: You specified no use of the JWST pipeline, but have")
-                print("not provided a linearized dark file to use. Without the")
-                print("pipeline, a raw dark cannot be used.")
-                sys.exit()
+                raise ValueError(("WARNING: You specified no use of the JWST pipeline, but "
+                                  "have not provided a linearized dark file to use. Without the "
+                                  "pipeline, a raw dark cannot be used."))
 
         # Make sure nframe, nskip, ngroup are all integers
         try:
             self.params['Readout']['nframe'] = int(self.params['Readout']['nframe'])
-        except:
+        except ValueError:
             print("WARNING: Input value of nframe is not an integer.")
-            sys.exit
 
         try:
             self.params['Readout']['nskip'] = int(self.params['Readout']['nskip'])
-        except:
+        except ValueError:
             print("WARNING: Input value of nskip is not an integer.")
-            sys.exit
 
         try:
             self.params['Readout']['ngroup'] = int(self.params['Readout']['ngroup'])
-        except:
+        except ValueError:
             print("WARNING: Input value of ngroup is not an integer.")
-            sys.exit
 
         try:
             self.params['Readout']['nint'] = int(self.params['Readout']['nint'])
-        except:
+        except ValueError:
             print("WARNING: Input value of nint is not an integer.")
-            sys.exit
 
         # Make sure that the requested number of groups is
         # less than or equal to the maximum allowed. If you're
@@ -136,12 +130,6 @@ class DarkPrep():
         self.runStep['superbias'] = self.check_run_step(self.params['Reffiles']['superbias'])
         self.runStep['linearity'] = self.check_run_step(self.params['Reffiles']['linearity'])
 
-        # NON-LINEARITY
-        #make sure the input accuracy is a float with reasonable bounds
-        #self.params['nonlin']['accuracy'] = self.checkParamVal(self.params['nonlin']['accuracy'], 'nlin accuracy', 1e-12, 1e-6, 1e-6)
-        #self.params['nonlin']['maxiter'] = self.checkParamVal(self.params['nonlin']['maxiter'], 'nonlin max iterations', 5, 40, 10)
-        #self.params['nonlin']['limit'] = self.checkParamVal(self.params['nonlin']['limit'], 'nonlin max value', 30000., 1.e6, 66000.)
-
         # If the pipeline is going to be used to create
         # the linearized dark current ramp, make sure the
         # specified configuration files are present.
@@ -171,13 +159,13 @@ class DarkPrep():
         """Check to see if a filename exists in the parameter file
         or if it is set to none.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             Name of the entry in the yaml file
 
-        Returns:
-        --------
+        Returns
+        -------
         state : bool
             True if entry is a filename, False if it is non or empty
         """
@@ -190,13 +178,13 @@ class DarkPrep():
         """Cut the dark current array down to the size dictated
         by the subarray bounds
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model : obj
             read_fits object holding dark current as well as superbias and refpix signal
 
-        Returns:
-        --------
+        Returns
+        -------
         model : obj
             read_fits object with cropped data arrays
         """
@@ -459,11 +447,10 @@ class DarkPrep():
                 darkfile = os.path.split(self.params['Reffiles']['dark'])[1]
                 hh = fits.open(os.path.join(self.dark_url, darkfile))
                 hh.writeto(self.params['Reffiles']['dark'])
-            except:
+            except Exception:
                 print("Local copy of dark current file")
                 print("{} not found.".format(self.params['Reffiles']['dark']))
                 print("And unable to download. Quitting.")
-                sys.exit()
 
         self.dark = read_fits.Read_fits()
         self.dark.file = self.params['Reffiles']['dark']
@@ -488,9 +475,8 @@ class DarkPrep():
         #  data range should be no larger than 65536
         darkrange = 1.*self.dark.data.max() - 1.*self.dark.data.min()
         if darkrange > 65535.:
-            print("WARNING: Range of data values in the input dark is too large.")
-            print("We assume the input dark is raw ADU values, with a range no more than 65536.")
-            sys.exit()
+            raise ValueError(("WARNING: Range of data values in the input dark is too large. "
+                              "We assume the input dark is raw ADU values, with a range no more than 65536."))
 
         # If the inputs are signed integers, change to unsigned.
         if self.dark.data.min() < 0.:
@@ -567,13 +553,13 @@ class DarkPrep():
         version of the ramp. This will be used when combining the dark ramp with the
         simulated signal ramp.
 
-        Parameters:
+        Parameters
         -----------
         darkobj : obj
             Instance of read_fits class containing dark current data and info
 
-        Returns:
-        --------
+        Returns
+        -------
         linDarkObj : obj
             Modified read_fits instance with linearized dark current data
         """
@@ -783,15 +769,12 @@ class DarkPrep():
             if self.zeroModel.data is not None:
                 self.zeroModel = self.crop_dark(self.zeroModel)
         else:
-            print("Mode not yet supported! Must use either:")
-            print("use_JWST_pipeline = True and a raw or linearized dark")
-            #print("or use_JWST_pipeline = False and supply a linearized dark.")
-            print("or supply a linearized dark.")
-            print("Cannot yet skip the pipeline and provide a raw dark.")
-            sys.exit()
+            raise NotImplementedError(("Mode not yet supported! Must use either: use_JWST_pipeline "
+                                       "= True and a raw or linearized dark or supply a linearized dark. "
+                                       "Cannot yet skip the pipeline and provide a raw dark."))
 
         # Save the linearized dark
-        #if self.params['Output']['save_intermediates']:
+        # if self.params['Output']['save_intermediates']:
         h0 = fits.PrimaryHDU()
         h1 = fits.ImageHDU(self.linDark.data, name='SCI')
         h2 = fits.ImageHDU(self.linDark.sbAndRefpix, name='SBANDREFPIX')
@@ -855,9 +838,8 @@ class DarkPrep():
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)
-        except:
+        except FileNotFoundError:
             print("WARNING: unable to open {}".format(self.paramfile))
-            sys.exit()
 
     def readpattern_check(self):
         """Check the readout pattern that's entered and set the number of averaged frames
@@ -883,25 +865,23 @@ class DarkPrep():
         else:
             # If the read pattern is not present in the definition file
             # then quit.
-            print(("WARNING: the {} readout pattern is not defined in {}."
-                   .format(self.params['Readout']['readpatt'],
-                           self.params['Reffiles']['readpattdefs'])))
-            print("Quitting.")
-            sys.exit()
+            raise ValueError(("WARNING: the {} readout pattern is not defined in {}."
+                              .format(self.params['Readout']['readpatt'],
+                                      self.params['Reffiles']['readpattdefs'])))
 
     def ref_check(self, rele):
         """Check for the existence of the input reference file
         Assume first that the file is in the directory tree
         specified by the MIRAGE_DATA environment variable.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         rele : tup
             Keywords needed to access a given entry in self.params from the
             input yaml file
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
         rfile = self.params[rele[0]][rele[1]]
@@ -918,13 +898,13 @@ class DarkPrep():
         dark ramp is RAPID, NISRAPID, or FGSRAPID, then save and return
         the 0th frame.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         dark : obj
             Instance of read_fits class containing dark current data and info
 
-        Returns:
-        --------
+        Returns
+        -------
         dark : obj
             Instance of read_fits class where dark data have been reordered to match
             the requested readout pattern

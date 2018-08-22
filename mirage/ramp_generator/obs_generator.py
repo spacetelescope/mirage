@@ -85,13 +85,13 @@ class Observation():
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         exposure : numpy.ndarray
             Always 4D
 
-        Returns:
-        --------
+        Returns
+        -------
         exposure : numpy.ndarray
             Exposure with crosstalk effects added
         """
@@ -136,7 +136,7 @@ class Observation():
         seed : numpy.ndarray
             Exposure to add CRs and noise to
 
-        Returns:
+        Returns
         --------
         sim_exposure : numpy.ndarray
             Exposure with CRs and noise added
@@ -173,13 +173,13 @@ class Observation():
         """Add detector-based effects to input data.
         Currently only crosstalk effects are added.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         ramp : numpy.ndarray
             Array containing the exposure
 
-        Returns:
-        --------
+        Returns
+        -------
         ramp : numpy.ndarray
             Exposure with effects added
         """
@@ -195,7 +195,7 @@ class Observation():
         ramp : numpy.ndarray
             Array containing exposure
 
-        Returns:
+        Returns
         --------
         ramp : numpy.ndarray
             Exposure with flat field applied
@@ -219,14 +219,14 @@ class Observation():
         function was copied from the IPC correction step in the JWST
         calibration pipeline.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         data : obj
             4d numpy ndarray containing the data to which the
             IPC effects will be added
 
-        Returns:
-        --------
+        Returns
+        -------
         returns : obj
             4d numpy ndarray of the modified data
         """
@@ -369,7 +369,7 @@ class Observation():
         signalramp : numpy.ndarray
             Array containing exposure
 
-        Returns:
+        Returns
         --------
         signalramp : numpy.ndarary
             Array after multiplying by the pixel area map
@@ -395,13 +395,18 @@ class Observation():
         """Add superbias and reference pixel-associated
         signal to the input ramp
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         ramp : numpy.ndarray
             Array containing exposure data
 
         sbref : numpy.ndarray
             Array containing superbias and reference pixel associated signal
+
+        Returns
+        -------
+        newramp : numpy.ndarray
+            Ramp with superbias and refpix signal added
         """
         rampdim = ramp.shape
         sbrefdim = sbref.shape
@@ -445,7 +450,7 @@ class Observation():
         syn_zeroframe : numpy.ndarray
             zeroframe data associated with simulated data
 
-        Returns:
+        Returns
         --------
         synthetic : numpy.ndarray
             4D exposure containing combined simulated + dark data
@@ -523,16 +528,16 @@ class Observation():
         """Linearize the input data
         cof[0] + num*cof[1] + cof[2]*num**2 + cof[3]*num**3 +...
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         data : numpy.ndarray
             data will be 2d
 
         cof : numpy.ndarray
             Non-linearity coefficients. cof will be 3d, or 1d
 
-        Returns:
-        --------
+        Returns
+        -------
         apply : numpy.ndarray
             Linearized data
         """
@@ -548,8 +553,8 @@ class Observation():
     def check_param_val(self, value, typ, vmin, vmax, default):
         """Make sure the input value is a float and between given min and max
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         value : float
             Value to be checked
 
@@ -565,8 +570,8 @@ class Observation():
         default : float
             Value to set value if it is outside accepible bounds
 
-        Returns:
-        --------
+        Returns
+        -------
         value : float
             Acceptible value of value
         """
@@ -716,9 +721,8 @@ class Observation():
                                            "CRs_MCD1.7_" + self.params['cosmicRay']["library"].upper())
             else:
                 self.crfile = None
-                print(("Warning: unrecognised cosmic ray library {}"
-                       .format(self.params['cosmicRay']["library"])))
-                sys.exit()
+                raise FileNotFoundError(("Warning: unrecognised cosmic ray library {}"
+                                         .format(self.params['cosmicRay']["library"])))
 
         # Read in distortion and WCS-related data. These will be placed
         # in the header of the output file.
@@ -734,8 +738,7 @@ class Observation():
                                                 self.params['Telescope']['dec'])
 
         if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or self.ra is None or self.dec is None:
-            print("WARNING: bad requested RA and Dec {} {}".format(self.ra, self.dec))
-            sys.exit()
+            raise ValueError("WARNING: bad requested RA and Dec {} {}".format(self.ra, self.dec))
 
         # Make sure the rotation angle is a float
         try:
@@ -758,20 +761,21 @@ class Observation():
         # Check that the various scaling factors are floats and
         # within a reasonable range
         self.params['cosmicRay']['scale'] = self.check_param_val(self.params['cosmicRay']['scale'],
-                                                               'cosmicRay', 0, 100, 1)
-        self.params['simSignals']['extendedscale'] = self.check_param_val(self.params['simSignals']['extendedscale'],
-                                                                        'extendedEmission', 0, 10000, 1)
-        self.params['simSignals']['zodiscale'] = self.check_param_val(self.params['simSignals']['zodiscale'], 'zodi',
-                                                                    0, 10000, 1)
-        self.params['simSignals']['scatteredscale'] = self.check_param_val(self.params['simSignals']['scatteredscale'],
-                                                                         'scatteredLight', 0, 10000, 1)
+                                                                 'cosmicRay', 0, 100, 1)
+        self.params['simSignals']['extendedscale'] = self.check_param_val(self.params['simSignals']
+                                                                                     ['extendedscale'],
+                                                                          'extendedEmission', 0, 10000, 1)
+        self.params['simSignals']['zodiscale'] = self.check_param_val(self.params['simSignals']['zodiscale'],
+                                                                      'zodi', 0, 10000, 1)
+        self.params['simSignals']['scatteredscale'] = self.check_param_val(self.params['simSignals']
+                                                                                      ['scatteredscale'],
+                                                                           'scatteredLight', 0, 10000, 1)
 
         # Make sure the requested output format is an allowed value
         if self.params['Output']['format'] not in ['DMS']:
-            print(("WARNING: unsupported output format {} requested. "
-                   "Possible options are {}."
-                   .format(self.params['Output']['format'], ['DMS'])))
-            sys.exit()
+            raise NotImplemmentedError(("WARNING: unsupported output format {} requested. "
+                                        "Possible options are {}."
+                                        .format(self.params['Output']['format'], ['DMS'])))
 
         # Check the output metadata, including visit and observation
         # numbers, obs_id, etc
@@ -781,21 +785,20 @@ class Observation():
         for quality in kwchecks:
             try:
                 self.params['Output'][quality] = str(self.params['Output'][quality])
-            except:
+            except ValueError:
                 print(("WARNING: unable to convert {} to string. "
                        "This is required.".format(self.params['Output'][quality])))
-                sys.exit()
 
     def check_run_step(self, filename):
         """Check to see if a filename exists in the parameter file.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             Name of file to be checked
 
-        Returns:
-        --------
+        Returns
+        -------
         state : bool
             Indicates whether or not filename is 'none'
         """
@@ -808,16 +811,16 @@ class Observation():
         """Convert a bad pixel mask to contain values used
         by the JWST pipeline
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         inmask : numpy.ndarray
             Input bad pixel mask
 
         dq_table : astropy.fits.record
             Table containing data quality definitions
 
-        Returns:
-        --------
+        Returns
+        -------
         dqmask : numpy.ndarray
             Data quality array modified to use values in dq_table
         """
@@ -852,16 +855,16 @@ class Observation():
         """Set up functions that will be used to generate
         cosmic ray hits
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         npix : int
             Number of pixels across which we are generating a collection of CR hits
 
         seed : int
             Seed value for random number generator
 
-        Returns:
-        --------
+        Returns
+        -------
         crhits : int
             Number of cosmic ray hits in the given number of pixels and time
 
@@ -982,8 +985,8 @@ class Observation():
 
         # Add the simulated source ramp to the dark ramp
         lin_outramp, lin_zeroframe, lin_sbAndRefpix = self.add_synthetic_to_dark(simexp,
-                                                                              self.linDark,
-                                                                              syn_zeroframe=simzero)
+                                                                                 self.linDark,
+                                                                                 syn_zeroframe=simzero)
 
         # Add other detector effects (Crosstalk/PAM)
         lin_outramp = self.add_detector_effects(lin_outramp)
@@ -1105,10 +1108,9 @@ class Observation():
                 print("{}".format(rawrampfile))
                 self.raw_output = rawrampfile
             else:
-                print("WARNING: raw output ramp requested, but the signal associated")
-                print("with the superbias and reference pixels is not present in")
-                print("the dark current data object. Quitting.")
-                sys.exit()
+                raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
+                                  "with the superbias and reference pixels is not present in "
+                                  "the dark current data object. Quitting."))
 
         print("Observation generation complete.")
 
@@ -1117,8 +1119,8 @@ class Observation():
         """Add the GROUP extension to the output file
         From an example Mark Kyprianou sent:
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         integration : int
             Integration number
 
@@ -1159,8 +1161,8 @@ class Observation():
         heliocentric : float
             Heliocentric end time (mjd) 57405.1163058
 
-        Returns:
-        --------
+        Returns
+        -------
         group : nump.ndarray
             Input values organized into format needed for group entry in
             JWST formatted file
@@ -1202,13 +1204,13 @@ class Observation():
         """If the linearized version of the file is to be saved, we
         need to create the error, pixel dq, and group dq extensions
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         data : numpy.ndarray
             Array containing the exposure data
 
-        Returns:
-        --------
+        Returns
+        -------
         err : numpy.ndarray
             Array containing error values
 
@@ -1255,13 +1257,13 @@ class Observation():
     def crop_to_subarray(self, data):
         """Crop the given (full frame) array to specified subarray
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         data : numpy.ndarray
             Array containing exposure data
 
-        Returns:
-        --------
+        Returns
+        -------
         data : numpy.ndarray
             Array cropped to requested size, using self.subarray_bounds
         """
@@ -1271,16 +1273,16 @@ class Observation():
     def crosstalk_image(self, orig, coeffs):
         """Using Xtalk coefficients, generate an image of the crosstalk signal
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         orig : numpy.ndarray
             Array to add crosstalk to
 
         coeffs : numpy.ndarray
             Crosstalk coefficients from the input coefficint file
 
-        Returns:
-        --------
+        Returns
+        -------
         xtalk_corr_im : numpy.ndarray
             Input data modified to have crosstalk
         """
@@ -1334,8 +1336,8 @@ class Observation():
     def do_cosmic_rays(self, image, ngroup, iframe, ncr, seedval):
         """Add cosmic rays to input data
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         image : numpy.ndarray
             2D array containing exposure data to add cosmic rays to
 
@@ -1351,8 +1353,8 @@ class Observation():
         seedval : int
             Seed to use for random number generator
 
-        Returns:
-        --------
+        Returns
+        -------
         image : numpy.ndarray
             Input image with cosmic rays added
         """
@@ -1396,7 +1398,7 @@ class Observation():
         the gain when calcuating Poisson noise. Then divide by the
         gain in order for the returned image to also be in ADU
 
-        Parameters:
+        Parameters
         ----------
         signalimage : numpy.ndarray
             2D array of signals in ADU
@@ -1404,8 +1406,8 @@ class Observation():
         seedval : int
             Seed value for the random number generator
 
-        Returns:
-        --------
+        Returns
+        -------
         newimage : numpy.ndarray
             signalimage with Poisson noise added
         """
@@ -1486,16 +1488,16 @@ class Observation():
         """Flag saturated pixels in intput data. Return a dq map
         with the appropriate dq value (2) for saturation
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         data : numpy.ndarray
             Exposure data
 
         sat : numpy.ndarray
             2D Saturation map
 
-        Returns:
-        --------
+        Returns
+        -------
         satmap : numpy.ndarray
             Map containing flagged saturated pixels
         """
@@ -1507,15 +1509,15 @@ class Observation():
         """Convert rate image to ramp, add poisson noise
         and cosmic rays
 
-        Parameters:
+        Parameters
         ----------
         data : numpy.ndarray
             Seed image. Should be a 2d frame or 3d integration.
             If the original seed image is a 4d exposure, call frame_to_ramp
             with one integration at a time.
 
-        Returns:
-        --------
+        Returns
+        -------
         outramp : numpy.ndarray
             3d integration with cosmic rays and poisson noise
 
@@ -1526,8 +1528,7 @@ class Observation():
         ndim = len(data.shape)
 
         if ndim == 4:
-            print("Shouldn't be here! No 4D seed images!")
-            sys.exit()
+            raise ValueError("Seed image shouldn't be 4D!")
             nintin, ngroupin, yd, xd = data.shape
         elif ndim == 3:
             ngroupin, yd, xd = data.shape
@@ -1650,15 +1651,15 @@ class Observation():
         ramp that includes poisson noise. No
         cosmic rays are added
 
-        Parameters:
+        Parameters
         ----------
         data : numpy.ndarray
             Seed image. Should be a 2d frame or 3d integration.
             If the original seed image is a 4d exposure, call frame_to_ramp
             with one integration at a time.
 
-        Returns:
-        --------
+        Returns
+        -------
         outramp : numpy.ndarray
             3d integration with cosmic rays and poisson noise
 
@@ -1796,13 +1797,13 @@ class Observation():
     def get_nonlin_coeffs(self, linfile):
         """Read in non-linearity coefficients from given file
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         linfile : str
             Name of fits file containing linearity coefficients
 
-        Returns:
-        --------
+        Returns
+        -------
         nonlin : numpy.ndarray
             Collection of nonlinearity correction coefficients
         """
@@ -1857,13 +1858,13 @@ class Observation():
         IPC effects from data, to being used to add IPC effects to data,
         or vice versa.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         kern : obj
             numpy ndarray, either 2D or 4D, containing the kernel
 
-        Returns:
-        --------
+        Returns
+        -------
         returns : obj
             numpy ndarray containing iInverted" kernel
         """
@@ -1929,16 +1930,16 @@ class Observation():
         """Make sure that reference pixels have no signal
         in the simulated source ramp
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         ramp : numpy.ndarray
             Array containing exposure data
 
         zero : numpy.ndarray
             Zeroth frame data
 
-        Returns:
-        --------
+        Returns
+        -------
         ramp : numpy.ndarray
             Exposure data with reference pixels zeroed out
 
@@ -1961,16 +1962,16 @@ class Observation():
         that will contain the list and positions of inserted
         cosmic rays.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             Name of ascii file to contain the summary of added cosmic rays
 
         hits : int
             Number of cosmic ray hits per frame
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
         self.cosmicraylist = open(filename, "w")
@@ -1988,13 +1989,13 @@ class Observation():
         the directory tree specified by the MIRAGE_DATA
         environment variable
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         p : tup
             Nested keys that point to a directory in self.params
 
-        Returns:
-        --------
+        Returns
+        -------
         Nothing
         """
         pth = self.params[p[0]][p[1]]
@@ -2011,8 +2012,8 @@ class Observation():
         scripts and more importantly, databses, is necessary. But they should be
         close.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         starttime : float
             Starting time of exposure (mjd)
 
@@ -2034,8 +2035,8 @@ class Observation():
         nx : int
             Number of pixels in the x dimension
 
-        Returns:
-        --------
+        Returns
+        -------
         grouptable : numpy.ndarray
             Group extension data for all groups in the exposure
         """
@@ -2089,13 +2090,13 @@ class Observation():
         """Read in the specified calibration fits file. This is for files that contain
         images (e.g. flats, superbias, etc)
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             Name of file to be opened
 
-        Returns:
-        --------
+        Returns
+        -------
         image : numpy.ndarray
             Array data from input file
 
@@ -2106,9 +2107,8 @@ class Observation():
             with fits.open(filename) as h:
                 image = h[1].data
                 header = h[0].header
-        except:
+        except FileNotFoundError:
             print("WARNING: Unable to open {}".format(filename))
-            sys.exit()
 
         # extract the appropriate subarray if necessary
         if ((self.subarray_bounds[0] != 0) or
@@ -2144,16 +2144,16 @@ class Observation():
         """Read in appropriate line from the xtalk coefficients
         file for the given detector and return the coeffs
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         file : str
             Name of ascii file containing the crosstalk coefficients
 
         detector : str
             Name of the detector being simulated
 
-        Returns:
-        --------
+        Returns
+        -------
         xtcoeffs : list
             Collection of crosstalk coefficients associated with detector
         """
@@ -2162,21 +2162,20 @@ class Observation():
         coeffs = []
         mtch = xtcoeffs['Det'] == detector.upper()
         if np.any(mtch) is False:
-            print('Detector {} not found in xtalk file {}'.format(detector, file))
-            sys.exit()
+            raise ValueError('Detector {} not found in xtalk file {}'.format(detector, file))
 
         return xtcoeffs[mtch]
 
     def read_dark_file(self, filename):
         """Read in a prepared dark current exposure
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             Name of fits file containing dark current data
 
-        Returns:
-        --------
+        Returns
+        -------
         obj : read_fits object
             obj contains: obj.data, obj.sbAndRefpix,
                           obj.zeroframe, obj.zero_sbAndRefpix,
@@ -2235,13 +2234,13 @@ class Observation():
     def read_seed(self, filename):
         """Read in the fits file containing the seed image/ramp
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             Fits file containing the seed image
 
-        Returns:
-        --------
+        Returns
+        -------
         seed : numpy.ndarray
             Seed image
 
@@ -2298,11 +2297,9 @@ class Observation():
         else:
             # If the read pattern is not present in the definition file
             # then quit.
-            print(("WARNING: the {} readout pattern is not defined in {}."
-                   .format(self.params['Readout']['readpatt'],
-                           self.params['Reffiles']['readpattdefs'])))
-            print("Quitting.")
-            sys.exit()
+            raise ValueError(("WARNING: the {} readout pattern is not defined in {}."
+                              .format(self.params['Readout']['readpatt'],
+                                      self.params['Reffiles']['readpattdefs'])))
 
     def readpattern_compatible(self):
         """Make sure the input dark has a readout pattern
@@ -2326,14 +2323,14 @@ class Observation():
         Assume first that the file is in the directory tree
         specified by the MIRAGE_DATA environment variable.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         rele : tup
             Nested keys that point to the refrence file of
             interest. These come from the yaml input file
 
         Reutrns:
-        --------
+        -------
         Nothing
         """
         rfile = self.params[rele[0]][rele[1]]
@@ -2350,8 +2347,8 @@ class Observation():
         """Save the new, simulated integration in DMS format (i.e. DMS orientation
         rather than raw fitswriter orientation) using JWST data models
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         ramp : numpy.ndarray
             Array containing the exposure to be saved
 
@@ -2377,8 +2374,8 @@ class Observation():
         pixel_dq : numpy.ndarray
             Array containing pixel data quality values. Used only if mod='ramp'
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
         if mod == '1b':
@@ -2619,8 +2616,8 @@ class Observation():
         rather than raw fitswriter orientation) using astropy rather than
         JWST data models
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         ramp : numpy.ndarray
             Array containing the exposure to be saved
 
@@ -2646,8 +2643,8 @@ class Observation():
         pixel_dq : numpy.ndarray
             Array containing pixel data quality values. Used only if mod='ramp'
 
-        Returns:
-        --------
+        Returns
+        -------
         filename : str
             Same as input filename
         """
@@ -2882,21 +2879,20 @@ class Observation():
     def simple_get_image(self, name):
         """Read in an array from a fits file and crop using subarray_bounds
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         name : str
             Name of fits file to be read in
 
-        Returns:
-        --------
+        Returns
+        -------
         image : numpy.ndarray
             Array populated with the file contents
         """
         try:
             image, header = fits.getdata(name, header=True)
         except:
-            print('WARNING: unable to read in {}'.format(name))
-            sys.exit()
+            raise FileNotFoundError('WARNING: unable to read in {}'.format(name))
 
         # assume that the input is 2D, since we are using it to build a signal rate frame
         imageshape = image.shape
@@ -2910,97 +2906,9 @@ class Observation():
             image = image[self.subarray_bounds[1]:self.subarray_bounds[3]+1,
                           self.subarray_bounds[0]:self.subarray_bounds[2]+1]
         except:
-            print("Unable to crop image from {}".format(name))
-            sys.exit
+            raise ValueError("Unable to crop image from {}".format(name))
 
         return image
-
-    #def populate_group_table(self, starttime, grouptime, ramptime, numint, numgroup, ny, nx):
-    #    """Create some reasonable values to fill the GROUP extension table.
-    #    These will not be completely correct because access to other ssb
-    #    scripts and more importantly, databses, is necessary. But they should be
-    #    close.
-    #    """
-
-    #    #print("Going in to populate_group_table:")
-    #    #print(starttime, grouptime, ramptime, numint, numgroup, ny, nx)
-
-    #    #Create the table with a first row populated by garbage
-    #    grouptable = self.create_group_entry(999, 999, 0, 0, 0, 'void', 0, 0, 0, 0, 'void', 1., 1.)
-
-    #   #Fixed for all exposures
-    #    compcode = 0
-    #    comptext = 'Normal Completion'
-    #    numgap = 0
-    #    baseday = Time('2000-01-01T00:00:00')
-
-    #    #integration start times
-    #    rampdelta = TimeDelta(ramptime, format='sec')
-    #    groupdelta = TimeDelta(grouptime, format='sec')
-    #    intstarts = starttime + (np.arange(numint)*rampdelta)
-
-    #    for integ in range(numint):
-    #        groups = np.arange(1, numgroup+1)
-    #        groupends = intstarts[integ] + (np.arange(1, numgroup+1)*groupdelta)
-    #        endday = (groupends - baseday).jd
-    #        enddayint = [np.int(s) for s in endday]
-
-    #        #now to get end_milliseconds, we need milliseconds from the beginning
-    #        #of the day
-    #        inday = TimeDelta(endday - enddayint, format='jd')
-    #        endmilli = inday.sec * 1000.
-
-    #        #submilliseconds - just use a random number
-    #        endsubmilli = np.random.randint(0, 1000, len(endmilli))
-
-    #        #group end time. need to remove : and - and make lowercase t
-    #        #gstr = groupends.isot
-    #        groupending = groupends.isot
-    #        #groupending = [s.replace(':', '').replace('-', '').lower() for s in gstr]
-
-    #        #approximate these as just the group end time in mjd
-    #        barycentric = groupends.mjd
-    #        heliocentric = groupends.mjd
-
-    #        for grp, day, milli, submilli, grpstr, bary, helio in zip(groups, endday, endmilli, endsubmilli, groupending, barycentric, heliocentric):
-    #            entry = self.create_group_entry(integ+1, grp, day, milli, submilli, grpstr, nx, ny, numgap, compcode, comptext, bary, helio)
-    #            grouptable = np.vstack([grouptable, entry])
-
-    #    # Now remove the top garbage row from the table
-    #    grouptable = grouptable[1:]
-    #    return grouptable
-
-    #def getSubarrayBounds(self):
-    #    # Find the bounds of the requested subarray
-    #    if self.params['Readout']['array_name'] in self.subdict['AperName']:
-    #        mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
-    #        #self.subarray_bounds = [self.subdict['xstart'].data[mtch][0], self.subdict['ystart'].data[mtch][0], self.subdict['xend'].data[mtch][0], self.subdict['yend'].data[mtch][0]]
-    #        self.refpix_pos = {'x':self.subdict['refpix_x'].data[mtch][0], 'y':self.subdict['refpix_y'][mtch][0], 'v2':self.subdict['refpix_v2'].data[mtch][0], 'v3':self.subdict['refpix_v3'].data[mtch][0]}
-
-            #namps = self.subdict['num_amps'].data[mtch][0]
-            #if namps != 0:
-            #    self.params['Readout']['namp'] = namps
-            #else:
-            #    if ((self.params['Readout']['namp'] == 1) or (self.params['Readout']['namp'] == 4)):
-            #        print(("CAUTION: Aperture {} can be used with either "
-            #               "a 1-amp"
-            #               .format(self.subdict['AperName'].data[mtch][0])))
-            #        print("or a 4-amp readout. The difference is a factor of 4 in")
-            #        print(("readout time. You have requested {} amps."
-            #               .format(self.params['Readout']['namp'])))
-            #    else:
-            #        print(("WARNING: {} requires the number of amps to "
-            #               "be 1 or 4. You have requested {}."
-            #               .format(self.params['Readout']['array_name']
-            #                       , self.params['Readout']['namp'])))
-            #        sys.exit()
-
-        #else:
-        #    print(("WARNING: subarray name {} not found in the subarray "
-        #           "dictionary {}."
-        #           .format(self.params['Readout']['array_name']
-        #                   , self.params['Reffiles']['subarray_defs'])))
-        #    sys.exit()
 
     def add_options(self, parser=None, usage=None):
         if parser is None:
