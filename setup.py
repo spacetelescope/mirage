@@ -108,9 +108,8 @@ setup(
         'lxml>=3.6.4',
         'asdf>=1.2.0',
         'scipy>=0.17',
-        'photutils==0.4.0',
-        'pysiaf',
-        'pytest<=3.6'
+        'photutils>=0.4.0',
+        'pysiaf'
     ],
     include_package_data=True,
     cmdclass={
