@@ -1,14 +1,14 @@
-#! /usr/bin/env python
-
-import sys
+#!/usr/bin/env python
+import os
 import subprocess
-
-from setuptools import setup, find_packages
+import sys
+from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.test import test as TestCommand
 
 
-# This next part allows you to build sphinx docs from the package
-# main directory with 'python setup.py build_docs'
+
+# allows you to build sphinx docs from the package
+# main directory with "python setup.py build_sphinx"
 
 try:
     from sphinx.cmd.build import build_main
@@ -113,6 +113,5 @@ setup(
     include_package_data=True,
     cmdclass={
         'test': PyTest,
-        'build_docs': BuildSphinx
-    },
-    )
+        'build_sphinx': BuildSphinx
+    },)
