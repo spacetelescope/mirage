@@ -231,3 +231,44 @@ simulated exposure. Example use shown in the WFSS notebook.
 **`yaml_generator.py`** - Beginning with an Astronomer's Proposal Tool (APT) file,
 create the yaml files necessary to simulate the entire proposal. Example use
 shown in the imaging and WFSS notebooks.
+
+
+### Contributing
+
+Prior to contributing to the `mirage` development, please review our [style guide](https://github.com/spacetelescope/mirage/blob/master/style_guide/style_guide.md).
+
+The following is a bare bones example of a best work flow for contributing to the project:
+
+1. Create a fork off of the `spacetelescope` `mirage` repository.
+2. Make a local clone of your fork.
+3. Ensure your personal fork is pointing `upstream` properly.
+4. Create a branch on that personal fork.
+5. Make your software changes.
+6. Push that branch to your personal GitHub repository (i.e. `origin`).
+7. On the `spacetelescope` `mirage` repository, create a pull request that merges the branch into `spacetelescope:master`.
+8. Assign a reviewer from the team for the pull request.
+9. Iterate with the reviewer over any needed changes until the reviewer accepts and merges your branch.
+10. Delete your local copy of your branch.
+
+
+## Code of Conduct
+
+Users and contributors to the `mirage` repository should adhere to the [Code of Conduct](https://github.com/spacetelescope/mirage/blob/master/CODE_OF_CONDUCT.md).  Any issues or violations pertaining to the Code of Conduct should be brought to the attention of a `mirage` team member or to `conduct@stsci.edu`.
+
+
+## Questions
+
+Any questions about the `mirage` project or its software can be directed to `hilbert@stsci.edu`.
+
+
+## Current Development Team
+- Bryan Hilbert
+- Johannes Sahlmann
+- Lauren Chambers
+- Kevin Volk
+- Shannon Osborne
+- Marshall Perrin
+
+
+## Acknowledgments:
+`Mirage` is based on a NIRISS data simulator originally written by Kevin Volk.
