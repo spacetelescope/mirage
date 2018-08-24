@@ -112,12 +112,35 @@ def sci_subarray_corners(instrument, aperture_name, verbose=False):
         if aperture.DetSciParity == 1:
             corner_index = np.array([1, 3])
         elif aperture.DetSciParity == -1:
+            # NIRCam will always fall in here, except in case of non-dms orientation
             corner_index = np.array([0, 2])
+        x_corner = x_sci[corner_index]
+        y_corner = y_sci[corner_index]
+    elif instrument == 'NIRISS':
+        x_corner_index = np.array([0, 2])
+        y_corner_index = np.array([0, 2])
+        if aperture_name == 'NIS_CEN_OSS':
+            x_corner_index = np.array([1, 3])
+            y_corner_index = np.array([3, 1])
+        x_corner = x_sci[x_corner_index]
+        y_corner = y_sci[y_corner_index]
+        if aperture_name in ['NIS_SUBSTRIP96', 'NIS_SUBSTRIP256']:
+            x_corner = [1, 2048]
+            y_corner = [1, 2048]
+    elif instrument == 'FGS':
+        x_corner_index = np.array([0, 2])
+        y_corner_index = np.array([0, 2])
+        if aperture_name == 'FGS1_FULL_OSS':
+            x_corner_index = np.array([1, 3])
+            y_corner_index = np.array([3, 1])
+        if aperture_name == 'FGS2_FULL_OSS':
+            x_corner_index = np.array([1, 3])
+            y_corner_index = np.array([1, 3])
+        x_corner = x_sci[x_corner_index]
+        y_corner = y_sci[y_corner_index]
     else:
-        raise NotImplementedError
-
-    x_corner = x_sci[corner_index]
-    y_corner = y_sci[corner_index]
+        raise NotImplementedError(("Instrument {} not supported for SIAF subarray corners"
+                                   .format(instrument)))
 
     # account for mirage conventions (e.g. 0-based indexing)
     # we also want integer values as these will be indexes
