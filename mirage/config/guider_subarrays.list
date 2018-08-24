@@ -1,6 +1,6 @@
 # Definitions of available FGS subarrays.
 #
-AperName         Name     numm_amps
+AperName         Name     num_amps
 FGS1_FULL       FULL          4
 FGS2_FULL       FULL          4
 FGS1_SUB128LL   SUB128LL      1

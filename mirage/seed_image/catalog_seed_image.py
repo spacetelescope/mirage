@@ -2932,7 +2932,7 @@ class Catalog_seed():
                                                              self.params['Readout'][usefilt].lower(),
                                                              str(wfe), str(wfegroup))
                 else:
-                    psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, shortdetector,
+                    psfname = '{}{}_x{}_y{}_{}_{}'.format(basename, detector,
                                                              'psfxpos', 'psfypos',
                                                              str(wfe), str(wfegroup))
 
@@ -2943,7 +2943,7 @@ class Catalog_seed():
                                                      self.params['Readout'][usefilt].lower(),
                                                      str(wfe))
                 else:
-                    pathaddition = "{}/{}".format(shortdetector, str(wfe))
+                    pathaddition = "{}/{}".format(detector, str(wfe))
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
