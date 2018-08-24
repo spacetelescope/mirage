@@ -85,6 +85,7 @@ class AptInput:
         if self.observation_table is not None:
             self.observation_table = os.path.abspath(self.observation_table)
 
+
         main_dir = os.path.split(self.input_xml)[0]
 
         # Read in xml file

@@ -107,7 +107,7 @@ class CreatePSFLibrary:
 
     def __init__(self, instrument, filters="all", detectors="all",
                  fov_pixels=101, oversample=5, num_psfs=16, save=True,
-                 fileloc=None, filename=None, overwrite=True):
+                 fileloc=None, filename=None, overwrite=True, pupil_opd=None):
 
         # Pull correct capitalization of instrument name
         webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
@@ -147,6 +147,7 @@ class CreatePSFLibrary:
         self.overwrite = overwrite
         self.fileloc = fileloc
         self.filename = filename
+        self.pupil_opd = pupil_opd
 
     def _set_filters(self):
         """ Get the list of filters to create PSF library files for """
@@ -205,6 +206,17 @@ class CreatePSFLibrary:
 
         raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
 
+    def _set_opd(self):
+        """Define the instrument's OPD as self.pupil_opd, ensuring the
+        type is an astropy FITS HDULIst. At the moment, this sets one
+        OPD for all the library files being created.
+        """
+        if not isinstance(self.pupil_opd, fits.hdu.hdulist.HDUList):
+            raise TypeError('Must provide pupil OPD as an astropy FITS HDUList,'
+                            'not {}'.format(type(self.pupil_opd)))
+
+        self.webb.pupilopd = self.pupil_opd
+
     def _set_psf_locations(self, num_psfs):
         """ Set the locations on the detector of the fiducial PSFs. Assumes a 2048x2048 detector"""
 
@@ -218,8 +230,12 @@ class CreatePSFLibrary:
 
         # Set the values
         ij_list = list(itertools.product(range(self.length), range(self.length)))
-        self.loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
-        location_list = list(itertools.product(self.loc_list, self.loc_list))  # list of tuples
+        if self.num_psfs != 1:
+            self.loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
+            location_list = list(itertools.product(self.loc_list, self.loc_list))  # list of tuples
+        elif self.num_psfs == 1:
+            self.loc_list = [1023]
+            location_list = list(itertools.product(self.loc_list, self.loc_list))
 
         return ij_list, location_list
 
@@ -241,6 +257,9 @@ class CreatePSFLibrary:
         requested).
 
         """
+
+        # Set the pupil OPD based on the input
+        self.pupil_opd = self._set_opd()
 
         # If someone wants to run all of NIRCam, run the function 2x: shortwave and longwave
         if self.instr == "NIRCam" and (self.filter_input, self.detector_input) == ("all", "all"):
