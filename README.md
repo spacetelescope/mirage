@@ -6,7 +6,7 @@ This repository contains code that can be used to generate
 simulated NIRCam, NIRISS, or FGS data. These data can be in one
 of two formats:
 
-`raw` - No calirbations applied. Detector level effects such as non-linearity,
+`raw` - No calibrations applied. Detector level effects such as non-linearity,
 superbias, etc are still present.
 
 `linearized` - Detector level effects have been removed, and data have been
@@ -262,12 +262,12 @@ Any questions about the `mirage` project or its software can be directed to `hil
 
 
 ## Current Development Team
-- Bryan Hilbert
-- Johannes Sahlmann
-- Lauren Chambers
-- Kevin Volk
-- Shannon Osborne
-- Marshall Perrin
+- Bryan Hilbert [@bhilbert4](https://github.com/bhilbert4)
+- Johannes Sahlmann [@Johannes-Sahlmann](https://github.com/johannes-sahlmann)
+- Lauren Chambers [@laurenmarietta](https://github.com/laurenmarietta)
+- Kevin Volk [@KevinVolkSTScI](https://github.com/KevinVolkSTScI)
+- Shannon Osborne [@shanosborne](https://github.com/shanosborne)
+- Marshall Perrin [@mperrin](https://github.com/mperrin)
 
 
 ## Acknowledgments:

@@ -29,6 +29,8 @@ Any changes pushed to the `master` branch should be tagged with a version number
     y = The feature number.  Increase when change contains a new feature with or without bug fixes.
     z = The hotfix number. Increase when change only contains bug fixes.
 
+Currently the version number is set in setup.py. Updating the version number should be one of the last things you change prior to merging a
+feature branch into `master`. The branch's author and reviewer should agree on the version number prior to merging.
 
 Security
 --------
