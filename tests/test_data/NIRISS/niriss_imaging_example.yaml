@@ -11,6 +11,7 @@ Readout:
   array_name: NIS_CEN    #Name of array (FULL, SUB160, SUB64P, etc)
   filter: F380M       #Filter of simulated data (F090W, F322W2, etc)
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
+  namp: 4        #Number of amplifiers used to read out array. Only used for NIRCam/NRCA5_GRISMXX_<filter> array_names
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
   dark: $MIRAGE_DATA/niriss/darks/raw/NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal.fits   #Dark current integration used as the base
