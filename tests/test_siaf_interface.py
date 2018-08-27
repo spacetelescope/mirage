@@ -14,6 +14,7 @@ from pysiaf import iando
 
 from mirage.utils import siaf_interface
 
+
 def test_sci_subarray_corners():
     """Unit test for siaf_interface.sci_subarray_corners."""
     instrument = 'NIRCam'

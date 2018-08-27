@@ -29,17 +29,13 @@ from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 def get_siaf_information(instrument, aperture, ra, dec, telescope_roll):
     """Use pysiaf to get aperture information
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     instrument : str
         Instrument name.
 
     aperture : str
         Aperture name (e.g. "NRCA1_FULL")
-
-    Returns:
-    --------
-    None
     """
     siaf = pysiaf.Siaf(instrument)[aperture]
     local_roll = set_telescope_pointing.compute_local_roll(telescope_roll,
