@@ -289,7 +289,6 @@ class CreatePSFLibrary:
         elif self.opd_type.lower() == "predicted":
             opd = self.webb.opd_list[0]
         self.webb.pupilopd = (opd, self.opd_number)
-        print(self.webb.pupilopd)
 
         # For every filter
         final_list = []
