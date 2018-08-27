@@ -334,7 +334,7 @@ class AptInput:
                             observation_label.append(obslabel)
                             observation_number.append(obsnum)
                             visit_number.append(visitnum)
-                            vid = str(propid) + visitnum + obsnum
+                            vid = str(propid) + obsnum + visitnum
                             visit_id.append(vid)
                             vgrp = '01'
                             visit_grp.append(vgrp)
@@ -370,8 +370,8 @@ class AptInput:
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
                             ddist.append(np.float(elements[21]))
-                            observation_id.append('V' + vid + 'P00000000' + vgrp + seq + act)
-                            act_counter  += 1
+                            observation_id.append("jw{}_{}{}{}_{}".format(vid, vgrp, seq, act, exnum))
+                            act_counter += 1
 
                     except:
                         pass
