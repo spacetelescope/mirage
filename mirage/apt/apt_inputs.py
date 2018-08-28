@@ -312,7 +312,7 @@ class AptInput:
                         obsnum, visitnum = v.split(':')
                         obsnum = str(obsnum).zfill(3)
                         visitnum = str(visitnum).zfill(3)
-                        if skip == True:
+                        if skip is True:
                             print('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
