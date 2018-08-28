@@ -312,7 +312,7 @@ class AptInput:
                         obsnum, visitnum = v.split(':')
                         obsnum = str(obsnum).zfill(3)
                         visitnum = str(visitnum).zfill(3)
-                        if skip == True:
+                        if skip is True:
                             print('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
@@ -334,10 +334,16 @@ class AptInput:
                             observation_label.append(obslabel)
                             observation_number.append(obsnum)
                             visit_number.append(visitnum)
-                            vid = str(propid) + visitnum + obsnum
+                            prop_5digit = "{0:05d}".format(int(propid))
+                            vid = "{}{}{}".format(prop_5digit, obsnum, visitnum)
                             visit_id.append(vid)
+                            # Visit group hard coded to 1. It's not clear how APT divides visits up into visit
+                            # groups. For now just keep everything in a single visit group.
                             vgrp = '01'
                             visit_grp.append(vgrp)
+                            # Parallel sequence id hard coded to 1 (Simulated instrument as prime rather than
+                            # parallel) at the moment. Future improvements may allow the proper sequence
+                            # number to be constructed.
                             seq = '1'
                             seq_id.append(seq)
                             tar.append(np.int(elements[0]))
@@ -370,8 +376,8 @@ class AptInput:
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
                             ddist.append(np.float(elements[21]))
-                            observation_id.append('V' + vid + 'P00000000' + vgrp + seq + act)
-                            act_counter  += 1
+                            observation_id.append("jw{}_{}{}{}_{}".format(vid, vgrp, seq, act, exnum))
+                            act_counter += 1
 
                     except:
                         pass
