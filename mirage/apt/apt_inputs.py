@@ -336,8 +336,13 @@ class AptInput:
                             visit_number.append(visitnum)
                             vid = str(propid) + obsnum + visitnum
                             visit_id.append(vid)
+                            # Visit group hard coded to 1. It's not clear how APT divides visits up into visit
+                            # groups. For now just keep everything in a single visit group.
                             vgrp = '01'
                             visit_grp.append(vgrp)
+                            # Parallel sequence id hard coded to 1 (Simulated instrument as prime rather than
+                            # parallel) at the moment. Future improvements may allow the proper sequence
+                            # number to be constructed.
                             seq = '1'
                             seq_id.append(seq)
                             tar.append(np.int(elements[0]))
