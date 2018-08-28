@@ -334,7 +334,8 @@ class AptInput:
                             observation_label.append(obslabel)
                             observation_number.append(obsnum)
                             visit_number.append(visitnum)
-                            vid = "{}{}{}".format(str(propid).zfill(5), obsnum, visitnum)
+                            prop_5digit = "{0:05d}".format(int(propid))
+                            vid = "{}{}{}".format(prop_5digit, obsnum, visitnum)
                             visit_id.append(vid)
                             # Visit group hard coded to 1. It's not clear how APT divides visits up into visit
                             # groups. For now just keep everything in a single visit group.
