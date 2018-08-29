@@ -2341,7 +2341,7 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            north_to_east_V3ang = rotations.posangle(attitude_matrix, entry['V2'], entry['V3'])
+            north_to_east_V3ang = rotations.posangle(self.attitude_matrix, entry['V2'], entry['V3'])
             # xposang = (0-self.v3scixang) - (north_to_east_V3ang - entry['pos_angle'])
             xposang = 0. - (self.v3scixang - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
 
