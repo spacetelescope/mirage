@@ -24,7 +24,7 @@ env:
     global:
         - MAIN_CMD='python setup.py'
         - CONDA_CHANNELS='http://ssb.stsci.edu/astroconda'
-        - CONDA_DEPENDENCIES='pytest=3.6'
+        - CONDA_DEPENDENCIES='pytest=3.6 sphinx'
         - PIP_DEPENDENCIES=''
         - PYTHON_VERSION=3.6
         - NUMPY_VERSION=stable
@@ -34,7 +34,6 @@ env:
     matrix:
         - SETUP_CMD='install'
         - SETUP_CMD='test'
-#        - PYTHON_VERSION=2.7 SETUP_CMD='test'
 
 matrix:
 
@@ -52,11 +51,13 @@ matrix:
         - os: linux
           env: MAIN_CMD='flake8 --count'
                SETUP_CMD='mirage'
+               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
 
     allow_failures:
         # PEP8 will fail for numerous reasons. Ignore it.
         - env: MAIN_CMD='flake8 --count'
                SETUP_CMD='mirage'
+               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
 
 install:
     - git clone git://github.com/astropy/ci-helpers.git
