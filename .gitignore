@@ -38,3 +38,8 @@ examples/.ipynb_checkpoints/*
 OTECommissioning/*
 dev_scripts/*
 *config.json
+
+# Docs build #
+docs/_build
+docs/_static
+docs/_templates
