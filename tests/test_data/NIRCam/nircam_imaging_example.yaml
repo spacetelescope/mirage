@@ -50,13 +50,13 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: $TEST_DATA/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: $TEST_NIRCAM_DATA/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/nircam/webbpsf_library/        #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
   psfwfegroup: 0      #WFE realization group (0 to 4)
-  galaxyListFile: $TEST_DATA/seed_im_from_catalog_test_galaxies_catalog.list
+  galaxyListFile: $TEST_NIRCAM_DATA/seed_im_from_catalog_test_galaxies_catalog.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size

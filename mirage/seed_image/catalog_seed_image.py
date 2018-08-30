@@ -2342,8 +2342,7 @@ class Catalog_seed():
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
             north_to_east_V3ang = rotations.posangle(self.attitude_matrix, entry['V2'], entry['V3'])
-            # xposang = (0-self.v3scixang) - (north_to_east_V3ang - entry['pos_angle'])
-            xposang = 0. - (self.v3scixang - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
+            xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
 
             # first create the galaxy image
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], xposang*np.pi/180., entry['counts_per_frame_e'])

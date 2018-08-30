@@ -660,9 +660,8 @@ class SimInput:
             match = aperture == subarray_def['AperName']
 
             if np.sum(match) == 0:
-                config = ascii.read(self.subarray_def_file)
                 aperture = [apername for apername, name in
-                            np.array(config['AperName', 'Name']) if
+                            np.array(subarray_def['AperName', 'Name']) if
                             (sub in apername) or (sub in name)]
 
                 match = aperture == subarray_def['AperName']
@@ -670,6 +669,8 @@ class SimInput:
                 if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
                     raise ValueError('Cannot combine detector {} and subarray {}\
                         into valid aperture name.'.format(det, sub))
+                # We don't want aperture as a list
+                aperture = aperture[0]
 
             amp = subarray_def['num_amps'][match][0]
             namp.append(amp)

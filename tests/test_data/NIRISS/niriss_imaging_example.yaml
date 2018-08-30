@@ -50,7 +50,7 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: $TEST_DATA/niriss_point_sources_mod.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: $TEST_NIRISS_DATA/niriss_point_sources_mod.list #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/niriss/webbpsf_library/  #Path to PSF library
   psfbasename: niriss                        #Basename of the files in the psf library
   psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
