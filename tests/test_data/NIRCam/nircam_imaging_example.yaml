@@ -89,7 +89,7 @@ newRamp:
   linear_configfile: config
 
 Output:
-  file: V42424024002P000000000112o_B5_F250M_uncal.fits   #Output filename
+  file: jw01111024002_0112o_00001_NRCB5_uncal.fits   #Output filename
   directory: ./   # Directory in which to place output files
   datatype: linear,raw # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
   format: DMS          #Output file format Options: DMS, SSR(not yet implemented)
@@ -97,7 +97,7 @@ Output:
   grism_source_image: False   # Create an image to be dispersed?
   unsigned: True   #Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
   dmsOrient: True    #Output in DMS orientation (vs. fitswriter orientation).
-  program_number: 42424    #Program Number
+  program_number: 01111    #Program Number
   title: Black Holes at the Restaurant at the End of the Universe   #Program title
   PI_Name: D. Adams  #Proposal PI Name
   Proposal_category: GO  #Proposal category
@@ -106,11 +106,11 @@ Output:
   observation_label: Obs1    #User-generated observation Label
   visit_number: '024'    #Visit Number
   visit_group: '01'    #Visit Group
-  visit_id: '42424024002'    #Visit ID
-  sequence_id: '2'    #Sequence ID
+  visit_id: '01111024002'    #Visit ID
+  sequence_id: '1'    #Sequence ID
   activity_id: '2o'    #Activity ID. Increment with each exposure.
   exposure_number: '00001'    #Exposure Number
-  obs_id: 'V42424024002P000000000112o'   #Observation ID number
+  obs_id: 'jw01111024002_0112o_00001'   #Observation ID number
   date_obs: '2019-10-15'  #Date of observation
   time_obs: '06:29:11.852'  #Time of observation
   obs_template: 'NIRCam Imaging'  #Observation template
