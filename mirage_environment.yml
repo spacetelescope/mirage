@@ -1,4 +1,4 @@
-name: mirage_final_test_2
+name: mirage
 channels:
   - http://ssb.stsci.edu/astroconda-dev
   - conda-forge
