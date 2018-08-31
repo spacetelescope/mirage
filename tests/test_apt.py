@@ -78,7 +78,7 @@ def RunAllAPTTemplates(instrument):
                                                 instrument +
                                                 'Test.xml_with_yaml_parameters.csv')), \
         'Observation table not created.'
-    assert len(glob.glob(os.path.join(out_dir, 'V' + PROPOSAL_ID + '*.yaml'))) \
+    assert len(glob.glob(os.path.join(out_dir, 'jw{0:05d}*.yaml'.format(int(PROPOSAL_ID))))) \
         >= n_obs, 'Fewer yaml files created than observations'
 
     # If a reference observationlist.yaml file exists, ensure that the
