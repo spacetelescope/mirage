@@ -33,6 +33,10 @@ def RunAllAPTTemplates(instrument):
     '''Parse the given APT files and create a set of .yamls for a given
     instrument
     '''
+    # Define MIRAGE_DATA environment variable. Used only for this creation of
+    # yaml files, so we can use a dummy value
+    os.environ['MIRAGE_DATA'] = "/mypath/mirage/refdata/"
+
     # Define .pointing and .xml file locations
     pointing_file = os.path.join(TESTS_DIR, 'test_data', instrument, instrument + 'Test.pointing')
     xml_file = os.path.join(TESTS_DIR, 'test_data',  instrument, instrument + 'Test.xml')
@@ -63,7 +67,6 @@ def RunAllAPTTemplates(instrument):
     yam = yaml_generator.SimInput()
     yam.input_xml = xml_file
     yam.pointing_file = pointing_file
-    # yam.siaf = os.path.expandvars('$MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv')
     yam.output_dir = out_dir
     yam.simdata_output_dir = out_dir
     yam.observation_table = observationlist_file
