@@ -156,6 +156,7 @@ dependencies:
   - zlib=1.2.11=hf3cbc9b_2
   - jwxml=0.3.0=py36_1
   - poppy=0.7.0=py36_0
+  - pysynphot=0.9.12=py36_0
   - webbpsf-data=0.6.0=1
   - asdf=2.0.0rc.dev61+g37d57aa=py36_2
   - astropy=4.0.0.dev10518+g0526009=py36_0
@@ -182,5 +183,3 @@ dependencies:
     - jwst-backgrounds==1.1.1
     - pysiaf==0.1.12
     - webbpsf==0.7.0
-
-
