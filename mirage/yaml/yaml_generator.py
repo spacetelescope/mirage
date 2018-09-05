@@ -880,7 +880,7 @@ class SimInput:
         input -- dictionary containing all needed exposure
                  information for one exposure
         """
-
+        instrument = input['Instrument']
         # select the right filter
         if input['detector'] == 'NIS':
             filtkey = 'FilterWheel'
@@ -901,12 +901,15 @@ class SimInput:
             outfile = input['outputfits']
             yamlout = input['yamlfile']
         else:
+            if instrument.upper() == 'NIRCAM':
+                fulldetector = 'nrc{}'.format(input['detector'].lower())
+            else:
+                fulldetector = input['detector'].lower()
             outtf = True
-            outfile = input['observation_id'] + '_' + input['detector'] + '_' + input[filtkey] + '_uncal.fits'
-            yamlout = input['observation_id'] + '_' + input['detector'] + '_' + input[filtkey] + '.yaml'
+            outfile = input['observation_id'] + '_' + fulldetector + '_uncal.fits'
+            yamlout = input['observation_id'] + '_' + fulldetector + '.yaml'
 
         yamlout = os.path.join(self.output_dir, yamlout)
-        instrument = input['Instrument']
         with open(yamlout, 'w') as f:
             f.write('Inst:\n')
             f.write('  instrument: {}          # Instrument name\n'.format(instrument))

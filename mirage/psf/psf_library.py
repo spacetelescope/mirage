@@ -70,6 +70,17 @@ class CreatePSFLibrary:
         number must be a square number. Default is 16.
         E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
 
+    opd_type: str, optional
+        The type of OPD map you would like to use to create the PSFs. Options are
+        "predicted" or "requirements" where the predicted map is of the expected
+        WFE and the requirements map is slightly more conservative (has slightly
+        larger WFE). Default is "requirements"
+
+    opd_number: int, optional
+        The realization of the OPD map pulled from the OPD file. Options are an
+        integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
+        the telescope included in the OPD map file. Default is 0.
+
     save: bool, optional
         True/False boolean if you want to save your file
 
@@ -97,17 +108,21 @@ class CreatePSFLibrary:
     """
 
     # Class variables for NIRCam short vs long wave information:
-    nrca_short_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W2', 'F150W', 'F162M', 'F164N', 'F182M', 'F187N',
-                          'F200W', 'F210M', 'F212N']
-    nrca_long_filters = ['F250M', 'F277W', 'F300M', 'F322W2', 'F323N', 'F335M', 'F356W', 'F360M', 'F405N', 'F410M',
-                         'F430M', 'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
+    nrca_short_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W2', 'F150W',
+                          'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
+                          'F212N']
+    nrca_long_filters = ['F250M', 'F277W', 'F300M', 'F322W2', 'F323N', 'F335M',
+                         'F356W', 'F360M', 'F405N', 'F410M', 'F430M', 'F444W',
+                         'F460M', 'F466N', 'F470N', 'F480M']
 
-    nrca_short_detectors = ['NRCA1', 'NRCA2', 'NRCA3', 'NRCA4', 'NRCB1', 'NRCB2', 'NRCB3', 'NRCB4']
+    nrca_short_detectors = ['NRCA1', 'NRCA2', 'NRCA3', 'NRCA4', 'NRCB1', 'NRCB2',
+                            'NRCB3', 'NRCB4']
     nrca_long_detectors = ['NRCA5', 'NRCB5']
 
-    def __init__(self, instrument, filters="all", detectors="all",
-                 fov_pixels=101, oversample=5, num_psfs=16, save=True,
-                 fileloc=None, filename=None, overwrite=True, pupil_opd=None):
+    def __init__(self, instrument, filters="all", detectors="all", fov_pixels=101,
+                 oversample=5, num_psfs=16, opd_type="requirements", opd_number=0,
+                 save=True, fileloc=None, filename=None, overwrite=True,
+                 pupil_opd=None):
 
         # Pull correct capitalization of instrument name
         webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
@@ -143,6 +158,8 @@ class CreatePSFLibrary:
         # Set PSF attributes
         self.fov_pixels = fov_pixels
         self.oversample = oversample
+        self.opd_type = opd_type
+        self.opd_number = opd_number
         self.save = save
         self.overwrite = overwrite
         self.fileloc = fileloc
@@ -294,13 +311,22 @@ class CreatePSFLibrary:
         # Create kernel to smooth pixel based on oversample
         kernel = astropy.convolution.Box2DKernel(width=self.oversample)
 
+        # Set output mode
+        self.webb.options['output_mode'] = 'Oversampled Image'
+
+        # Set OPD Map (pull most recent version with self.webb.opd_list call) - always predicted then requirements
+        if self.opd_type.lower() == "requirements":
+            opd = self.webb.opd_list[1]
+        elif self.opd_type.lower() == "predicted":
+            opd = self.webb.opd_list[0]
+        self.webb.pupilopd = (opd, self.opd_number)
+
         # For every filter
         final_list = []
         for filt in filter_list:
             print("\nStarting filter: {}".format(filt))
 
-            # Edit instance (created above) of instrument in WebbPSF
-            self.webb.options['output_mode'] = 'Oversampled Image'
+            # Set filter
             self.webb.filter = filt
 
             # Create an array to fill ([SCA, j, i, y, x])
@@ -321,7 +347,7 @@ class CreatePSFLibrary:
                     psf = self.webb.calc_psf(fov_pixels=self.fov_pixels, oversample=self.oversample)
 
                     # Convolve PSF with a square kernel
-                    psf_conv = astropy.convolution.convolve(psf[0].data, kernel)
+                    psf_conv = astropy.convolution.convolve(psf["OVERDIST"].data, kernel)
 
                     # Add PSF to 5D array
                     psf_arr[k, j, i, :, :] = psf_conv
@@ -331,6 +357,8 @@ class CreatePSFLibrary:
 
             header["INSTRUME"] = (self.instr, "Instrument")
             header["FILTER"] = (filt, "Filter name")
+            header["PUPILOPD"] = (self.webb.pupilopd[0], "Pupil OPD source name")
+            header["OPD_REAL"] = (self.webb.pupilopd[1], "Pupil OPD source realization from file")
 
             for i, det in enumerate(detector_list):
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))

@@ -13,18 +13,18 @@ sudo: false
 
 # The apt packages below are needed for sphinx builds, which can no longer
 # be installed with sudo apt-get.
-#addons:
-#    apt:
-#        packages:
-#            - graphviz
-#            - texlive-latex-extra
-#            - dvipng
+addons:
+    apt:
+        packages:
+            - graphviz
+            - texlive-latex-extra
+            - dvipng
 
 env:
     global:
         - MAIN_CMD='python setup.py'
         - CONDA_CHANNELS='http://ssb.stsci.edu/astroconda'
-        - CONDA_DEPENDENCIES='pytest sphinx'
+        - CONDA_DEPENDENCIES='pytest=3.6 sphinx'
         - PIP_DEPENDENCIES=''
         - PYTHON_VERSION=3.6
         - NUMPY_VERSION=stable
@@ -34,7 +34,6 @@ env:
     matrix:
         - SETUP_CMD='install'
         - SETUP_CMD='test'
-#        - PYTHON_VERSION=2.7 SETUP_CMD='test'
 
 matrix:
 
@@ -43,21 +42,21 @@ matrix:
 
     include:
         # build sphinx documentation with warnings
-#        - os: linux
-#          env: SETUP_CMD='build_sphinx'
-#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
-#               PIP_DEPENDENCIES='sphinx_rtd_theme stsci_rtd_theme sphinx-automodapi'
+        - os: linux
+          env: SETUP_CMD='build_sphinx'
+               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+               PIP_DEPENDENCIES='sphinx_rtd_theme stsci_rtd_theme sphinx-automodapi'
 
         # PEP8 check with flake8 (only once, i.e. "os: linux")
         - os: linux
           env: MAIN_CMD='flake8 --count'
-               SETUP_CMD='pysiaf' TEST_CMD='flake8 --version'
+               SETUP_CMD='mirage'
                CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
 
     allow_failures:
         # PEP8 will fail for numerous reasons. Ignore it.
         - env: MAIN_CMD='flake8 --count'
-               SETUP_CMD='pysiaf' TEST_CMD='flake8 --version'
+               SETUP_CMD='mirage'
                CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
 
 install:

@@ -1,11 +1,49 @@
-#! /usr/bin/env python
-
-import sys
+#!/usr/bin/env python
+import os
 import subprocess
-
-from setuptools import setup, find_packages
+import sys
+from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.test import test as TestCommand
 
+
+
+# allows you to build sphinx docs from the package
+# main directory with "python setup.py build_sphinx"
+
+try:
+    from sphinx.cmd.build import build_main
+    from sphinx.setup_command import BuildDoc
+
+    class BuildSphinx(BuildDoc):
+        """Build Sphinx documentation after compiling C source files"""
+
+        description = 'Build Sphinx documentation'
+
+        def initialize_options(self):
+            BuildDoc.initialize_options(self)
+
+        def finalize_options(self):
+            BuildDoc.finalize_options(self)
+
+        def run(self):
+            build_cmd = self.reinitialize_command('build_ext')
+            build_cmd.inplace = 1
+            self.run_command('build_ext')
+            build_main(['-b', 'html', './docs', './docs/_build/html'])
+
+except ImportError:
+    class BuildSphinx(Command):
+        user_options = []
+
+        def initialize_options(self):
+            pass
+
+        def finalize_options(self):
+            pass
+
+        def run(self):
+            print('!\n! Sphinx is not installed!\n!', file=sys.stderr)
+            exit(1)
 
 class PyTest(TestCommand):
     def finalize_options(self):
@@ -74,7 +112,6 @@ setup(
     ],
     include_package_data=True,
     cmdclass={
-        'test': PyTest
-        # 'build_sphinx': BuildSphinx
-    },
-    )
+        'test': PyTest,
+        'build_sphinx': BuildSphinx
+    },)
