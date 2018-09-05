@@ -107,6 +107,7 @@ def test_environment_variable():
                                     "from the Mirage package."
 
 
+@pytest.mark.xfail
 def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''
