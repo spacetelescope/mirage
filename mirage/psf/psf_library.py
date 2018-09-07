@@ -357,9 +357,10 @@ class CreatePSFLibrary:
             for i, det in enumerate(detector_list):
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))
 
-            header["FOVPIXEL"] = (self.fov_pixels, "Field of view in pixels (full array)")
-            header["DISTORT"] = (self.add_distortion, "Distortion added to PSFs")
+            header["FOVPIXEL"] = (psf[ext].header["FOV"], "Field of view in pixels (full array)")
+            header["FOV"] = (self.fov_pixels, "Field of view in arcsec (full array) ")
             header["OVERSAMP"] = (self.oversample, "Oversampling factor for FFTs in computation")
+            header["NWAVES"] = (psf[ext].header["NWAVES"], "Number of wavelengths used in calculation")
 
             for k, ij in enumerate(self.ij_list):  # these were originally written out in (i,j) and (x,y)
                 header["DET_JI{}".format(k)] = (str((ij[1], ij[0])), "The #{} PSF's (j,i) detector position".format(k))
@@ -376,8 +377,25 @@ class CreatePSFLibrary:
             header["J{}_Y".format(last)] = (self.loc_list[-1],
                                             "The y pixel value for j={} (final value; AXIS3)".format(last))
 
+            # Distortion information
+            if self.add_distortion:
+                header["ROTATION"] = (psf[ext].header["ROTATION"], "PSF rotated to match detector rotation")
+                header["DISTORT"] = (psf[ext].header["DISTORT"], "SIAF distortion coefficients applied")
+                header["SIAF_VER"] = (psf[ext].header["SIAF_VER"], "SIAF PRD version used")
+
+                for key in list(psf[ext].header.keys()):
+                    if "COEF_" in key:
+                        header[key] = (psf[ext].header[key], "SIAF distortion coefficient for {}".format(key))
+
             # Pull values from the last made psf
+            header["WAVELEN"] = (psf[ext].header["WAVELEN"], "Weighted mean wavelength in meters")
+            header["DIFFLMT"] = (psf[ext].header["DIFFLMT"], "Diffraction limit lambda/D in arcsec")
+            header["FFTTYPE"] = (psf[ext].header["FFTTYPE"], "Algorithm for FFTs: numpy or fftw")
             header["NORMALIZ"] = (psf[ext].header["NORMALIZ"], "PSF normalization method")
+            header["JITRTYPE"] = (psf[ext].header["JITRTYPE"], "Type of jitter applied")
+            header["JITRSIGM"] = (psf[ext].header["JITRSIGM"], "Gaussian sigma for jitter [arcsec]")
+            header["TEL_WFE"] = (psf[ext].header["TEL_WFE"], "[nm] Telescope pupil RMS wavefront error")
+
             header["DATE"] = (psf[ext].header["DATE"], "Date of calculation")
             header["AUTHOR"] = (psf[ext].header["AUTHOR"], "username@host for calculation")
             header["VERSION"] = (psf[ext].header["VERSION"], "WebbPSF software version")
