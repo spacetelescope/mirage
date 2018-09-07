@@ -13,21 +13,21 @@ Readout:
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
-  dark: /ifs/jwst/wit/nircam/nircam_simulator_data/niriss_darks/NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal.fits   #Dark current integration used as the base
+  dark: $MIRAGE_DATA/niriss/darks/raw/NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal.fits   #Dark current integration used as the base
   linearized_darkfile: None # Linearized dark ramp to use as input. Supercedes dark above
-  badpixmask: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_mask_0008.fits # If linearized dark is used, populate output DQ extensions using this file
-  superbias: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_superbias_0080.fits #Superbias file. Set to None or leave blank if not using
-  linearity: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_linearity_0010.fits #linearity correction coefficients
-  saturation: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_saturation_0010.fits #well depth reference files
-  gain: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_gain_0005.fits
+  badpixmask: $MIRAGE_DATA/niriss/reference_files/badpix/jwst_niriss_mask_0008.fits # If linearized dark is used, populate output DQ extensions using this file
+  superbias: $MIRAGE_DATA/niriss/reference_files/superbias/jwst_niriss_superbias_0080.fits #Superbias file. Set to None or leave blank if not using
+  linearity: $MIRAGE_DATA/niriss/reference_files/linearity/jwst_niriss_linearity_0010.fits #linearity correction coefficients
+  saturation: $MIRAGE_DATA/niriss/reference_files/saturation/jwst_niriss_saturation_0010.fits #well depth reference files
+  gain: $MIRAGE_DATA/niriss/reference_files/gain/jwst_niriss_gain_0005.fits
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_distortion_0008.asdf #Astrometric distortion file (asdf)
-  distortion_coeffs: /ifs/jwst/wit/nircam/nircam_simulator_data/NIRISS_SIAF_09-28-2017.csv        #CSV file containing distortion coefficients
-  ipc: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits  #File containing IPC kernel to apply
+  astrometric: $MIRAGE_DATA/niriss/reference_files/distortion/jwst_niriss_distortion_0008.asdf #Astrometric distortion file (asdf)
+  distortion_coeffs: $MIRAGE_DATA/niriss/reference_files/SIAF/NIRISS_SIAF_09-28-2017.csv        #CSV file containing distortion coefficients
+  ipc: $MIRAGE_DATA/niriss/reference_files/ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits  #File containing IPC kernel to apply
   invertIPC: False      #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
-  pixelAreaMap: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/reference_files/jwst_niriss_area_0011.fits  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+  pixelAreaMap: $MIRAGE_DATA/niriss/reference_files/pam/jwst_niriss_area_0011.fits  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
   subarray_defs:   config   #File that contains a list of all possible subarray names and coordinates
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
@@ -42,15 +42,15 @@ nonlin:
   robberto:  False                         #Use Massimo Robberto type non-linearity coefficients
 
 cosmicRay:
-  path: /ifs/jwst/wit/nircam/nircam_simulator_data/cosmic_ray_library/         #Path to CR library
+  path: $MIRAGE_DATA/niriss/cosmic_ray_library/         #Path to CR library
   library: SUNMIN    #Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)
   scale: 1.5     #Cosmic ray scaling factor
-  suffix: IPC_NIRCam_B5    #Suffix of library file names
+  suffix: IPC_NIRISS_NIS    #Suffix of library file names
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: test_data/NIRISS/niriss_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: /ifs/jwst/wit/niriss/nircam_ramp_simulation_files/webbpsf_files/  #Path to PSF library
+  pointsource: $TEST_DATA/niriss_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  psfpath: $MIRAGE_DATA/niriss/webbpsf_library/  #Path to PSF library
   psfbasename: niriss                        #Basename of the files in the psf library
   psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
