@@ -44,3 +44,5 @@ def test_niriss_imaging():
     targetratio = 0.15 / 0.84
     deviation = abs(fluxratio/targetratio - 1.)
     assert deviation < 1.e-06
+    # clean up the output files in the test directory from this test.
+    os.system('/bin/rm V88888024002P000000000112o*')
