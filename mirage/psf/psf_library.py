@@ -57,9 +57,9 @@ class CreatePSFLibrary:
         E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
 
     add_distortion: bool
-        If True, will add 2 new extensions to the PSF HDUlist object. The 2nd
-        extension will be a distorted version of the over-sampled PSF and the
-        3rd extension will be a distorted version of the detector-sampled PSF.
+        If True, the PSF will have distortions applied: the geometric distortion from
+        the detectors (using data from SIAF) and the rotation of the detectors with
+        respect to the focal plane. Default is True.
 
     fov_pixels: int
         The field of view in undersampled detector pixels used by WebbPSF when
@@ -93,11 +93,14 @@ class CreatePSFLibrary:
     overwrite: bool
         True/False boolean to overwrite the output file if it already exists.
 
+    **kwargs
+        This can used to add any extra arguments to the webbpsf calc_psf() method
+        call.
 
     Use:
     ----
-    c = CreatePSFLibrary(instrument, filters, detectors, fov_pixels, oversample,
-                         num_psfs, save, fileloc, filename, overwrite)
+    c = CreatePSFLibrary(instrument, filters, detectors, num_psfs, add_distortion,
+                         fov_pixels, oversample, save, fileloc, filename, overwrite)
     c.create_files()
 
     nis = CreatePSFLibrary("NIRISS") # will run all filters/detectors
@@ -197,7 +200,8 @@ class CreatePSFLibrary:
 
     def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, add_distortion=True,
                  fov_pixels=101, oversample=5,
-                 opd_type="requirements", opd_number=0, save=True, fileloc=None, filename=None, overwrite=True):
+                 opd_type="requirements", opd_number=0, save=True, fileloc=None, filename=None, overwrite=True,
+                 **kwargs):
 
         # Pull correct capitalization of instrument name
         webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
@@ -236,6 +240,9 @@ class CreatePSFLibrary:
         self.oversample = oversample
         self.opd_type = opd_type
         self.opd_number = opd_number
+        self._kwargs = kwargs
+
+        # Set saving attributes
         self.save = save
         self.overwrite = overwrite
         self.fileloc = fileloc
@@ -327,7 +334,7 @@ class CreatePSFLibrary:
 
                     # Create PSF
                     psf = self.webb.calc_psf(add_distortion=self.add_distortion,
-                                             fov_pixels=self.fov_pixels, oversample=self.oversample)
+                                             fov_pixels=self.fov_pixels, oversample=self.oversample, **self._kwargs)
 
                     # Set extension to read based on distortion choice
                     if self.add_distortion: ext = "OVERDIST"
