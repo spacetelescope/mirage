@@ -19,12 +19,16 @@ class CreatePSFLibrary:
     This class must be run separately for each instrument.
 
     Special Case for NIRCam:
-    For NIRCam, you can set detectors and filters both to "shortwave" or both to
-    "longwave" to run all the shortwave/longwave filters/detectors.
-    Or if you want to run all of the filters and detectors, setting both to "all"
-    will separate the short and long wave filter/detectors and run them in the
+    For NIRCam, you can set detectors and filters with multiple options.
+
+    You may set both filters and detectors = "all" just like the other instruments, and
+    the short and long wave filter/detectors will be seperated and run in the
     correct pairings.
-    If you choose to specify specific filters and detectors, they must all be either
+    If you choose only certain filters (either by name or with "shortwave" or
+    "longwave" to run all the shortwave/longwave filters), you may set detectors
+    to be "all" and the script will pull the all possible detectors (ie either
+    all the shortwave or all the longwave detectors).
+    If you choose specific filters and detectors, they must all be either
     shortwave or longwave. Mismatched lists of short and long wave filters and
     detectors will result in an error.
 
@@ -144,12 +148,18 @@ class CreatePSFLibrary:
 
         return filter_list
 
-    def _set_detectors(self):
+    def _set_detectors(self, filter):
         """ Get the list of detectors to include in the PSF library files """
 
         # Set detector list to loop over
         if self.detector_input == "all":
-            detector_list = self.webb.detector_list
+            if self.instr != "NIRCam":
+                detector_list = self.webb.detector_list
+            else:
+                if filter in CreatePSFLibrary.nrca_short_filters:
+                    detector_list = CreatePSFLibrary.nrca_short_detectors
+                elif filter in CreatePSFLibrary.nrca_long_filters:
+                    detector_list = CreatePSFLibrary.nrca_long_detectors
         elif self.detector_input == "shortwave":
             detector_list = CreatePSFLibrary.nrca_short_detectors
         elif self.detector_input == "longwave":
@@ -220,26 +230,25 @@ class CreatePSFLibrary:
         self.filter_input = filters
         self.detector_input = detectors
 
+        # A list of filters and a list of list of detectors (1 sublist per filter)
         self.filter_list = self._set_filters()
-        self.detector_list = self._set_detectors()
+        self.detector_list = [self._set_detectors(filter) for filter in self.filter_list]
 
         # Set the locations on the detector of the fiducial PSFs
         self.ij_list, self.loc_list, self.location_list = self._set_psf_locations(num_psfs, psf_location)
 
         # For NIRCam: Check if filters/detectors match in terms of if they are longwave/shortwave
-        # The "all" case will be updated later
-        if self.instr == "NIRCam" and (self.filter_input, self.detector_input) != ("all", "all"):
-            for det in self.detector_list:
-                if "5" in det:
-                    [self._raise_value_error("short filter", det, filt) for filt in
-                     self.filter_list if filt in CreatePSFLibrary.nrca_short_filters]
-
-                else:
-                    [self._raise_value_error("long filter", det, filt) for filt in
-                     self.filter_list if filt in CreatePSFLibrary.nrca_long_filters]
+        if self.instr == "NIRCam":
+            for filt, det_list in zip(self.filter_list, self.detector_list):
+                for det in det_list:
+                    if "5" in det:
+                        if filt in CreatePSFLibrary.nrca_short_filters:
+                            self._raise_value_error("short filter", det, filt)
+                    else:
+                        if filt in CreatePSFLibrary.nrca_long_filters:
+                            self._raise_value_error("long filter", det, filt)
 
         # Set PSF attributes
-        self.num_psfs = num_psfs
         self.add_distortion = add_distortion
         self.fov_pixels = fov_pixels
         self.oversample = oversample
@@ -255,44 +264,11 @@ class CreatePSFLibrary:
 
     def create_files(self):
         """
-        This method creates the following:
-
-        For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
-        (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
-        is the 2D PSF.
-
-        All variables needed to run this method are defined during the creation for the
-        instance
-
-        Returns:
-        -------
-        This saves out the library files if requested and then returns a list of all the
-        hdulist objects created (each in the form of [SCA, j, i, y, x], 1 per filter
-        requested).
-
-        """
-
-        # If someone wants to run all of NIRCam, run the function 2x: shortwave and longwave
-        if self.instr == "NIRCam" and (self.filter_input, self.detector_input) == ("all", "all"):
-            short_list = self._run_files(CreatePSFLibrary.nrca_short_filters, CreatePSFLibrary.nrca_short_detectors)
-            long_list = self._run_files(CreatePSFLibrary.nrca_long_filters, CreatePSFLibrary.nrca_long_detectors)
-
-            final_list = short_list + long_list
-
-        else:
-            final_list = self._run_files(self.filter_list, self.detector_list)
-
-        return final_list
-
-    def _run_files(self, filter_list, detector_list):
-        """
         This method is called in the create_files() method
 
         For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
         (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
         is the 2D PSF.
-
-        Parameters filter_list and detector_list are defined in the create_files method
 
         Returns:
         -------
@@ -317,7 +293,7 @@ class CreatePSFLibrary:
 
         # For every filter
         final_list = []
-        for filt in filter_list:
+        for filt, det_list in zip(self.filter_list, self.detector_list):
             print("\nStarting filter: {}".format(filt))
 
             # Set filter
@@ -325,11 +301,11 @@ class CreatePSFLibrary:
 
             # Create an array to fill ([SCA, j, i, y, x])
             psf_size = self.fov_pixels * self.oversample
-            psf_arr = np.empty((len(detector_list), self.length, self.length, psf_size, psf_size))
+            psf_arr = np.empty((len(det_list), self.length, self.length, psf_size, psf_size))
 
             # For every detector
-            for k, det in enumerate(detector_list):
-                print("  Running detector {}".format(det))
+            for k, det in enumerate(det_list):
+                print("  Running detector: {}".format(det))
 
                 self.webb.detector = det
 
@@ -359,7 +335,7 @@ class CreatePSFLibrary:
             header["PUPILOPD"] = (self.webb.pupilopd[0], "Pupil OPD source name")
             header["OPD_REAL"] = (self.webb.pupilopd[1], "Pupil OPD source realization from file")
 
-            for i, det in enumerate(detector_list):
+            for i, det in enumerate(det_list):
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))
 
             header["FOVPIXEL"] = (psf[ext].header["FOV"], "Field of view in pixels (full array)")
