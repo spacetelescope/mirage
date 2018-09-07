@@ -3193,6 +3193,10 @@ class Catalog_seed():
                 # files are in a separate directory and have the altered file names
                 # compared to imaging.  Hence one can point to the same base 
                 # directory to run both imaging and NRM models.
+                # 
+                # This set-up requires that the NRM PSF library files be placed in a directory named NIS_NRM under the 
+                # PSF path given in the .yaml file, just as the NIRISS imaging PSF library files need to be placed in a 
+                # directory named NIS under the specified PSF path.
                 if self.params['Inst']['mode'] in ['ami']:
                     self.psfname = self.psfname.replace('NIS','NIS_NRM')
         else:
