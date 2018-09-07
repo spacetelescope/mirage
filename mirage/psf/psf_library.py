@@ -51,6 +51,11 @@ class CreatePSFLibrary:
         attribute of webbpsf.INSTR(). Spelling/capitalization must match what
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
+    num_psfs: int
+        The total number of fiducial PSFs to be created and saved in the files. This
+        number must be a square number. Default is 16.
+        E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
+
     add_distortion: bool
         If True, will add 2 new extensions to the PSF HDUlist object. The 2nd
         extension will be a distorted version of the over-sampled PSF and the
@@ -62,11 +67,6 @@ class CreatePSFLibrary:
 
     oversample: int
         The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
-
-    num_psfs: int
-        The total number of fiducial PSFs to be created and saved in the files. This
-        number must be a square number. Default is 16.
-        E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
 
     opd_type: str
         The type of OPD map you would like to use to create the PSFs. Options are
@@ -183,11 +183,17 @@ class CreatePSFLibrary:
             raise ValueError("You must choose a square number of fiducial PSFs to create (E.g. 9, 16, etc.)")
 
         # Set the values
-        ij_list = list(itertools.product(range(self.length), range(self.length)))
-        self.loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
-        location_list = list(itertools.product(self.loc_list, self.loc_list))  # list of tuples
+        if num_psfs == 1:
+            # Want this case to be at the detector center rather than the corner
+            ij_list = (0, 0)
+            loc_list = [1024]
+            location_list = (1024, 1024)
+        else:
+            ij_list = list(itertools.product(range(self.length), range(self.length)))
+            loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
+            location_list = list(itertools.product(loc_list, loc_list))  # list of tuples
 
-        return ij_list, location_list
+        return ij_list, loc_list, location_list
 
     def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, add_distortion=True,
                  fov_pixels=101, oversample=5,
@@ -210,7 +216,7 @@ class CreatePSFLibrary:
         self.detector_list = self._set_detectors()
 
         # Set the locations on the detector of the fiducial PSFs
-        self.ij_list, self.location_list = self._set_psf_locations(num_psfs)
+        self.ij_list, self.loc_list, self.location_list = self._set_psf_locations(num_psfs)
 
         # For NIRCam: Check if filters/detectors match in terms of if they are longwave/shortwave
         # The "all" case will be updated later
