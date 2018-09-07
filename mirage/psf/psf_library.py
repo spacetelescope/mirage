@@ -56,6 +56,10 @@ class CreatePSFLibrary:
         number must be a square number. Default is 16.
         E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
 
+    psf_location: tuple
+        If num_psfs = 1, then this is used to set the (y,x) location of that PSF.
+        Default is (1024,1024).
+
     add_distortion: bool
         If True, the PSF will have distortions applied: the geometric distortion from
         the detectors (using data from SIAF) and the rotation of the detectors with
@@ -174,7 +178,7 @@ class CreatePSFLibrary:
 
         raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
 
-    def _set_psf_locations(self, num_psfs):
+    def _set_psf_locations(self, num_psfs, psf_location):
         """ Set the locations on the detector of the fiducial PSFs. Assumes a 2048x2048 detector"""
 
         # The locations these PSFs should be centered on for a 2048x2048 detector
@@ -187,20 +191,20 @@ class CreatePSFLibrary:
 
         # Set the values
         if num_psfs == 1:
-            # Want this case to be at the detector center rather than the corner
+            # Want this case to be at the specified location
             ij_list = [(0, 0)]
-            loc_list = [1024]
-            location_list = [(1024, 1024)]
+            loc_list = [psf_location[1], psf_location[0]]  # list of x,y location
+            location_list = [(psf_location[1], psf_location[0])]  # tuple of (x,y)
         else:
             ij_list = list(itertools.product(range(self.length), range(self.length)))
             loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
-            location_list = list(itertools.product(loc_list, loc_list))  # list of tuples
+            location_list = list(itertools.product(loc_list, loc_list))  # list of tuples (x,y) (for webbpsf)
 
         return ij_list, loc_list, location_list
 
-    def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, add_distortion=True,
-                 fov_pixels=101, oversample=5,
-                 opd_type="requirements", opd_number=0, save=True, fileloc=None, filename=None, overwrite=True,
+    def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, psf_location=(1024, 1024),
+                 add_distortion=True, fov_pixels=101, oversample=5, opd_type="requirements", opd_number=0,
+                 save=True, fileloc=None, filename=None, overwrite=True,
                  **kwargs):
 
         # Pull correct capitalization of instrument name
@@ -220,7 +224,7 @@ class CreatePSFLibrary:
         self.detector_list = self._set_detectors()
 
         # Set the locations on the detector of the fiducial PSFs
-        self.ij_list, self.loc_list, self.location_list = self._set_psf_locations(num_psfs)
+        self.ij_list, self.loc_list, self.location_list = self._set_psf_locations(num_psfs, psf_location)
 
         # For NIRCam: Check if filters/detectors match in terms of if they are longwave/shortwave
         # The "all" case will be updated later
@@ -235,6 +239,7 @@ class CreatePSFLibrary:
                      self.filter_list if filt in CreatePSFLibrary.nrca_long_filters]
 
         # Set PSF attributes
+        self.num_psfs = num_psfs
         self.add_distortion = add_distortion
         self.fov_pixels = fov_pixels
         self.oversample = oversample
@@ -369,13 +374,19 @@ class CreatePSFLibrary:
 
             header["NUM_PSFS"] = (self.num_psfs, "The total number of fiducial PSFs")
 
-            last = len(self.loc_list) - 1
-            header["I0_X"] = (self.loc_list[0], "The x pixel value for i=0 (AXIS4)")
-            header["I{}_X".format(last)] = (self.loc_list[-1],
-                                            "The x pixel value for i={} (final value; AXIS4)".format(last))
-            header["J0_Y"] = (self.loc_list[0], "The y pixel value for j=0 (AXIS3)")
-            header["J{}_Y".format(last)] = (self.loc_list[-1],
-                                            "The y pixel value for j={} (final value; AXIS3)".format(last))
+            # The range of location values
+            if self.num_psfs == 1:
+                # In this case, loc_list is the single x and y value (x may not equal y)
+                header["I0_X"] = (self.loc_list[0], "The x pixel value for i=0 (AXIS4)")
+                header["J0_Y"] = (self.loc_list[1], "The y pixel value for j=0 (AXIS3)")
+            else:
+                last = len(self.loc_list) - 1
+                header["I0_X"] = (self.loc_list[0], "The x pixel value for i=0 (AXIS4)")
+                header["I{}_X".format(last)] = (self.loc_list[-1],
+                                                "The x pixel value for i={} (final value; AXIS4)".format(last))
+                header["J0_Y"] = (self.loc_list[0], "The y pixel value for j=0 (AXIS3)")
+                header["J{}_Y".format(last)] = (self.loc_list[-1],
+                                                "The y pixel value for j={} (final value; AXIS3)".format(last))
 
             # Distortion information
             if self.add_distortion:
