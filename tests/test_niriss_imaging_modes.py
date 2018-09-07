@@ -32,7 +32,6 @@ from mirage import imaging_simulator
 # os.environ['MIRAGE_DATA'] = ''
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
-@pytest.mark.xfail
 def test_niriss_imaging():
     nis = imaging_simulator.ImgSim()
     nis.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_test.yaml')
