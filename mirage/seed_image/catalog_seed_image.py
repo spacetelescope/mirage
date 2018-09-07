@@ -32,7 +32,7 @@ from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         'niriss': ["imaging"],
+         'niriss': ["imaging","ami"],
          'fgs': ["imaging"]}
 TRACKING_LIST = ['sidereal','non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
@@ -402,21 +402,31 @@ class Catalog_seed():
 
     def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
         # Convert object magnitude to counts/sec
+        #
+        # For NIRISS AMI mode, the count rate values calculated need to be 
+        # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the 
+        # throughput of the NRM, while the 0.84 value is the throughput of the 
+        # imaging CLEARP element that is in place in the pupil wheel for the 
+        # normal imaging observations.
+        if self.params['Inst']['mode'] in ['ami']:
+            count_scale = 0.15 / 0.84
+        else:
+            count_scale = 1.
         if magsys.lower() == 'abmag':
             try:
-                return 10**((mag + 48.6) / -2.5) / photfnu
+                return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
             except:
                 raise ValueError(("AB mag to countrate conversion failed."
                                   "magnitude = {}, photfnu = {}".format(mag, photfnu)))
         if magsys.lower() == 'vegamag':
             try:
-                return 10**((self.vegazeropoint - mag) / 2.5)
+                return count_scale * (10**((self.vegazeropoint - mag) / 2.5))
             except:
                 raise ValueError(("Vega mag to countrate conversion failed."
                                   "magnitude = {}".format(mag)))
         if magsys.lower() == 'stmag':
             try:
-                return 10**((mag + 21.1) / -2.5) / photflam
+                return count_scale * (10**((mag + 21.099934378) / -2.5) / photflam)
             except:
                 raise ValueError(("ST mag to countrate conversion failed."
                                   "magnitude = {}, photflam = {}".format(mag, photflam)))
@@ -3179,6 +3189,12 @@ class Catalog_seed():
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
+                # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF 
+                # files are in a separate directory and have the altered file names
+                # compared to imaging.  Hence one can point to the same base 
+                # directory to run both imaging and NRM models.
+                if self.params['Inst']['mode'] in ['ami']:
+                    self.psfname = self.psfname.replace('NIS','NIS_NRM')
         else:
             # case where psfPath is None. In this case, create a PSF on the fly to use
             # for adding sources
