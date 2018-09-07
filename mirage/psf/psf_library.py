@@ -51,6 +51,11 @@ class CreatePSFLibrary:
         attribute of webbpsf.INSTR(). Spelling/capitalization must match what
         webbpsf expects. See also special case for NIRCam. Default is "all"
 
+    add_distortion: bool
+        If True, will add 2 new extensions to the PSF HDUlist object. The 2nd
+        extension will be a distorted version of the over-sampled PSF and the
+        3rd extension will be a distorted version of the detector-sampled PSF.
+
     fov_pixels: int
         The field of view in undersampled detector pixels used by WebbPSF when
         creating the PSFs. Default is 101 pixels.
@@ -184,7 +189,8 @@ class CreatePSFLibrary:
 
         return ij_list, location_list
 
-    def __init__(self, instrument, filters="all", detectors="all", fov_pixels=101, oversample=5, num_psfs=16,
+    def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, add_distortion=True,
+                 fov_pixels=101, oversample=5,
                  opd_type="requirements", opd_number=0, save=True, fileloc=None, filename=None, overwrite=True):
 
         # Pull correct capitalization of instrument name
@@ -219,6 +225,7 @@ class CreatePSFLibrary:
                      self.filter_list if filt in CreatePSFLibrary.nrca_long_filters]
 
         # Set PSF attributes
+        self.add_distortion = add_distortion
         self.fov_pixels = fov_pixels
         self.oversample = oversample
         self.opd_type = opd_type
@@ -313,10 +320,15 @@ class CreatePSFLibrary:
                     self.webb.detector_position = loc  # (X,Y) - line 286 in webbpsf_core
 
                     # Create PSF
-                    psf = self.webb.calc_psf(fov_pixels=self.fov_pixels, oversample=self.oversample)
+                    psf = self.webb.calc_psf(add_distortion=self.add_distortion,
+                                             fov_pixels=self.fov_pixels, oversample=self.oversample)
+
+                    # Set extension to read based on distortion choice
+                    if self.add_distortion: ext = "OVERDIST"
+                    else: ext = "OVERSAMP"
 
                     # Convolve PSF with a square kernel
-                    psf_conv = astropy.convolution.convolve(psf["OVERDIST"].data, kernel)
+                    psf_conv = astropy.convolution.convolve(psf[ext].data, kernel)
 
                     # Add PSF to 5D array
                     psf_arr[k, j, i, :, :] = psf_conv
@@ -333,6 +345,7 @@ class CreatePSFLibrary:
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))
 
             header["FOVPIXEL"] = (self.fov_pixels, "Field of view in pixels (full array)")
+            header["DISTORT"] = (self.add_distortion, "Distortion added to PSFs")
             header["OVERSAMP"] = (self.oversample, "Oversampling factor for FFTs in computation")
 
             for k, ij in enumerate(self.ij_list):  # these were originally written out in (i,j) and (x,y)
@@ -351,11 +364,11 @@ class CreatePSFLibrary:
                                             "The y pixel value for j={} (final value; AXIS3)".format(last))
 
             # Pull values from the last made psf
-            header["NORMALIZ"] = (psf[0].header["NORMALIZ"], "PSF normalization method")
-            header["DATE"] = (psf[0].header["DATE"], "Date of calculation")
-            header["AUTHOR"] = (psf[0].header["AUTHOR"], "username@host for calculation")
-            header["VERSION"] = (psf[0].header["VERSION"], "WebbPSF software version")
-            header["DATAVERS"] = (psf[0].header["DATAVERS"], "WebbPSF reference data files version ")
+            header["NORMALIZ"] = (psf[ext].header["NORMALIZ"], "PSF normalization method")
+            header["DATE"] = (psf[ext].header["DATE"], "Date of calculation")
+            header["AUTHOR"] = (psf[ext].header["AUTHOR"], "username@host for calculation")
+            header["VERSION"] = (psf[ext].header["VERSION"], "WebbPSF software version")
+            header["DATAVERS"] = (psf[ext].header["DATAVERS"], "WebbPSF reference data files version ")
 
             # Add descriptor for how the file was made
             header["COMMENT"] = "For a given instrument, 1 file per filter in the form [SCA, j, i, y, x]"
