@@ -185,9 +185,9 @@ class CreatePSFLibrary:
         # Set the values
         if num_psfs == 1:
             # Want this case to be at the detector center rather than the corner
-            ij_list = (0, 0)
+            ij_list = [(0, 0)]
             loc_list = [1024]
-            location_list = (1024, 1024)
+            location_list = [(1024, 1024)]
         else:
             ij_list = list(itertools.product(range(self.length), range(self.length)))
             loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
