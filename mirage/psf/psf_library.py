@@ -36,7 +36,7 @@ class CreatePSFLibrary:
     -----------
     instrument: str
         The name of the instrument you want to run. Can be any capitalization. Can
-        only run 1 instrument at a time. Right now this is only set up for NIRCam,
+        only run 1 instrument at a time. Right now this class is only set up for NIRCam,
         NIRISS, and FGS (they are 2048x2048)
 
     filters: str or list
@@ -139,12 +139,13 @@ class CreatePSFLibrary:
             filter_list = self.filter_input.split()
         elif type(self.filter_input) is list:
             filter_list = self.filter_input
+        else:
+            raise TypeError("Method of setting filters is not valid - see docstring for options")
 
         # If the user hand chose a filter list, check it's a valid list for the chosen instrument
         if self.filter_input not in ["all", "shortwave", "longwave"]:
-            for filt in filter_list:
-                if filt not in self.webb.filter_list:
-                    raise ValueError("Instrument {} doesn't have a filter called {}.".format(self.instr, filt))
+            filt = set(filter_list).difference(set(self.webb.filter_list))
+            if filt != set(): raise ValueError("Instrument {} doesn't have the filter(s) {}.".format(self.instr, filt))
 
         return filter_list
 
@@ -155,11 +156,10 @@ class CreatePSFLibrary:
         if self.detector_input == "all":
             if self.instr != "NIRCam":
                 detector_list = self.webb.detector_list
-            else:
-                if filter in CreatePSFLibrary.nrca_short_filters:
-                    detector_list = CreatePSFLibrary.nrca_short_detectors
-                elif filter in CreatePSFLibrary.nrca_long_filters:
-                    detector_list = CreatePSFLibrary.nrca_long_detectors
+            elif self.instr == "NIRCam" and filter in CreatePSFLibrary.nrca_short_filters:
+                detector_list = CreatePSFLibrary.nrca_short_detectors
+            elif self.instr == "NIRCam" and filter in CreatePSFLibrary.nrca_long_filters:
+                detector_list = CreatePSFLibrary.nrca_long_detectors
         elif self.detector_input == "shortwave":
             detector_list = CreatePSFLibrary.nrca_short_detectors
         elif self.detector_input == "longwave":
@@ -168,12 +168,13 @@ class CreatePSFLibrary:
             detector_list = self.detector_input.split()
         elif type(self.detector_input) is list:
             detector_list = self.detector_input
+        else:
+            raise TypeError("Method of setting detectors is not valid - see docstring for options")
 
         # If the user hand chose a detector list, check it's a valid list for the chosen instrument
         if self.detector_input not in ["all", "shortwave", "longwave"]:
-            for det in detector_list:
-                if det not in self.webb.detector_list:
-                    raise ValueError("Instrument {} doesn't have a detector called {}.".format(self.instr, det))
+            det = set(self.detector_list).difference(set(self.webb.detector_list))
+            if det != set(): raise ValueError("Instrument {} doesn't have the detector(s) {}.".format(self.instr, det))
 
         return detector_list
 
@@ -218,9 +219,7 @@ class CreatePSFLibrary:
                  **kwargs):
 
         # Pull correct capitalization of instrument name
-        webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
-                             "MIRI": "MIRI", "FGS": "FGS"}
-
+        webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS", "MIRI": "MIRI", "FGS": "FGS"}
         self.instr = webbpsf_name_dict[instrument.upper()]
 
         # Create instance of instrument in WebbPSF (same as webbpsf.instr)
@@ -241,12 +240,10 @@ class CreatePSFLibrary:
         if self.instr == "NIRCam":
             for filt, det_list in zip(self.filter_list, self.detector_list):
                 for det in det_list:
-                    if "5" in det:
-                        if filt in CreatePSFLibrary.nrca_short_filters:
-                            self._raise_value_error("short filter", det, filt)
-                    else:
-                        if filt in CreatePSFLibrary.nrca_long_filters:
-                            self._raise_value_error("long filter", det, filt)
+                    if "5" in det and filt in CreatePSFLibrary.nrca_short_filters:
+                        self._raise_value_error("short filter", det, filt)
+                    elif "5" not in det and filt in CreatePSFLibrary.nrca_long_filters:
+                        self._raise_value_error("long filter", det, filt)
 
         # Set PSF attributes
         self.add_distortion = add_distortion
@@ -277,6 +274,10 @@ class CreatePSFLibrary:
         requested).
 
         """
+
+        # Set extension to read based on distortion choice
+        if self.add_distortion: ext = "OVERDIST"
+        else: ext = "OVERSAMP"
 
         # Create kernel to smooth pixel based on oversample
         kernel = astropy.convolution.Box2DKernel(width=self.oversample)
@@ -311,15 +312,11 @@ class CreatePSFLibrary:
 
                 # For each of the 9 locations on the detector (loc = tuple = (x,y))
                 for (i, j), loc in zip(self.ij_list, self.location_list):
-                    self.webb.detector_position = loc  # (X,Y) - line 286 in webbpsf_core
+                    self.webb.detector_position = loc  # (X,Y) - line 286 in webbpsf_core.py
 
                     # Create PSF
                     psf = self.webb.calc_psf(add_distortion=self.add_distortion,
                                              fov_pixels=self.fov_pixels, oversample=self.oversample, **self._kwargs)
-
-                    # Set extension to read based on distortion choice
-                    if self.add_distortion: ext = "OVERDIST"
-                    else: ext = "OVERSAMP"
 
                     # Convolve PSF with a square kernel
                     psf_conv = astropy.convolution.convolve(psf[ext].data, kernel)
