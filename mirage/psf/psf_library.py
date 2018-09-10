@@ -20,15 +20,15 @@ class CreatePSFLibrary:
 
     Special Case for NIRCam:
     For NIRCam, you can set detectors and filters with multiple options.
-
-    You may set both filters and detectors = "all" just like the other instruments, and
-    the short and long wave filter/detectors will be seperated and run in the
+    You may set both filters and detectors = "all" just like the other instruments,
+    and the short and long wave filter/detectors will be separated and run in the
     correct pairings.
     If you choose only certain filters (either by name or with "shortwave" or
     "longwave" to run all the shortwave/longwave filters), you may set detectors
-    to be "all" and the script will pull the all possible detectors (ie either
-    all the shortwave or all the longwave detectors).
-    If you choose specific filters and detectors, they must all be either
+    to "shortwave" or "longwave" or you can set it to be "all" and the script will
+    pull the all possible detectors (ie either all the shortwave or all the longwave
+    detectors).
+    If you choose individual filters and detectors, they must match in
     shortwave or longwave. Mismatched lists of short and long wave filters and
     detectors will result in an error.
 
@@ -96,13 +96,13 @@ class CreatePSFLibrary:
 
     filename: str
         The name to save your current file under if "save" keyword is set to True.
-        Default of None will save it as "INSTRNAME_FILTERNAME.fits"
+        Default of None will save it in the form: "INSTR_FILT_fovp####_samp#_npsf##.fits"
 
     overwrite: bool
         True/False boolean to overwrite the output file if it already exists.
 
     **kwargs
-        This can used to add any extra arguments to the webbpsf calc_psf() method
+        This can be used to add any extra arguments to the webbpsf calc_psf() method
         call.
 
     Use:
@@ -173,7 +173,7 @@ class CreatePSFLibrary:
 
         # If the user hand chose a detector list, check it's a valid list for the chosen instrument
         if self.detector_input not in ["all", "shortwave", "longwave"]:
-            det = set(self.detector_list).difference(set(self.webb.detector_list))
+            det = set(detector_list).difference(set(self.webb.detector_list))
             if det != set(): raise ValueError("Instrument {} doesn't have the detector(s) {}.".format(self.instr, det))
 
         return detector_list
@@ -335,8 +335,8 @@ class CreatePSFLibrary:
             for i, det in enumerate(det_list):
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))
 
-            header["FOVPIXEL"] = (psf[ext].header["FOV"], "Field of view in pixels (full array)")
-            header["FOV"] = (self.fov_pixels, "Field of view in arcsec (full array) ")
+            header["FOVPIXEL"] = (self.fov_pixels, "Field of view in pixels (full array)")
+            header["FOV"] = (psf[ext].header["FOV"], "Field of view in arcsec (full array) ")
             header["OVERSAMP"] = (self.oversample, "Oversampling factor for FFTs in computation")
             header["NWAVES"] = (psf[ext].header["NWAVES"], "Number of wavelengths used in calculation")
 
