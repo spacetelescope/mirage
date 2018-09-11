@@ -1,0 +1,8 @@
+#
+#
+# 
+# abmag 
+# catalog for ramp_simulator.py. created from candels catalog
+# Magnitudes are converted from input flux densities. See
+x_or_RA y_or_Dec magnitude
+53.1       -27.8       17.0

@@ -25,7 +25,7 @@ from ..utils import set_telescope_pointing_separated as stp
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         "niriss": ["imaging"],
+         "niriss": ["imaging","ami"],
          "fgs": ["imaging"]}
 
 
@@ -844,7 +844,7 @@ class Observation():
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                               "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE"},
+                   "niriss": {"imaging": "NIS_IMAGE","ami": "NIS_IMAGE"},
                    "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
