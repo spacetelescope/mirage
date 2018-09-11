@@ -149,7 +149,7 @@ dependencies:
   - freetds=1.00.9=0
   - gwcs=0.10a.dev9+g5c9f6d5=py36_2
   - jplephem=2.8.dev0+g9926bb5=py36_2
-  - jwst=0.10.0.dev0+g4d1a743=py36_4
+  - jwst=0.12.0a.dev4+ge725861=py36_4
   - namedlist=1.7=py36_1
   - parsley=1.3=py36_0
   - photutils=0.4.dev308+g8de0150=py36_4
