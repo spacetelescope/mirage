@@ -1509,7 +1509,7 @@ class Catalog_seed():
                 # Case where point source list entries are given with RA and Dec
                 if not pixelflag:
 
-                    # Same function call regardless of whether distortion file is provided or not
+                    # Same function call regardless of wh<ether distortion file is provided or not
                     pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
 
                 else:
@@ -1923,6 +1923,7 @@ class Catalog_seed():
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
             pixely -= 1
+        stophere
         return pixelx, pixely
 
     def object_separation(self, radec1, radec2, wcs):

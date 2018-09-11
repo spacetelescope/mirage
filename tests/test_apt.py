@@ -33,10 +33,6 @@ def RunAllAPTTemplates(instrument):
     '''Parse the given APT files and create a set of .yamls for a given
     instrument
     '''
-    # Define MIRAGE_DATA environment variable. Used only for this creation of
-    # yaml files, so we can use a dummy value
-    os.environ['MIRAGE_DATA'] = "/mypath/mirage/refdata/"
-
     # Define .pointing and .xml file locations
     pointing_file = os.path.join(TESTS_DIR, 'test_data', instrument, instrument + 'Test.pointing')
     xml_file = os.path.join(TESTS_DIR, 'test_data',  instrument, instrument + 'Test.xml')
