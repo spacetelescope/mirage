@@ -290,13 +290,13 @@ class SimInput:
 
         filenames = [y.split('/')[-1] for y in yamls]
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
-        obs_ids = sorted(list(set([m[9:12] for m in mosaic_numbers])))
+        obs_ids = sorted(list(set([m[7:10] for m in mosaic_numbers])))
 
         print('\n')
         i_mod = 0
         for obs in obs_ids:
-            n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
-            n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
+            n_visits = len(list(set([m[10:13] for m in mosaic_numbers if m[7:10] == obs])))
+            n_activities = len(list(set([f[17:19] for f in filenames if f[7:10] == obs])))
 
             module = self.info['Module'][i_mod]
 
@@ -319,9 +319,9 @@ class SimInput:
                 module = ' NIS'
 
 
-            i_mod += n_tiles * n_det
+            i_mod += n_activities * n_det
 
-            print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
+            print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_activities, n_det, module))
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
