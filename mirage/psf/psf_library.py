@@ -81,6 +81,11 @@ class CreatePSFLibrary:
         integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
         the telescope included in the OPD map file. Default is 0.
 
+    pupil_opd: webbpsf.opds.OTE_Linear_Model_WSS, optional
+        The OPD map to use to generate all PSFs, in the form of a
+        OTE_Linear_Model_WSS object. If provided, overrides the ``opd_type`` and
+        ``opd_number`` options.
+
     save: bool, optional
         True/False boolean if you want to save your file
 
@@ -224,15 +229,35 @@ class CreatePSFLibrary:
         raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
 
     def _set_opd(self):
-        """Define the instrument's OPD as self.pupil_opd, ensuring the
-        type is an astropy FITS HDULIst. At the moment, this sets one
-        OPD for all the library files being created.
+        """Define the telescope's OPD, either grabbing the requested
+        FITS file (requirements or predicted) or loading an OPD as a
+        FITS object from an OTE_Linear_Model_WSS instance.
+
+        For now, sets one OPD for all files being created.
         """
-        if not isinstance(self.pupil_opd, fits.hdu.hdulist.HDUList):
-            raise TypeError('Must provide pupil OPD as an astropy FITS HDUList,'
+        if self.pupil_opd is None:
+            # Set OPD Map (pull most recent version with self.webb.opd_list call) - always predicted then requirements
+            if self.opd_type.lower() == "requirements":
+                opd = self.webb.opd_list[1]
+            elif self.opd_type.lower() == "predicted":
+                opd = self.webb.opd_list[0]
+
+            self.opd_name = opd
+            self.opd_realization = self.opd_number
+
+            return (opd, self.opd_number)
+
+        elif not isinstance(self.pupil_opd, webbpsf.opds.OTE_Linear_Model_WSS):
+            raise TypeError('Must provide pupil OPD as an OTE_Linear_Model_WSS object,'
                             'not {}'.format(type(self.pupil_opd)))
 
-        self.webb.pupilopd = self.pupil_opd
+        else:
+            opd_hdu = self.pupil_opd.as_fits()
+
+            self.opd_name = "Modified OPD"
+            self.opd_realization = "N/A"
+
+            return opd_hdu
 
     def _set_psf_locations(self, num_psfs):
         """ Set the locations on the detector of the fiducial PSFs. Assumes a 2048x2048 detector"""
@@ -276,7 +301,7 @@ class CreatePSFLibrary:
         """
 
         # Set the pupil OPD based on the input
-        self.pupil_opd = self._set_opd()
+        self.webb.pupilopd = self._set_opd()
 
         # If someone wants to run all of NIRCam, run the function 2x: shortwave and longwave
         if self.instr == "NIRCam" and (self.filter_input, self.detector_input) == ("all", "all"):
@@ -314,13 +339,6 @@ class CreatePSFLibrary:
         # Set output mode
         self.webb.options['output_mode'] = 'Oversampled Image'
 
-        # Set OPD Map (pull most recent version with self.webb.opd_list call) - always predicted then requirements
-        if self.opd_type.lower() == "requirements":
-            opd = self.webb.opd_list[1]
-        elif self.opd_type.lower() == "predicted":
-            opd = self.webb.opd_list[0]
-        self.webb.pupilopd = (opd, self.opd_number)
-
         # For every filter
         final_list = []
         for filt in filter_list:
@@ -357,8 +375,9 @@ class CreatePSFLibrary:
 
             header["INSTRUME"] = (self.instr, "Instrument")
             header["FILTER"] = (filt, "Filter name")
-            header["PUPILOPD"] = (self.webb.pupilopd[0], "Pupil OPD source name")
-            header["OPD_REAL"] = (self.webb.pupilopd[1], "Pupil OPD source realization from file")
+
+            header["PUPILOPD"] = (self.opd_name, "Pupil OPD source name")
+            header["OPD_REAL"] = (self.opd_realization, "Pupil OPD source realization from file")
 
             for i, det in enumerate(detector_list):
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))
