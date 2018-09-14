@@ -8,7 +8,6 @@ Inputs:
 
 xml file - Name of xml file exported from APT.
 pointing file - Name of associated pointing file exported from APT.
-siaf - Name of csv version of SIAF.
 
 Optional inputs:
 
@@ -75,6 +74,7 @@ HISTORY:
 July 2017 - V0: Initial version. Bryan Hilbert
 Feb 2018 - V1: Updates to accomodate multiple filter pairs per
                observation. Lauren Chambers
+August 2018 - V2: Replaced input SIAF CSV file with pysiaf dependence. Bryan Hilbert
 
 '''
 
@@ -84,13 +84,15 @@ import argparse
 from glob import glob
 from copy import deepcopy
 
-import pkg_resources
-import numpy as np
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
 from astropy.io import ascii, fits
+import numpy as np
+import pkg_resources
+import pysiaf
 
 from ..apt import apt_inputs
+from ..utils.utils import calc_frame_time
 
 
 ENV_VAR = 'MIRAGE_DATA'
@@ -101,7 +103,6 @@ class SimInput:
         self.info = {}
         self.input_xml = None
         self.pointing_file = None
-        self.siaf = None
         self.datatype = 'linear'
         self.output_dir = './'
         self.table_file = None
@@ -123,32 +124,131 @@ class SimInput:
         self.simdata_output_dir = './'
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
-        self.resets_bet_ints = 1 # NIRCam should be 1
+        self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
 
+    def add_catalogs(self):
+        """
+        Add list(s) of source catalogs to the table containing the
+        observation information
+        """
+        self.info['point_source'] = [None] * len(self.info['Module'])
+        self.info['galaxyListFile'] = [None] * len(self.info['Module'])
+        self.info['extended'] = [None] * len(self.info['Module'])
+        self.info['convolveExtended'] = [False] * len(self.info['Module'])
+        self.info['movingTarg'] = [None] * len(self.info['Module'])
+        self.info['movingTargSersic'] = [None] * len(self.info['Module'])
+        self.info['movingTargExtended'] = [None] * len(self.info['Module'])
+        self.info['movingTargToTrack'] = [None] * len(self.info['Module'])
+
+        for i in range(len(self.info['ShortFilter'])):
+            if np.int(self.info['detector'][i][-1]) < 5:
+                filtkey = 'ShortFilter'
+                pupilkey = 'ShortPupil'
+            else:
+                filtkey = 'LongFilter'
+                pupilkey = 'LongPupil'
+            filt = self.info[filtkey][i]
+            pup = self.info[pupilkey][i]
+
+            if self.point_source[i] is not None:
+                # In here, we assume the user provided a catalog to go with each filter
+                # so now we need to find the filter for each entry and generate a list that makes sense
+                self.info['point_source'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.point_source, 'point source')))
+            else:
+                self.info['point_source'][i] = None
+            if self.galaxyListFile[i] is not None:
+                self.info['galaxyListFile'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.galaxyListFile, 'galaxy')))
+            else:
+                self.info['galaxyListFile'][i] = None
+            if self.extended[i] is not None:
+                self.info['extended'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.extended, 'extended')))
+            else:
+                self.info['extended'][i] = None
+            if self.movingTarg[i] is not None:
+                self.info['movingTarg'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.movingTarg, 'moving point source target')))
+            else:
+                self.info['movingTarg'][i] = None
+            if self.movingTargSersic[i] is not None:
+                self.info['movingTargSersic'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.movingTargSersic, 'moving sersic target')))
+            else:
+                self.info['movingTargSersic'][i] = None
+            if self.movingTargExtended[i] is not None:
+                self.info['movingTargExtended'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.movingTargExtended, 'moving extended target')))
+            else:
+                self.info['movingTargExtended'][i] = None
+            if self.movingTargToTrack[i] is not None:
+                self.info['movingTargToTrack'][i] = os.path.abspath(os.path.expandvars(
+                    self.catalog_match(filt, pup, self.movingTargToTrack, 'non-sidereal moving target')))
+            else:
+                self.info['movingTargToTrack'][i] = None
+        if self.convolveExtended is True:
+            self.info['convolveExtended'] = [True] * len(self.info['Module'])
+
+    def catalog_match(self, filter, pupil, catalog_list, cattype):
+        """
+        Given a filter and pupil value, along with a list of input
+        catalogs, find the catalog names that contain each filter/
+        pupil name.
+
+        Parameters
+        ----------
+        filter : str
+            Name of a filter element
+        pupil : str
+            Name of a pupil element
+        catalog_list : list
+            List of catalog filenames
+        cattype : str
+            Type of catalog in the list.
+
+        Returns
+        -------
+        match : str
+            Name of catalog that contains the name of the
+            input filter/pupil element
+        """
+        if pupil[0].upper() == 'F':
+            match = [s for s in catalog_list if pupil.lower() in s.lower()]
+            if len(match) == 0:
+                self.no_catalog_match(pupil, cattype)
+                return None
+            elif len(match) > 1:
+                self.multiple_catalog_match(pupil, cattype, match)
+            return match[0]
+        else:
+            match = [s for s in catalog_list if filter.lower() in s.lower()]
+            if len(match) == 0:
+                self.no_catalog_match(filter, cattype)
+                return None
+            elif len(match) > 1:
+                self.multiple_catalog_match(filter, cattype, match)
+            return match[0]
+
     def create_inputs(self):
-        # Use full paths for inputs
+        """Create observation table """
         self.path_defs()
 
         if ((self.input_xml is not None) &
-            (self.pointing_file is not None) &
-            (self.siaf is not None) &
-            (self.observation_table is not None)):
-
-            print('Using {}, \n      {}, \n      {}, and \n      {} \n      to generate observation table.\n'.
-                  format(self.observation_table, self.input_xml, self.pointing_file, self.siaf))
+           (self.pointing_file is not None) &
+           (self.observation_table is not None)):
 
             # Define directories and paths
             indir, infile = os.path.split(self.input_xml)
             final_file = os.path.join(self.output_dir,
-                                      'Observation_table_for_' + infile + \
+                                      'Observation_table_for_' + infile +
                                       '_with_yaml_parameters.csv')
 
             # Read XML file and make observation table
             apt = apt_inputs.AptInput()
             apt.input_xml = self.input_xml
             apt.pointing_file = self.pointing_file
-            apt.siaf = self.siaf
             apt.observation_table = self.observation_table
             apt.create_input_table()
             self.info = apt.exposure_tab
@@ -170,10 +270,9 @@ class SimInput:
             final_file = self.table_file + '_with_yaml_parameters.csv'
 
         else:
-            print("WARNING. You must include either an ascii table file of observations")
-            print("or xml and pointing files from APT plus an ascii siaf table plus the observation list file.")
-            print('Aborted.')
-            sys.exit()
+            raise FileNotFoundError(("WARNING. You must include either an ascii table file of observations"
+                                     " or xml and pointing files from APT plus the observation list file."
+                                     "Aborting."))
 
         # For each element in the lists below, use the detector name to
         # find the appropriate reference files. Create lists, and add
@@ -280,13 +379,11 @@ class SimInput:
             subpix_dither = tot_dith - (primary_dither * primarytot * subpixtot - subpixtot)
             file_dict['primary_dither_num'] = primary_dither
             file_dict['subpix_dither_num'] = subpix_dither
-            file_dict['siaf'] = self.siaf
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
 
         # Write out summary of all written yaml files
-        yaml_path = os.path.join(self.output_dir, 'V*.yaml')
-        #yamls = glob(yaml_path)
+        # yaml_path = os.path.join(self.output_dir, 'V*.yaml')
 
         filenames = [y.split('/')[-1] for y in yamls]
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
@@ -318,24 +415,16 @@ class SimInput:
                 n_det = 1
                 module = ' NIS'
 
-
             i_mod += n_tiles * n_det
 
-            print('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'.format(obs, n_visits, n_tiles, n_det, module))
+            print(('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'
+                   .format(obs, n_visits, n_tiles, n_det, module)))
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
     def expand_env_var(self):
         """ Expand the MIRAGE_DATA environment variable
         so that reference files can be found
-
-        Parameters:
-        -----------
-        None
-
-        Rerturns:
-        ---------
-        None
         """
         self.datadir = os.environ.get(ENV_VAR)
         if self.datadir is None:
@@ -354,13 +443,13 @@ class SimInput:
         The first inverted kernel found will be used. If none are found,
         the first kernel will be used and set to be inverted.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         inputipc : list
            List of fits files containing IPC kernels for a single detector
 
-        Returns:
-        --------
+        Returns
+        -------
         (ipcfile, invstatus) : tup
            ipcfile is the name of the IPC kernel file to use, and invstatus
            lists whether the kernel needs to be inverted or not.
@@ -374,209 +463,122 @@ class SimInput:
             if len(kernel.shape) == 4:
                 kernel = kernel[:, :, np.int(kshape[2]/2), np.int(kshape[2]/2)]
 
-            if kernel[1,1] < 1.0:
+            if kernel[1, 1] < 1.0:
                 return (ifile, False)
         # If no inverted kernel was found, just return the first file
         return (inputipc[0], True)
 
-    def path_defs(self):
-        """Expand input files to have full paths"""
-        self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
-        self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
-        self.siaf = os.path.abspath(os.path.expandvars(self.siaf))
-        self.output_dir = os.path.abspath(os.path.expandvars(self.output_dir))
-        self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
-        if self.table_file is not None:
-            self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
-        self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
-        self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
-        self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
-        self.fluxcal = self.set_config(self.fluxcal, 'fluxcal')
-        self.filter_throughput = self.set_config(self.filter_throughput, 'filter_throughput')
-        self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init_config')
-        self.refpix_config = self.set_config(self.refpix_config, 'refpix_config')
-        self.saturation_config = self.set_config(self.saturation_config, 'saturation_config')
-        self.superbias_config = self.set_config(self.superbias_config, 'superbias_config')
-        self.linearity_config = self.set_config(self.linearity_config, 'linearity_config')
-
-        if self.observation_table is not None:
-            self.observation_table = os.path.abspath(os.path.expandvars(self.observation_table))
-        if self.crosstalk not in [None, 'config']:
-            self.crosstalk = os.path.abspath(os.path.expandvars(self.crosstalk))
-        elif self.crosstalk == 'config':
-            self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
-
-    def set_config(self, file, prop):
+    def get_dark(self, detector):
         """
-        If a given file is listed as 'config'
-        then set it in the yaml output as being in
-        the config subdirectory.
+        Return the name of a dark current file to use as input
+        based on the detector being used
 
-        Parameters:
-        -----------
-        file -- Name of the input file
-        prop -- String. Type of file that file is.
+        Parameters
+        ----------
+        detector : str
+            Name of detector being used
 
-        Returns:
-        --------
-        Full path name to the input file
+        Returns
+        -------
+        files : str
+            Name of a dark current file to use for this detector
         """
-        if file.lower() not in ['config']:
-            file = os.path.abspath(file)
-        elif file.lower() == 'config':
-            file = os.path.join(self.modpath, 'config', self.configfiles[prop])
-        return file
-
-    def add_catalogs(self):
-        """
-        Add list(s) of source catalogs to the table containing the
-        observation information
-        """
-        self.info['point_source'] = [None] * len(self.info['Module'])
-        self.info['galaxyListFile'] = [None] * len(self.info['Module'])
-        self.info['extended'] = [None] * len(self.info['Module'])
-        self.info['convolveExtended'] = [False] * len(self.info['Module'])
-        self.info['movingTarg'] = [None] * len(self.info['Module'])
-        self.info['movingTargSersic'] = [None] * len(self.info['Module'])
-        self.info['movingTargExtended'] = [None] * len(self.info['Module'])
-        self.info['movingTargToTrack'] = [None] * len(self.info['Module'])
-
-        for i in range(len(self.info['ShortFilter'])):
-            if np.int(self.info['detector'][i][-1]) < 5:
-                filtkey = 'ShortFilter'
-                pupilkey = 'ShortPupil'
-            else:
-                filtkey = 'LongFilter'
-                pupilkey = 'LongPupil'
-            filt = self.info[filtkey][i]
-            pup = self.info[pupilkey][i]
-
-            if self.point_source[i] is not None:
-                # In here, we assume the user provided a catalog to go with each filter
-                # so now we need to find the filter for each entry and generate a list that makes sense
-                self.info['point_source'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.point_source, 'point source')))
-            else:
-                self.info['point_source'][i] = None
-            if self.galaxyListFile[i] is not None:
-                self.info['galaxyListFile'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.galaxyListFile, 'galaxy')))
-            else:
-                self.info['galaxyListFile'][i] = None
-            if self.extended[i] is not None:
-                self.info['extended'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.extended, 'extended')))
-            else:
-                self.info['extended'][i] = None
-            if self.movingTarg[i] is not None:
-                self.info['movingTarg'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTarg, 'moving point source target')))
-            else:
-                self.info['movingTarg'][i] = None
-            if self.movingTargSersic[i] is not None:
-                self.info['movingTargSersic'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargSersic, 'moving sersic target')))
-            else:
-                self.info['movingTargSersic'][i] = None
-            if self.movingTargExtended[i] is not None:
-                self.info['movingTargExtended'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargExtended, 'moving extended target')))
-            else:
-                self.info['movingTargExtended'][i] = None
-            if self.movingTargToTrack[i] is not None:
-                self.info['movingTargToTrack'][i] = os.path.abspath(os.path.expandvars(self.catalog_match(filt, pup, self.movingTargToTrack, 'non-sidereal moving target')))
-            else:
-                self.info['movingTargToTrack'][i] = None
-        if self.convolveExtended == True:
-            self.info['convolveExtended'] = [True] * len(self.info['Module'])
-
-
-    def catalog_match(self, filter, pupil, catalog_list, cattype):
-        """
-        Given a filter and pupil value, along with a list of input
-        catalogs, find the catalog names that contain each filter/
-        pupil name.
-
-        Parameters:
-        -----------
-        filter -- String name of a filter element
-        pupil -- String name of a pupil element
-        catalog_list -- List of catalog filenames
-        cattype -- String containing the type of catalog in
-                   the list.
-
-        Returns:
-        --------
-        Name of catalog that contains the name of the
-        input filter/pupil element
-        """
-        if pupil[0].upper() == 'F':
-            match = [s for s in catalog_list if pupil.lower() in s.lower()]
-            if len(match) == 0:
-                self.no_catalog_match(pupil, cattype)
-                return None
-            elif len(match) > 1:
-                self.multiple_catalog_match(pupil, cattype, match)
-            return match[0]
+        files = self.dark_list[detector]
+        if len(files) == 1:
+            return files[0]
         else:
-            match = [s for s in catalog_list if filter.lower() in s.lower()]
-            if len(match) == 0:
-                self.no_catalog_match(filter, cattype)
-                return None
-            elif len(match) > 1:
-                self.multiple_catalog_match(filter, cattype, match)
-            return match[0]
+            rand_index = np.random.randint(0, len(files) - 1)
+            return files[rand_index]
 
-    def no_catalog_match(self, filter, cattype):
+    def get_lindark(self, detector):
         """
-        Tell user if no catalog match was found.
+        Return the name of a linearized dark current file to
+        use as input based on the detector being used
 
-        Parameters:
-        -----------
-        filter : str
-          Name of filter element
-        cattype : str
-          Type of catalog (e.g. pointsource)
+        Parameters
+        ----------
+        detector : str
+            Name of detector being used
 
-        Returns:
-        --------
-        None
+        Returns
+        -------
+        files : str
+            Name of a linearized dark current file to use for this detector
         """
-        print("WARNING: unable to find filter ({}) name".format(filter))
-        print("in any of the given {} inputs".format(cattype))
-        print("Using the first input for now. Make sure input catalog names have")
-        print("the appropriate filter name in the filename to get matching to work.")
+        files = self.lindark_list[detector]
+        if len(files) == 1:
+            return files[0]
+        else:
+            rand_index = np.random.randint(0, len(files) - 1)
+            return files[rand_index]
 
-    def multiple_catalog_match(self, filter, cattype, matchlist):
+    def get_readpattern_defs(self):
+        """Read in the readpattern definition file and return table
+
+        Returns
+        -------
+        tab : obj
+            astropy.table.Table containing readpattern definitions
         """
-        Tell the user if more than one catalog matches the filter/pupil
+        tab = ascii.read(self.readpatt_def_file)
+        return tab
 
-        Parameters:
-        filter : str
-          Name of filter element
-        cattype : str
-          Type of catalog (e.g. pointsource)
-        matchlist : list
-          Matching catalog names
-
-        Returns:
-        --------
-        None
+    def get_reffile(self, refs, detector):
         """
-        print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
-        print("Observation filter: {}".format(filter))
-        print("Matched point source catalogs: {}".format(matchlist))
+        Return the appropriate reference file for detector
+        and given reference file dictionary.
 
-    def table_to_dict(self, tab):
+        Parameters
+        ----------
+        refs : dict
+            dictionary in the form of:
+             {'A1':'filenamea1.fits', 'A2':'filenamea2.fits'...}
+             Containing reference file names
+        detector : str
+            Name of detector
+
+        Returns
+        -------
+        refs: str
+            Name of reference file appropriate for given detector
         """
-        Convert the ascii table of observations to a dictionary
+        for key in refs:
+            if detector in key:
+                return refs[key]
+        print("WARNING: no file found for detector {} in {}"
+              .format(detector, refs))
 
-        Parameters:
-        -----------
-        tab -- astropy Table containing observation information
+    def get_subarray_defs(self):
+        """Read in subarray definition file and return table
 
-        Returns:
-        --------
-        Dictionary of observation information
+        Returns
+        -------
+        sub : obj
+            astropy.table.Table containing subarray definition information
         """
-        dict = {}
-        for colname in tab.colnames:
-            dict[colname] = tab[colname].data
-        return dict
+        sub = ascii.read(self.subarray_def_file)
+        return sub
+
+    def make_output_names(self):
+        """
+        Create output yaml file names to go with all of the
+        entries in the dictionary
+        """
+        onames = []
+        fnames = []
+        for i in range(len(self.info['Module'])):
+            act = str(self.info['act_id'][i]).zfill(2)
+            if self.info['Instrument'][i].lower() == 'niriss':
+                det = 'NIS'
+            else:
+                det = self.info['detector'][i]
+            mode = self.info['Mode'][i]
+            dither = str(self.info['dither'][i]).zfill(2)
+            onames.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}.yaml'
+                                                                        .format(act, det, mode, dither))))
+            fnames.append('Act{}_{}_{}_Dither{}_uncal.fits'.format(act, det, mode, dither))
+        self.info['yamlfile'] = onames
+        self.info['outputfits'] = fnames
 
     def make_start_times(self):
         """
@@ -625,9 +627,6 @@ class SimInput:
             next_visit = self.info['visit_num'][i]
             next_obsname = self.info['obs_label'][i]
 
-            # Get the values of nframes, nskip, and namp
-            readpatt = self.info['ReadoutPattern'][i]
-
             # Find the readpattern of the file
             readpatt = self.info['ReadoutPattern'][i]
             groups = np.int(self.info['Groups'][i])
@@ -635,7 +634,8 @@ class SimInput:
 
             match2 = readpatt == readpatt_def['name']
             if np.sum(match2) == 0:
-                raise RuntimeError("WARNING!! Readout pattern {} not found in definition file.".format(readpatt))
+                raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
+                                    .format(readpatt)))
 
             # Now get nframe and nskip so we know how many frames in a group
             fpg = np.int(readpatt_def['nframe'][match2][0])
@@ -643,7 +643,12 @@ class SimInput:
             nframe.append(fpg)
             nskip.append(spg)
 
-            # need to find number of amps used
+            # Get the aperture name. For non-NIRCam instruments,
+            # this is simply the self.info['aperture']. But for NIRCam,
+            # we need to be careful of entries like NRCBS_FULL, which is used
+            # for observations using all 4 shortwave B detectors. In that case,
+            # we need to build the aperture name from the combination of detector
+            # and subarray name.
             if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
                 aperture = self.info['aperture']
             else:
@@ -651,12 +656,12 @@ class SimInput:
                 det = 'NRC' + self.info['detector'][i]
                 aperture = det + '_' + sub
 
+            # Get the number of amps from the subarray definition file
             match = aperture == subarray_def['AperName']
 
             if np.sum(match) == 0:
-                config = ascii.read(self.subarray_def_file)
-                aperture = [apername for apername, name in \
-                            np.array(config['AperName', 'Name']) if \
+                aperture = [apername for apername, name in
+                            np.array(subarray_def['AperName', 'Name']) if
                             (sub in apername) or (sub in name)]
 
                 match = aperture == subarray_def['AperName']
@@ -664,6 +669,8 @@ class SimInput:
                 if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
                     raise ValueError('Cannot combine detector {} and subarray {}\
                         into valid aperture name.'.format(det, sub))
+                # We don't want aperture as a list
+                aperture = aperture[0]
 
             amp = subarray_def['num_amps'][match][0]
             namp.append(amp)
@@ -702,18 +709,18 @@ class SimInput:
                 overhead = act_overhead
             else:
                 # should never get in here
-                print("Error. Fix me")
-                sys.exit()
+                raise NotImplementedError()
 
             # For cases where the base time needs to change
             # continue down here
-            xs = subarray_def['xstart'][match][0]
-            xe = subarray_def['xend'][match][0]
-            ys = subarray_def['ystart'][match][0]
-            ye = subarray_def['yend'][match][0]
-            xd = xe - xs + 1
-            yd = ye - ys + 1
-            frametime = self.calcFrameTime(xd, yd, amp)
+            siaf_inst = self.info['Instrument'][i].upper()
+            if siaf_inst == 'NIRCAM':
+                siaf_inst = "NIRCam"
+            siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
+
+            # Calculate the readout time for a single frame
+            frametime = calc_frame_time(siaf_inst, aperture,
+                                        siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
 
             # Estimate total exposure time
             exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
@@ -740,389 +747,73 @@ class SimInput:
         self.info['nskip'] = nskip
         self.info['namp'] = namp
 
-    def get_readpattern_defs(self):
-        """Read in the readpattern definition file and return table"""
-        tab = ascii.read(self.readpatt_def_file)
-        return tab
-
-    def get_subarray_defs(self):
-        """Read in subarray definition file and return table"""
-        sub = ascii.read(self.subarray_def_file)
-        return sub
-
-    def calcFrameTime(self, xd, yd, namp):
+    def multiple_catalog_match(self, filter, cattype, matchlist):
         """
-        Calculate the exposure time of a single frame of the proposed output ramp
-        based on the size of the cropped dark current integration
+        Alert the user if more than one catalog matches the filter/pupil
 
-        Parameters:
-        -----------
-        xd -- Integer x-coordinate size of the aperture to read out, in pixels
-        yd -- Integer y-coordinate size of the aperture to read out, in pixels
-        nanp -- Integer number of amplifiers used to read out the aperture
-
-        Returns:
-        --------
-        The amount of time needed, in seconds, to read out the detector
+        Parameters
+        ----------
+        filter : str
+          Name of filter element
+        cattype : str
+          Type of catalog (e.g. pointsource)
+        matchlist : list
+          Matching catalog names
         """
-        if self.instrument == 'nircam':
-            colpad = 12
-            rowpad = 2
-            if ((xd <= 8) & (yd <= 8)):
-                rowpad = 3
-            return ((1.0 * xd / namp + colpad) * (yd + rowpad)) * 1.e-5
-        elif self.instrument in ['niriss', 'fgs']:
-            # the following applies to NIRISS and Guider full frame imaging and
-            # NIRISS sub-arrays.
-            #
-            # According JDox the NIRCam full frame time is 10.73677 seconds the
-            # same as for NIRISS, but right now the change does not apply to NIRCam.
-            #
-            #
-            # note that the Guider frame time may be different for small sub-arrays
-            # less than 64 pixels square, but that needs to be confirmed.
-            colpad = 12
-            if namp == 4:
-                pad1 = 1
-                pad2 = 1
-            else:
-                pad1 = 2
-                pad2 = 0
-            return (pad2 + (yd / namp + colpad) * (xd + pad1)) * 0.00001
+        print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
+        print("Observation filter: {}".format(filter))
+        print("Matched point source catalogs: {}".format(matchlist))
 
-    def make_output_names(self):
+    def no_catalog_match(self, filter, cattype):
         """
-        Create output yaml file names to go with all of the
-        entries in the dictionary
+        Alert user if no catalog match was found.
+
+        Parameters
+        ----------
+        filter : str
+          Name of filter element
+        cattype : str
+          Type of catalog (e.g. pointsource)
+
         """
-        onames = []
-        fnames = []
-        for i in range(len(self.info['Module'])):
-            act = str(self.info['act_id'][i]).zfill(2)
-            if self.info['Instrument'][i].lower() == 'niriss':
-                det ='NIS'
-            else:
-                det = self.info['detector'][i]
-            mode = self.info['Mode'][i]
-            dither = str(self.info['dither'][i]).zfill(2)
-            onames.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}.yaml'.format(act, det, mode, dither))))
-            fnames.append('Act{}_{}_{}_Dither{}_uncal.fits'.format(act, det, mode, dither))
-        self.info['yamlfile'] = onames
-        self.info['outputfits'] = fnames
+        print("WARNING: unable to find filter ({}) name".format(filter))
+        print("in any of the given {} inputs".format(cattype))
+        print("Using the first input for now. Make sure input catalog names have")
+        print("the appropriate filter name in the filename to get matching to work.")
 
-    def get_dark(self, detector):
-        """
-        Return the name of a dark current file to use as input
-        based on the detector being used
+    def path_defs(self):
+        """Expand input files to have full paths"""
+        self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
+        self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
+        self.output_dir = os.path.abspath(os.path.expandvars(self.output_dir))
+        self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
+        if self.table_file is not None:
+            self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
+        self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
+        self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
+        self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
+        self.fluxcal = self.set_config(self.fluxcal, 'fluxcal')
+        self.filter_throughput = self.set_config(self.filter_throughput, 'filter_throughput')
+        self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init_config')
+        self.refpix_config = self.set_config(self.refpix_config, 'refpix_config')
+        self.saturation_config = self.set_config(self.saturation_config, 'saturation_config')
+        self.superbias_config = self.set_config(self.superbias_config, 'superbias_config')
+        self.linearity_config = self.set_config(self.linearity_config, 'linearity_config')
 
-        Parameters:
-        -----------
-        detector -- string name of detector being used
-
-        Returns:
-        --------
-        Name of a dark current file to use for this detector
-        """
-        files = self.dark_list[detector]
-        if len(files) == 1:
-            return files[0]
-        else:
-            rand_index = np.random.randint(0, len(files) - 1)
-            return files[rand_index]
-
-    def get_lindark(self, detector):
-        """
-        Return the name of a linearized dark current file to
-        use as input based on the detector being used
-
-        Parameters:
-        -----------
-        detector -- string name of detector being used
-
-        Returns:
-        --------
-        Name of a linearized dark current file to use for this detector
-        """
-        files = self.lindark_list[detector]
-        if len(files) == 1:
-            return files[0]
-        else:
-            rand_index = np.random.randint(0, len(files) - 1)
-            return files[rand_index]
-
-    def get_reffile(self, refs, detector):
-        """
-        Return the appropriate reference file for detector
-        and given reference file dictionary.
-
-        Parameters:
-        -----------
-        refs -- dictionary in the form of:
-             {'A1':'filenamea1.fits', 'A2':'filenamea2.fits'...}
-        detector -- String name of detector
-
-        Returns:
-        --------
-        Name of reference file appropriate for given detector
-        """
-        for key in refs:
-            if detector in key:
-                return refs[key]
-        print("WARNING: no file found for detector {} in {}"
-              .format(detector, refs))
-
-    def write_yaml(self, input):
-        """
-        Create yaml file for a single exposure/detector
-
-        Parameters:
-        -----------
-        input -- dictionary containing all needed exposure
-                 information for one exposure
-        """
-        instrument = input['Instrument']
-        # select the right filter
-        if input['detector'] == 'NIS':
-            filtkey = 'FilterWheel'
-            pupilkey = 'PupilWheel'
-            catkey = ''
-        else:
-            if np.int(input['detector'][-1]) < 5:
-                filtkey = 'ShortFilter'
-                pupilkey = 'ShortPupil'
-                catkey = 'sw'
-            else:
-                filtkey = 'LongFilter'
-                pupilkey = 'LongPupil'
-                catkey = 'lw'
-
-        if self.use_nonstsci_names:
-            outtf = False
-            outfile = input['outputfits']
-            yamlout = input['yamlfile']
-        else:
-            if instrument.upper() == 'NIRCAM':
-                fulldetector = 'nrc{}'.format(input['detector'].lower())
-            else:
-                fulldetector = input['detector'].lower()
-            outtf = True
-            outfile = input['observation_id'] + '_' + fulldetector + '_uncal.fits'
-            yamlout = input['observation_id'] + '_' + fulldetector + '.yaml'
-
-        yamlout = os.path.join(self.output_dir, yamlout)
-        with open(yamlout, 'w') as f:
-            f.write('Inst:\n')
-            f.write('  instrument: {}          # Instrument name\n'.format(instrument))
-            f.write('  mode: {}                # Observation mode (e.g. imaging, WFSS)\n'.format(input['Mode']))
-            f.write('  use_JWST_pipeline: {}   # Use pipeline in data transformations\n'.format(input['use_JWST_pipeline']))
-            f.write('\n')
-            f.write('Readout:\n')
-            f.write('  readpatt: {}        # Readout pattern (RAPID, BRIGHT2, etc) overrides nframe, nskip unless it is not recognized\n'.format(input['ReadoutPattern']))
-            f.write('  ngroup: {}              # Number of groups in integration\n'.format(input['Groups']))
-            f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
-            f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
-
-            if self.instrument.lower() == 'nircam':
-                apunder = input['aperture'].find('_')
-                full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
-            if self.instrument.lower() == 'niriss':
-                full_ap = input['aperture']
-
-            yaml_path = os.path.dirname(os.path.realpath(__file__))
-            modpath = os.path.split(yaml_path)[0]
-            subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
-            config = ascii.read(subarray_def_file)
-
-            if full_ap not in config['AperName']:
-                full_ap_new = [apername for apername, name in \
-                           np.array(config['AperName', 'Name']) if \
-                           (full_ap in apername) or (full_ap in name)]
-                if len(full_ap_new) > 1 or len(full_ap_new) == 0:
-                    raise ValueError('Cannot match {} with valid aperture name for observation {}.'
-                                     .format(full_ap, input['obs_num']))
-                else:
-                    full_ap = full_ap_new[0]
-
-            f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
-            f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
-            f.write('  pupil: {}        # Pupil element for simulated data (CLEAR, GRISMC, etc)\n'.format(input[pupilkey]))
-            f.write('\n')
-            f.write('Reffiles:                                 # Set to None or leave blank if you wish to skip that step\n')
-            f.write('  dark: {}   # Dark current integration used as the base\n'.format(input['dark']))
-            f.write('  linearized_darkfile: {}   # Linearized dark ramp to use as input. Supercedes dark above\n'.format(input['lindark']))
-            f.write('  badpixmask: None   # If linearized dark is used, populate output DQ extensions using this file\n')
-            f.write('  superbias: {}     # Superbias file. Set to None or leave blank if not using\n'.format(input['superbias']))
-            f.write('  linearity: {}    # linearity correction coefficients\n'.format(input['linearity']))
-            f.write('  saturation: {}    # well depth reference files\n'.format(input['saturation']))
-            f.write('  gain: {} # Gain map\n'.format(input['gain']))
-            f.write('  pixelflat: None \n')
-            f.write('  illumflat: None                               # Illumination flat field file\n')
-            f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
-            f.write('  distortion_coeffs: {}        # CSV file containing distortion coefficients\n'.format(input['siaf']))
-            f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
-            #if instrument.lower() in ['nircam', 'wfsc']:
-            #    invertIPC = True
-            #elif instrument.lower() == 'niriss':
-            #    invertIPC = False
-            #f.write('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n'.format(invertIPC))
-            f.write('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.\n'.format(False))
-            f.write('  occult: None                                    # Occulting spots correction image\n')
-            f.write('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'.format(input['pixelAreaMap']))
-            f.write('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'.format(self.subarray_def_file))
-            f.write('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values\n'.format(self.readpatt_def_file))
-            f.write('  crosstalk: {}   # File containing crosstalk coefficients\n'.format(self.crosstalk))
-            f.write('  filtpupilcombo: {}   # File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file\n'.format(self.filtpupil_pairs))
-            f.write('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.\n'.format(self.fluxcal))
-            f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.filter_throughput))
-            f.write('\n')
-            f.write('nonlin:\n')
-            f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')
-            f.write('  accuracy: 0.000001                        # Non-linearity accuracy threshold\n')
-            f.write('  maxiter: 10                              # Maximum number of iterations to use when applying non-linearity\n')
-            f.write('  robberto:  False                         # Use Massimo Robberto type non-linearity coefficients\n')
-            f.write('\n')
-            f.write('cosmicRay:\n')
-            cosmic_ray_path = os.path.join(self.datadir,instrument.lower(),'cosmic_ray_library')
-            f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
-            f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
-            f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
-            # temporary tweak here to make it work with NIRISS
-            if instrument.lower() in ['nircam', 'wfsc']:
-                detector_label = input['detector']
-            elif instrument.lower() == 'niriss':
-                detector_label = 'B5'
-            f.write('  suffix: IPC_NIRCam_{}    # Suffix of library file names\n'.format(detector_label))
-            f.write('  seed: {}                           # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
-            f.write('\n')
-            f.write('simSignals:\n')
-            if instrument.lower() in ['nircam', 'wfsc']:
-                PointSourceCatalog = input['{}_ptsrc'.format(catkey)]
-                GalaxyCatalog = input['{}_galcat'.format(catkey)]
-                ExtendedCatalog = input['{}_ext'.format(catkey)]
-                ExtendedScale = input['{}_extscl'.format(catkey)]
-                ExtendedCenter = input['{}_extcent'.format(catkey)]
-                MovingTargetList = input['{}_movptsrc'.format(catkey)]
-                MovingTargetSersic = input['{}_movgal'.format(catkey)]
-                MovingTargetExtended = input['{}_movext'.format(catkey)]
-                MovingTargetConvolveExtended = input['{}_movconv'.format(catkey)]
-                MovingTargetToTrack = input['{}_solarsys'.format(catkey)]
-                BackgroundRate = input['{}_bkgd'.format(catkey)]
-            elif instrument.lower() == 'niriss':
-                PointSourceCatalog = input['PointSourceCatalog']
-                GalaxyCatalog = input['GalaxyCatalog']
-                ExtendedCatalog = input['ExtendedCatalog']
-                ExtendedScale = input['ExtendedScale']
-                ExtendedCenter = input['ExtendedCenter']
-                MovingTargetList = input['MovingTargetList']
-                MovingTargetSersic = input['MovingTargetSersic']
-                MovingTargetExtended = input['MovingTargetExtended']
-                MovingTargetConvolveExtended = input['MovingTargetConvolveExtended']
-                MovingTargetToTrack = input['MovingTargetToTrack']
-                BackgroundRate = input['BackgroundRate']
-
-            f.write('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'.format(PointSourceCatalog))   #'point_source']))
-            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
-            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
-            f.write('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac))
-            f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
-            f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
-            f.write('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies to simulate\n'.format(GalaxyCatalog))   #'galaxyListFile']))
-            f.write('  extended: {}          #Extended emission count rate image file name\n'.format(ExtendedCatalog))     #'extended']))
-            f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(ExtendedScale))
-            f.write('  extendedCenter: {}                   #x, y pixel location at which to place the extended image if it is smaller than the output array size\n'.format(ExtendedCenter))
-            f.write('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output image (True or False)\n')
-            f.write('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.\n'.format(MovingTargetList))   #'movingTarg']))
-            f.write('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through the field\n'.format(MovingTargetSersic))  #'movingTargSersic']))
-            f.write('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)\n'.format(MovingTargetExtended))  #'movingTargExtended']))
-            f.write('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'.format(MovingTargetConvolveExtended))
-            f.write('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target" \n'.format(MovingTargetToTrack))  #'movingTargToTrack']))
-            f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
-            f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
-            f.write('  scattered:  None                          #Scattered light count rate image file\n')
-            f.write('  scatteredscale: 1.0                        #Scattered light scaling factor\n')
-            f.write("  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel) or 'high','medium','low' similar to what is used in the ETC\n".format(BackgroundRate))  #'bkgdrate']))
-            f.write('  poissonseed: {}                  #Random number generator seed for Poisson simulation)\n'.format(np.random.randint(1, 2**32-2)))
-            f.write('  photonyield: True                         #Apply photon yield in simulation\n')
-            f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
-            f.write('\n')
-            f.write('Telescope:\n')
-            f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
-            f.write('  dec: {}                    # Dec of simulated pointing\n'.format(input['dec_ref']))
-            if 'pav3' in input.keys():
-                pav3_value = input['pav3']
-            else:
-                pav3_value = input['PAV3']
-            f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(pav3_value))
-            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
-            f.write('\n')
-            f.write('newRamp:\n')
-            f.write('  dq_configfile: {}\n'.format(self.dq_init_config))
-            f.write('  sat_configfile: {}\n'.format(self.saturation_config))
-            f.write('  superbias_configfile: {}\n'.format(self.superbias_config))
-            f.write('  refpix_configfile: {}\n'.format(self.refpix_config))
-            f.write('  linear_configfile: {}\n'.format(self.linearity_config))
-            f.write('\n')
-            f.write('Output:\n')
-            # f.write('  use_stsci_output_name: {} # Output filename should follow STScI naming conventions (True/False)\n'.format(outtf))
-            f.write('  directory: {}  # Output directory\n'.format(self.simdata_output_dir))
-            f.write('  file: {}   # Output filename\n'.format(outfile))
-            f.write("  datatype: {} # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear, raw' for both\n".format(self.datatype))
-            f.write('  format: DMS          # Output file format Options: DMS, SSR(not yet implemented)\n')
-            f.write('  save_intermediates: False   # Save intermediate products separately (point source image, etc)\n')
-            f.write('  grism_source_image: {}   # grism\n'.format(input['grism_source_image']))
-            f.write('  unsigned: True   # Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)\n')
-            f.write('  dmsOrient: True    # Output in DMS orientation (vs. fitswriter orientation).\n')
-            f.write('  program_number: {}    # Program Number\n'.format(input['ProposalID']))
-            f.write('  title: {}   # Program title\n'.format(input['Title'].replace(':', ', ')))
-            f.write('  PI_Name: {}  # Proposal PI Name\n'.format(input['PI_Name']))
-            f.write('  Proposal_category: {}  # Proposal category\n'.format(input['Proposal_category']))
-            f.write('  Science_category: {}  # Science category\n'.format(input['Science_category']))
-            f.write("  observation_number: '{}'    # Observation Number\n".format(input['obs_num']))
-            f.write('  observation_label: {}    # User-generated observation Label\n'.format(input['obs_label'].strip()))
-            f.write("  visit_number: '{}'    # Visit Number\n".format(input['visit_num']))
-            f.write("  visit_group: '{}'    # Visit Group\n".format(input['visit_group']))
-            f.write("  visit_id: '{}'    # Visit ID\n".format(input['visit_id']))
-            f.write("  sequence_id: '{}'    # Sequence ID\n".format(input['sequence_id']))
-            f.write("  activity_id: '{}'    # Activity ID. Increment with each exposure.\n".format(input['act_id']))
-            f.write("  exposure_number: '{}'    # Exposure Number\n".format(input['exposure']))
-            f.write("  obs_id: '{}'   # Observation ID number\n".format(input['observation_id']))
-            f.write("  date_obs: '{}'  # Date of observation\n".format(input['date_obs']))
-            f.write("  time_obs: '{}'  # Time of observation\n".format(input['time_obs']))
-            f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
-            f.write("  primary_dither_type: {}  # Primary dither pattern name\n".format(input['PrimaryDitherType']))
-            f.write("  total_primary_dither_positions: {}  # Total number of primary dither positions\n".format(input['PrimaryDithers']))
-            f.write("  primary_dither_position: {}  # Primary dither position number\n".format(np.int(input['primary_dither_num'])))
-            f.write("  subpix_dither_type: {}  # Subpixel dither pattern name\n".format(input['SubpixelDitherType']))
-            # For WFSS we need to strip out the '-Points' from
-            # the number of subpixel positions entry
-            dash = input['SubpixelPositions'].find('-')
-            if (dash == -1):
-                val = input['SubpixelPositions']
-            else:
-                val = input['SubpixelPositions'][0:dash]
-            if val == 'None':
-                val = 1
-            # try:
-            #     dash = input['SubpixelPositions'].find('-')
-            #     val = input['SubpixelPositions'][0:dash]
-            # except:
-            #     val = input['SubpixelPositions']
-            f.write("  total_subpix_dither_positions: {}  # Total number of subpixel dither positions\n".format(val))
-            f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
-            f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
-            f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
-        return yamlout
+        if self.observation_table is not None:
+            self.observation_table = os.path.abspath(os.path.expandvars(self.observation_table))
+        if self.crosstalk not in [None, 'config']:
+            self.crosstalk = os.path.abspath(os.path.expandvars(self.crosstalk))
+        elif self.crosstalk == 'config':
+            self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
     def reffile_setup(self, instrument='nircam'):
         """Create lists of reference files associate with each detector
 
-        Parameters:
-        -----------
-        None
-
-        Returns:
-        --------
-        None
+        Parameters
+        ----------
+        instrument : str
+            Name of instrument
         """
 
         # Expand the MIRAGE_DATA environment variable
@@ -1152,7 +843,7 @@ class SimInput:
             self.configfiles['linearity_config'] = 'linearity.cfg'
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         elif self.instrument.lower() == 'niriss':
-            self.reference_file_dir =  os.path.join(self.datadir, 'niriss/reference_files')
+            self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
             self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
             self.psfbasename = 'niriss'
             self.psfpixfrac = 0.1
@@ -1220,9 +911,7 @@ class SimInput:
 
         elif self.instrument.lower() == 'niriss':
             # directory containing NIRISS reference files
-
-
-            #define NIRISS detector name (convention?)
+            # define NIRISS detector name (convention?)
             det = 'NIS'
 
             self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
@@ -1233,18 +922,318 @@ class SimInput:
             self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
             self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
 
-            self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw', '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+            self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
+                                       '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
             self.lindark_list[det] = [None]
+
+    def set_config(self, file, prop):
+        """
+        If a given file is listed as 'config'
+        then set it in the yaml output as being in
+        the config subdirectory.
+
+        Parameters
+        ----------
+        file : str
+            Name of the input file
+        prop : str
+            Type of file that file is.
+
+        Returns:
+        --------
+        file : str
+            Full path name to the input file
+        """
+        if file.lower() not in ['config']:
+            file = os.path.abspath(file)
+        elif file.lower() == 'config':
+            file = os.path.join(self.modpath, 'config', self.configfiles[prop])
+        return file
+
+    def table_to_dict(self, tab):
+        """
+        Convert the ascii table of observations to a dictionary
+
+        Parameters
+        ----------
+        tab : obj
+            astropy.table.Table containing observation information
+
+        Returns
+        -------
+        dict : dict
+            Dictionary of observation information
+        """
+        dict = {}
+        for colname in tab.colnames:
+            dict[colname] = tab[colname].data
+        return dict
+
+    def write_yaml(self, input):
+        """
+        Create yaml file for a single exposure/detector
+
+        Parameters
+        ----------
+        input : dict
+            dictionary containing all needed exposure
+            information for one exposure
+        """
+        instrument = input['Instrument']
+        # select the right filter
+        if input['detector'] == 'NIS':
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            catkey = ''
+        else:
+            if np.int(input['detector'][-1]) < 5:
+                filtkey = 'ShortFilter'
+                pupilkey = 'ShortPupil'
+                catkey = 'sw'
+            else:
+                filtkey = 'LongFilter'
+                pupilkey = 'LongPupil'
+                catkey = 'lw'
+
+        if self.use_nonstsci_names:
+            outtf = False
+            outfile = input['outputfits']
+            yamlout = input['yamlfile']
+        else:
+            if instrument.upper() == 'NIRCAM':
+                fulldetector = 'nrc{}'.format(input['detector'].lower())
+            else:
+                fulldetector = input['detector'].lower()
+            outtf = True
+            outfile = input['observation_id'] + '_' + fulldetector + '_uncal.fits'
+            yamlout = input['observation_id'] + '_' + fulldetector + '.yaml'
+
+        yamlout = os.path.join(self.output_dir, yamlout)
+        with open(yamlout, 'w') as f:
+            f.write('Inst:\n')
+            f.write('  instrument: {}          # Instrument name\n'.format(instrument))
+            f.write('  mode: {}                # Observation mode (e.g. imaging, WFSS)\n'.format(input['Mode']))
+            f.write('  use_JWST_pipeline: {}   # Use pipeline in data transformations\n'.format(input['use_JWST_pipeline']))
+            f.write('\n')
+            f.write('Readout:\n')
+            f.write('  readpatt: {}        # Readout pattern (RAPID, BRIGHT2, etc) overrides nframe, nskip unless it is not recognized\n'.format(input['ReadoutPattern']))
+            f.write('  ngroup: {}              # Number of groups in integration\n'.format(input['Groups']))
+            f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
+            f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
+
+            if self.instrument.lower() == 'nircam':
+                apunder = input['aperture'].find('_')
+                full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
+            if self.instrument.lower() == 'niriss':
+                full_ap = input['aperture']
+
+            yaml_path = os.path.dirname(os.path.realpath(__file__))
+            modpath = os.path.split(yaml_path)[0]
+            subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
+            config = ascii.read(subarray_def_file)
+
+            if full_ap not in config['AperName']:
+                full_ap_new = [apername for apername, name in
+                               np.array(config['AperName', 'Name']) if
+                               (full_ap in apername) or (full_ap in name)]
+                if len(full_ap_new) > 1 or len(full_ap_new) == 0:
+                    raise ValueError('Cannot match {} with valid aperture name for observation {}.'
+                                     .format(full_ap, input['obs_num']))
+                else:
+                    full_ap = full_ap_new[0]
+
+            f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
+            f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
+            f.write('  pupil: {}        # Pupil element for simulated data (CLEAR, GRISMC, etc)\n'.format(input[pupilkey]))
+            f.write('\n')
+            f.write('Reffiles:                                 # Set to None or leave blank if you wish to skip that step\n')
+            f.write('  dark: {}   # Dark current integration used as the base\n'.format(input['dark']))
+            f.write('  linearized_darkfile: {}   # Linearized dark ramp to use as input. Supercedes dark above\n'.format(input['lindark']))
+            f.write('  badpixmask: None   # If linearized dark is used, populate output DQ extensions using this file\n')
+            f.write('  superbias: {}     # Superbias file. Set to None or leave blank if not using\n'.format(input['superbias']))
+            f.write('  linearity: {}    # linearity correction coefficients\n'.format(input['linearity']))
+            f.write('  saturation: {}    # well depth reference files\n'.format(input['saturation']))
+            f.write('  gain: {} # Gain map\n'.format(input['gain']))
+            f.write('  pixelflat: None \n')
+            f.write('  illumflat: None                               # Illumination flat field file\n')
+            f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
+            f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
+            f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
+                     'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(False)))
+            f.write('  occult: None                                    # Occulting spots correction image\n')
+            f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
+                     .format(input['pixelAreaMap'])))
+            f.write(('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'
+                     .format(self.subarray_def_file)))
+            f.write(('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated '
+                     'NFRAME/NSKIP values\n'.format(self.readpatt_def_file)))
+            f.write('  crosstalk: {}   # File containing crosstalk coefficients\n'.format(self.crosstalk))
+            f.write(('  filtpupilcombo: {}   # File that lists the filter wheel element / pupil wheel element combinations. '
+                     'Used only in writing output file\n'.format(self.filtpupil_pairs)))
+            f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
+                     'used when making direct image outputs to be fed into the grism disperser code.\n'.format(self.fluxcal)))
+            f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.filter_throughput))
+            f.write('\n')
+            f.write('nonlin:\n')
+            f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')
+            f.write('  accuracy: 0.000001                        # Non-linearity accuracy threshold\n')
+            f.write('  maxiter: 10                              # Maximum number of iterations to use when applying non-linearity\n')
+            f.write('  robberto:  False                         # Use Massimo Robberto type non-linearity coefficients\n')
+            f.write('\n')
+            f.write('cosmicRay:\n')
+            cosmic_ray_path = os.path.join(self.datadir, instrument.lower(), 'cosmic_ray_library')
+            f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
+            f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
+            f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
+            # temporary tweak here to make it work with NIRISS
+            if instrument.lower() in ['nircam', 'wfsc']:
+                detector_label = input['detector']
+            elif instrument.lower() == 'niriss':
+                detector_label = 'B5'
+            f.write('  suffix: IPC_NIRCam_{}    # Suffix of library file names\n'.format(detector_label))
+            f.write('  seed: {}                 # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
+            f.write('\n')
+            f.write('simSignals:\n')
+            if instrument.lower() in ['nircam', 'wfsc']:
+                PointSourceCatalog = input['{}_ptsrc'.format(catkey)]
+                GalaxyCatalog = input['{}_galcat'.format(catkey)]
+                ExtendedCatalog = input['{}_ext'.format(catkey)]
+                ExtendedScale = input['{}_extscl'.format(catkey)]
+                ExtendedCenter = input['{}_extcent'.format(catkey)]
+                MovingTargetList = input['{}_movptsrc'.format(catkey)]
+                MovingTargetSersic = input['{}_movgal'.format(catkey)]
+                MovingTargetExtended = input['{}_movext'.format(catkey)]
+                MovingTargetConvolveExtended = input['{}_movconv'.format(catkey)]
+                MovingTargetToTrack = input['{}_solarsys'.format(catkey)]
+                BackgroundRate = input['{}_bkgd'.format(catkey)]
+            elif instrument.lower() == 'niriss':
+                PointSourceCatalog = input['PointSourceCatalog']
+                GalaxyCatalog = input['GalaxyCatalog']
+                ExtendedCatalog = input['ExtendedCatalog']
+                ExtendedScale = input['ExtendedScale']
+                ExtendedCenter = input['ExtendedCenter']
+                MovingTargetList = input['MovingTargetList']
+                MovingTargetSersic = input['MovingTargetSersic']
+                MovingTargetExtended = input['MovingTargetExtended']
+                MovingTargetConvolveExtended = input['MovingTargetConvolveExtended']
+                MovingTargetToTrack = input['MovingTargetToTrack']
+                BackgroundRate = input['BackgroundRate']
+
+            f.write(('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'
+                     .format(PointSourceCatalog)))
+            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
+            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
+            f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
+                     'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac)))
+            f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
+            f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
+            f.write(('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies '
+                     'to simulate\n'.format(GalaxyCatalog)))
+            f.write('  extended: {}          #Extended emission count rate image file name\n'.format(ExtendedCatalog))
+            f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(ExtendedScale))
+            f.write(('  extendedCenter: {}                   #x, y pixel location at which to place the extended image '
+                     'if it is smaller than the output array size\n'.format(ExtendedCenter)))
+            f.write(('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output '
+                     'image (True or False)\n'))
+            f.write(('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. '
+                     'KBOs, asteroids) to add.\n'.format(MovingTargetList)))
+            f.write(('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through '
+                     'the field\n'.format(MovingTargetSersic)))
+            f.write(('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets '
+                     '(planets, moons, etc)\n'.format(MovingTargetExtended)))
+            f.write(('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'
+                     .format(MovingTargetConvolveExtended)))
+            f.write(('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during '
+                     'observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to '
+                     '"moving_target" \n'.format(MovingTargetToTrack)))
+            f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
+            f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
+            f.write('  scattered:  None                          #Scattered light count rate image file\n')
+            f.write('  scatteredscale: 1.0                        #Scattered light scaling factor\n')
+            f.write(('  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel) or '
+                     '"high","medium","low" similar to what is used in the ETC\n'.format(BackgroundRate)))
+            f.write(('  poissonseed: {}                  #Random number generator seed for Poisson simulation)\n'
+                     .format(np.random.randint(1, 2**32-2))))
+            f.write('  photonyield: True                         #Apply photon yield in simulation\n')
+            f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
+            f.write('\n')
+            f.write('Telescope:\n')
+            f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
+            f.write('  dec: {}                    # Dec of simulated pointing\n'.format(input['dec_ref']))
+            if 'pav3' in input.keys():
+                pav3_value = input['pav3']
+            else:
+                pav3_value = input['PAV3']
+            f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(pav3_value))
+            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
+            f.write('\n')
+            f.write('newRamp:\n')
+            f.write('  dq_configfile: {}\n'.format(self.dq_init_config))
+            f.write('  sat_configfile: {}\n'.format(self.saturation_config))
+            f.write('  superbias_configfile: {}\n'.format(self.superbias_config))
+            f.write('  refpix_configfile: {}\n'.format(self.refpix_config))
+            f.write('  linear_configfile: {}\n'.format(self.linearity_config))
+            f.write('\n')
+            f.write('Output:\n')
+            # f.write('  use_stsci_output_name: {} # Output filename should follow STScI naming conventions (True/False)\n'.format(outtf))
+            f.write('  directory: {}  # Output directory\n'.format(self.simdata_output_dir))
+            f.write('  file: {}   # Output filename\n'.format(outfile))
+            f.write(("  datatype: {} # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear, "
+                     "raw' for both\n".format(self.datatype)))
+            f.write('  format: DMS          # Output file format Options: DMS, SSR(not yet implemented)\n')
+            f.write('  save_intermediates: False   # Save intermediate products separately (point source image, etc)\n')
+            f.write('  grism_source_image: {}   # grism\n'.format(input['grism_source_image']))
+            f.write('  unsigned: True   # Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)\n')
+            f.write('  dmsOrient: True    # Output in DMS orientation (vs. fitswriter orientation).\n')
+            f.write('  program_number: {}    # Program Number\n'.format(input['ProposalID']))
+            f.write('  title: {}   # Program title\n'.format(input['Title'].replace(':', ', ')))
+            f.write('  PI_Name: {}  # Proposal PI Name\n'.format(input['PI_Name']))
+            f.write('  Proposal_category: {}  # Proposal category\n'.format(input['Proposal_category']))
+            f.write('  Science_category: {}  # Science category\n'.format(input['Science_category']))
+            f.write("  observation_number: '{}'    # Observation Number\n".format(input['obs_num']))
+            f.write('  observation_label: {}    # User-generated observation Label\n'.format(input['obs_label'].strip()))
+            f.write("  visit_number: '{}'    # Visit Number\n".format(input['visit_num']))
+            f.write("  visit_group: '{}'    # Visit Group\n".format(input['visit_group']))
+            f.write("  visit_id: '{}'    # Visit ID\n".format(input['visit_id']))
+            f.write("  sequence_id: '{}'    # Sequence ID\n".format(input['sequence_id']))
+            f.write("  activity_id: '{}'    # Activity ID. Increment with each exposure.\n".format(input['act_id']))
+            f.write("  exposure_number: '{}'    # Exposure Number\n".format(input['exposure']))
+            f.write("  obs_id: '{}'   # Observation ID number\n".format(input['observation_id']))
+            f.write("  date_obs: '{}'  # Date of observation\n".format(input['date_obs']))
+            f.write("  time_obs: '{}'  # Time of observation\n".format(input['time_obs']))
+            f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
+            f.write("  primary_dither_type: {}  # Primary dither pattern name\n".format(input['PrimaryDitherType']))
+            f.write("  total_primary_dither_positions: {}  # Total number of primary dither positions\n".format(input['PrimaryDithers']))
+            f.write("  primary_dither_position: {}  # Primary dither position number\n".format(np.int(input['primary_dither_num'])))
+            f.write("  subpix_dither_type: {}  # Subpixel dither pattern name\n".format(input['SubpixelDitherType']))
+            # For WFSS we need to strip out the '-Points' from
+            # the number of subpixel positions entry
+            dash = input['SubpixelPositions'].find('-')
+            if (dash == -1):
+                val = input['SubpixelPositions']
+            else:
+                val = input['SubpixelPositions'][0:dash]
+            if val == 'None':
+                val = 1
+            # try:
+            #     dash = input['SubpixelPositions'].find('-')
+            #     val = input['SubpixelPositions'][0:dash]
+            # except:
+            #     val = input['SubpixelPositions']
+            f.write("  total_subpix_dither_positions: {}  # Total number of subpixel dither positions\n".format(val))
+            f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
+            f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
+            f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
+        return yamlout
 
     def add_options(self, parser=None, usage=None):
         if parser is None:
             parser = argparse.ArgumentParser(usage=usage, description='Simulate JWST ramp')
         parser.add_argument("--input_xml", help='XML file from APT describing the observations.')
         parser.add_argument("--pointing_file", help='Pointing file from APT describing observations.')
-        parser.add_argument("--siaf", help='CSV version of SIAF. Needed only in conjunction with input_xml + pointing.')
         parser.add_argument("--datatype", help='Type of data to save. Can be "linear", "raw" or "linear, raw"', default="linear")
         parser.add_argument("--output_dir", help='Directory into which the yaml files are output', default='./')
-        parser.add_argument("--table_file", help='Ascii table containing observation info. Use this or xml + pointing + siaf files.', default=None)
+        parser.add_argument("--table_file", help='Ascii table containing observation info. Use this or xml + pointing files.', default=None)
         parser.add_argument("--use_nonstsci_names", help="Use STScI naming convention for output files", action='store_true')
         parser.add_argument("--subarray_def_file", help="Ascii file containing subarray definitions", default='config')
         parser.add_argument("--readpatt_def_file", help='Ascii file containing readout pattern definitions', default='config')
