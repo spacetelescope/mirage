@@ -109,7 +109,7 @@ setup(
         'asdf>=1.2.0',
         'scipy>=0.17',
         'photutils>=0.4.0',
-        'pysiaf'
+        'pysiaf>=0.1.11'
     ],
     include_package_data=True,
     cmdclass={
