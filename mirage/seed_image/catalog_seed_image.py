@@ -1923,7 +1923,6 @@ class Catalog_seed():
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
             pixely -= 1
-        stophere
         return pixelx, pixely
 
     def object_separation(self, radec1, radec2, wcs):
