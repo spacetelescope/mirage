@@ -47,7 +47,7 @@ from ..utils import set_telescope_pointing_separated as stp
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         "niriss": ["imaging"],
+         "niriss": ["imaging","ami"],
          "fgs": ["imaging"]}
 
 
