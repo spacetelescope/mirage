@@ -125,8 +125,9 @@ class SimInput:
         self.psfwfegroup = 0
         self.resets_bet_ints = 1 # NIRCam should be 1
         self.tracking = 'sidereal'
+        self.psf_paths = None
 
-    def create_inputs(self):
+    def create_inputs(self, psf_paths=None):
         # Use full paths for inputs
         self.path_defs()
 
@@ -251,6 +252,9 @@ class SimInput:
                 seq.append('1')
         self.info['sequence_id'] = seq
         self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
+
+        # Deal with user-provided PSFs that differ across observations/visits/exposures
+        self.info['psfpath'] = self.get_psf_path()
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
@@ -850,6 +854,54 @@ class SimInput:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
 
+    def get_psf_path(self):
+        """ Create a list of the path to the PSF library directory for
+        each observation/visit/exposure in the APT program.
+
+        Parameters:
+        -----------
+        psf_paths : list or None
+            Either a list of the paths to the PSF library(ies), with a
+            length equal to the number of activities in the APT program,
+            or None. If the former, each path will be written
+            chronologically into the yaml file. If the latter, the
+            default PSF library path will be used for all yamls.
+
+        Returns:
+        --------
+        paths_out : list
+            The list of paths to the PSF library(ies), with a length
+            equal to the number of activities in the APT program.
+        """
+        act_ids = sorted(list(set(self.info['act_id'])))
+        act_id_indices = []
+        for act_id in self.info['act_id']:
+            act_id_indices.append(act_ids.index(act_id))
+        n_activities = len(act_ids)
+
+        if self.psf_paths is None:
+            default_path = os.path.join(self.datadir, self.instrument, 'webbpsf_library')
+            print('No PSF path provided. Using {} as PSF path for all yamls.'.format(default_path))
+            paths_out = default_path * len(self.info['act_id'])
+            return paths_out
+
+        elif not isinstance(self.psf_paths, list):
+            raise TypeError('Invalid PSF paths parameter provided. Please '
+                             'provide the psf_paths in the form of a list, not'
+                             '{}'.format(type(self.psf_paths)))
+
+        elif len(self.psf_paths) != n_activities:
+            raise ValueError('Invalid PSF paths parameter provided. Please '
+                             'provide the psf_paths in the form of a list of '
+                             'strings with a length equal to the number of '
+                             'activities in the APT program ({}), not equal to {}.'
+                             .format(n_activities, len(self.psf_paths)))
+
+        else:
+            print('Using provided PSF paths.')
+            paths_out = [sorted(self.psf_paths)[i] for i in act_id_indices]
+            return paths_out
+
     def get_reffile(self, refs, detector):
         """
         Return the appropriate reference file for detector
@@ -1021,7 +1073,7 @@ class SimInput:
                 BackgroundRate = input['BackgroundRate']
 
             f.write('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'.format(PointSourceCatalog))   #'point_source']))
-            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
+            f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
             f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
             f.write('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
@@ -1137,7 +1189,6 @@ class SimInput:
         # and set up PSF path
         self.configfiles = {}
         if self.instrument == 'nircam':
-            self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
             self.psfbasename = 'nircam'
             self.psfpixfrac = 0.25
             self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
@@ -1153,7 +1204,6 @@ class SimInput:
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         elif self.instrument.lower() == 'niriss':
             self.reference_file_dir =  os.path.join(self.datadir, 'niriss/reference_files')
-            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
             self.psfbasename = 'niriss'
             self.psfpixfrac = 0.1
             self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
