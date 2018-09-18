@@ -187,9 +187,8 @@ dependencies:
     - gnureadline==6.3.8
     - ipdb==0.8
     - jwst-backgrounds==1.1.1
-    - mirage==2.0.1
     - mock==1.0.1
-    - pysiaf==0.1.12
+    - pysiaf>=0.1.15
     - terminaltables==1.2.1
     - uritemplate.py==0.3.0
     - webbpsf==0.7.0
