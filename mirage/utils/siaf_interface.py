@@ -22,6 +22,7 @@ import numpy as np
 
 import pysiaf
 from pysiaf import iando
+from pysiaf.constants import JWST_DELIVERY_DATA_ROOT
 from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
@@ -37,7 +38,16 @@ def get_siaf_information(instrument, aperture, ra, dec, telescope_roll):
     aperture : str
         Aperture name (e.g. "NRCA1_FULL")
     """
-    siaf = pysiaf.Siaf(instrument)[aperture]
+    # Temporary fix to access good NIRCam distortion coefficients which
+    # which are not yet in the PRD
+    if instrument.lower() == 'nircam':
+        import os
+        print("NOTE: Using pre-delivery SIAF data")
+        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, instrument)
+        siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture]
+    else:
+        siaf = pysiaf.Siaf(instrument)[aperture]
+
     local_roll = set_telescope_pointing.compute_local_roll(telescope_roll,
                                                            ra, dec, siaf.V2Ref,
                                                            siaf.V3Ref)

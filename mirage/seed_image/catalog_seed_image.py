@@ -417,10 +417,10 @@ class Catalog_seed():
     def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
         # Convert object magnitude to counts/sec
         #
-        # For NIRISS AMI mode, the count rate values calculated need to be 
-        # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the 
-        # throughput of the NRM, while the 0.84 value is the throughput of the 
-        # imaging CLEARP element that is in place in the pupil wheel for the 
+        # For NIRISS AMI mode, the count rate values calculated need to be
+        # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
+        # throughput of the NRM, while the 0.84 value is the throughput of the
+        # imaging CLEARP element that is in place in the pupil wheel for the
         # normal imaging observations.
         if self.params['Inst']['mode'] in ['ami']:
             count_scale = 0.15 / 0.84
@@ -2956,13 +2956,13 @@ class Catalog_seed():
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
-                # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF 
+                # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF
                 # files are in a separate directory and have the altered file names
-                # compared to imaging.  Hence one can point to the same base 
+                # compared to imaging.  Hence one can point to the same base
                 # directory to run both imaging and NRM models.
-                # 
-                # This set-up requires that the NRM PSF library files be placed in a directory named NIS_NRM under the 
-                # PSF path given in the .yaml file, just as the NIRISS imaging PSF library files need to be placed in a 
+                #
+                # This set-up requires that the NRM PSF library files be placed in a directory named NIS_NRM under the
+                # PSF path given in the .yaml file, just as the NIRISS imaging PSF library files need to be placed in a
                 # directory named NIS under the specified PSF path.
                 if self.params['Inst']['mode'] in ['ami']:
                     self.psfname = self.psfname.replace('NIS','NIS_NRM')
