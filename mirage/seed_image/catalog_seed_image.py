@@ -192,36 +192,6 @@ class Catalog_seed():
         base_table.add_column(det_column, index = 0)
         return base_table
 
-    #def get_siaf_information(self, instrument, aperture):
-    #    """Use pysiaf to get aperture information
-
-    #    Parameters:
-    #    -----------
-    #    instrument : str
-    #        Instrument name.
-
-    #    aperture : str
-    #        Aperture name (e.g. "NRCA1_FULL")
-
-    #    Returns:
-    #    --------
-    #    None
-    #    """
-    #    self.siaf = pysiaf.Siaf(instrument)[aperture]
-    #    self.local_roll = set_telescope_pointing.compute_local_roll(self.params['Telescope']['rotation'],
-    #                                                                self.ra, self.dec, self.siaf.V2Ref,
-    #                                                                self.siaf.V3Ref)
-    #    # Create attitude_matrix
-    #    self.attitude_matrix = rotations.attitude(self.siaf.V2Ref, self.siaf.V3Ref, self.ra, self.dec,
-    #                                              self.local_roll)
-
-    #    # Get full frame size
-    #    self.ffsize = self.siaf.XDetSize
-
-    #    # Subarray boundaries in full frame coordinates
-    #    xcorner, ycorner = siaf_interface.sci_subarray_corners(instrument, aperture)
-    #    self.subarray_bounds = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
-
     def prepare_PAM(self):
         """
         Read in and prepare the pixel area map (PAM), to be used
