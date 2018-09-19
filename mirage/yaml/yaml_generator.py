@@ -376,9 +376,9 @@ class SimInput:
                 except:
                     subpixtot = np.int(file_dict['SubpixelPositions'][0])
             primary_dither = np.ceil(1. * tot_dith / subpixtot)
-            subpix_dither = tot_dith - (primary_dither * primarytot * subpixtot - subpixtot)
-            file_dict['primary_dither_num'] = primary_dither
-            file_dict['subpix_dither_num'] = subpix_dither
+            file_dict['primary_dither_num'] = np.int(primary_dither)
+            subpix_dither = (tot_dith-1) % subpixtot
+            file_dict['subpix_dither_num'] = subpix_dither + 1
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
 
@@ -421,6 +421,32 @@ class SimInput:
                    .format(obs, n_visits, n_tiles, n_det, module)))
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
+
+    def create_output_name(self, input_obj):
+        """Put together the JWST formatted fits file name based on observation parameters
+
+        Parameters
+        ----------
+        input_obj : dict
+            Dictionary from apt_inputs giving information for each exposure
+
+        Returns
+        -------
+        base : str
+            JWST formatted filename base (excluding pipeline step suffix and ".fits")
+        """
+        proposal_id = input_obj['ProposalID']
+        observation = input_obj['obs_num']
+        visit_number = input_obj['visit_num']
+        visit_group = input_obj['visit_group']
+        parallel_sequence_id = input_obj['sequence_id']
+        activity_id = input_obj['act_id']
+        exposure = input_obj['exposure']
+
+        base = 'jw{}{}{}_{}{}{}_{}_'.format(proposal_id, observation, visit_number,
+                                            visit_group, parallel_sequence_id, activity_id,
+                                            exposure)
+        return base
 
     def expand_env_var(self):
         """ Expand the MIRAGE_DATA environment variable
@@ -1005,8 +1031,11 @@ class SimInput:
             else:
                 fulldetector = input['detector'].lower()
             outtf = True
-            outfile = input['observation_id'] + '_' + fulldetector + '_uncal.fits'
-            yamlout = input['observation_id'] + '_' + fulldetector + '.yaml'
+            outfilebase = self.create_output_name(input)
+            outfile = "{}{}{}".format(outfilebase, fulldetector, '_uncal.fits')
+            yamlout = "{}{}{}".format(outfilebase, fulldetector, '.yaml')
+            # outfile = input['observation_id'] + '_' + fulldetector + '_uncal.fits'
+            # yamlout = input['observation_id'] + '_' + fulldetector + '.yaml'
 
         yamlout = os.path.join(self.output_dir, yamlout)
         with open(yamlout, 'w') as f:
