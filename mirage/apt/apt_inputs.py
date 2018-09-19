@@ -678,7 +678,10 @@ class AptInput:
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
                             ddist.append(np.float(elements[21]))
-                            observation_id.append("jw{}_{}{}{}_{}".format(vid, vgrp, seq, act, exnum))
+                            # For the moment we assume that the instrument being simulated is not being
+                            # run in parallel, so the parallel proposal number will be all zeros,
+                            # as seen in the line below.
+                            observation_id.append("V{}P{}{}{}{}".format(vid, '00000000', vgrp, seq, act))
                             act_counter += 1
 
                     except:
