@@ -62,7 +62,10 @@ class PSFCollection:
             yi, xi = literal_eval(self.library_info['DET_JI' + str(num)])
             self.x_index.append(xi)
             self.y_index.append(yi)
-        self.interpolator = self.create_interpolator()
+        if self.num_psfs > 1:
+            self.interpolator = self.create_interpolator()
+        else:
+            self.interpolator = None
 
     def create_interpolator(self, interp_type='interp2d'):
         """Create an interpolator function for the detector-dependent
@@ -311,8 +314,8 @@ class PSFCollection:
         lower left corner. This is important more for when the FittableImageModel
         that is returned here is evaluated.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         x :  int (float?)
             X-coordinate value for the new PSF
 
@@ -330,25 +333,29 @@ class PSFCollection:
         idw_alpha : float
             Exponent used for turning distances into weights. Default is -2.
 
-        Returns:
-        --------
-        None
+        Returns
+        -------
+        out : FittableImageModel
+            Instance of FittableImageModel containing the interpolated PSF
         """
         # Get the locations on the detector for each PSF
         # in the library
-        if method == "spline":
-            interp_psf = self.evaluate_interp2d(self.interpolator, x, y)
-        elif method == "idw":
-            nearest_x, nearest_y, nearest_dist = self.find_nearest_neighbors(x, y, idw_number_nearest)
-            if len(nearest_dist) > 1:
-                psfs_to_avg = self.library[nearest_x, nearest_y, :, :]
-                interp_psf = self.weighted_avg(psfs_to_avg, nearest_dist,
-                                               idw_alpha)
-            elif len(nearest_dist) == 1:
-                interp_psf = self.library[nearest_x, nearest_y, :, :]
+        if self.num_psfs == 1:
+            interp_psf = self.library[0, 0, :, :]
         else:
-            raise ValueError(("{} interpolation method not supported."
-                              .format(method)))
+            if method == "spline":
+                interp_psf = self.evaluate_interp2d(self.interpolator, x, y)
+            elif method == "idw":
+                nearest_x, nearest_y, nearest_dist = self.find_nearest_neighbors(x, y, idw_number_nearest)
+                if len(nearest_dist) > 1:
+                    psfs_to_avg = self.library[nearest_x, nearest_y, :, :]
+                    interp_psf = self.weighted_avg(psfs_to_avg, nearest_dist,
+                                                   idw_alpha)
+                elif len(nearest_dist) == 1:
+                    interp_psf = self.library[nearest_x, nearest_y, :, :]
+            else:
+                raise ValueError(("{} interpolation method not supported."
+                                .format(method)))
 
         # Return resulting PSF in instance of FittableImageModel (or EPSFModel)
         return self.populate_epsfmodel(interp_psf)
