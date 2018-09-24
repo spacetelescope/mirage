@@ -10,7 +10,7 @@ in the repository to create a conda environment. There are two environment files
 
 
 Create an environment using the environment file
------------------------------------------------
+------------------------------------------------
 First, be sure that your conda installation is up to date. Exit the current environment if necessary.
 
 ::
@@ -29,7 +29,7 @@ Activate the environment
 
 ::
 
-    source activate mirage
+    source activate mirage_osx
 
 
 Install Mirage
@@ -55,9 +55,10 @@ For each of these packages, clone or download the repository, cd into the top-le
 
     python setup.py install
 
+.. _reference_files:
 
 Reference Files and MIRAGE_DATA Environment Variable
-====================================================
+----------------------------------------------------
 
 There is a set of reference files that accompany Mirage, and are necessary for Mirage to function. These
 files include dark current ramps, grism throughput curves, cosmic ray and PSF libraries, as well as more standard

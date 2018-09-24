@@ -1,7 +1,7 @@
 Simulating Observations from an APT File
 ========================================
 
-The easiest way to simulate a large amount of files using Mirage is to begin with the `APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ file of a JWST proposal. Mirage contains functions that can create the collection of yaml files necessary to simulate all of the observations contained in the APT file.
+The easiest way to simulate a large amount of obsrvtions using Mirage is to begin with the `APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ file of a JWST proposal. Mirage contains functions that can (for imaging and WFSS modes) create the collection of yaml files necessary to simulate all of the observations contained in the APT file.
 
 Export XML and Poining files from APT
 -------------------------------------
@@ -169,7 +169,7 @@ With the XML, pointing, and observation list files in hand, Mirage's *yaml_gener
 	yam.reffile_setup()
 	yam.create_inputs()
 
-The outptut from this will be the collection of yaml files needed to run Mirage and create all of the observation files.
+The outptut from this will be the collection of yaml files needed to run Mirage and create all of the observation files. An :ref:`example yaml file <example_yaml>` shows all of the parameters necessary when simulating an exposure.
 
 Run Mirage
 ----------

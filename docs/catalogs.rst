@@ -42,7 +42,7 @@ The locations of sources can be specified in RA, Dec or in (x,y) pixel locations
 
 	    03:32:21.273  -27:50:23.983
 
-Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system be specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**.
+Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system by specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**.
 
 For moving targets (both those that are moving across the field of view, as well as non-sidereal targets), the default unit for velocity is arcseconds per hour. If you wish to instead use pixels per hour, then **velocity_pixels** must be added to one of the 4 top lines of the catalog.
 
@@ -100,7 +100,7 @@ The simulator software looks for the exact column names shown below when reading
 Extended Objects
 ----------------
 
-The extended object catalog lists files containing stamp images to be added to the seed image. For example, a source such as a nebula or spiral galaxy that cannot be simulated via a 2-dimensional Sersic profile can be added by placing an image of the source in a fits file. Mirage will then read in, scale, and add this image to the seed image.
+The extended object catalog lists files containing stamp images to be added to the seed image. For example, a source such as a nebula or spiral galaxy that cannot be simulated via a 2-dimensional Sersic profile can be added by placing an image of the source in a fits file. `Mirage` will then read in, scale, and add this image to the seed image.
 
 It is assumed that the fits file contains an array in the 1st (rather than 0th) extension. The array can be any size. If it is larger than the field of view of the simulated data, then it is cropped by placing the center of the extended stamp image at the specified x,y or RA, Dec location on the detector, and cropping any areas that fall outside of the detector.
 
@@ -147,7 +147,7 @@ This catalog is used when creating non-sidereal simulated exposures. In this cas
 	# Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# if the units are pixels per hour, include 'velocity pixels' in line 2 above.
 	object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     magnitude
-    pointSource  53.101      -27.801       2103840.              0.0                17.
+	pointSource  53.101      -27.801       2103840.              0.0                17.
 
 .. _moving_point_source:
 

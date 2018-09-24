@@ -23,6 +23,8 @@ For WFSS observations, multiple seed images and optional input spectra are then 
 
 The second stage is the preparation of the dark current exposure to use for the simulation. The input dark current exposure is reorganized into the requested readout pattern and number of groups and cropped to the requested subarray size. Detector non-linearity effects are then removed using the initial steps of the JWST calibration pipeline.
 
+By using actual dark current exposures from ground testing, Mirage is able to capture many effects which are specific to the instrument and detector being simulated. For example, the 1/f noise, bias structure, and hot pixel population.
+
 The final stage involves the combination of the seed image and the dark current in order to produce the output exposure. The seed image is expanded into integrations with groups that follow the requested readout pattern. Other effects are also added at this stage, including cosmic rays, interpixel capacitance (IPC) and crosstalk effects.
 
 In addition, the Mirage package includes ancillary convenience functions that allow the user to translate an `Astronomer’s Proposal Tool (APT) <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ proposal into a series of input yaml files for the simulator.
@@ -40,32 +42,23 @@ Source brightnesses are constant. There is currently no way to simulate a variab
 
 Tangent plane projection is currently not performed when translating from detector pixel x,y values to RA, Dec values. This leads to small errors in the calculated RA, Dec values. This will be corrected in a future version of MIRAGE.
 
-
-
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
 
    install.rst
    seed_images.rst
    catalogs.rst
+   dark_preparation.rst
+   observation_generator.rst
    yaml_generator.rst
+   example_yaml.rst
    quickstart.ipynb
    api.rst
 
-
-
-Intro
------
-Mirage combines several types of inputs in order to create realistic exposures.
-
-The base of the simulated data is a dark current exposure. By using actual dark current exposures from ground testing, Mirage is able to capture many effects which are specific to the instrument and detector being simulated. For example, the 1/f noise, bias structure, and hot pixel population.
-
-Mirage creates a noiseless scene, called a "seed image", containing signal from simulated astronomical sources, and adds this scene to the dark current exposure.
-
 .. admonition:: Getting Help
 
-	For help installing or running Mirage, please `open an issue on the Mirage github page <https://github.com/spacetelescope/mirage/issues>`_.
+   For help installing or running Mirage, please `open an issue on the Mirage github page <https://github.com/spacetelescope/mirage/issues>`_.
 
 Contributors
 ------------
