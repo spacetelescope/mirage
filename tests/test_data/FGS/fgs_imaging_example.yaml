@@ -11,6 +11,7 @@ Readout:
   array_name: FGS1_FULL    #Name of array (FULL, SUB160, SUB64P, etc)
   filter: N/A       #Filter of simulated data (F090W, F322W2, etc)
   pupil: N/A        #Pupil element for simulated data (CLEAR, GRISMC, etc)
+  namp: 4        #Number of amplifiers used to read out array. Only used for NIRCam/NRCA5_GRISMXX_<filter> array_names
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
   dark: $MIRAGE_DATA/fgs/darks/raw/30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal.fits #Dark current integration used as the base
@@ -49,13 +50,13 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: $TEST_DATA/fgs_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: $TEST_FGS_DATA/fgs_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/fgs/webbpsf_library/ #Path to PSF library
   psfbasename: fgs                        #Basename of the files in the psf library
   psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
   psfwfegroup: 0      #WFE realization group (0 to 4)
-  galaxyListFile: $TEST_DATA/seed_im_from_catalog_test_galaxies_catalog.list
+  galaxyListFile: $TEST_FGS_DATA/seed_im_from_catalog_test_galaxies_catalog.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
@@ -88,7 +89,7 @@ newRamp:
   linear_configfile: config
 
 Output:
-  file: V88888024002P000000000112o_GUIDER1_uncal.fits   #Output filename
+  file: jw01111024002_0112o_00001_GUIDER1_uncal.fits   #Output filename
   directory: ./   # Directory in which to place output files
   datatype: linear,raw # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
   format: DMS          #Output file format Options: DMS, SSR(not yet implemented)
@@ -96,7 +97,7 @@ Output:
   grism_source_image: False   # Create an image to be dispersed?
   unsigned: True   #Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
   dmsOrient: True    #Output in DMS orientation (vs. fitswriter orientation).
-  program_number: 42424    #Program Number
+  program_number: 01111    #Program Number
   title: Black Holes at the Restaurant at the End of the Universe   #Program title
   PI_Name: D. Adams  #Proposal PI Name
   Proposal_category: GO  #Proposal category
@@ -105,11 +106,11 @@ Output:
   observation_label: Obs1    #User-generated observation Label
   visit_number: '024'    #Visit Number
   visit_group: '01'    #Visit Group
-  visit_id: '88888024002'    #Visit ID
-  sequence_id: '2'    #Sequence ID
+  visit_id: '01111024002'    #Visit ID
+  sequence_id: '1'    #Sequence ID
   activity_id: '2o'    #Activity ID. Increment with each exposure.
   exposure_number: '00001'    #Exposure Number
-  obs_id: 'V88888024002P000000000112o'   #Observation ID number
+  obs_id: 'jw01111024002_0112o_00001'   #Observation ID number
   date_obs: '2019-10-15'  #Date of observation
   time_obs: '06:29:11.852'  #Time of observation
   obs_template: 'FGS Imaging'  #Observation template

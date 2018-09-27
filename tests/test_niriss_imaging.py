@@ -17,9 +17,9 @@ import pytest
 from mirage import imaging_simulator as im
 
 # os.environ['MIRAGE_DATA'] = ''
-os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
+os.environ['TEST_NIRISS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
-@pytest.mark.xfail
+
 def test_niriss_imaging():
     m = im.ImgSim()
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_example.yaml')

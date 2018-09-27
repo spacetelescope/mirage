@@ -101,6 +101,7 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
 
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.
@@ -154,3 +155,66 @@ def get_aperture_definition(aperture_name, instrument):
     aperture_definition = [aperture_name, detector, filt, xstart, ystart, xend,
                            yend, refpix_x, refpix_y, refpix_v2, refpix_v3]
     return aperture_definition
+
+
+def get_subarray_info(params, subarray_table):
+    """Find aperture-specific information from the subarray information config file
+
+    Parameters:
+    -----------
+    params : dict
+        Nested dictionary containing Mirage parameters.
+
+    subarray_table : astropy.table.Table
+        Table containing subarray definition information. Output from
+        read_subarray_definition_file
+
+    Returns:
+    --------
+    params : dict
+        Updated nested dictionary
+    """
+    if params['Readout']['array_name'] in subarray_table['AperName']:
+        mtch = params['Readout']['array_name'] == subarray_table['AperName']
+        namps = subarray_table['num_amps'].data[mtch][0]
+        if namps != 0:
+            params['Readout']['namp'] = namps
+        else:
+            if ((params['Readout']['namp'] == 1) or
+               (params['Readout']['namp'] == 4)):
+                print(("CAUTION: Aperture {} can be used with either "
+                       "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
+                print("or a 4-amp readout. The difference is a factor of 4 in")
+                print(("readout time. You have requested {} amps."
+                        .format(params['Readout']['namp'])))
+            else:
+                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
+                                  "'Readout':'namp' in the input yaml file to one of these values."
+                                  .format(params['Readout']['array_name'])))
+    else:
+        raise ValueError(("WARNING: subarray name {} not found in the "
+                          "subarray dictionary {}."
+                          .format(params['Readout']['array_name'],
+                                  params['Reffiles']['subarray_defs'])))
+    return params
+
+
+def read_subarray_definition_file(filename):
+    """Read in the file that contains a list of subarray names and related information
+
+    Parameters:
+    -----------
+    filename : str
+        Name of the ascii file containing the table of subarray information
+
+    Returns:
+    --------
+    data : astropy.table.Table
+        Table containing subarray information
+    """
+    try:
+        data = asc.read(filename, data_start=1, header_start=0)
+    except:
+        raise RuntimeError(("Error: could not read in subarray definitions file: {}"
+                            .format(filename)))
+    return data

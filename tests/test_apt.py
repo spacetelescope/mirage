@@ -54,7 +54,6 @@ def RunAllAPTTemplates(instrument):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-
     # Write observationlist.yaml
     observationlist_file = os.path.join(out_dir, instrument + '_observationlist.yaml')
     write_observationlist.write_yaml(xml_file, pointing_file, observationlist_file,
@@ -64,7 +63,6 @@ def RunAllAPTTemplates(instrument):
     yam = yaml_generator.SimInput()
     yam.input_xml = xml_file
     yam.pointing_file = pointing_file
-    yam.siaf = os.path.expandvars('$MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv')
     yam.output_dir = out_dir
     yam.simdata_output_dir = out_dir
     yam.observation_table = observationlist_file
@@ -79,7 +77,7 @@ def RunAllAPTTemplates(instrument):
                                                 instrument +
                                                 'Test.xml_with_yaml_parameters.csv')), \
         'Observation table not created.'
-    assert len(glob.glob(os.path.join(out_dir, 'V' + PROPOSAL_ID + '*.yaml'))) \
+    assert len(glob.glob(os.path.join(out_dir, 'jw{0:05d}*.yaml'.format(int(PROPOSAL_ID))))) \
         >= n_obs, 'Fewer yaml files created than observations'
 
     # If a reference observationlist.yaml file exists, ensure that the
@@ -110,9 +108,3 @@ def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''
     RunAllAPTTemplates('NIRCam')
-
-
-def test_trivial():
-    assert 1==1
-
-
