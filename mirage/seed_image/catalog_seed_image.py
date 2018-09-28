@@ -1601,6 +1601,8 @@ class Catalog_seed():
         source : Table
             astropy Table containing filtered list of sources
         """
+        x_comparison_operator = 'and'
+        y_comparison_operator = 'and'
         if pixflag:
             minx = 0 - delta_pixels
             maxx = 2 * delta_pixels
@@ -1613,11 +1615,35 @@ class Catalog_seed():
             miny = self.dec - delta_degrees
             maxy = self.dec + delta_degrees
 
+            # Deal with the case where the sources in the catalog span across 0 RA.
+            if maxx > 360. or minx < 0.:
+                x_comparison_operator = 'or'
+                if maxx >= 360.:
+                    maxx -= 360.
+                if minx < 0.:
+                    minx += 360.
+            # Deal with the case where the sources in the catalog span across 0 Dec.
+            if maxy > 360. or miny < 0.:
+                y_comparison_operator = 'or'
+                if maxy >= 360.:
+                    maxy -= 360.
+                if miny < 0.:
+                    miny += 360.
+
         x = source['x_or_RA']
         y = source['y_or_Dec']
-        good = ((x > minx) & (x < maxx) & (y > miny) & (y < maxy))
+        if x_comparison_operator == 'and' and y_comparison_operator == 'and':
+            good = ((x > minx) & (x < maxx) & (y > miny) & (y < maxy))
+        elif x_comparison_operator == 'or' and y_comparison_operator == 'and':
+            good = ((x > minx) | (x < maxx) & (y > miny) & (y < maxy))
+        elif x_comparison_operator == 'and' and y_comparison_operator == 'or':
+            good = ((x > minx) & (x < maxx) & (y > miny) | (y < maxy))
+        elif x_comparison_operator == 'or' and y_comparison_operator == 'or':
+            good = ((x > minx) | (x < maxx) & (y > miny) | (y < maxy))
+
         filtered_sources = source[good]
         filtered_indexes = index[good]
+
         return filtered_indexes, filtered_sources
 
     def makePointSourceImage(self, pointSources):
