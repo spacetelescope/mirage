@@ -195,5 +195,5 @@ dependencies:
     - jwxml==0.3.0
     - poppy==0.7.0
     - webbpsf==0.7.0
-    - pysiaf>=0.1.15
+    - pysiaf>=0.2.0
 

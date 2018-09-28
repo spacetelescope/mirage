@@ -188,7 +188,7 @@ dependencies:
     - ipdb==0.8
     - jwst-backgrounds==1.1.1
     - mock==1.0.1
-    - pysiaf>=0.1.15
+    - pysiaf>=0.2.0
     - terminaltables==1.2.1
     - uritemplate.py==0.3.0
     - webbpsf==0.7.0
