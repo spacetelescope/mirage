@@ -21,9 +21,11 @@ from asdf import AsdfFile
 import scipy.signal as s1
 import numpy as np
 from photutils import detect_sources
+from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
+import astropy.units as u
 import pysiaf
 
 from . import moving_targets
@@ -34,15 +36,16 @@ from ..utils import siaf_interface
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         'niriss': ["imaging","ami"],
+         'niriss': ["imaging", "ami"],
          'fgs': ["imaging"]}
-TRACKING_LIST = ['sidereal','non-sidereal']
+TRACKING_LIST = ['sidereal', 'non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
                'niriss': 'NIS',
                'fgs': 'FGS'}
 ALLOWEDOUTPUTFORMATS = ['DMS']
 WFE_OPTIONS = ['predicted', 'requirements']
 WFEGROUP_OPTIONS = np.arange(5)
+
 
 class Catalog_seed():
     def __init__(self):
@@ -1452,7 +1455,7 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        indexes, lines  = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
+        indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
 
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
@@ -1601,45 +1604,20 @@ class Catalog_seed():
         source : Table
             astropy Table containing filtered list of sources
         """
-        x_comparison_operator = 'and'
-        y_comparison_operator = 'and'
+        catalog_x = source['x_or_RA']
+        catalog_y = source['y_or_Dec']
+
         if pixflag:
             minx = 0 - delta_pixels
-            maxx = 2 * delta_pixels
+            maxx = self.output_dims[1] + delta_pixels
             miny = 0 - delta_pixels
-            maxy = 2 * delta_pixels
+            maxy = self.output_dims[0] + delta_pixels
+            good = ((catalog_x > minx) & (catalog_x < maxx) & (catalog_y > miny) & (catalog_y < maxy))
         else:
             delta_degrees = (delta_pixels * self.siaf.XSciScale) / 3600.
-            minx = self.ra - delta_degrees
-            maxx = self.ra + delta_degrees
-            miny = self.dec - delta_degrees
-            maxy = self.dec + delta_degrees
-
-            # Deal with the case where the sources in the catalog span across 0 RA.
-            if maxx > 360. or minx < 0.:
-                x_comparison_operator = 'or'
-                if maxx >= 360.:
-                    maxx -= 360.
-                if minx < 0.:
-                    minx += 360.
-            # Deal with the case where the sources in the catalog span across 0 Dec.
-            if maxy > 360. or miny < 0.:
-                y_comparison_operator = 'or'
-                if maxy >= 360.:
-                    maxy -= 360.
-                if miny < 0.:
-                    miny += 360.
-
-        x = source['x_or_RA']
-        y = source['y_or_Dec']
-        if x_comparison_operator == 'and' and y_comparison_operator == 'and':
-            good = ((x > minx) & (x < maxx) & (y > miny) & (y < maxy))
-        elif x_comparison_operator == 'or' and y_comparison_operator == 'and':
-            good = ((x > minx) | (x < maxx) & (y > miny) & (y < maxy))
-        elif x_comparison_operator == 'and' and y_comparison_operator == 'or':
-            good = ((x > minx) & (x < maxx) & (y > miny) | (y < maxy))
-        elif x_comparison_operator == 'or' and y_comparison_operator == 'or':
-            good = ((x > minx) | (x < maxx) & (y > miny) | (y < maxy))
+            reference = SkyCoord(ra=self.ra * u.deg, dec=self.dec * u.deg)
+            catalog = SkyCoord(ra=catalog_x * u.deg, dec=catalog_y * u.deg)
+            good = np.where(reference.separation(catalog) < delta_degrees * u.deg)[0]
 
         filtered_sources = source[good]
         filtered_indexes = index[good]
