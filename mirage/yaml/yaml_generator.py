@@ -870,7 +870,7 @@ class SimInput:
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         elif self.instrument.lower() == 'niriss':
             self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
-            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_files')
+            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_library')
             self.psfbasename = 'niriss'
             self.psfpixfrac = 0.1
             self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
@@ -1115,11 +1115,15 @@ class SimInput:
             f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
             f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
             # temporary tweak here to make it work with NIRISS
+            detector_label = input['detector']
+
             if instrument.lower() in ['nircam', 'wfsc']:
-                detector_label = input['detector']
+                # detector_label = input['detector']
+                f.write('  suffix: IPC_NIRCam_{}    # Suffix of library file names\n'.format(
+                    detector_label))
             elif instrument.lower() == 'niriss':
-                detector_label = 'B5'
-            f.write('  suffix: IPC_NIRCam_{}    # Suffix of library file names\n'.format(detector_label))
+                f.write('  suffix: IPC_NIRISS_{}    # Suffix of library file names\n'.format(
+                    detector_label))
             f.write('  seed: {}                 # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
