@@ -810,11 +810,7 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        #print(("Stripping out sources with initial positions that are more than 4096 pixels from"
-        #       " the detector."))
-        #print("{} sources in original input catalog {}.".format(len(mtlist), file))
-        #indexes, mtlist  = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
-        #print("{} sources in filtered input catalog.".format(len(mtlist)))
+        indexes, mtlist = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
 
         for index, entry in zip(indexes, mtlist):
             # For each object, calculate x,y or RA,Dec of initial position
@@ -1040,18 +1036,18 @@ class Catalog_seed():
                 ra_string, dec_string = self.makePos(entry0, entry1)
                 ra_number = entry0
                 dec_number = entry1
-            near_fov = self.ignore_outside_fov_source(entry0, entry1, pixel_flag, max_source_distance)
+            # near_fov = self.ignore_outside_fov_source(entry0, entry1, pixel_flag, max_source_distance)
         except:
             # if inputs can't be converted to floats, then
             # assume we have RA/Dec strings. Convert to floats.
             ra_string = input_x
             dec_string = input_y
             ra_number, dec_number = utils.parse_RA_Dec(ra_string, dec_string)
-            near_fov = self.ignore_outside_fov_source(ra_number, dec_number, pixel_flag, max_source_distance)
+            # near_fov = self.ignore_outside_fov_source(ra_number, dec_number, pixel_flag, max_source_distance)
 
         # If the source is far from the fov, return Nones
-        if not near_fov:
-            return None, None, None, None, 'none', 'none'
+        # if not near_fov:
+        #    return None, None, None, None, 'none', 'none'
 
         # Case where point source list entries are given with RA and Dec
         if not pixel_flag:
@@ -1499,14 +1495,13 @@ class Catalog_seed():
         pslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
                       "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
-        start_time = time.time()
-        times = []
-
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        # indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
+        indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
+        start_time = time.time()
+        times = []
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
             try:
@@ -1525,11 +1520,6 @@ class Catalog_seed():
                                                                               values['y_or_Dec'],
                                                                               pixelflag, 4096)
 
-                # If the source was found to be too far outside the field of view, skip it
-                # and move on to the next
-                if pixelx is None:
-                    continue
-
                 # Get the input magnitude of the point source
                 mag = float(values['magnitude'])
 
@@ -1538,7 +1528,8 @@ class Catalog_seed():
                     entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
                     # Calculate the countrate for the source
-                    countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu, photflam=self.photflam)
+                    countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
+                                                      photflam=self.photflam)
                     framecounts = countrate * self.frametime
 
                     # add the countrate and the counts per frame to pointSourceList
@@ -1613,10 +1604,25 @@ class Catalog_seed():
             maxy = self.output_dims[0] + delta_pixels
             good = ((catalog_x > minx) & (catalog_x < maxx) & (catalog_y > miny) & (catalog_y < maxy))
         else:
-            delta_degrees = (delta_pixels * self.siaf.XSciScale) / 3600.
+            delta_degrees = (delta_pixels * self.siaf.XSciScale) / 3600. * u.deg
             reference = SkyCoord(ra=self.ra * u.deg, dec=self.dec * u.deg)
-            catalog = SkyCoord(ra=catalog_x * u.deg, dec=catalog_y * u.deg)
-            good = np.where(reference.separation(catalog) < delta_degrees * u.deg)[0]
+
+            # Need to determine the units of the RA values.
+            # Dec units should always be degrees whether or not they are in decimal
+            # or DD:MM:SS or DDd:MMm:SSs formats.
+            dec_unit = u.deg
+            try:
+                # if it can be converted to a float, assume decimal degrees
+                entry0 = float(catalog_x[0])
+                ra_unit = u.deg
+            except ValueError:
+                # if it cannot be converted to a float, then the unit is 'hour'
+                ra_unit = 'hour'
+
+            # Assume that units are consisent within each column. (i.e. no mixing of
+            # 12h:23m:34.5s and 189.87463 degrees within a column)
+            catalog = SkyCoord(ra=catalog_x, dec=catalog_y, unit=(ra_unit, dec_unit))
+            good = np.where(reference.separation(catalog) < delta_degrees)[0]
 
         filtered_sources = source[good]
         filtered_indexes = index[good]
@@ -2049,6 +2055,11 @@ class Catalog_seed():
         self.maxindex = np.max(indexes)
         print("after galaxies, max index is {}".format(self.maxindex))
 
+        # Check the source list and remove any sources that are well outside the
+        # field of view of the detector. These sources cause the coordinate
+        # conversion to hang.
+        indexes, galaxylist = self.remove_outside_fov_sources(indexes, galaxylist, pixelflag, 4096)
+
         # Loop over galaxy sources
         for index, source in zip(indexes, galaxylist):
 
@@ -2071,10 +2082,6 @@ class Catalog_seed():
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(source['x_or_RA'],
                                                                           source['y_or_Dec'],
                                                                           pixelflag, 4096)
-            # If the source is too far outside the field of view, skip it and move on to the
-            # next one
-            if pixelx is None:
-                continue
 
             # only keep the source if the peak will fall within the subarray
             if pixely > outminy and pixely < outmaxy and pixelx > outminx and pixelx < outmaxx:
@@ -2381,10 +2388,6 @@ class Catalog_seed():
                 pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                               values['y_or_Dec'],
                                                                               pixelflag, 4096)
-                # If the source is too far outside the field of view, skip it and move on to the next
-                if pixelx is None:
-                    continue
-
                 # Get the input magnitude
                 try:
                     mag = float(values['magnitude'])
