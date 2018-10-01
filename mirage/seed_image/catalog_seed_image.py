@@ -810,19 +810,23 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        print(("Stripping out sources with initial positions that are more than 4096 pixels from"
-               " the detector."))
-        print("{} sources in original input catalog {}.".format(len(mtlist), file))
-        indexes, mtlist  = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
-        print("{} sources in filtered input catalog.".format(len(mtlist)))
+        #print(("Stripping out sources with initial positions that are more than 4096 pixels from"
+        #       " the detector."))
+        #print("{} sources in original input catalog {}.".format(len(mtlist), file))
+        #indexes, mtlist  = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
+        #print("{} sources in filtered input catalog.".format(len(mtlist)))
 
         for index, entry in zip(indexes, mtlist):
             # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
-                entry['x_or_RA'], entry['y_or_Dec'], pixelFlag)
+                entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
+
+            # If the source is far from the FOV, skip it and move on to the next
+            if pixelx is None:
+                continue
 
             # Now generate a list of x,y position in each frame
-            if pixvelflag == False:
+            if pixvelflag is False:
                 # Calculate the RA,Dec in each frame
                 # input velocities are arcsec/hour. ra/dec are in units of degrees,
                 # so divide velocities by 3600^2.
@@ -833,7 +837,7 @@ class Catalog_seed():
                 y_frames = []
                 for in_ra, in_dec in zip(ra_frames, dec_frames):
                     # Calculate the x,y position at each frame
-                    px, py, pra, pdec, pra_str, pdec_str = self.get_positions(in_ra, in_dec, False)
+                    px, py, pra, pdec, pra_str, pdec_str = self.get_positions(in_ra, in_dec, False, 4096)
                     x_frames.append(px)
                     y_frames.append(py)
                 x_frames = np.array(x_frames)
@@ -984,40 +988,86 @@ class Catalog_seed():
             status = 'off'
         return status
 
-    def get_positions(self, inx, iny, pixelflag):
-        #input a row containing x,y or ra,dec values, and figure out
-        #x,y, RA, Dec, and RA string and Dec string
+    def get_positions(self, input_x, input_y, pixel_flag, max_source_distance):
+        """ Given an input position ( (x,y) or (RA,Dec) ) for a source, calculate
+        the corresponding detector (x,y), RA, Dec, and provide RA and Dec strings.
+
+        Parameters
+        ----------
+
+        input_x : str
+            Detector x coordinate or RA of source. RA can be in decimal degrees or
+            (e.g 10:23:34.2 or 10h23m34.2s)
+
+        input_y : str
+            Detector y coordinate or Dec of source. Dec can be in decimal degrees
+            or (e.g. 10d:23m:34.2s)
+
+        pixel_flag : bool
+            True if input_x and input_y are in units of pixels. False if they are
+            in the RA, Dec coordinate system.
+
+        max_source_distance : float
+            Maximum number of pixels from the aperture's reference location to keep
+            a source. Sources very far off the detector will cause the calculation of
+            RA, Dec to hang.
+
+        Returns
+        -------
+
+        pixelx : float
+            Detector x coordinate of source
+
+        pixely : float
+            Detector y coordinate of source
+
+        ra : float
+            RA of source (degrees)
+
+        dec : float
+            Dec of source (degrees)
+
+        ra_string : str
+            String representation of RA
+
+        dec_string : str
+            String representation of Dec
+        """
         try:
-            entry0 = float(inx)
-            entry1 = float(iny)
-            if not pixelflag:
-                ra_str, dec_str = self.makePos(entry0, entry1)
-                ra = entry0
-                dec = entry1
+            entry0 = float(input_x)
+            entry1 = float(input_y)
+            if not pixel_flag:
+                ra_string, dec_string = self.makePos(entry0, entry1)
+                ra_number = entry0
+                dec_number = entry1
+            near_fov = self.ignore_outside_fov_source(entry0, entry1, pixel_flag, max_source_distance)
         except:
             # if inputs can't be converted to floats, then
             # assume we have RA/Dec strings. Convert to floats.
-            ra_str = inx
-            dec_str = iny
-            ra, dec = self.parseRADec(ra_str, dec_str)
+            ra_string = input_x
+            dec_string = input_y
+            ra_number, dec_number = utils.parse_RA_Dec(ra_string, dec_string)
+            near_fov = self.ignore_outside_fov_source(ra_number, dec_number, pixel_flag, max_source_distance)
+
+        # If the source is far from the fov, return Nones
+        if not near_fov:
+            return None, None, None, None, 'none', 'none'
 
         # Case where point source list entries are given with RA and Dec
-        if not pixelflag:
+        if not pixel_flag:
 
             # If distortion is to be included - either with or without the full set of coordinate
             # translation coefficients
-            pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
+            pixel_x, pixel_y = self.RADecToXY_astrometric(ra_number, dec_number)
 
         else:
             # Case where the point source list entry locations are given in units of pixels
             # In this case we have the source position, and RA/Dec are calculated only so
             # they can be written out into the output source list file.
-
-            pixelx = entry0
-            pixely = entry1
-
-            ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely)
-        return pixelx, pixely, ra, dec, ra_str, dec_str
+            pixel_x = entry0
+            pixel_y = entry1
+            ra_number, dec_number, ra_string, dec_string = self.XYToRADec(pixel_x, pixel_y)
+        return pixel_x, pixel_y, ra_number, dec_number, ra_string, dec_string
 
     def nonsidereal_CRImage(self, file):
         """
@@ -1455,15 +1505,11 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
+        # indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
 
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
             try:
-            #line below (if 1>0) used to keep the block
-            # of code below at correct indent for the try: above
-            # the try: is commented out for code testing.
-            #if 1 > 0:
                 # Warn user of how long this calcuation might take...
                 if index < 100:
                     elapsed_time = time.time() - start_time
@@ -1475,41 +1521,14 @@ class Catalog_seed():
                     print(("Expected time to process {} sources: {:.2f} seconds "
                            "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
 
-                try:
-                    entry0 = float(values['x_or_RA'])
-                    entry1 = float(values['y_or_Dec'])
-                    if not pixelflag:
-                        ra_str, dec_str = self.makePos(entry0, entry1)
-                        ra = entry0
-                        dec = entry1
-                except:
-                    # if inputs can't be converted to floats, then
-                    # assume we have RA/Dec strings. Convert to floats.
-                    ra_str = values['x_or_RA']
-                    dec_str = values['y_or_Dec']
-                    ra, dec = self.parseRADec(ra_str, dec_str)
+                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                              values['y_or_Dec'],
+                                                                              pixelflag, 4096)
 
-                # Case where point source list entries are given with RA and Dec
-                if not pixelflag:
-
-                    # Same function call regardless of wh<ether distortion file is provided or not
-                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
-
-                else:
-                    # Case where the point source list entry locations are given in units of pixels
-                    # In this case we have the source position, and RA/Dec are calculated only so
-                    # they can be written out into the output source list file.
-
-                    # Assume that the input x and y values are coordinate values
-                    # WITHIN THE SPECIFIED SUBARRAY. So for example, a source in the file
-                    # at 0, 0 when you are making a SUB160 ramp will fall on the lower left
-                    # corner of the SUB160 subarray, NOT the lower left corner of the full
-                    # frame.
-
-                    pixelx = entry0
-                    pixely = entry1
-
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely)
+                # If the source was found to be too far outside the field of view, skip it
+                # and move on to the next
+                if pixelx is None:
+                    continue
 
                 # Get the input magnitude of the point source
                 mag = float(values['magnitude'])
@@ -1517,28 +1536,6 @@ class Catalog_seed():
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
                     # set up an entry for the output table
                     entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
-
-                    # translate magnitudes to countrate
-                    # scale = 10.**(0.4*(15.0-mag))
-
-                    # get the countrate that corresponds to a 15th magnitude star for this filter
-                    # if self.params['Readout']['pupil'][0].upper() == 'F':
-                    #    usefilt = 'pupil'
-                    # else:
-                    #    usefilt = 'filter'
-                    # cval = self.countvalues[self.params['Readout'][usefilt]]
-                    #
-                    # DEAL WITH THIS LATER, ONCE PYSYNPHOT IS INCLUDED WITH PIPELINE DIST?
-                    # if cval == 0:
-                    #    print("Countrate value for {} is zero in {}.".format(self.params['Readout'][usefilt], self.parameters['phot_file']))
-                    #    print("Eventually attempting to calculate value using pysynphot.")
-                    #    print("but pysynphot is not present in jwst build 6, so pushing off to later...")
-                    #    sys.exit()
-                    #    cval = self.findCountrate(self.params['Readout'][usefilt])
-                    #
-                    # translate to counts in single frame at requested array size
-                    # framecounts = scale*cval*self.frametime
-                    # countrate = scale*cval
 
                     # Calculate the countrate for the source
                     countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu, photflam=self.photflam)
@@ -1577,6 +1574,8 @@ class Catalog_seed():
         """Filter out entries in the source catalog that are located well outside the field of
         view of the detector. This can be a fairly rough cut. We just need to remove sources
         that are very far from the detector.
+
+        CURRENTLY NOT USED
 
         Parameters:
         -----------
@@ -1851,32 +1850,6 @@ class Catalog_seed():
         delta2 = delta2.replace(" ", "0")
         return alpha2, delta2
 
-    def parseRADec(self, rastr, decstr):
-        # convert the input RA and Dec strings to floats
-        try:
-            rastr = rastr.lower()
-            rastr = rastr.replace("h", ":")
-            rastr = rastr.replace("m", ":")
-            rastr = rastr.replace("s", "")
-            decstr = decstr.lower()
-            decstr = decstr.replace("d", ":")
-            decstr = decstr.replace("m", ":")
-            decstr = decstr.replace("s", "")
-
-            values = rastr.split(":")
-            ra0 = 15.*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
-
-            values = decstr.split(":")
-            if "-" in values[0]:
-                sign = -1
-                values[0] = values[0].replace("-", " ")
-            else:
-                sign =  +1
-            dec0 = sign*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
-            return ra0, dec0
-        except:
-            raise ValueError("Error parsing RA, Dec strings: {} {}".format(rastr, decstr))
-
     def RADecToXY_astrometric(self, ra, dec):
         """Translate backwards, RA, Dec to V2, V3. If a distortion reference file is
         provided, use that. Otherwise fall back to pysiaf.
@@ -2080,7 +2053,7 @@ class Catalog_seed():
         for index, source in zip(indexes, galaxylist):
 
             # If galaxy radii are given in units of arcseconds, translate to pixels
-            if radiusflag == False:
+            if radiusflag is False:
                 source['radius'] /= self.siaf.XSciScale
 
             # how many pixels beyond the nominal subarray edges can a source be located and
@@ -2095,40 +2068,13 @@ class Catalog_seed():
             outminx = minx - edgex
             outmaxx = maxx + edgex
 
-            try:
-                entry0 = float(source['x_or_RA'])
-                entry1 = float(source['y_or_Dec'])
-                if not pixelflag:
-                    ra_str, dec_str = self.makePos(entry0, entry1)
-                    ra = entry0
-                    dec = entry1
-            except:
-                # if inputs can't be converted to floats, then
-                # assume we have RA/Dec strings. Convert to floats.
-                ra_str = source['x_or_RA']
-                dec_str = source['y_or_Dec']
-                ra, dec = self.parseRADec(ra_str, dec_str)
-
-            # case where point source list entries are given with RA and Dec
-            if not pixelflag:
-
-                pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
-
-            else:
-                # case where the point source list entry locations are given in units of pixels
-                # In this case we have the source position, and RA/Dec are calculated only so
-                # they can be written out into the output source list file.
-
-                # Assume that the input x and y values are coordinate values
-                # WITHIN THE SPECIFIED SUBARRAY. So for example, a source in the file
-                # at 0, 0 when you are making a SUB160 ramp will fall on the lower left
-                # corner of the SUB160 subarray, NOT the lower left corner of the full
-                # frame.
-
-                pixelx = entry0
-                pixely = entry1
-
-                ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely)
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(source['x_or_RA'],
+                                                                          source['y_or_Dec'],
+                                                                          pixelflag, 4096)
+            # If the source is too far outside the field of view, skip it and move on to the
+            # next one
+            if pixelx is None:
+                continue
 
             # only keep the source if the peak will fall within the subarray
             if pixely > outminy and pixely < outmaxy and pixelx > outminx and pixelx < outmaxx:
@@ -2141,28 +2087,6 @@ class Catalog_seed():
                 # append the mag and pixel position to the list of ra, dec
                 mag = float(source['magnitude'])
                 entry.append(mag)
-
-                # translate magnitudes to countrate
-                # scale = 10.**(0.4*(15.0-mag))
-
-                # get the countrate that corresponds to a 15th magnitude star for this filter
-                # if self.params['Readout']['pupil'][0].upper() == 'F':
-                #    usefilt = 'pupil'
-                # else:
-                #    usefilt = 'filter'
-                # cval = self.countvalues[self.params['Readout'][usefilt]]
-
-                # DEAL WITH THIS LATER, ONCE PYSYNPHOT IS INCLUDED WITH PIPELINE DIST?
-                # if cval == 0:
-                #    print("Countrate value for {} is zero in {}.".format(self.params['Readout'][usefilt], self.parameters['phot_file']))
-                #    print("Eventually attempting to calculate value using pysynphot.")
-                #    print("but pysynphot is not present in jwst build 6, so pushing off to later...")
-                #    sys.exit()
-                #    cval = self.findCountrate(self.params['Readout'][usefilt])
-
-                # translate to counts in single frame at requested array size
-                # framecounts = scale*cval*self.frametime
-                # rate = scale*cval
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
                 rate = self.mag_to_countrate(magsystem, mag, photfnu=self.photfnu, photflam=self.photflam)
@@ -2454,49 +2378,17 @@ class Catalog_seed():
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
             try:
-            #line below (if 1>0) used to keep the block of code below at correct indent for the try: above
-            #the try: is commented out for code testing.
-            #if 1>0:
-                try:
-                    entry0 = float(values['x_or_RA'])
-                    entry1 = float(values['y_or_Dec'])
-
-                    if not pixelflag:
-                        ra_str, dec_str = self.makePos(entry0, entry1)
-                        ra = entry0
-                        dec = entry1
-                except:
-                    # if inputs can't be converted to floats, then
-                    # assume we have RA/Dec strings. Convert to floats.
-                    ra_str = values['x_or_RA']
-                    dec_str = values['y_or_Dec']
-                    ra, dec = self.parseRADec(ra_str, dec_str)
-
-                # Case where point source list entries are given with RA and Dec
-                if not pixelflag:
-
-                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec)
-
-                else:
-                    # Case where the point source list entry locations are given in units of pixels
-                    # In this case we have the source position, and RA/Dec are calculated only so
-                    # they can be written out into the output source list file.
-
-                    # Assume that the input x and y values are coordinate values
-                    # WITHIN THE SPECIFIED SUBARRAY. So for example, a source in the file
-                    # at 0, 0 when you are making a SUB160 ramp will fall on the lower left
-                    # corner of the SUB160 subarray, NOT the lower left corner of the full
-                    # frame.
-
-                    pixelx = entry0
-                    pixely = entry1
-
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely)
+                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                              values['y_or_Dec'],
+                                                                              pixelflag, 4096)
+                # If the source is too far outside the field of view, skip it and move on to the next
+                if pixelx is None:
+                    continue
 
                 # Get the input magnitude
                 try:
                     mag = float(values['magnitude'])
-                except:
+                except ValueError:
                     mag = None
 
                 # Now find out how large the extended source image is, so we
@@ -2622,6 +2514,46 @@ class Catalog_seed():
             print("The extended source image option is being turned off")
 
         return extSourceList, all_stamps
+
+    def ignore_outside_fov_source(self, catalog_x, catalog_y, pixel_flag, max_pixel_distance):
+        """Check to see if a source is far outside the field of view of the detector
+
+        Parameters
+        ----------
+
+
+        Returns
+        -------
+
+        inside : bool
+            True if the source is within (or close) to the field of view
+            False if the source is farther than max_pixel_distnace from the fov
+        """
+        if pixel_flag:
+            # If coordinates are in pixels, filtered sources must be within max_pixel_distance of
+            # the center of the detector
+            center_x = int(self.output_dims[1] // 2)
+            center_y = int(self.output_dims[0] // 2)
+            minx = center_x - max_pixel_distance
+            maxx = center_x + max_pixel_distance
+            miny = center_y - max_pixel_distance
+            maxy = center_y + max_pixel_distance
+            if ((catalog_x > minx) & (catalog_x < maxx) & (catalog_y > miny) & (catalog_y < maxy)):
+                inside = True
+            else:
+                inside = False
+        else:
+            # If coordinates are RA, Dec, filtered sources must be within delta_degress of the
+            # reference location. Note that this is usually the center of the detector, but not always.
+            delta_degrees = (max_pixel_distance * self.siaf.XSciScale) / 3600.
+            reference_location = SkyCoord(ra=self.ra * u.deg, dec=self.dec * u.deg)
+            catalog = SkyCoord(ra=catalog_x * u.deg, dec=catalog_y * u.deg)
+            good = np.where(reference_location.separation(catalog) < delta_degrees * u.deg)[0]
+            if reference_location.separation(catalog) < (delta_degrees * u.deg):
+                inside = True
+            else:
+                inside = False
+        return inside
 
     def makeExtendedSourceImage(self, extSources, extStamps):
         dims = np.array(self.nominal_dims)
@@ -2972,8 +2904,8 @@ class Catalog_seed():
 
             self.dec = float(self.params['Telescope']['dec'])
         except:
-            self.ra, self.dec = self.parseRADec(self.params['Telescope']['ra'],
-                                                self.params['Telescope']['dec'])
+            self.ra, self.dec = utils.parse_RA_Dec(self.params['Telescope']['ra'],
+                                                   self.params['Telescope']['dec'])
 
         if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or \
            self.ra is None or self.dec is None:
