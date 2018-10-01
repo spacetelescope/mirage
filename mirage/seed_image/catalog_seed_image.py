@@ -1036,18 +1036,12 @@ class Catalog_seed():
                 ra_string, dec_string = self.makePos(entry0, entry1)
                 ra_number = entry0
                 dec_number = entry1
-            # near_fov = self.ignore_outside_fov_source(entry0, entry1, pixel_flag, max_source_distance)
         except:
             # if inputs can't be converted to floats, then
             # assume we have RA/Dec strings. Convert to floats.
             ra_string = input_x
             dec_string = input_y
             ra_number, dec_number = utils.parse_RA_Dec(ra_string, dec_string)
-            # near_fov = self.ignore_outside_fov_source(ra_number, dec_number, pixel_flag, max_source_distance)
-
-        # If the source is far from the fov, return Nones
-        # if not near_fov:
-        #    return None, None, None, None, 'none', 'none'
 
         # Case where point source list entries are given with RA and Dec
         if not pixel_flag:
@@ -2519,46 +2513,6 @@ class Catalog_seed():
             print("The extended source image option is being turned off")
 
         return extSourceList, all_stamps
-
-    def ignore_outside_fov_source(self, catalog_x, catalog_y, pixel_flag, max_pixel_distance):
-        """Check to see if a source is far outside the field of view of the detector
-
-        Parameters
-        ----------
-
-
-        Returns
-        -------
-
-        inside : bool
-            True if the source is within (or close) to the field of view
-            False if the source is farther than max_pixel_distnace from the fov
-        """
-        if pixel_flag:
-            # If coordinates are in pixels, filtered sources must be within max_pixel_distance of
-            # the center of the detector
-            center_x = int(self.output_dims[1] // 2)
-            center_y = int(self.output_dims[0] // 2)
-            minx = center_x - max_pixel_distance
-            maxx = center_x + max_pixel_distance
-            miny = center_y - max_pixel_distance
-            maxy = center_y + max_pixel_distance
-            if ((catalog_x > minx) & (catalog_x < maxx) & (catalog_y > miny) & (catalog_y < maxy)):
-                inside = True
-            else:
-                inside = False
-        else:
-            # If coordinates are RA, Dec, filtered sources must be within delta_degress of the
-            # reference location. Note that this is usually the center of the detector, but not always.
-            delta_degrees = (max_pixel_distance * self.siaf.XSciScale) / 3600.
-            reference_location = SkyCoord(ra=self.ra * u.deg, dec=self.dec * u.deg)
-            catalog = SkyCoord(ra=catalog_x * u.deg, dec=catalog_y * u.deg)
-            good = np.where(reference_location.separation(catalog) < delta_degrees * u.deg)[0]
-            if reference_location.separation(catalog) < (delta_degrees * u.deg):
-                inside = True
-            else:
-                inside = False
-        return inside
 
     def makeExtendedSourceImage(self, extSources, extStamps):
         dims = np.array(self.nominal_dims)
