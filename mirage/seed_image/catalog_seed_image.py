@@ -817,10 +817,6 @@ class Catalog_seed():
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
                 entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
 
-            # If the source is far from the FOV, skip it and move on to the next
-            if pixelx is None:
-                continue
-
             # Now generate a list of x,y position in each frame
             if pixvelflag is False:
                 # Calculate the RA,Dec in each frame
