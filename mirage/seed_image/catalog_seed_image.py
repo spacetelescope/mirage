@@ -1502,19 +1502,21 @@ class Catalog_seed():
 
         start_time = time.time()
         times = []
+        time_reported = False
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
             try:
                 # Warn user of how long this calcuation might take...
-                if index < 100:
+                if len(times) < 100:
                     elapsed_time = time.time() - start_time
                     times.append(elapsed_time)
                     start_time = time.time()
-                elif index == 100:
+                elif len(times) == 100 and time_reported is False:
                     avg_time = np.mean(times)
                     total_time = len(indexes) * avg_time
                     print(("Expected time to process {} sources: {:.2f} seconds "
                            "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                    time_reported = True
 
                 pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                               values['y_or_Dec'],
