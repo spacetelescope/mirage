@@ -138,7 +138,7 @@ class Catalog_seed():
             filt = self.params['Readout']['filter']
         else:
             filt = self.params['Readout']['pupil']
-        self.psf_library = PSFCollection(self.params['Inst']['instrument'], self._detector, filt,
+        self.psf_library = PSFCollection(self.params['Inst']['instrument'], self.detector, filt,
                                          self.params['simSignals']['psfpath'])
 
         # For imaging mode, generate the countrate image using the catalogs
@@ -2939,6 +2939,7 @@ class Catalog_seed():
             # detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
             # module = detector[0]
             detector = aper_name.split('_')[0]
+            self.detector = detector
             shortdetector = detector
             if self.params["Inst"]["instrument"].lower() == 'nircam':
                 module = detector[3]
