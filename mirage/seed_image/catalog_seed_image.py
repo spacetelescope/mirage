@@ -431,7 +431,7 @@ class Catalog_seed():
             yd, xd = input1.shape
             numints = self.params['Readout']['nint']
             num_frames = self.params['Readout']['ngroup'] * \
-                         (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+                (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print("Countrate image of synthetic signals being converted to "
                   "RAPID/NISRAPID integration with {} frames.".format(num_frames))
             input1_ramp = np.zeros((numints, num_frames, yd, xd))
@@ -468,7 +468,6 @@ class Catalog_seed():
             # print("RA velocity of {} and dec_val of {}".format(ra_vel, dec_vel))
 
         if self.runStep['movingTargets']:
-            #print('Starting moving targets for point sources!')
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],
                                                                        'pointSource',
                                                                        MT_tracking=tracking,
@@ -477,12 +476,10 @@ class Catalog_seed():
             # Multiply by pixel area map since these sources are trailed across detector
             mov_targs_ptsrc *= self.pam
             mov_targs_ramps.append(mov_targs_ptsrc)
-            #print("Moving target segmap, min, max {}, {}".format(np.min(mt_ptsrc_segmap), np.max(mt_ptsrc_segmap)))
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
         # moving target using a sersic object
         if self.runStep['movingTargetsSersic']:
-            #print("Moving targets, sersic!")
             mov_targs_sersic, mt_galaxy_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],
                                                                          'galaxies',
                                                                          MT_tracking=tracking,
@@ -498,7 +495,6 @@ class Catalog_seed():
 
         # moving target using an extended object
         if self.runStep['movingTargetsExtended']:
-            #print("Extended moving targets!!!")
             mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],
                                                                    'extended',
                                                                    MT_tracking=tracking,
@@ -518,7 +514,7 @@ class Catalog_seed():
             mov_targs_integration = mov_targs_ramps[0]
             if len(mov_targs_ramps) > 1:
                 for i in range(1, len(mov_targs_ramps)):
-                    mov_targs_integration += mov_targs_ramps[0]
+                    mov_targs_integration += mov_targs_ramps[i]
         return mov_targs_integration, mov_targs_segmap
 
     def calcCoordAdjust(self):
@@ -532,8 +528,12 @@ class Catalog_seed():
         if self.params['Output']['grism_source_image']:
             self.coord_adjust['x'] = self.grism_direct_factor
             self.coord_adjust['y'] = self.grism_direct_factor
-            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[2] - self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[3] - self.subarray_bounds[1] + 1) / 2.)
+            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[2] -
+                                                   self.subarray_bounds[0] + 1) / 2.)
+            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[3] -
+                                                   self.subarray_bounds[1] + 1) / 2.)
 
     def non_sidereal_seed(self):
         """
