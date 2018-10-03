@@ -207,5 +207,6 @@ dependencies:
     - openpyxl==2.5.8
     - poppy==0.7.0
     - pysiaf==0.2.2
+    - relic==1.1.2
     - webbpsf==0.7.0
 
