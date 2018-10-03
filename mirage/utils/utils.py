@@ -186,7 +186,7 @@ def get_subarray_info(params, subarray_table):
                        "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
                 print("or a 4-amp readout. The difference is a factor of 4 in")
                 print(("readout time. You have requested {} amps."
-                        .format(params['Readout']['namp'])))
+                       .format(params['Readout']['namp'])))
             else:
                 raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
                                   "'Readout':'namp' in the input yaml file to one of these values."
@@ -197,6 +197,57 @@ def get_subarray_info(params, subarray_table):
                           .format(params['Readout']['array_name'],
                                   params['Reffiles']['subarray_defs'])))
     return params
+
+
+def parse_RA_Dec(ra_string, dec_string):
+    """Convert input RA and Dec strings to floats
+
+    Parameters
+    ----------
+
+    ra_string : str
+        String containing RA information. Can be in the form 10:12:13.2
+        or 10h12m13.2s
+
+    dec_string : str
+        String containing Declination information. Can be in the form
+        10:12:2.4 or 10d12m2.4s
+
+    Returns
+    -------
+
+    ra_degrees : float
+        Right Ascention value in degrees
+
+    dec_degrees : float
+        Declination value in degrees
+    """
+    try:
+        ra_string = ra_string.lower()
+        ra_string = ra_string.replace("h", ":")
+        ra_string = ra_string.replace("m", ":")
+        ra_string = ra_string.replace("s", "")
+        ra_string = re.sub(r"\s+", "", ra_string)
+        dec_string = dec_string.lower()
+        dec_string = dec_string.replace("d", ":")
+        dec_string = dec_string.replace("m", ":")
+        dec_string = dec_string.replace("s", "")
+        dec_string = re.sub(r"\s+", "", dec_string)
+
+        values = ra_string.split(":")
+        ra_degrees = 15.*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
+
+        values = dec_string.split(":")
+        if "-" in values[0]:
+            sign = -1
+            values[0] = values[0].replace("-", "")
+        else:
+            sign = +1
+
+        dec_degrees = sign*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
+        return ra_degrees, dec_degrees
+    except:
+        raise ValueError("Error parsing RA, Dec strings: {} {}".format(ra_string, dec_string))
 
 
 def read_subarray_definition_file(filename):
