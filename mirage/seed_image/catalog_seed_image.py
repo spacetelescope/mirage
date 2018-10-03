@@ -1846,6 +1846,13 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
+        # The following fixes a format issue; it is not clear why the signa
+        # can have spaces around it in view of the above format string, but
+        # that is what happens.
+        alpha2 = alpha2.replace("0+0",'+')
+        delta2 = alpha2.replace("0+0",'+')
+        alpha2 = alpha2.replace("0-0",'-')
+        delta2 = alpha2.replace("0-0",'-')
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
@@ -2141,8 +2148,10 @@ class Catalog_seed():
         # Scale such that the total number of counts in the galaxy matches the input
         summedcounts = np.sum(img)
         if summedcounts == 0:
-            print('in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
-        factor = totalcounts / summedcounts
+            print('Zero counts in image in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
+            factor = 0.
+        else:
+            factor = totalcounts / summedcounts
         img = img * factor
 
         # Crop image down such that it contains 99.95% of the total signal
@@ -2167,6 +2176,11 @@ class Catalog_seed():
         cropped image
         """
         totsignal = np.sum(stamp)
+        # In the case of no signal, return the original stamp image.
+        # This can happen for some Sersic profile parameters when the galaxy
+        # is very small compared to the pixel size.
+        if totsignal == 0.:
+            return stamp
         yd, xd = stamp.shape
         mid = np.int(xd / 2)
         for rad in range(mid):
