@@ -21,8 +21,8 @@ import numpy as np
 from ..apt import read_apt_xml
 
 
-def write_yaml(xml_file, pointing_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=None):
-    """Write observation list file (required miareg input) on the basis of APT files.
+def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=None):
+    """Write observation list file (required mirage input) on the basis of APT files.
 
     Parameters
     ----------
@@ -73,10 +73,20 @@ def write_yaml(xml_file, pointing_file, yaml_file, catalog_files, ps_cat_sw=None
 
     # Read in filters from APT .xml file
     readxml_obj = read_apt_xml.ReadAPTXML()
+
+    # TODO: this is a dictionary, so it should be renamed
     xml_table = readxml_obj.read_xml(xml_file)
 
     # array of unique instrument names
-    used_instruments =  np.unique(instruments)
+    # used_instruments = np.unique(instruments)
+    used_instruments = np.unique(xml_table['Instrument'])
+
+
+    print('Summary of dictionary extracted from {}'.format(xml_file))
+    for key in xml_table.keys():
+        print('{:<25}: number of elements is {:>5}'.format(key, len(xml_table[key])))
+    # 1/0
+
 
     if len(used_instruments) > 1:
         # Several instruments used within one APT file, e.g. parallels
@@ -148,6 +158,11 @@ def write_yaml(xml_file, pointing_file, yaml_file, catalog_files, ps_cat_sw=None
                     # At some point could use the tile_nums to fix this
                 filters[i_obs_all] = filters_all[current_obs_indices]
                 # lw_filters[i_obs_all] = lw_filters_all[current_obs_indices]
+
+            # if only one catalog is provided, that catalog will be used for all observations
+            if len(catalog_files) == 1:
+                catalog_files = catalog_files*len(observations)
+
 
             # Check that all parameters have the right length
             all_param_lengths = [len(catalog_files), len(filters), len(observations),
@@ -240,9 +255,9 @@ def write_yaml(xml_file, pointing_file, yaml_file, catalog_files, ps_cat_sw=None
     print('\nSuccessfully wrote {} observations to {}'.format(num_obs, yaml_file))
 
 
-if __name__ == '__main__':
-    xml_file = '../OTECommissioning/OTE01/OTE01-1134.xml'
-    pointing_file = '../OTECommissioning/OTE01/OTE01-1134.pointing'
-    yaml_file = 'test.yaml'
-
-    write_yaml(xml_file, pointing_file, yaml_file)
+# if __name__ == '__main__':
+#     xml_file = '../OTECommissioning/OTE01/OTE01-1134.xml'
+#     pointing_file = '../OTECommissioning/OTE01/OTE01-1134.pointing'
+#     yaml_file = 'test.yaml'
+#
+#     write_yaml(xml_file, pointing_file, yaml_file)

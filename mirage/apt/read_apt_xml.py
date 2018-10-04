@@ -1,5 +1,7 @@
 # ! /usr/bin/env python
 
+
+import copy
 import os
 import re
 from collections import OrderedDict
@@ -11,6 +13,7 @@ import numpy as np
 APT_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 PACKAGE_DIR = os.path.dirname(APT_DIR)
 
+flatten_list = lambda l: [item for sublist in l for item in sublist]
 
 class ReadAPTXML():
     """Class to open and parse XML files from APT. Can read templates for
@@ -40,9 +43,13 @@ class ReadAPTXML():
         ObsParams_keys = ['Module', 'Subarray', 'Instrument',
                           'PrimaryDitherType', 'PrimaryDithers', 'SubpixelPositions',
                           'SubpixelDitherType', 'CoordinatedParallel',
-                          'ObservationID', 'TileNumber', 'APTTemplate']
+                          'ObservationID', 'TileNumber', 'APTTemplate',
+                          'ApertureOverride'
+                          ]
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
-                             'ReadoutPattern', 'Groups', 'Integrations']
+                             'ReadoutPattern', 'Groups', 'Integrations',
+                             'FilterWheel', 'PupilWheel' # for NIRISS
+                             ]
         OtherParams_keys = ['Mode', 'Grism']
 
         self.APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
@@ -52,7 +59,7 @@ class ReadAPTXML():
             self.APTObservationParams[key] = []
 
     def read_xml(self, infile):
-        """Read in the .xml file from APT, and output dictionary of parameters
+        """Read in the .xml file from APT, and output dictionary of parameters.
 
         Arguments
         ---------
@@ -136,6 +143,7 @@ class ReadAPTXML():
                 observations.append(o)
                 i_observations.append(i_obs)
 
+
         # Get parameters out!
         for i_obs, obs in zip(i_observations, observations):
 
@@ -146,6 +154,7 @@ class ReadAPTXML():
             # Determine what template is used for the observation
             template = obs.find(self.apt + 'Template')[0]
             template_name = etree.QName(template).localname
+
 
             # Are all the templates in the XML file something that we can handle?
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
@@ -168,6 +177,8 @@ class ReadAPTXML():
             # Get coordinated parallel
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
 
+
+
             # Determine pointing offset?
             offset = obs.find('.//' + self.apt + 'Offset')
             try:
@@ -183,16 +194,37 @@ class ReadAPTXML():
             prop_params = [pi_name, prop_id, prop_title, prop_category,
                            science_category, coordparallel, i_obs]
 
-            proposal_parameter_dictionary = {'PI_Name': pi_name, 'ProposalID': prop_id, 'Title': prop_title, 'Proposal_category': prop_category, 'Science_category': science_category, 'CoordinatedParallel': coordparallel, 'ObservationID': i_obs}
+            proposal_parameter_dictionary = {'PI_Name': pi_name, 'ProposalID': prop_id,
+                                             'Title': prop_title,
+                                             'Proposal_category': prop_category,
+                                             'Science_category': science_category,
+                                             'CoordinatedParallel': coordparallel,
+                                             'ObservationID': i_obs}
 
-
+            # 1/0
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # If template is NircamImaging or NircamEngineeringImaging
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 self.read_imaging_template(template, template_name, obs, prop_params)
 
             elif template_name in ['NirissExternalCalibration']:
-                self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary)
+                exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary)
+                self.APTObservationParams = self.append_dictionary(self.APTObservationParams, exposures_dictionary)
+
+                if coordparallel == 'true':
+                    # Determine what template is used for the parallel observation
+                    template = obs.find(self.apt + 'FirstCoordinatedTemplate')[0]
+                    template_name = etree.QName(template).localname
+                    exposures_dictionary = self.read_generic_imaging_template(template,
+                                                                              template_name, obs,
+                                                                              proposal_parameter_dictionary,
+                                                                              parallel=True, verbose=True)
+                    self.APTObservationParams = self.append_dictionary(self.APTObservationParams,
+                                                                       exposures_dictionary)
+                    # print(exposures_dictionary)
+                    # 1/0
+
+            # 1/0
 
             # If template is WFSC Commissioning
             if template_name in ['WfscCommissioning']:
@@ -216,14 +248,16 @@ class ReadAPTXML():
 
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+
             # Now we need to look for mosaic details, if any
             mostile = obs.findall('.//' + self.apt + 'MosaicTiles')
             n_tiles = len(mostile)
 
             if n_tiles > 1:
                 for i in range(n_tiles - 1):
-                    for tup in self.obs_tuple_list:
-                        self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup)
+                    # for tup in self.obs_tuple_list:
+                    #     self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup)
+                    self.APTObservationParams = self.append_dictionary(self.APTObservationParams, exposures_dictionary)
 
             # If WFSC, look at expected groups rather than mosaic tiles:
             if n_tiles == 0 and template_name == 'WfscCommissioning':
@@ -242,7 +276,57 @@ class ReadAPTXML():
 
             print("Found {} exposure(s) for observation {} {}".format(n_tiles, i_obs + 1, label))
 
+
+        # flatten the lists if necessary
+        for key in self.APTObservationParams.keys():
+            self.APTObservationParams[key] = flatten_list(self.APTObservationParams[key])
+
         return self.APTObservationParams
+
+
+    def append_dictionary(self, base_dictionary, added_dictionary):
+        """Append the content of added_dictionary key-by-key to the base_dictionary.
+
+        This assumes that the keys refer for lists.
+
+        Parameters
+        ----------
+        base_dictionary : dict
+        added_dictionary : dict
+
+        Returns
+        -------
+        new_dictionary : dict
+            Dictionary where every key holds a list of lists
+
+        """
+        new_dictionary = copy.deepcopy(base_dictionary)
+
+        # extract an arbitrary key name
+        first_key = [key for i,key in enumerate(base_dictionary.keys()) if i==0][0]
+
+        #Insert keys from added_dictionary that are not yet present in base_dictionary
+        for key in added_dictionary.keys():
+            if key not in base_dictionary.keys():
+                new_dictionary[key] = ['None']*len(base_dictionary[first_key])
+
+        # # Insert keys from added_dictionary that are not yet present in base_dictionary
+        # for key in added_dictionary.keys():
+        #     if key not in base_dictionary.keys():
+        #         new_dictionary[key] = ['None'] * len(base_dictionary[first_key])
+
+        #Append the items
+        for key in new_dictionary.keys():
+            if key not in added_dictionary.keys():
+                continue
+            if len(new_dictionary[key]) == 0:
+                new_dictionary[key] = [added_dictionary[key]]
+            else:
+                new_dictionary[key].append(added_dictionary[key])
+
+        return new_dictionary
+
+
 
     def add_exposure(self, dictionary, tup):
         # add an exposure to the dictionary
@@ -274,53 +358,73 @@ class ReadAPTXML():
         return dictionary
 
 
-    def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary):
+    def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary, verbose=False, parallel=False):
         """Read imaging template content regardless of instrument.
+
         Save content to object attributes.
 
         Parameters
         ----------
-        template
+        template : etree xml element
+            xml content of template
         template_name : str
-        obs
+            name of the template
+        obs : etree xml element
+            xml content of observation
         proposal_parameter_dictionary : dict
+            Dictionary of proposal parameters to extract from template
+
+        Returns
+        -------
+        exposures_dictionary : OrderedDict
+            Dictionary containing relevant exposure parameters
 
         """
+        if parallel:
+            if template_name == 'FgsExternalCalibration':
+                instrument = 'FGS'
+        else:
+            instrument = obs.find(self.apt + 'Instrument').text
 
-        instrument = obs.find(self.apt + 'Instrument').text
+        # verbose = True
 
         # Get proposal parameters
         # pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
-
         exposures_dictionary = OrderedDict()
-
         for key in self.APTObservationParams_keys:
             exposures_dictionary[key] = []
 
         # Set namespace
+        # if parallel:
+        #     ns = "{{http://www.stsci.edu/JWST/APT/FirstCoordinatedTemplate/{}}}".format(template_name)
+        # else:
         ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
 
         for element in template:
+            print(element)
             element_tag_stripped = element.tag.split(ns)[1]
-            print('{} {}'.format(element_tag_stripped, element.text))
+            if verbose:
+                print('{} {}'.format(element_tag_stripped, element.text))
 
             # for NIRISS loop through exposures and collect exposure parameters
-            if (instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList'):
+            if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
+                    ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures')):
                 for exposure in element.findall(ns + 'Exposure'):
                     exposure_dict = {}
                     for exposure_parameter in exposure:
                         parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
-                        print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
+                        if verbose:
+                            print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
                         exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
                     # fill dictionary to return
                     for key in self.APTObservationParams_keys:
                         if key in exposure_dict.keys():
                             value = exposure_dict[key]
-                            print(key)
+                            # print(key)
                         elif key in proposal_parameter_dictionary.keys():
                             value = proposal_parameter_dictionary[key]
-                            print(key)
+                            # print(key)
                         elif key == 'Instrument':
                             value = instrument
                         else:
@@ -345,10 +449,12 @@ class ReadAPTXML():
                             else:
                                 exposures_dictionary[key].append(str(exposure_dict[key]))
 
-        self.APTObservationParams = exposures_dictionary
+        # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+        # self.APTObservationParams = exposures_dictionary
 
+        return exposures_dictionary
         # print(exposures_dictionary)
-        return
+        # return
 
 
 
