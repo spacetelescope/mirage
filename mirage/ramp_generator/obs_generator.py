@@ -738,7 +738,8 @@ class Observation():
             self.ra, self.dec = utils.parse_RA_Dec(self.params['Telescope']['ra'],
                                                    self.params['Telescope']['dec'])
 
-        if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or self.ra is None or self.dec is None:
+        #if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or self.ra is None or self.dec is None:
+        if abs(self.dec) > 90. or self.ra is None or self.dec is None:
             raise ValueError("WARNING: bad requested RA and Dec {} {}".format(self.ra, self.dec))
 
         # Make sure the rotation angle is a float
