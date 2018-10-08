@@ -27,15 +27,15 @@ from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
 
-def get_siaf_information(instrument, aperture, ra, dec, telescope_roll):
-    """Use pysiaf to get aperture information
+def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_arcsec=None, v3_arcsec=None):
+    """Use pysiaf to get aperture information.
 
     Parameters
     ----------
     instrument : str
         Instrument name.
 
-    aperture : str
+    aperture_name : str
         Aperture name (e.g. "NRCA1_FULL")
     """
     # Temporary fix to access good NIRCam distortion coefficients which
@@ -44,21 +44,26 @@ def get_siaf_information(instrument, aperture, ra, dec, telescope_roll):
         import os
         print("NOTE: Using pre-delivery SIAF data")
         pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, instrument)
-        siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture]
+        siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture_name]
     else:
-        siaf = pysiaf.Siaf(instrument)[aperture]
+        siaf = pysiaf.Siaf(instrument)[aperture_name]
+
+    if v2_arcsec is None:
+        v2_arcsec = siaf.V2Ref
+    if v3_arcsec is None:
+        v3_arcsec = siaf.V3Ref
 
     local_roll = set_telescope_pointing.compute_local_roll(telescope_roll,
-                                                           ra, dec, siaf.V2Ref,
-                                                           siaf.V3Ref)
+                                                           ra, dec, v2_arcsec, v3_arcsec)
+
     # Create attitude_matrix
-    att_matrix = rotations.attitude(siaf.V2Ref, siaf.V3Ref, ra, dec, local_roll)
+    att_matrix = rotations.attitude(v2_arcsec, v3_arcsec, ra, dec, local_roll)
 
     # Get full frame size
     fullframesize = siaf.XDetSize
 
     # Subarray boundaries in full frame coordinates
-    xcorner, ycorner = sci_subarray_corners(instrument, aperture)
+    xcorner, ycorner = sci_subarray_corners(instrument, aperture_name)
     subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
     return siaf, local_roll, att_matrix, fullframesize, subarray_boundaries
 

@@ -231,7 +231,7 @@ class SimInput:
                 self.multiple_catalog_match(filter, cattype, match)
             return match[0]
 
-    def create_inputs(self):
+    def create_inputs(self, apt_xml_dict=None):
         """Create observation table """
         self.path_defs()
 
@@ -250,7 +250,9 @@ class SimInput:
             apt.input_xml = self.input_xml
             apt.pointing_file = self.pointing_file
             apt.observation_table = self.observation_table
+            apt.apt_xml_dict = apt_xml_dict
             apt.create_input_table()
+
             self.info = apt.exposure_tab
             # pprint.pprint(self.info)
 
@@ -287,10 +289,15 @@ class SimInput:
         ipc = []
         pam = []
 
-        # if self.instrument.lower() == 'nircam':
-        if self.instrument.lower() == 'niriss':
-            self.info['detector'] = ['NIS']
-            # detector_labels = ['NIS']
+        # for i, instrument in enumerate(self.info['Instrument']):
+        #     if instrument.lower() == 'niriss':
+        #         self.info['detector'][i] = 'NIS'
+        #
+        #
+        # # if self.instrument.lower() == 'nircam':
+        # if self.instrument.lower() == 'niriss':
+        #     self.info['detector'] = ['NIS']
+        #     # detector_labels = ['NIS']
         detector_labels = self.info['detector']
 
         for det in detector_labels:
@@ -353,6 +360,9 @@ class SimInput:
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
+        # 1/0
+        for key in self.info.keys():
+            print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
         print('Updated observation table file saved to {}'.format(final_file))
         ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
 
@@ -495,8 +505,7 @@ class SimInput:
         return (inputipc[0], True)
 
     def get_dark(self, detector):
-        """
-        Return the name of a dark current file to use as input
+        """Return the name of a dark current file to use as input
         based on the detector being used
 
         Parameters
@@ -538,14 +547,19 @@ class SimInput:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
 
-    def get_readpattern_defs(self):
-        """Read in the readpattern definition file and return table
+    def get_readpattern_defs(self, filename=None):
+        """Read in the readpattern definition file and return table.
 
         Returns
         -------
         tab : obj
             astropy.table.Table containing readpattern definitions
+        filename : str
+            Path to input file name
         """
+        if filename is not None:
+            return ascii.read(filename)
+
         tab = ascii.read(self.readpatt_def_file)
         return tab
 
@@ -574,14 +588,19 @@ class SimInput:
         print("WARNING: no file found for detector {} in {}"
               .format(detector, refs))
 
-    def get_subarray_defs(self):
+    def get_subarray_defs(self, filename=None):
         """Read in subarray definition file and return table
 
         Returns
         -------
         sub : obj
             astropy.table.Table containing subarray definition information
+        filename : str
+            Path to input file name
         """
+        if filename is not None:
+            return ascii.read(filename)
+
         sub = ascii.read(self.subarray_def_file)
         return sub
 
@@ -596,6 +615,8 @@ class SimInput:
             act = str(self.info['act_id'][i]).zfill(2)
             if self.info['Instrument'][i].lower() == 'niriss':
                 det = 'NIS'
+            elif self.info['Instrument'][i].lower() == 'fgs':
+                det = 'FGS'
             else:
                 det = self.info['detector'][i]
             mode = self.info['Mode'][i]
@@ -606,11 +627,25 @@ class SimInput:
         self.info['yamlfile'] = onames
         self.info['outputfits'] = fnames
 
+    def set_global_definitions(self):
+        """Store the subarray defnitions of all supported instruments."""
+        self.global_subarray_definitions = {}
+        self.global_readout_patterns = {}
+        for instrument in 'niriss fgs nircam'.split():
+            if instrument.lower() == 'niriss':
+                readout_pattern_file = 'niriss_readout_pattern.txt'
+                subarray_def_file = 'niriss_subarrays.list'
+            elif instrument.lower() == 'fgs':
+                readout_pattern_file = 'guider_readout_pattern.txt'
+                subarray_def_file = 'guider_subarrays.list'
+            elif instrument.lower() == 'nircam':
+                readout_pattern_file = 'nircam_read_pattern_definitions.list'
+                subarray_def_file = 'NIRCam_subarray_definitions.list'
+            self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
+            self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
+
     def make_start_times(self):
-        """
-        Create exposure start times for each entry in
-        the observation dictionary
-        """
+        """Create exposure start times for each entry in the observation dictionary."""
         date_obs = []
         time_obs = []
         expstart = []
@@ -644,7 +679,8 @@ class SimInput:
         # Now read in readpattern definitions
         readpatt_def = self.get_readpattern_defs()
 
-        for i in range(len(self.info['Module'])):
+        # for i in range(len(self.info['Module'])):
+        for i, instrument in enumerate(self.info['Instrument']):
             # Get dither/visit
             # Files with the same activity_id should have the same start time
             # Overhead after a visit break should be large, smaller between
@@ -657,6 +693,24 @@ class SimInput:
             readpatt = self.info['ReadoutPattern'][i]
             groups = np.int(self.info['Groups'][i])
             integrations = np.int(self.info['Integrations'][i])
+
+            # self.global_subarray_definitions = {}
+            # # need smarter implementation for programe with several/parallel instruments
+            # if instrument.lower() == 'niriss':
+            #     readout_pattern_file = 'niriss_readout_pattern.txt'
+            #     subarray_def_file = 'niriss_subarrays.list'
+            #     self.global_subarray_definitions['niriss'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
+            # elif instrument.lower() == 'fgs':
+            #     readout_pattern_file = 'guider_readout_pattern.txt'
+            #     subarray_def_file = 'guider_subarrays.list'
+            #     self.global_subarray_definitions['fgs'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
+            # elif instrument.lower() == 'nircam':
+            #     readout_pattern_file = 'nircam_read_pattern_definitions.list'
+            #     subarray_def_file = 'NIRCam_subarray_definitions.list'
+            #     self.global_subarray_definitions['nircam'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
+
+            readpatt_def = self.global_readout_patterns[instrument.lower()]
+            subarray_def = self.global_subarray_definitions[instrument.lower()]
 
             match2 = readpatt == readpatt_def['name']
             if np.sum(match2) == 0:
@@ -675,28 +729,34 @@ class SimInput:
             # for observations using all 4 shortwave B detectors. In that case,
             # we need to build the aperture name from the combination of detector
             # and subarray name.
-            if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
-                aperture = self.info['aperture']
-            else:
-                sub = self.info['Subarray'][i]
-                det = 'NRC' + self.info['detector'][i]
-                aperture = det + '_' + sub
+            # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
+            #     aperture = self.info['aperture']
+            # else:
+            #     sub = self.info['Subarray'][i]
+            #     det = 'NRC' + self.info['detector'][i]
+            #     aperture = det + '_' + sub
+
+            aperture = self.info['aperture'][i]
+
 
             # Get the number of amps from the subarray definition file
             match = aperture == subarray_def['AperName']
 
-            if np.sum(match) == 0:
-                aperture = [apername for apername, name in
-                            np.array(subarray_def['AperName', 'Name']) if
-                            (sub in apername) or (sub in name)]
+            # JSA: not sure when this is needed
+            # if np.sum(match) == 0:
+            #     aperture = [apername for apername, name in
+            #                 np.array(subarray_def['AperName', 'Name']) if
+            #                 (sub in apername) or (sub in name)]
+            #
+            #     match = aperture == subarray_def['AperName']
+            #
+            #     if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+            #         raise ValueError('Cannot combine detector {} and subarray {}\
+            #             into valid aperture name.'.format(det, sub))
+            #     # We don't want aperture as a list
+            #     aperture = aperture[0]
 
-                match = aperture == subarray_def['AperName']
-
-                if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
-                    raise ValueError('Cannot combine detector {} and subarray {}\
-                        into valid aperture name.'.format(det, sub))
-                # We don't want aperture as a list
-                aperture = aperture[0]
+            # print(aperture)
 
             amp = subarray_def['num_amps'][match][0]
             namp.append(amp)
@@ -937,20 +997,34 @@ class SimInput:
 
         elif self.instrument.lower() == 'niriss':
             # directory containing NIRISS reference files
-            # define NIRISS detector name (convention?)
-            det = 'NIS'
+            #HACK: add FGS files temporarily
 
-            self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
-            self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
-            self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
-            self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
-            self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
-            self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
-            self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
+            for det in ['G1', 'G2', 'NIS']:
+                if det == 'G1':
+                    self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
+                    self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                    self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
+                                           '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
 
-            self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
-                                       '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
-            self.lindark_list[det] = [None]
+                elif det == 'G2':
+                    self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
+                    self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                    self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
+                                           '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
+
+                elif det == 'NIS':
+                    self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
+                    self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+                    self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
+                                           '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+                self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
+                self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
+                self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
+                self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
+                self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
+                self.lindark_list[det] = [None]
+
 
     def set_config(self, file, prop):
         """
@@ -1056,10 +1130,13 @@ class SimInput:
             if self.instrument.lower() == 'niriss':
                 full_ap = input['aperture']
 
-            yaml_path = os.path.dirname(os.path.realpath(__file__))
-            modpath = os.path.split(yaml_path)[0]
-            subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
-            config = ascii.read(subarray_def_file)
+
+            # yaml_path = os.path.dirname(os.path.realpath(__file__))
+            # modpath = os.path.split(yaml_path)[0]
+            # subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
+            # config = ascii.read(subarray_def_file)
+
+            config = self.global_subarray_definitions[instrument.lower()]
 
             if full_ap not in config['AperName']:
                 full_ap_new = [apername for apername, name in
@@ -1139,7 +1216,7 @@ class SimInput:
                 MovingTargetConvolveExtended = input['{}_movconv'.format(catkey)]
                 MovingTargetToTrack = input['{}_solarsys'.format(catkey)]
                 BackgroundRate = input['{}_bkgd'.format(catkey)]
-            elif instrument.lower() == 'niriss':
+            elif instrument.lower() in ['niriss', 'fgs']:
                 PointSourceCatalog = input['PointSourceCatalog']
                 GalaxyCatalog = input['GalaxyCatalog']
                 ExtendedCatalog = input['ExtendedCatalog']

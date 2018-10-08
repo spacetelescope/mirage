@@ -1,0 +1,14 @@
+# APT Output Product
+# 
+# APT Version: Version 26.0 Beta (Mon Mar 26 2018) JWST PRD: PRDOPSSOC-H-015 
+# Date: Wed Apr 04 13:38:11 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1087 (1087_minimal.aptx)
+
+========================================
+* Imaging F200W (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.48542  -69.49836   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   -0.000   -0.000 TARGET     SCIENCE       85     85  0.000 (base)
+
+
