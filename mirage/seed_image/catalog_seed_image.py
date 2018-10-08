@@ -1952,12 +1952,12 @@ class Catalog_seed():
         # This is used only for segmap now that epsf is
         # implemented.
         if l2 > psfydim:
-            l2 = psfydim
-            j2 = j1 + (l2 - l1)
+            l2 = np.int(psfydim)1
+            j2 = np.int(j1 + (l2 - l1))
 
         if k2 > psfxdim:
-            k2 = psfxdim
-            i2 = i1 + (k2 - k1)
+            k2 = np.int(psfxdim)
+            i2 = np.int(i1 + (k2 - k1))
 
         # At this point coordinates are in the final output array coordinate system, so there
         # should be no negative values, nor values larger than the output array size
