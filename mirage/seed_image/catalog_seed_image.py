@@ -1952,7 +1952,7 @@ class Catalog_seed():
         # This is used only for segmap now that epsf is
         # implemented.
         if l2 > psfydim:
-            l2 = np.int(psfydim)1
+            l2 = np.int(psfydim)
             j2 = np.int(j1 + (l2 - l1))
 
         if k2 > psfxdim:
