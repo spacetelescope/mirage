@@ -74,10 +74,17 @@ Crosstalk
 
 Crosstalk effects can also be added to the observation. Crosstalk in this case is defined as the unintentional mirroring of a fraction of the measured signal across amplifiers. Bright sources located in one quadrant of a detector can create dimmed copies of themselves in the other three quadrants (Rest, 2015). Crosstalk is added to the observation using an input file containing crosstalk coefficients. These coefficients control the magnitude and sign of the crosstalk signal between each combination of amplifiers. Currently, only the NIRCam detectors have non-zero crosstalk coefficients in the collection of `mirage` reference files.
 
+(Optionally) Return from Linearized to Raw State
+------------------------------------------------
+
+At this point, the observation contains linearized, partially calibrated (superbias and reference pixel subtracted) signal. This can be directly saved to an output fits file in the format used by the JWST calibration pipeline. There is also an option to return the observation exposure to a completely uncalibrated ("raw") state, such that the full calibration pipeline can be run on the data. The advantage of this is that pipeline parameters and settings can be customized/optimized by the user.
+
+In order to return to a raw state, the linearization step of the pipeline is run in reverse on the data. The previously subtracted superbias and reference pixel signal is then added back in to the exposure.
+
 Save Observation
 ================
 
-With the construction of the observation exposure complete, the exposure is then saved in the requested format. At this point, the observation contains linearized, partially calibrated (superbias and reference pixel subtracted) signal. This can be directly saved to an output fits file in the format used by the JWST calibration pipeline. There is also an option to return the observation exposure to a completely uncalibrated ("raw") state, such that the full calibration pipeline can be run on the data. The advantage of this is that pipeline parameters and settings can be customized/optimized by the user.
+With the construction of the observation exposure complete, the exposure is then saved in the requested format.
 
 .. hint::
     The output format of the data is controlled by the **Output:datatype** line in the input yaml file. Possible values for this parameter include "raw", "linear", or "raw,linear". In the latter case, both the linearized and raw versions of the observation will be saved.

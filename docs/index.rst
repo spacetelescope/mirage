@@ -52,6 +52,7 @@ Tangent plane projection is currently not performed when translating from detect
    dark_preparation.rst
    observation_generator.rst
    yaml_generator.rst
+   input_yaml_parameters.rst
    example_yaml.rst
    quickstart.ipynb
    api.rst
