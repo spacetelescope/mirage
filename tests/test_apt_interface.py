@@ -68,10 +68,7 @@ def test_observation_list_generation_minimal():
 
     # Write observationlist.yaml
     observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
-
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-    # apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
-    # apt_file_pointing,
     write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name)
 
     assert os.path.isfile(source_list_file_name)

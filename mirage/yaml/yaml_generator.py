@@ -392,6 +392,12 @@ class SimInput:
             file_dict['primary_dither_num'] = np.int(primary_dither)
             subpix_dither = (tot_dith-1) % subpixtot
             file_dict['subpix_dither_num'] = subpix_dither + 1
+            file_dict['subarray_def_file'] = self.global_subarray_definition_files[self.info['Instrument'][i].lower()]
+            file_dict['readpatt_def_file'] = self.global_readout_pattern_files[self.info['Instrument'][i].lower()]
+            file_dict['crosstalk_file'] = self.global_crosstalk_files[self.info['Instrument'][i].lower()]
+            file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[self.info['Instrument'][i].lower()]
+            file_dict['flux_cal_file'] = self.global_flux_cal_files[self.info['Instrument'][i].lower()]
+
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
 
@@ -634,18 +640,42 @@ class SimInput:
         """Store the subarray defnitions of all supported instruments."""
         self.global_subarray_definitions = {}
         self.global_readout_patterns = {}
+        self.global_subarray_definition_files = {}
+        self.global_readout_pattern_files = {}
+
+        self.global_crosstalk_files = {}
+        self.global_filtpupilcombo_files = {}
+        self.global_flux_cal_files = {}
+        # self.global_filter_throughput_files = {} ?
+
         for instrument in 'niriss fgs nircam'.split():
             if instrument.lower() == 'niriss':
                 readout_pattern_file = 'niriss_readout_pattern.txt'
                 subarray_def_file = 'niriss_subarrays.list'
+                crosstalk_file = 'niriss_xtalk_zeros.txt'
+                filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
+                flux_cal_file = 'niriss_zeropoints.list'
             elif instrument.lower() == 'fgs':
                 readout_pattern_file = 'guider_readout_pattern.txt'
                 subarray_def_file = 'guider_subarrays.list'
+                crosstalk_file = 'guider_xtalk_zeros.txt'
+                filtpupilcombo_file = 'guider_filter_dummy.list'
+                flux_cal_file = 'guider_zeropoints.list'
             elif instrument.lower() == 'nircam':
                 readout_pattern_file = 'nircam_read_pattern_definitions.list'
                 subarray_def_file = 'NIRCam_subarray_definitions.list'
+                crosstalk_file = 'xtalk20150303g0.errorcut.txt'
+                filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
+                flux_cal_file = 'NIRCam_zeropoints.list'
+
             self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
             self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
+            self.global_subarray_definition_files[instrument] = os.path.join(self.modpath, 'config', subarray_def_file)
+            self.global_readout_pattern_files[instrument] = os.path.join(self.modpath, 'config', readout_pattern_file)
+            self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
+            self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
+            self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
+
 
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
@@ -1187,14 +1217,14 @@ class SimInput:
             f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
                      .format(input['pixelAreaMap'])))
             f.write(('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'
-                     .format(self.subarray_def_file)))
+                     .format(input['subarray_def_file'])))
             f.write(('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated '
-                     'NFRAME/NSKIP values\n'.format(self.readpatt_def_file)))
-            f.write('  crosstalk: {}   # File containing crosstalk coefficients\n'.format(self.crosstalk))
+                     'NFRAME/NSKIP values\n'.format(input['readpatt_def_file'])))
+            f.write('  crosstalk: {}   # File containing crosstalk coefficients\n'.format(input['crosstalk_file']))
             f.write(('  filtpupilcombo: {}   # File that lists the filter wheel element / pupil wheel element combinations. '
-                     'Used only in writing output file\n'.format(self.filtpupil_pairs)))
+                     'Used only in writing output file\n'.format(input['filtpupilcombo_file'])))
             f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
-                     'used when making direct image outputs to be fed into the grism disperser code.\n'.format(self.fluxcal)))
+                     'used when making direct image outputs to be fed into the grism disperser code.\n'.format(input['flux_cal_file'] )))
             f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.filter_throughput))
             f.write('\n')
             f.write('nonlin:\n')

@@ -504,7 +504,7 @@ class ReadAPTXML():
                         if (key == 'PrimaryDithers') and ((value is None) or (value == 'None')):
                             value = '1'
 
-                        elif (key == 'Mode') and (template_name == 'NirissExternalCalibration'):
+                        elif (key == 'Mode') and (template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
                             value = 'imaging'
 
 
