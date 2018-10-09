@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 """Test the interface between mirage and APT files for automatic observation list generation.
 
 Authors
@@ -15,8 +16,14 @@ import glob
 import os
 import pytest
 
-# from mirage import imaging_simulator as im
 from mirage.yaml import write_observationlist, yaml_generator
+from mirage.apt import read_apt_xml, apt_inputs
+
+# import importlib
+# importlib.reload( yaml_generator )
+# importlib.reload( write_observationlist )
+# importlib.reload( read_apt_xml )
+# importlib.reload( apt_inputs )
 
 
 # os.environ['MIRAGE_DATA'] = ''
@@ -71,6 +78,7 @@ def test_observation_list_generation_minimal():
 
 
 def test_complete_input_generation():
+    """Exercise mirage input generation from APT files (.xml and .pointing)."""
 
     # generate output directory
     temporary_directory()
@@ -79,32 +87,35 @@ def test_complete_input_generation():
 
     if instrument == 'NIRISS':
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
-        apt_file_seed = '1087'
+        apt_file_seeds = ['1087', 'm31_field_test_observation']
+        # apt_file_seed = '1087'
+        # apt_file_seed = 'm31_field_test_observation'
         source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
-    # Write observationlist.yaml
-    observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
+    for apt_file_seed in apt_file_seeds:
+        # Write observationlist.yaml
+        observation_list_file = os.path.join(TEMPORARY_DIR, '{}_{}_observation_list.yaml'.format(instrument.lower(), apt_file_seed))
 
-    apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-    apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
+        apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
+        apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
-    apt_xml_dict = write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name)
+        apt_xml_dict = write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name)
 
-    yam = yaml_generator.SimInput()
-    yam.input_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-    yam.pointing_file = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
-    yam.output_dir = TEMPORARY_DIR
-    yam.simdata_output_dir = TEMPORARY_DIR
-    yam.observation_table = observation_list_file
-    yam.use_JWST_pipeline = True
-    yam.use_linearized_darks = False
-    yam.datatype = 'linear'
-    yam.reffile_setup(instrument=instrument, offline=True) # only PRIME, ignores FGS
-    yam.set_global_definitions()
-    yam.create_inputs(apt_xml_dict=apt_xml_dict)
+        yam = yaml_generator.SimInput()
+        yam.input_xml = apt_file_xml
+        yam.pointing_file = apt_file_pointing
+        yam.output_dir = TEMPORARY_DIR
+        yam.simdata_output_dir = TEMPORARY_DIR
+        yam.observation_table = observation_list_file
+        yam.use_JWST_pipeline = True
+        yam.use_linearized_darks = False
+        yam.datatype = 'linear'
+        yam.reffile_setup(instrument=instrument, offline=True)
+        yam.set_global_definitions()
+        yam.create_inputs(apt_xml_dict=apt_xml_dict)
 
-    yfiles = glob.glob(os.path.join(yam.output_dir,'jw*.yaml'))
-    # print(len(yfiles))
-    # print(len(apt_xml_dict['Instrument']))
+        yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
+        assert len(yam.info['Instrument']) == len(yfiles)
 
-    # assert os.path.isfile(source_list_file_name)
+# if __name__ == '__main__':
+#     test_complete_input_generation()

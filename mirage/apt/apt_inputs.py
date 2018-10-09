@@ -237,7 +237,7 @@ class AptInput:
                     except:
                         pass
 
-                intab['epoch_start_date'] = obs_start
+                # intab['epoch_start_date'] = obs_start
                 intab['pav3'] = obs_pav3
                 intab['sw_ptsrc'] = obs_sw_ptsrc
                 intab['sw_galcat'] = obs_sw_galcat
@@ -282,6 +282,7 @@ class AptInput:
                     # Match observation from observation table yaml file with observatoins
                     # from  APT XML/pointing; extract the date and PAV3
                     obslist = self.obstab[onums[match[0]]]
+                    obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
                     for key in OBSERVATION_LIST_FIELDS:
                         if key == 'Date':
                             value = obslist[key].strftime('%Y-%m-%d')
@@ -289,6 +290,8 @@ class AptInput:
                             value = str(obslist[key])
 
                         intab[key].append(value)
+
+                # intab['epoch_start_date'] = obs_start
 
         else:
             if 'fgs' in unique_instrument_names and 'niriss' in unique_instrument_names:
@@ -317,11 +320,12 @@ class AptInput:
                         intab[key].append(value)
 
 
-                intab['epoch_start_date'] = obs_start
+                # intab['epoch_start_date'] = obs_start
 
             else:
                 raise NotImplementedError
 
+        intab['epoch_start_date'] = obs_start
         return intab
 
     def base36encode(self, integer):
@@ -407,8 +411,8 @@ class AptInput:
 
 
         # Read in the pointing file and produce dictionary
-        # pointing_tab = self.get_pointing_info(self.pointing_file, xmltab['ProposalID'][0])
-        pointing_tab = self.get_pointing_info(self.pointing_file)
+        pointing_tab = self.get_pointing_info(self.pointing_file, propid=xmltab['ProposalID'][0])
+        # pointing_tab = self.get_pointing_info(self.pointing_file)
 
         # Check that the .xml and .pointing files agree
         assert len(xmltab['ProposalID']) == len(pointing_tab['obs_num']),\
@@ -449,6 +453,8 @@ class AptInput:
             self.exposure_tab = self.expand_for_detectors(obstab)
 
 
+        # for key in self.exposure_tab.keys():
+        #     print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
         detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
@@ -586,8 +592,12 @@ class AptInput:
                     else:
                         expanded_table = vstack((expanded_table, dither_table))
                 elif (table['CoordinatedParallel'][i] == 'false'):
-                    # add single row
-                    expanded_table = vstack((expanded_table, table[i]))
+                    # add row multiplied by number of dithers
+                    dither_table = vstack([table[i]]*table['ImageDithers'][i])
+                    if expanded_table is None:
+                        expanded_table = dither_table
+                    else:
+                        expanded_table = vstack((expanded_table, dither_table))
 
 
             # expanded_table['Instrument', 'ImageDithers', 'ParallelInstrument'].pprint()
@@ -648,7 +658,7 @@ class AptInput:
         else:
             return os.path.abspath(os.path.expandvars(in_path))
 
-    def get_pointing_info(self, file):
+    def get_pointing_info(self, file, propid=0, verbose=True):
         """Read in information from APT's pointing file.
 
         Parameters
@@ -704,7 +714,14 @@ class AptInput:
                     continue
                 # extract proposal ID
                 elif line.split()[0] == 'JWST':
-                    propid = line.split()[7]
+                    propid_header = line.split()[7]
+                    try:
+                        propid = np.int(propid_header)
+                    except ValueError:
+                        #adopt value passed to function
+                        pass
+                    if verbose:
+                        print('Extracted proposal ID {}'.format(propid))
                     continue
 
                 # TODO: extract useful information from header?
@@ -810,7 +827,7 @@ class AptInput:
                             act_counter += 1
 
                     except ValueError as e:
-                        print('Skipping line {} producing error {}'.format(line, e))
+                        print('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
                         pass
 
         pointing = {'exposure': exp, 'dither': dith, 'aperture': aperture,

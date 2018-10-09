@@ -193,7 +193,12 @@ class ReadAPTXML():
             if coordparallel == 'true':
                 CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
 
-            obs_label = obs.find(self.apt + 'Label').text
+            try:
+                obs_label = obs.find(self.apt + 'Label').text
+            except AttributeError:
+                # label tag not present
+                obs_label = 'Observation 1'
+
             # DitherPatternType = obs.find(self.apt + 'DitherPatternType').text
             # ImageDithers = obs.find(self.apt + 'ImageDithers').text
 

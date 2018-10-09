@@ -361,17 +361,10 @@ class SimInput:
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
-        for key in self.info.keys():
-            print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
+        if 0: #for debugging
+            for key in self.info.keys():
+                print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
         table = Table(self.info)
-        # for key in table.colnames:
-        #     # print(type(table[key][0]))
-        #     if type(table[key][0]) == 'numpy.ndarray':
-        #         print('converting')
-        #         # table[key] = np.array(table[key])
-        #     print('{} {}'.format(key, type(table[key][0])));
-                # table[[key]].write('test.txt',            #                                                                     format='ascii.basic')
-
         table.write(final_file, format='csv', overwrite=True)
         # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
         print('Updated observation table file saved to {}'.format(final_file))
