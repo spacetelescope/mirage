@@ -468,6 +468,7 @@ class Catalog_seed():
             # print("RA velocity of {} and dec_val of {}".format(ra_vel, dec_vel))
 
         if self.runStep['movingTargets']:
+            print("Adding moving point sources to seed image.")
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],
                                                                        'pointSource',
                                                                        MT_tracking=tracking,
@@ -480,6 +481,7 @@ class Catalog_seed():
 
         # moving target using a sersic object
         if self.runStep['movingTargetsSersic']:
+            print("Adding moving galaxies to seed image.")
             mov_targs_sersic, mt_galaxy_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],
                                                                          'galaxies',
                                                                          MT_tracking=tracking,
@@ -495,6 +497,7 @@ class Catalog_seed():
 
         # moving target using an extended object
         if self.runStep['movingTargetsExtended']:
+            print("Adding moving extended sources to seed image.")
             mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],
                                                                    'extended',
                                                                    MT_tracking=tracking,
@@ -570,6 +573,7 @@ class Catalog_seed():
         if self.runStep['pointsource']:
             # Now ptsrc is a list, which we need to provide to
             # movingTargetInputs
+            print("Adding moving background point sources to seed image.")
             mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],
                                                                   'pointSource',
                                                                   MT_tracking=True,
@@ -588,6 +592,7 @@ class Catalog_seed():
                    .format(self.params['simSignals']['pointsource'])))
 
         if self.runStep['galaxies']:
+            print("Adding moving background galaxies to seed image.")
             mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],
                                                                         'galaxies',
                                                                         MT_tracking=True,
@@ -606,6 +611,7 @@ class Catalog_seed():
                    format(self.params['simSignals']['galaxyListFile'])))
 
         if self.runStep['extendedsource']:
+            print("Adding moving background extended sources to seed image.")
             mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'],
                                                               'extended',
                                                               MT_tracking=True,
@@ -845,8 +851,12 @@ class Catalog_seed():
         indexes, mtlist  = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
         print("{} sources in filtered input catalog.".format(len(mtlist)))
 
+        times = []
+        obj_counter = 0
+        time_reported = False
         for index, entry in zip(indexes, mtlist):
-            # For each object, calculate x,y or RA,Dec of initial position
+            start_time = time.time()
+             # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
                 entry['x_or_RA'], entry['y_or_Dec'], pixelFlag)
 
@@ -974,6 +984,17 @@ class Catalog_seed():
                 else:
                     indseg = self.seg_from_photutils(mt_source[-1, :, :], index, noiseval)
                     moving_segmap.segmap += indseg
+
+            # Check the elapsed time for creating each object
+            elapsed_time = time.time() - start_time
+            times.append(elapsed_time)
+            if obj_counter > 3 and not time_reported:
+                avg_time = np.mean(times)
+                total_time = len(indexes) * avg_time
+                print(("Expected time to process {} sources: {:.2f} seconds "
+                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                time_reported = True
+            obj_counter += 1
         return mt_integration, moving_segmap.segmap
 
     def on_detector(self, xloc, yloc, stampdim, finaldim):
