@@ -251,6 +251,7 @@ class SimInput:
             apt.pointing_file = self.pointing_file
             apt.observation_table = self.observation_table
             apt.apt_xml_dict = apt_xml_dict
+            apt.output_dir = self.output_dir
             apt.create_input_table()
 
             self.info = apt.exposure_tab
@@ -360,11 +361,20 @@ class SimInput:
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
-        # 1/0
         for key in self.info.keys():
             print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
+        table = Table(self.info)
+        # for key in table.colnames:
+        #     # print(type(table[key][0]))
+        #     if type(table[key][0]) == 'numpy.ndarray':
+        #         print('converting')
+        #         # table[key] = np.array(table[key])
+        #     print('{} {}'.format(key, type(table[key][0])));
+                # table[[key]].write('test.txt',            #                                                                     format='ascii.basic')
+
+        table.write(final_file, format='csv', overwrite=True)
+        # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
         print('Updated observation table file saved to {}'.format(final_file))
-        ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
 
         # Now go through the lists one element at a time
         # and create a yaml file for each.
@@ -893,7 +903,7 @@ class SimInput:
         elif self.crosstalk == 'config':
             self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
-    def reffile_setup(self, instrument='nircam'):
+    def reffile_setup(self, instrument='nircam', offline=False):
         """Create lists of reference files associate with each detector
 
         Parameters
@@ -999,31 +1009,45 @@ class SimInput:
             # directory containing NIRISS reference files
             #HACK: add FGS files temporarily
 
-            for det in ['G1', 'G2', 'NIS']:
-                if det == 'G1':
-                    self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
-                    self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
-                    self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                           '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
+            if offline:
+                # no access to central store. Set all files to none.
+                default_value = 'none'
+                for det in ['G1', 'G2', 'NIS']:
+                    self.ipc_list[det] = default_value
+                    self.dark_list[det] = default_value
+                    self.superbias_list[det] = default_value
+                    self.linearity_list[det] = default_value
+                    self.gain_list[det] = default_value
+                    self.saturation_list[det] = default_value
+                    self.astrometric_list[det] = default_value
+                    self.pam_list[det] = default_value
+                    self.lindark_list[det] = default_value
+            else:
+                for det in ['G1', 'G2', 'NIS']:
+                    if det == 'G1':
+                        self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
+                        self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                        self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
+                                               '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
 
-                elif det == 'G2':
-                    self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
-                    self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
-                    self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                           '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
+                    elif det == 'G2':
+                        self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
+                        self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                        self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
+                                               '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
 
-                elif det == 'NIS':
-                    self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
-                    self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
-                    self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
-                                           '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
-                self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
-                self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
-                self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
-                self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
-                self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
-                self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
-                self.lindark_list[det] = [None]
+                    elif det == 'NIS':
+                        self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
+                        self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+                        self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
+                                               '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+                    self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
+                    self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
+                    self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
+                    self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
+                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                    self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
+                    self.lindark_list[det] = [None]
 
 
     def set_config(self, file, prop):

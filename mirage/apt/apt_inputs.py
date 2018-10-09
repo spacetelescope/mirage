@@ -450,7 +450,7 @@ class AptInput:
 
 
 
-        detectors_file = os.path.join(main_dir, 'expand_for_detectors.csv')
+        detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
         print('Wrote exposure table to {}'.format(detectors_file))
 
@@ -460,7 +460,7 @@ class AptInput:
         # Output to a csv file.
         if self.output_csv is None:
             indir, infile = os.path.split(self.input_xml)
-            self.output_csv = os.path.join(indir, 'Observation_table_for_' + infile + '.csv')
+            self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('Final csv exposure list written to {}'.format(self.output_csv))
 

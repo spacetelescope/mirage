@@ -189,7 +189,9 @@ class ReadAPTXML():
 
             # Get coordinated parallel
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
-            CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
+            CoordinatedParallelSet = None
+            if coordparallel == 'true':
+                CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
 
             obs_label = obs.find(self.apt + 'Label').text
             # DitherPatternType = obs.find(self.apt + 'DitherPatternType').text
