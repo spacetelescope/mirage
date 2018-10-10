@@ -397,6 +397,7 @@ class SimInput:
             file_dict['crosstalk_file'] = self.global_crosstalk_files[self.info['Instrument'][i].lower()]
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[self.info['Instrument'][i].lower()]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[self.info['Instrument'][i].lower()]
+            file_dict['psfpath'] = self.global_psfpath[self.info['Instrument'][i].lower()]
 
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
@@ -646,6 +647,7 @@ class SimInput:
         self.global_crosstalk_files = {}
         self.global_filtpupilcombo_files = {}
         self.global_flux_cal_files = {}
+        self.global_psfpath = {}
         # self.global_filter_throughput_files = {} ?
 
         for instrument in 'niriss fgs nircam'.split():
@@ -655,18 +657,21 @@ class SimInput:
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
+                psfpath = os.path.join(self.datadir, 'niriss/webbpsf_library')
             elif instrument.lower() == 'fgs':
                 readout_pattern_file = 'guider_readout_pattern.txt'
                 subarray_def_file = 'guider_subarrays.list'
                 crosstalk_file = 'guider_xtalk_zeros.txt'
                 filtpupilcombo_file = 'guider_filter_dummy.list'
                 flux_cal_file = 'guider_zeropoints.list'
+                psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
             elif instrument.lower() == 'nircam':
                 readout_pattern_file = 'nircam_read_pattern_definitions.list'
                 subarray_def_file = 'NIRCam_subarray_definitions.list'
                 crosstalk_file = 'xtalk20150303g0.errorcut.txt'
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
                 flux_cal_file = 'NIRCam_zeropoints.list'
+                psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
 
             self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
             self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
@@ -675,7 +680,7 @@ class SimInput:
             self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
             self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
             self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
-
+            self.global_psfpath[instrument] = psfpath
 
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
@@ -1248,6 +1253,13 @@ class SimInput:
             elif instrument.lower() == 'niriss':
                 f.write('  suffix: IPC_NIRISS_{}    # Suffix of library file names\n'.format(
                     detector_label))
+            elif instrument.lower() == 'fgs':
+                if detector_label == 'G1':
+                    detector_string = 'GUIDER1'
+                elif detector_label == 'G2':
+                    detector_string = 'GUIDER2'
+                f.write('  suffix: IPC_FGS_{}    # Suffix of library file names\n'.format(
+                    detector_string))
             f.write('  seed: {}                 # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
@@ -1278,8 +1290,8 @@ class SimInput:
 
             f.write(('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'
                      .format(PointSourceCatalog)))
-            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
-            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
+            f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
+            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
             f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
                      'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac)))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))

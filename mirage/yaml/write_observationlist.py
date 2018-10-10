@@ -28,6 +28,7 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
     ----------
     xml_file : str
         path to APT .xml file
+    pointing_file
     yaml_file : str
         output_file
     catalog_files : str or list(str)

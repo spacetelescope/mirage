@@ -62,6 +62,7 @@ class ImgSim():
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
+            print('Perform dark preparation:')
             d = dark_prep.DarkPrep()
             d.paramfile = self.paramfile
             d.prepare()
