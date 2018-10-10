@@ -2959,14 +2959,6 @@ class Catalog_seed():
             else:
                 raise ValueError("WARNING: grism_source_image needs to be True or False")
 
-        # Location of extended image on output array, pixel x, y values.
-        try:
-            self.params['simSignals']['extendedCenter'] = np.fromstring(self.params['simSignals']['extendedCenter'], dtype=int, sep=", ")
-        except:
-            raise RuntimeError(("WARNING: not able to parse the extendedCenter list {}. "
-                                "It should be a comma-separated list of x and y pixel positions."
-                                .format(self.params['simSignals']['extendedCenter'])))
-
         # check the output metadata, including visit and observation numbers, obs_id, etc
         #
         # kwchecks = ['program_number', 'visit_number', 'visit_group',
