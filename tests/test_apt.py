@@ -13,6 +13,7 @@ Use
 
 import os
 import glob
+import shutil
 import yaml
 
 from lxml import etree
@@ -51,7 +52,11 @@ def RunAllAPTTemplates(instrument):
 
     # Point to appropriate output directory
     out_dir = os.path.join(TESTS_DIR, 'test_data',  instrument, 'APT_{}_out'.format(instrument))
-    if not os.path.exists(out_dir):
+
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+        os.makedirs(out_dir)
+    else:
         os.makedirs(out_dir)
 
     # Write observationlist.yaml
@@ -77,17 +82,23 @@ def RunAllAPTTemplates(instrument):
                                                 instrument +
                                                 'Test.xml_with_yaml_parameters.csv')), \
         'Observation table not created.'
-    assert len(glob.glob(os.path.join(out_dir, 'jw{0:05d}*.yaml'.format(int(PROPOSAL_ID))))) \
-        >= n_obs, 'Fewer yaml files created than observations'
+
+    number_of_yaml_files  = len(glob.glob(os.path.join(out_dir, 'jw{}*.yaml'.format(int(PROPOSAL_ID)))))
+    print('PROPOSAL_ID: {}'.format(PROPOSAL_ID))
+    print('number of observations: {}'.format(n_obs))
+    print('number of files written: {}'.format(number_of_yaml_files))
+    assert number_of_yaml_files >= n_obs, 'Fewer yaml files created than observations'
 
     # If a reference observationlist.yaml file exists, ensure that the
     # file that was just created matches it
-    reference_yaml = os.path.join(out_dir, 'REFERENCE_' + instrument + '_observationlist.yaml')
-    if os.path.exists(reference_yaml):
-        assert yaml.load(reference_yaml) == yaml.load(observationlist_file),\
-            'The created observationlist.yaml file does not match the reference' +\
-            'observationlist.yaml file. Either the APT parser is malfunctioning,' +\
-            'or the reference yaml is out of date.'
+    # NOT USED because out_dir is being recreated at runtime
+    # reference_yaml = os.path.join(out_dir, 'REFERENCE_' + instrument + '_observationlist.yaml')
+    # print(reference_yaml)
+    # if os.path.exists(reference_yaml):
+    #     assert yaml.load(reference_yaml) == yaml.load(observationlist_file),\
+    #         'The created observationlist.yaml file does not match the reference' +\
+    #         'observationlist.yaml file. Either the APT parser is malfunctioning,' +\
+    #         'or the reference yaml is out of date.'
 
 
 @pytest.mark.xfail
