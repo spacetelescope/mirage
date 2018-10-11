@@ -709,13 +709,7 @@ class SimInput:
         # Get visit, activity_id info for first exposure
         actid = self.info['act_id'][0]
         visit = self.info['visit_num'][0]
-        obsname = self.info['obs_label'][0]
-
-        # Read in file containing subarray definitions
-        subarray_def = self.get_subarray_defs()
-
-        # Now read in readpattern definitions
-        readpatt_def = self.get_readpattern_defs()
+        # obsname = self.info['obs_label'][0]
 
         # for i in range(len(self.info['Module'])):
         for i, instrument in enumerate(self.info['Instrument']):
@@ -732,137 +726,134 @@ class SimInput:
             groups = np.int(self.info['Groups'][i])
             integrations = np.int(self.info['Integrations'][i])
 
-            # self.global_subarray_definitions = {}
-            # # need smarter implementation for programe with several/parallel instruments
-            # if instrument.lower() == 'niriss':
-            #     readout_pattern_file = 'niriss_readout_pattern.txt'
-            #     subarray_def_file = 'niriss_subarrays.list'
-            #     self.global_subarray_definitions['niriss'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-            # elif instrument.lower() == 'fgs':
-            #     readout_pattern_file = 'guider_readout_pattern.txt'
-            #     subarray_def_file = 'guider_subarrays.list'
-            #     self.global_subarray_definitions['fgs'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-            # elif instrument.lower() == 'nircam':
-            #     readout_pattern_file = 'nircam_read_pattern_definitions.list'
-            #     subarray_def_file = 'NIRCam_subarray_definitions.list'
-            #     self.global_subarray_definitions['nircam'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-
-            readpatt_def = self.global_readout_patterns[instrument.lower()]
-            subarray_def = self.global_subarray_definitions[instrument.lower()]
-
-            match2 = readpatt == readpatt_def['name']
-            if np.sum(match2) == 0:
-                raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
-                                    .format(readpatt)))
-
-            # Now get nframe and nskip so we know how many frames in a group
-            fpg = np.int(readpatt_def['nframe'][match2][0])
-            spg = np.int(readpatt_def['nskip'][match2][0])
-            nframe.append(fpg)
-            nskip.append(spg)
-
-            # Get the aperture name. For non-NIRCam instruments,
-            # this is simply the self.info['aperture']. But for NIRCam,
-            # we need to be careful of entries like NRCBS_FULL, which is used
-            # for observations using all 4 shortwave B detectors. In that case,
-            # we need to build the aperture name from the combination of detector
-            # and subarray name.
-            # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
-            #     aperture = self.info['aperture']
-            # else:
-            #     sub = self.info['Subarray'][i]
-            #     det = 'NRC' + self.info['detector'][i]
-            #     aperture = det + '_' + sub
-
-            aperture = self.info['aperture'][i]
-
-
-            # Get the number of amps from the subarray definition file
-            match = aperture == subarray_def['AperName']
-
-            # JSA: not sure when this is needed
-            # if np.sum(match) == 0:
-            #     aperture = [apername for apername, name in
-            #                 np.array(subarray_def['AperName', 'Name']) if
-            #                 (sub in apername) or (sub in name)]
-            #
-            #     match = aperture == subarray_def['AperName']
-            #
-            #     if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
-            #         raise ValueError('Cannot combine detector {} and subarray {}\
-            #             into valid aperture name.'.format(det, sub))
-            #     # We don't want aperture as a list
-            #     aperture = aperture[0]
-
-            # print(aperture)
-
-            amp = subarray_def['num_amps'][match][0]
-            namp.append(amp)
-
-            # same activity ID
-            if next_actid == actid:
-                # in this case, the start time should remain the same
+            if instrument.lower() in ['miri', 'nirspec']:
+                nframe.append(0)
+                nskip.append(0)
+                namp.append(0)
                 date_obs.append(base_date)
                 time_obs.append(base_time)
                 expstart.append(base.mjd)
-                # print(actid, visit, obsname, base_date, base_time)
-                continue
 
-            epoch_date = self.info['epoch_start_date'][i]
-            epoch_time = deepcopy(epoch_base_time0)
-            # new epoch - update the base time
-            if epoch_date != epoch_base_date:
-                epoch_base_date = deepcopy(epoch_date)
-                base = Time(epoch_base_date + 'T' + epoch_base_time)
+            else:
+                # Now read in readpattern definitions
+                readpatt_def = self.global_readout_patterns[instrument.lower()]
+
+                # Read in file containing subarray definitions
+                subarray_def = self.global_subarray_definitions[instrument.lower()]
+
+                match2 = readpatt == readpatt_def['name']
+                if np.sum(match2) == 0:
+                    raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
+                                        .format(readpatt)))
+
+                # Now get nframe and nskip so we know how many frames in a group
+                fpg = np.int(readpatt_def['nframe'][match2][0])
+                spg = np.int(readpatt_def['nskip'][match2][0])
+                nframe.append(fpg)
+                nskip.append(spg)
+
+                # Get the aperture name. For non-NIRCam instruments,
+                # this is simply the self.info['aperture']. But for NIRCam,
+                # we need to be careful of entries like NRCBS_FULL, which is used
+                # for observations using all 4 shortwave B detectors. In that case,
+                # we need to build the aperture name from the combination of detector
+                # and subarray name.
+                # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
+                #     aperture = self.info['aperture']
+                # else:
+                #     sub = self.info['Subarray'][i]
+                #     det = 'NRC' + self.info['detector'][i]
+                #     aperture = det + '_' + sub
+
+                aperture = self.info['aperture'][i]
+
+
+                # Get the number of amps from the subarray definition file
+                match = aperture == subarray_def['AperName']
+
+                # JSA: not sure when this is needed
+                # if np.sum(match) == 0:
+                #     aperture = [apername for apername, name in
+                #                 np.array(subarray_def['AperName', 'Name']) if
+                #                 (sub in apername) or (sub in name)]
+                #
+                #     match = aperture == subarray_def['AperName']
+                #
+                #     if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+                #         raise ValueError('Cannot combine detector {} and subarray {}\
+                #             into valid aperture name.'.format(det, sub))
+                #     # We don't want aperture as a list
+                #     aperture = aperture[0]
+
+                # print(aperture)
+
+                amp = subarray_def['num_amps'][match][0]
+                namp.append(amp)
+
+                # same activity ID
+                if next_actid == actid:
+                    # in this case, the start time should remain the same
+                    date_obs.append(base_date)
+                    time_obs.append(base_time)
+                    expstart.append(base.mjd)
+                    # print(actid, visit, obsname, base_date, base_time)
+                    continue
+
+                epoch_date = self.info['epoch_start_date'][i]
+                epoch_time = deepcopy(epoch_base_time0)
+                # new epoch - update the base time
+                if epoch_date != epoch_base_date:
+                    epoch_base_date = deepcopy(epoch_date)
+                    base = Time(epoch_base_date + 'T' + epoch_base_time)
+                    base_date, base_time = base.iso.split()
+                    basereset = True
+                    date_obs.append(base_date)
+                    time_obs.append(base_time)
+                    expstart.append(base.mjd)
+                    actid = deepcopy(next_actid)
+                    visit = deepcopy(next_visit)
+                    obsname = deepcopy(next_obsname)
+                    continue
+
+                # new visit
+                if next_visit != visit:
+                    # visit break. Larger overhead
+                    overhead = visit_overhead
+                elif ((next_actid > actid) & (next_visit == visit)):
+                    # same visit, new activity. Smaller overhead
+                    overhead = act_overhead
+                else:
+                    # should never get in here
+                    raise NotImplementedError()
+
+                # For cases where the base time needs to change
+                # continue down here
+                siaf_inst = self.info['Instrument'][i].upper()
+                if siaf_inst == 'NIRCAM':
+                    siaf_inst = "NIRCam"
+                siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
+
+                # Calculate the readout time for a single frame
+                frametime = calc_frame_time(siaf_inst, aperture,
+                                            siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
+
+                # Estimate total exposure time
+                exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
+
+                # Delta should include the exposure time, plus overhead
+                delta = TimeDelta(exptime + overhead, format='sec')
+                base += delta
                 base_date, base_time = base.iso.split()
-                basereset = True
+
+                # Add updated dates and times to the list
                 date_obs.append(base_date)
                 time_obs.append(base_time)
                 expstart.append(base.mjd)
+
+                # increment the activity ID and visit
                 actid = deepcopy(next_actid)
                 visit = deepcopy(next_visit)
                 obsname = deepcopy(next_obsname)
-                continue
-
-            # new visit
-            if next_visit != visit:
-                # visit break. Larger overhead
-                overhead = visit_overhead
-            elif ((next_actid > actid) & (next_visit == visit)):
-                # same visit, new activity. Smaller overhead
-                overhead = act_overhead
-            else:
-                # should never get in here
-                raise NotImplementedError()
-
-            # For cases where the base time needs to change
-            # continue down here
-            siaf_inst = self.info['Instrument'][i].upper()
-            if siaf_inst == 'NIRCAM':
-                siaf_inst = "NIRCam"
-            siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
-
-            # Calculate the readout time for a single frame
-            frametime = calc_frame_time(siaf_inst, aperture,
-                                        siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
-
-            # Estimate total exposure time
-            exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
-
-            # Delta should include the exposure time, plus overhead
-            delta = TimeDelta(exptime + overhead, format='sec')
-            base += delta
-            base_date, base_time = base.iso.split()
-
-            # Add updated dates and times to the list
-            date_obs.append(base_date)
-            time_obs.append(base_time)
-            expstart.append(base.mjd)
-
-            # increment the activity ID and visit
-            actid = deepcopy(next_actid)
-            visit = deepcopy(next_visit)
-            obsname = deepcopy(next_obsname)
 
         self.info['date_obs'] = date_obs
         self.info['time_obs'] = time_obs

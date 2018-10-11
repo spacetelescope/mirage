@@ -294,8 +294,7 @@ class AptInput:
                 # intab['epoch_start_date'] = obs_start
 
         else:
-            if ('fgs' in unique_instrument_names and 'niriss' in unique_instrument_names) | ('miri' in unique_instrument_names and 'niriss' in unique_instrument_names) | ('nirspec' in unique_instrument_names and 'niriss' in unique_instrument_names):
-            # if unique_instrument_names[0] == 'niriss':
+            if ('fgs' in unique_instrument_names and 'niriss' in unique_instrument_names) | ('fgs' in unique_instrument_names and 'miri' in unique_instrument_names) | ('fgs' in unique_instrument_names and 'nirspec' in unique_instrument_names):
                 for key in OBSERVATION_LIST_FIELDS:
                     intab[key] = []
 
@@ -443,6 +442,13 @@ class AptInput:
             for i, instrument in enumerate(obstab['Instrument']):
                 if instrument.lower() == 'niriss':
                     obstab['detector'].append('NIS')
+                elif instrument.lower() == 'nirspec':
+                    obstab['detector'].append('NRS')
+                elif instrument.lower() == 'nirspec':
+                    if 'NRS1' in obstab['aperture'][i]:
+                        obstab['detector'].append('NRS1')
+                    elif 'NRS2' in obstab['aperture'][i]:
+                        obstab['detector'].append('NRS1')
                 elif instrument.lower() == 'fgs':
                     if 'FGS1' in obstab['aperture'][i]:
                         obstab['detector'].append('G1')
@@ -885,6 +891,8 @@ class AptInput:
         # 1/0
         for i in range(len(self.exposure_tab['Module'])):
             siaf_instrument = self.exposure_tab["Instrument"][i]
+            if siaf_instrument == 'NIRSPEC':
+                siaf_instrument = 'NIRSpec'
             aperture_name = self.exposure_tab['aperture'][i]
             # print('{} {}'.format(siaf_instrument, aperture_name))
             pointing_ra = np.float(self.exposure_tab['ra'][i])

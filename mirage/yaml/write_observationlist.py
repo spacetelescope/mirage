@@ -128,7 +128,7 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
             if instrument in ['NIRCAM', 'WFSC']:
                 # LW and SW stuff
                 pass
-            elif instrument in ['NIRISS', 'FGS']:
+            elif instrument in ['NIRISS', 'FGS', 'NIRSPEC', 'MIRI']:
                 text += [
                     "  Filter: {}\n".format(xml_dict['FilterWheel'][exposure_index]),
                     "  PointSourceCatalog: {}\n".format(catalog_files[exposure_index]),
