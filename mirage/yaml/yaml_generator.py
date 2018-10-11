@@ -983,7 +983,8 @@ class SimInput:
             self.configfiles['linearity_config'] = 'linearity.cfg'
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         else:
-            raise RuntimeError('Instrument {} is not supported'.format(instrument))
+            # raise RuntimeError('Instrument {} is not supported'.format(instrument))
+            print('WARNING: Instrument {} is not supported as PRIME. Looking for parallels.'.format(instrument))
 
         self.superbias_list = {}
         self.linearity_list = {}
@@ -1033,9 +1034,15 @@ class SimInput:
                 self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
                 self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
-        elif self.instrument.lower() == 'niriss':
+        elif self.instrument.lower() in ['niriss', 'nirspec', 'miri']:
             # directory containing NIRISS reference files
             #HACK: add FGS files temporarily
+
+            if self.instrument.lower() in ['nirspec', 'miri']:
+                for key in 'subarray_def_file fluxcal filtpupil_pairs readpatt_def_file crosstalk ' \
+                           'dq_init_config saturation_config superbias_config refpix_config ' \
+                           'linearity_config filter_throughput'.split():
+                    self.configfiles[key] = 'N/A'
 
             if offline:
                 # no access to central store. Set all files to none.

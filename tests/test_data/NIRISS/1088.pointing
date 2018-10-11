@@ -1,0 +1,34 @@
+# APT Output Product
+# 
+# APT Version: Version 26.0.5  JWST PRD: PRDOPSSOC-H-015 
+# Date: Thu Oct 11 15:22:44 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1088 (Unsaved)
+
+========================================
+* NIRISS_FGS1_alignment (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   +0.000   +0.000  -41.466 -699.973 -248.646   +0.001 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 1 LMC-NIRI  +80.48876  -69.49942 +248.649   +2.955   +0.000   +0.000  -41.466 -699.973 +248.651   +2.956 TARGET     PARALLEL       0      0                  
+  1    1   1    2 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   +0.392   +0.165  -41.857 -699.804 -248.254   +0.165 DITHER     SCIENCE        0      0  0.425           
+  1    1   1    2 FGS1_FULL                 1 LMC-NIRI  +80.48876  -69.49942 +248.649   +2.955   +0.387   +0.177  -41.857 -699.804 +249.038   +3.133 DITHER     PARALLEL       0      0                  
+  1    1   1    3 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   +0.164   +0.461  -41.625 -699.510 -248.483   +0.461 DITHER     SCIENCE        0      0  0.374           
+  1    1   1    3 FGS1_FULL                 1 LMC-NIRI  +80.48876  -69.49942 +248.649   +2.955   +0.149   +0.466  -41.625 -699.510 +248.799   +3.422 DITHER     PARALLEL       0      0                  
+  1    1   1    4 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   -0.229   +0.296  -41.234 -699.679 -248.875   +0.297 DITHER     SCIENCE        0      0  0.425           
+  1    1   1    4 FGS1_FULL                 1 LMC-NIRI  +80.48876  -69.49942 +248.649   +2.955   -0.238   +0.289  -41.234 -699.679 +248.413   +3.245 DITHER     PARALLEL       0      0                  
+
+========================================
+* NIRISS_FGS2_alignment (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   +0.000   +0.000  -41.466 -699.973 -248.646   +0.001 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS2_FULL                 1 LMC-NIRI  +80.48876  -69.49942  +65.887   -2.691   +0.000   +0.000  -41.466 -699.973  +65.887   -2.691 TARGET     PARALLEL       0      0                  
+  1    1   1    2 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   +0.392   +0.165  -41.857 -699.804 -248.254   +0.165 DITHER     SCIENCE        0      0  0.425           
+  1    1   1    2 FGS2_FULL                 1 LMC-NIRI  +80.48876  -69.49942  +65.887   -2.691   +0.391   +0.167  -41.857 -699.804  +66.279   -2.524 DITHER     PARALLEL       0      0                  
+  1    1   1    3 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   +0.164   +0.461  -41.625 -699.510 -248.483   +0.461 DITHER     SCIENCE        0      0  0.374           
+  1    1   1    3 FGS2_FULL                 1 LMC-NIRI  +80.48876  -69.49942  +65.887   -2.691   +0.160   +0.462  -41.625 -699.510  +66.048   -2.230 DITHER     PARALLEL       0      0                  
+  1    1   1    4 NIS_CEN                   1 LMC-NIRI  +80.48876  -69.49942 -248.645   +0.000   -0.229   +0.296  -41.234 -699.679 -248.875   +0.297 DITHER     SCIENCE        0      0  0.425           
+  1    1   1    4 FGS2_FULL                 1 LMC-NIRI  +80.48876  -69.49942  +65.887   -2.691   -0.231   +0.295  -41.234 -699.679  +65.657   -2.397 DITHER     PARALLEL       0      0                  
+
+

@@ -294,7 +294,7 @@ class AptInput:
                 # intab['epoch_start_date'] = obs_start
 
         else:
-            if 'fgs' in unique_instrument_names and 'niriss' in unique_instrument_names:
+            if ('fgs' in unique_instrument_names and 'niriss' in unique_instrument_names) | ('miri' in unique_instrument_names and 'niriss' in unique_instrument_names) | ('nirspec' in unique_instrument_names and 'niriss' in unique_instrument_names):
             # if unique_instrument_names[0] == 'niriss':
                 for key in OBSERVATION_LIST_FIELDS:
                     intab[key] = []
@@ -728,7 +728,6 @@ class AptInput:
                 elif (len(line) > 1):
                     elements = line.split()
 
-
                     # Look for lines that give visit/observation numbers
                     if line[0:2] == '* ':
                         paren = line.rfind('(')
@@ -741,10 +740,11 @@ class AptInput:
                         if (' (' in obslabel) and (')' in obslabel):
                             obslabel = re.split(r' \(|\)', obslabel)[0]
 
-                        if 'FGS' in obslabel:
-                            skip = True
-                        else:
-                            skip = False
+                        # if 'FGS' in obslabel:
+                        #     skip = True
+                        # else:
+                        #     skip = False
+                        skip = False
 
                     if line[0:2] == '**':
                         v = elements[2]
@@ -765,7 +765,12 @@ class AptInput:
                         #
                         # Also, skip non-NIRCam lines. Check for NRC in aperture name
                         # Add NIRISS and FGS support (JSA)
-                        if ((np.int(elements[1]) > 0) & ('NRC' in elements[4] or 'NIS' in elements[4] or 'FGS' in elements[4])):
+                        if ((np.int(elements[1]) > 0) & ('NRC' in elements[4]
+                                                         or 'NIS' in elements[4]
+                                                         or 'FGS' in elements[4]
+                                                         or 'NRS' in elements[4]
+                                                         or 'MIR' in elements[4])
+                            ):
                             if skip:
                                 act_counter += 1
                                 continue

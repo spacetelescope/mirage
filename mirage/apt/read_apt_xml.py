@@ -94,7 +94,7 @@ class ReadAPTXML():
         # Get high-level information: proposal info - - - - - - - - - - - - - -
 
         # Set default values
-        propid_default = 42424
+        propid_default = 42
         proptitle_default = 'Looking for my towel'
         scicat_default = 'Planets and Planet Formation'
         piname_default = 'D.N. Adams'
@@ -146,11 +146,9 @@ class ReadAPTXML():
         i_observations = []
         obs_indices = range(len(obs_results))
         for o, i_obs in zip(obs_results, obs_indices):
-            if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC', 'NIRISS']:
+            if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC', 'NIRISS', 'MIRI', 'NIRSPEC']:
                 observations.append(o)
                 i_observations.append(i_obs)
-
-
 
 
         # Get parameters out!
@@ -173,7 +171,9 @@ class ReadAPTXML():
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
                                    'NircamEngineeringImaging', 'WfscGlobalAlignment',
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
-                                   'NirissExternalCalibration']
+                                   'NirissExternalCalibration', # NIRISS
+                                   'NirspecImaging', 'NirspecInternalLamp', # NIRSpec
+                                   ]
             if template_name not in known_APT_templates:
                 # If not, turn back now.
                 raise ValueError('No protocol written to read {} template.'.format(template_name))
@@ -235,9 +235,8 @@ class ReadAPTXML():
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 self.read_imaging_template(template, template_name, obs, prop_params)
 
-            elif template_name in ['NirissExternalCalibration']:
+            elif template_name in ['NirissExternalCalibration', 'NirspecImaging']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
-
                 if coordparallel == 'true':
                     # Determine what template is used for the parallel observation
                     template = obs.find(self.apt + 'FirstCoordinatedTemplate')[0]
@@ -247,7 +246,9 @@ class ReadAPTXML():
                                                                               proposal_parameter_dictionary,
                                                                               parallel=True, verbose=verbose)
 
-                    if exposures_dictionary['Instrument'][0] == 'NIRISS':
+                    if exposures_dictionary['Instrument'][0] in ['NIRISS']:
+                       dither_key_name = 'ImageDithers'
+                    elif exposures_dictionary['Instrument'][0] in ['NIRSPEC', 'MIRI']:
                        dither_key_name = 'ImageDithers'
 
                     # replicate the dithers for the parallel instrument
@@ -255,7 +256,7 @@ class ReadAPTXML():
                         raise RuntimeError('Mismatch in the number of parallel observations.')
                     # else:
                     #     parallel_exposures_dictionary[dither_key_name] = exposures_dictionary[dither_key_name]
-
+                    # 1/0
                     exposures_dictionary = self.append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
                     # print(exposures_dictionary['Instrument'])
 
@@ -291,8 +292,11 @@ class ReadAPTXML():
 
 
             # Now we need to look for mosaic details, if any
-            mostile = obs.findall('.//' + self.apt + 'MosaicTiles')
-            n_tiles = len(mostile)
+            mosaic_tiles = obs.findall('.//' + self.apt + 'MosaicTiles')
+
+            # count only tiles that are included
+            tile_state = np.array([mosaic_tiles[i].find('.//' + self.apt + 'TileState').text for i in range(len(mosaic_tiles))])
+            n_tiles = np.sum(tile_state=='Tile Included')
 
             if n_tiles > 1:
                 for i in range(n_tiles - 1):
@@ -323,10 +327,6 @@ class ReadAPTXML():
                 number_of_exposures = len(self.APTObservationParams['Instrument'])
                 print('Dictionary currently holds {} exposures'.format(number_of_exposures))
                 print(self.APTObservationParams['Instrument'])
-
-        # flatten the lists if necessary
-        # for key in self.APTObservationParams.keys():
-        #     self.APTObservationParams[key] = flatten_list(self.APTObservationParams[key])
 
         return self.APTObservationParams
 
@@ -475,7 +475,8 @@ class ReadAPTXML():
                 # 1/0
 
             if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
-                    ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures')):
+                    ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
+                    ((instrument.lower() == 'nirspec') and (element_tag_stripped == 'Exposures')):
                 for exposure in element.findall(ns + 'Exposure'):
                     exposure_dict = {}
                     exposure_dict['DitherPatternType'] = DitherPatternType
