@@ -3,8 +3,6 @@
 Example yaml Input File
 =======================
 
-.. _example_yaml:
-
 Below is an example yaml input file for `mirage`.
 
 

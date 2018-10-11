@@ -1,3 +1,5 @@
+.. _from_apt:
+
 Simulating Observations from an APT File
 ========================================
 
@@ -144,6 +146,8 @@ One other input file is needed in addition to those from the APT proposal. This 
 	      MovingTargetToTrack: None
 	      BackgroundRate: medium
 
+
+.. _yaml_generator:
 
 Run the yaml generator
 ----------------------
