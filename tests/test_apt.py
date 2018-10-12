@@ -83,7 +83,7 @@ def RunAllAPTTemplates(instrument):
                                                 'Test.xml_with_yaml_parameters.csv')), \
         'Observation table not created.'
 
-    number_of_yaml_files  = len(glob.glob(os.path.join(out_dir, 'jw{}*.yaml'.format(int(PROPOSAL_ID)))))
+    number_of_yaml_files  = len(glob.glob(os.path.join(out_dir, 'jw{:05d}*.yaml'.format(int(PROPOSAL_ID)))))
     print('PROPOSAL_ID: {}'.format(PROPOSAL_ID))
     print('number of observations: {}'.format(n_obs))
     print('number of files written: {}'.format(number_of_yaml_files))
