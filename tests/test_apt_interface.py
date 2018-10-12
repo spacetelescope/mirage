@@ -19,12 +19,15 @@ import shutil
 
 from mirage.yaml import write_observationlist, yaml_generator
 from mirage.apt import read_apt_xml, apt_inputs
+from mirage.utils import siaf_interface
 
-import importlib
-importlib.reload( yaml_generator )
-importlib.reload( write_observationlist )
-importlib.reload( read_apt_xml )
-importlib.reload( apt_inputs )
+# import importlib
+# importlib.reload( yaml_generator )
+# importlib.reload( write_observationlist )
+# importlib.reload( read_apt_xml )
+# importlib.reload( apt_inputs )
+# importlib.reload( siaf_interface )
+
 
 
 # os.environ['MIRAGE_DATA'] = ''
@@ -58,7 +61,7 @@ def temporary_directory(test_dir=TEMPORARY_DIR):
 
 
 
-def est_observation_list_generation_minimal():
+def test_observation_list_generation_minimal():
 
     # generate output directory
     temporary_directory()
@@ -84,9 +87,10 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
-    # for instrument in ['NIRCam', 'NIRISS']:
+    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
-    for instrument in ['NIRSpec']:
+    # for instrument in ['NIRSpec']:
+    # for instrument in ['MIRI']:
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
@@ -98,6 +102,9 @@ def test_complete_input_generation():
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
+        elif instrument == 'MIRI':
+            apt_file_seeds = ['1171']
+            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
         for apt_file_seed in apt_file_seeds:
             # Write observationlist.yaml
@@ -107,7 +114,7 @@ def test_complete_input_generation():
             apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             apt_xml_dict = write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name, verbose=True)
-            print(apt_xml_dict)
+            # print(apt_xml_dict)
             yam = yaml_generator.SimInput()
             yam.input_xml = apt_file_xml
             yam.pointing_file = apt_file_pointing
@@ -122,7 +129,8 @@ def test_complete_input_generation():
             yam.create_inputs(apt_xml_dict=apt_xml_dict)
 
             yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
-            assert len(yam.info['Instrument']) == len(yfiles)
+            valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
+            assert len(valid_instrument_list) == len(yfiles)
 
-if __name__ == '__main__':
-    test_complete_input_generation()
+# if __name__ == '__main__':
+#     test_complete_input_generation()

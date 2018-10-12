@@ -402,6 +402,9 @@ class AptInput:
         # Expand the dictionary for multiple dithers. Expand such that there
         # is one entry in each list for each exposure, rather than one entry
         # for each set of dithers
+        # for key in tab.keys():
+        #     print('{:<25}: number of elements is {:>5}'.format(key, len(tab[key])))
+
         if (np.all(np.array(tab['PrimaryDithers']).astype(int) == 1) and np.all(np.array(tab['ImageDithers']).astype(int) == 1)): # NIRCam and NIRISS dither names
             # skip step if no dithers are included
             xmltab = tab
@@ -454,6 +457,8 @@ class AptInput:
                         obstab['detector'].append('G1')
                     elif 'FGS2' in obstab['aperture'][i]:
                         obstab['detector'].append('G2')
+                elif instrument.lower() == 'miri':
+                        obstab['detector'].append('MIR')
             self.exposure_tab = obstab
         else:
             self.exposure_tab = self.expand_for_detectors(obstab)

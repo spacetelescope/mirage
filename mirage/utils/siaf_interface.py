@@ -66,7 +66,7 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     try:
         xcorner, ycorner = sci_subarray_corners(instrument, aperture_name)
         subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
-    except RuntimeError as e: # e.g. NIRSpec NRS_FULL_MSA aperture
+    except (RuntimeError, TypeError) as e: # e.g. NIRSpec NRS_FULL_MSA aperture
         print('get_siaf_information raised error:\n{}\nIgnoring it.'.format(e))
         subarray_boundaries = [0, 0, 0, 0]
     return siaf, local_roll, att_matrix, fullframesize, subarray_boundaries

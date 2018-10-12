@@ -290,15 +290,6 @@ class SimInput:
         ipc = []
         pam = []
 
-        # for i, instrument in enumerate(self.info['Instrument']):
-        #     if instrument.lower() == 'niriss':
-        #         self.info['detector'][i] = 'NIS'
-        #
-        #
-        # # if self.instrument.lower() == 'nircam':
-        # if self.instrument.lower() == 'niriss':
-        #     self.info['detector'] = ['NIS']
-        #     # detector_labels = ['NIS']
         detector_labels = self.info['detector']
 
         for det in detector_labels:
@@ -372,7 +363,11 @@ class SimInput:
         # Now go through the lists one element at a time
         # and create a yaml file for each.
         yamls = []
-        for i in range(len(detector_labels)):
+        # for i in range(len(detector_labels)):
+        for i, instrument in enumerate(self.info['Instrument']):
+            if instrument.lower() not in 'fgs nircam niriss'.split():
+                # do not write files for MIRI and NIRSpec
+                continue
             file_dict = {}
             for key in self.info:
                 file_dict[key] = self.info[key][i]
@@ -650,7 +645,7 @@ class SimInput:
         self.global_psfpath = {}
         # self.global_filter_throughput_files = {} ?
 
-        for instrument in 'niriss fgs nircam'.split():
+        for instrument in 'niriss fgs nircam miri nirspec'.split():
             if instrument.lower() == 'niriss':
                 readout_pattern_file = 'niriss_readout_pattern.txt'
                 subarray_def_file = 'niriss_subarrays.list'
@@ -672,9 +667,16 @@ class SimInput:
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
                 flux_cal_file = 'NIRCam_zeropoints.list'
                 psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
-
-            self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-            self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
+            else:
+                readout_pattern_file = 'N/A'
+                subarray_def_file = 'N/A'
+                crosstalk_file = 'N/A'
+                filtpupilcombo_file = 'N/A'
+                flux_cal_file = 'N/A'
+                psfpath = 'N/A'
+            if instrument in 'niriss fgs nircam'.split():
+                self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
+                self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
             self.global_subarray_definition_files[instrument] = os.path.join(self.modpath, 'config', subarray_def_file)
             self.global_readout_pattern_files[instrument] = os.path.join(self.modpath, 'config', readout_pattern_file)
             self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
@@ -942,7 +944,7 @@ class SimInput:
         # Prepare to find files listed as 'config'
         # and set up PSF path
         self.configfiles = {}
-        if self.instrument == 'nircam':
+        if self.instrument.lower() == 'nircam':
             self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
             self.psfbasename = 'nircam'
             self.psfpixfrac = 0.25
@@ -974,6 +976,8 @@ class SimInput:
             self.configfiles['linearity_config'] = 'linearity.cfg'
             self.configfiles['filter_throughput'] = 'placeholder.txt'
         else:
+            self.psfpixfrac = 0
+            self.psfbasename = 'N/A'
             # raise RuntimeError('Instrument {} is not supported'.format(instrument))
             print('WARNING: Instrument {} is not supported as PRIME. Looking for parallels.'.format(instrument))
 
@@ -1034,6 +1038,17 @@ class SimInput:
                            'dq_init_config saturation_config superbias_config refpix_config ' \
                            'linearity_config filter_throughput'.split():
                     self.configfiles[key] = 'N/A'
+                default_value = 'none'
+                for det in ['NRS', 'MIR']:
+                    self.ipc_list[det] = default_value
+                    self.dark_list[det] = default_value
+                    self.superbias_list[det] = default_value
+                    self.linearity_list[det] = default_value
+                    self.gain_list[det] = default_value
+                    self.saturation_list[det] = default_value
+                    self.astrometric_list[det] = default_value
+                    self.pam_list[det] = default_value
+                    self.lindark_list[det] = default_value
 
             if offline:
                 # no access to central store. Set all files to none.
@@ -1135,6 +1150,10 @@ class SimInput:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             catkey = ''
+        elif input['detector'] in ['NRS', 'MIR']:
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            catkey = ''
         else:
             if np.int(input['detector'][-1]) < 5:
                 filtkey = 'ShortFilter'
@@ -1174,10 +1193,10 @@ class SimInput:
             f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
             f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
-            if self.instrument.lower() == 'nircam':
+            if instrument.lower() == 'nircam':
                 apunder = input['aperture'].find('_')
                 full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
-            if self.instrument.lower() == 'niriss':
+            if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
 

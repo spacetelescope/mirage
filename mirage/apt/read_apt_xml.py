@@ -57,7 +57,12 @@ class ReadAPTXML():
                              'ReadoutPattern', 'Groups', 'Integrations',
                              'FilterWheel', 'PupilWheel' # for NIRISS
                              ]
-        OtherParams_keys = ['Mode', 'Grism']
+        OtherParams_keys = ['Mode', 'Grism',
+                            'IntegrationsShort', 'GroupsShort', 'Dither', # MIRI
+                            'GroupsLong', 'ReadoutPatternShort', 'IntegrationsLong',
+                            'Exposures', 'Wavelength', 'ReadoutPatternLong', 'Filter',
+                            'EtcIdLong', 'EtcIdShort',
+                            ]
 
         self.APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
             FilterParams_keys + OtherParams_keys
@@ -173,6 +178,7 @@ class ReadAPTXML():
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
                                    'NirissExternalCalibration', # NIRISS
                                    'NirspecImaging', 'NirspecInternalLamp', # NIRSpec
+                                   'MiriMRS', # MIRI
                                    ]
             if template_name not in known_APT_templates:
                 # If not, turn back now.
@@ -235,7 +241,7 @@ class ReadAPTXML():
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 self.read_imaging_template(template, template_name, obs, prop_params)
 
-            elif template_name in ['NirissExternalCalibration', 'NirspecImaging']:
+            elif template_name in ['NirissExternalCalibration', 'NirspecImaging', 'MiriMRS']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
                 if coordparallel == 'true':
                     # Determine what template is used for the parallel observation
@@ -472,10 +478,14 @@ class ReadAPTXML():
                 DitherPatternType = element.text
             elif element_tag_stripped == 'ImageDithers':
                 ImageDithers = element.text
-                # 1/0
+            elif element_tag_stripped == 'Dithers':
+                DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
+                # number of dithers
+                ImageDithers = int(DitherPatternType[0])
 
             if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
                     ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
+                    ((instrument.lower() == 'miri') and (element_tag_stripped == 'ExposureList'))| \
                     ((instrument.lower() == 'nirspec') and (element_tag_stripped == 'Exposures')):
                 for exposure in element.findall(ns + 'Exposure'):
                     exposure_dict = {}
