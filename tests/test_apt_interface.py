@@ -18,9 +18,8 @@ import pytest
 import shutil
 
 from mirage.yaml import write_observationlist, yaml_generator
-from mirage.apt import read_apt_xml, apt_inputs
-from mirage.utils import siaf_interface
-
+# from mirage.apt import read_apt_xml, apt_inputs
+# from mirage.utils import siaf_interface
 # import importlib
 # importlib.reload( yaml_generator )
 # importlib.reload( write_observationlist )
@@ -87,7 +86,8 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
-    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
+    # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
+    for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
