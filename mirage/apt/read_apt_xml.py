@@ -116,9 +116,9 @@ class ReadAPTXML():
 
         # Proposal ID
         try:
-            prop_id = proposal_info.find(self.apt + 'ProposalID').text
+            prop_id = '{:05d}'.format(proposal_info.find(self.apt + 'ProposalID').text)
         except:
-            prop_id = propid_default
+            prop_id = '{:05d}'.format(propid_default)
 
         # Proposal Category
         try:
@@ -240,6 +240,12 @@ class ReadAPTXML():
             # If template is NircamImaging or NircamEngineeringImaging
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 self.read_imaging_template(template, template_name, obs, prop_params)
+                # complement dictionary entries
+                number_of_entries = len(self.APTObservationParams['ProposalID'])
+                self.APTObservationParams['ObservationName'] = [obs_label] * number_of_entries
+                # self.APTObservationParams['ImageDithers'] = [1] * number_of_entries
+                exposures_dictionary = copy.deepcopy(self.APTObservationParams)
+                # 1/0
 
             elif template_name in ['NirissExternalCalibration', 'NirspecImaging', 'MiriMRS']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
@@ -421,7 +427,7 @@ class ReadAPTXML():
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary, verbose=False, parallel=False):
         """Read imaging template content regardless of instrument.
 
-        Save content to object attributes. Support for coordinates parallels is included.
+        Save content to object attributes. Support for coordinated parallels is included.
 
         Parameters
         ----------
@@ -546,17 +552,24 @@ class ReadAPTXML():
 
 
     def read_imaging_template(self, template, template_name, obs, prop_params):
+        """Read NIRCam imaging template.
+
+        Parameters
+        ----------
+        template
+        template_name
+        obs
+        prop_params
+
+        Returns
+        -------
+
+        """
         # Get proposal parameters
         pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
 
-
         # Set namespace
         ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
-        # if template_name == 'NircamImaging':
-        #     ns = "{http://www.stsci.edu/JWST/APT/Template/NircamImaging}"
-        # elif template_name == 'NircamEngineeringImaging':
-        #     ns = "{http://www.stsci.edu/JWST/APT/Template/NircamEngineeringImaging}"
-
         instrument = obs.find(self.apt + 'Instrument').text
 
         # Set parameters that are constant for all imaging obs

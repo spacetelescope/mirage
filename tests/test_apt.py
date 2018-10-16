@@ -14,12 +14,23 @@ Use
 import os
 import glob
 import shutil
-import yaml
 
 from lxml import etree
 import pytest
 
 from mirage.yaml import write_observationlist, yaml_generator
+
+from mirage.yaml import write_observationlist, yaml_generator
+from mirage.apt import read_apt_xml, apt_inputs
+from mirage.utils import siaf_interface
+import importlib
+importlib.reload( yaml_generator )
+importlib.reload( write_observationlist )
+importlib.reload( read_apt_xml )
+importlib.reload( apt_inputs )
+importlib.reload( siaf_interface )
+
+
 
 # to be set before running test
 # os.environ['MIRAGE_DATA'] = ''
@@ -63,6 +74,7 @@ def RunAllAPTTemplates(instrument):
     observationlist_file = os.path.join(out_dir, instrument + '_observationlist.yaml')
     write_observationlist.write_yaml(xml_file, pointing_file, observationlist_file,
                                      ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
+
 
     # Create a series of data simulator input yaml files
     yam = yaml_generator.SimInput()
@@ -120,4 +132,8 @@ def test_environment_variable():
 def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''
+    RunAllAPTTemplates('NIRCam')
+
+
+if __name__ == '__main__':
     RunAllAPTTemplates('NIRCam')
