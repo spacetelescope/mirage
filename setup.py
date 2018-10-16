@@ -48,7 +48,8 @@ except ImportError:
 class PyTest(TestCommand):
     def finalize_options(self):
         TestCommand.finalize_options(self)
-        self.test_args = ['tests']
+        # self.test_args = ['tests']
+        self.test_args = ['tests/test_apt_interface.py', 'tests/test_apt.py', 'tests/test_siaf_interface.py']
         self.test_suite = True
 
     def run_tests(self):
