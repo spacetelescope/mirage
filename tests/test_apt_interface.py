@@ -18,14 +18,14 @@ import pytest
 import shutil
 
 from mirage.yaml import write_observationlist, yaml_generator
-# from mirage.apt import read_apt_xml, apt_inputs
-# from mirage.utils import siaf_interface
-# import importlib
-# importlib.reload( yaml_generator )
-# importlib.reload( write_observationlist )
-# importlib.reload( read_apt_xml )
-# importlib.reload( apt_inputs )
-# importlib.reload( siaf_interface )
+from mirage.apt import read_apt_xml, apt_inputs
+from mirage.utils import siaf_interface
+import importlib
+importlib.reload( yaml_generator )
+importlib.reload( write_observationlist )
+importlib.reload( read_apt_xml )
+importlib.reload( apt_inputs )
+importlib.reload( siaf_interface )
 
 
 
@@ -87,10 +87,11 @@ def test_complete_input_generation():
     temporary_directory()
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
-    for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
+    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
+    for instrument in ['NIRCam']:
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
