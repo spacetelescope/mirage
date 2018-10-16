@@ -1,9 +1,32 @@
 #!/usr/bin/env python
 import os
+import pkgutil
 import subprocess
 import sys
 from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.test import test as TestCommand
+
+
+if not pkgutil.find_loader('relic'):
+    relic_local = os.path.exists('relic')
+    relic_submodule = (relic_local and
+                       os.path.exists('.gitmodules') and
+                       not os.listdir('relic'))
+    try:
+        if relic_submodule:
+            subprocess.check_call(['git', 'submodule', 'update', '--init', '--recursive'])
+        elif not relic_local:
+            subprocess.check_call(['git', 'clone', 'https://github.com/spacetelescope/relic.git'])
+
+        sys.path.insert(1, 'relic')
+    except subprocess.CalledProcessError as e:
+        print(e)
+        exit(1)
+
+import relic.release
+
+version = relic.release.get_info()
+relic.release.write_template(version, 'mirage')
 
 
 # allows you to build sphinx docs from the package
@@ -75,7 +98,7 @@ except ImportError:
 
 setup(
     name='mirage',
-    version='2.1.1',
+    version=version.pep386,
     description='Create simulated JWST data',
     long_description=('A tool to create simulated NIRCam, NIRISS,'
                       'and FGS exposures'

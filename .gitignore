@@ -44,3 +44,8 @@ mirage.egg-info
 docs/_build
 docs/_static
 docs/_templates
+
+# Versioning via Relic #
+########################
+RELIC-INFO
+mirage/version.py

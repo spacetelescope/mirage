@@ -450,7 +450,7 @@ class SimInput:
         base : str
             JWST formatted filename base (excluding pipeline step suffix and ".fits")
         """
-        proposal_id = input_obj['ProposalID']
+        proposal_id = '{0:05d}'.format(int(input_obj['ProposalID']))
         observation = input_obj['obs_num']
         visit_number = input_obj['visit_num']
         visit_group = input_obj['visit_group']

@@ -9,3 +9,11 @@ include mirage/config/refpix.cfg
 include mirage/config/saturation.cfg
 include mirage/config/superbias.cfg
 include mirage/config/xtalk20150303g0.errorcut.txt
+include RELIC-INFO
+exclude mirage/version.py
+
+# Not recommended: Uncomment below to bundle RELIC during `sdist`
+#
+#recursive-include relic *
+#prune relic/.git
+#prune relic/tests

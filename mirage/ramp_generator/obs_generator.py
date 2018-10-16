@@ -47,7 +47,7 @@ from ..utils import set_telescope_pointing_separated as stp
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         "niriss": ["imaging","ami"],
+         "niriss": ["imaging", "ami"],
          "fgs": ["imaging"]}
 
 
@@ -734,8 +734,8 @@ class Observation():
             self.ra = float(self.params['Telescope']['ra'])
             self.dec = float(self.params['Telescope']['dec'])
         except:
-            self.ra, self.dec = self.parseRADec(self.params['Telescope']['ra'],
-                                                self.params['Telescope']['dec'])
+            self.ra, self.dec = utils.parse_RA_Dec(self.params['Telescope']['ra'],
+                                                   self.params['Telescope']['dec'])
 
         if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or self.ra is None or self.dec is None:
             raise ValueError("WARNING: bad requested RA and Dec {} {}".format(self.ra, self.dec))
