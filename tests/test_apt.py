@@ -87,6 +87,8 @@ def RunAllAPTTemplates(instrument):
     print('PROPOSAL_ID: {}'.format(PROPOSAL_ID))
     print('number of observations: {}'.format(n_obs))
     print('number of files written: {}'.format(number_of_yaml_files))
+    assert n_obs == 17
+    assert number_of_yaml_files == 150
     assert number_of_yaml_files >= n_obs, 'Fewer yaml files created than observations'
 
     # If a reference observationlist.yaml file exists, ensure that the
