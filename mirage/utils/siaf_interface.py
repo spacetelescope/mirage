@@ -43,6 +43,8 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     if instrument.lower() == 'nircam':
         import os
         print("NOTE: Using pre-delivery SIAF data")
+        if instrument == 'NIRCAM':
+            instrument = 'NIRCam'
         pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, instrument)
         siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture_name]
     else:

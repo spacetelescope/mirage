@@ -21,7 +21,7 @@ import numpy as np
 from ..apt import read_apt_xml
 
 
-def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=None, verbose=False):
+def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_lw=None, verbose=False):
     """Write observation list file (required mirage input) on the basis of APT files.
 
     Parameters
@@ -46,7 +46,7 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
     # with open(xml_file) as f:
     #     tree = etree.parse(f)
     #
-    if type(catalog_files) is str:
+    if (catalog_files is not None) and (type(catalog_files) is str):
         catalog_files = [catalog_files]
     #
     # apt = '{http://www.stsci.edu/JWST/APT}'
@@ -77,10 +77,14 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
     readxml_obj = read_apt_xml.ReadAPTXML()
 
     xml_dict = readxml_obj.read_xml(xml_file, verbose=verbose)
+    # verbose = True
+    if verbose:
+        print('Summary of observation dictionary:')
+        for key in xml_dict.keys():
+            print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
 
     # array of unique instrument names
     used_instruments = np.unique(xml_dict['Instrument'])
-
 
     if verbose:
         print('Summary of dictionary extracted from {}'.format(xml_file))
@@ -101,11 +105,10 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
     MovingTargetToTrack = 'None'
     BackgroundRate = '0.5'
 
-
     number_of_exposures = len(xml_dict['ObservationID'])
 
     # if only one catalog is provided, that catalog will be used for all observations
-    if len(catalog_files) == 1:
+    if (catalog_files is not None) and (len(catalog_files) == 1):
         catalog_files = catalog_files * number_of_exposures
 
 
@@ -142,23 +145,28 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
                 BackgroundRate_sw = '0.5'
                 BackgroundRate_lw = '1.2'
 
-                sw_filters = {}
-                lw_filters = {}
-                sw_filters_all = np.array(xml_dict['ShortFilter'])
-                lw_filters_all = np.array(xml_dict['LongFilter'])
-                tile_nums = xml_dict['TileNumber']
-                observation_ids = xml_dict['ObservationID']
+                # sw_filters = {}
+                # lw_filters = {}
+                # sw_filters_all = np.array(xml_dict['ShortFilter'])
+                # lw_filters_all = np.array(xml_dict['LongFilter'])
+                # tile_nums = xml_dict['TileNumber']
+                # observation_ids = xml_dict['ObservationID']
 
-                for i_obs_all in set(observation_ids):
-                    # i_obs_all = int(i_obs_all)
-                    current_obs_indices = [i == i_obs_all for i in observation_ids]
-                    if len(set(np.array(sw_filters_all)[current_obs_indices])) > 1:
-                        print('Note: Multiple filters in observation {}'.format(
-        i_obs_all))
-                        # At some point could use the tile_nums to fix this
-                    sw_filters[i_obs_all] = sw_filters_all[current_obs_indices]
-                    lw_filters[i_obs_all] = lw_filters_all[current_obs_indices]
+        #         for i_obs_all in set(observation_ids):
+        #             # i_obs_all = int(i_obs_all)
+        #             current_obs_indices = [i == i_obs_all for i in observation_ids]
+        #             if len(set(np.array(sw_filters_all)[current_obs_indices])) > 1:
+        #                 print('Note: Multiple filters in observation {}'.format(
+        # i_obs_all))
+        #                 # At some point could use the tile_nums to fix this
+        #             sw_filters[i_obs_all] = sw_filters_all[current_obs_indices]
+        #             lw_filters[i_obs_all] = lw_filters_all[current_obs_indices]
 
+                # filter_list = np.array([])
+                # for key, item in sw_filters.items():
+                #     filter_list = np.hstack((filter_list, item))
+                # assert np.all(filter_list == np.array(xml_dict['ShortFilter']))
+                # print(filter_list)
                 # # Check that all parameters have the right length
                 # all_param_lengths = [len(ps_cat_sw), len(ps_cat_lw), len(sw_filters),
                 #                      len(lw_filters), len(observations),len(i_observations),
@@ -169,40 +177,44 @@ def write_yaml(xml_file, yaml_file, catalog_files, ps_cat_sw=None, ps_cat_lw=Non
                 #     raise ValueError('Not all provided parameters have compatible '
                 #                      'dimensions. Will not write {}'.format(yaml_file))
 
-                for i_filt, (sw_filt, lw_filt) in enumerate(zip(sw_filters[obs_number], lw_filters[obs_number])):
-                        text += [
-                            "  FilterConfig{}:\n".format(i_filt + 1),
-                            "    SW:\n",
-                            "      Filter: {}\n".format(sw_filt),
-                            "      PointSourceCatalog: {}\n".format(ps_cat_sw[i_obs]),
-                            "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
-                            "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
-                            "      ExtendedScale: {}\n".format(ExtendedScale),
-                            "      ExtendedCenter: {}\n".format(ExtendedCenter),
-                            "      MovingTargetList: {}\n".format(MovingTargetList),
-                            "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
-                            "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
-                            "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
-                            "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
-                            "      BackgroundRate: {}\n".format(BackgroundRate_sw),
-                            "    LW:\n",
-                            "      Filter: {}\n".format(lw_filt),
-                            "      PointSourceCatalog: {}\n".format(ps_cat_lw[i_obs]),
-                            "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
-                            "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
-                            "      ExtendedScale: {}\n".format(ExtendedScale),
-                            "      ExtendedCenter: {}\n".format(ExtendedCenter),
-                            "      MovingTargetList: {}\n".format(MovingTargetList),
-                            "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
-                            "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
-                            "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
-                            "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
-                            "      BackgroundRate: {}\n\n".format(BackgroundRate_lw)
-                        ]
+                # for i_filt, (sw_filt, lw_filt) in enumerate(zip(sw_filters[obs_number], lw_filters[obs_number])):
+                sw_filt = xml_dict['ShortFilter'][exposure_index]
+                lw_filt = xml_dict['LongFilter'][exposure_index]
+                i_obs = xml_dict['ObservationID'][exposure_index]-1
+                text += [
+                    # "  FilterConfig{}:\n".format(i_obs+1),
+                    "  FilterConfig{}:\n".format(exposure_index),
+                    "    SW:\n",
+                    "      Filter: {}\n".format(sw_filt),
+                    "      PointSourceCatalog: {}\n".format(ps_cat_sw[i_obs]),
+                    "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
+                    "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
+                    "      ExtendedScale: {}\n".format(ExtendedScale),
+                    "      ExtendedCenter: {}\n".format(ExtendedCenter),
+                    "      MovingTargetList: {}\n".format(MovingTargetList),
+                    "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
+                    "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
+                    "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
+                    "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+                    "      BackgroundRate: {}\n".format(BackgroundRate_sw),
+                    "    LW:\n",
+                    "      Filter: {}\n".format(lw_filt),
+                    "      PointSourceCatalog: {}\n".format(ps_cat_lw[i_obs]),
+                    "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
+                    "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
+                    "      ExtendedScale: {}\n".format(ExtendedScale),
+                    "      ExtendedCenter: {}\n".format(ExtendedCenter),
+                    "      MovingTargetList: {}\n".format(MovingTargetList),
+                    "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
+                    "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
+                    "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
+                    "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+                    "      BackgroundRate: {}\n\n".format(BackgroundRate_lw)
+                ]
 
 
 
-                text_out += text * xml_dict['PrimaryDithers'][exposure_index]
+                text_out += text * np.int(xml_dict['PrimaryDithers'][exposure_index])
 
             elif instrument in ['NIRISS', 'FGS', 'NIRSPEC', 'MIRI']:
                 text += [

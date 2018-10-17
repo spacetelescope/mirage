@@ -761,31 +761,37 @@ class SimInput:
                 # we need to build the aperture name from the combination of detector
                 # and subarray name.
                 # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
-                #     aperture = self.info['aperture']
-                # else:
+                #     # aperture = self.info['aperture']
+                #
+                # elif np.all(np.unique(self.info['Instrument']) == 'NIRCAM'):
                 #     sub = self.info['Subarray'][i]
                 #     det = 'NRC' + self.info['detector'][i]
                 #     aperture = det + '_' + sub
 
                 aperture = self.info['aperture'][i]
+                if 'NRC' == aperture[0:3]:
+                    sub = self.info['Subarray'][i]
+                    det = 'NRC' + self.info['detector'][i]
+                    aperture = det + '_' + sub
+
 
 
                 # Get the number of amps from the subarray definition file
                 match = aperture == subarray_def['AperName']
 
-                # JSA: not sure when this is needed
-                # if np.sum(match) == 0:
-                #     aperture = [apername for apername, name in
-                #                 np.array(subarray_def['AperName', 'Name']) if
-                #                 (sub in apername) or (sub in name)]
-                #
-                #     match = aperture == subarray_def['AperName']
-                #
-                #     if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
-                #         raise ValueError('Cannot combine detector {} and subarray {}\
-                #             into valid aperture name.'.format(det, sub))
-                #     # We don't want aperture as a list
-                #     aperture = aperture[0]
+                # needed for NIRCam case
+                if np.sum(match) == 0:
+                    aperture = [apername for apername, name in
+                                np.array(subarray_def['AperName', 'Name']) if
+                                (sub in apername) or (sub in name)]
+
+                    match = aperture == subarray_def['AperName']
+
+                    if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+                        raise ValueError('Cannot combine detector {} and subarray {}\
+                            into valid aperture name.'.format(det, sub))
+                    # We don't want aperture as a list
+                    aperture = aperture[0]
 
                 # print(aperture)
 
@@ -981,53 +987,65 @@ class SimInput:
             # raise RuntimeError('Instrument {} is not supported'.format(instrument))
             print('WARNING: Instrument {} is not supported as PRIME. Looking for parallels.'.format(instrument))
 
-        self.superbias_list = {}
-        self.linearity_list = {}
-        self.gain_list = {}
-        self.saturation_list = {}
-        self.ipc_list = {}
-        self.astrometric_list = {}
-        self.pam_list = {}
-        self.dark_list = {}
-        self.lindark_list = {}
+
+        # create empty lists
+        list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
+        for list_name in list_names:
+            setattr(self, '{}_list'.format(list_name), {})
+        # self.superbias_list = {}
+        # self.linearity_list = {}
+        # self.gain_list = {}
+        # self.saturation_list = {}
+        # self.ipc_list = {}
+        # self.astrometric_list = {}
+        # self.pam_list = {}
+        # self.dark_list = {}
+        # self.lindark_list = {}
 
         if self.instrument.lower() == 'nircam':
             self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-            sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
-            lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
-            gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
-            sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
-            ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
-            dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
-            pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
-            rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
-            lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
-            for det in self.det_list:
-                sbfiles = glob(os.path.join(sb_dir, '*fits'))
-                self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
-                linfiles = glob(os.path.join(lin_dir, '*fits'))
-                longdet = deepcopy(det)
-                if '5' in det:
-                    longdet = det.replace('5', 'LONG')
-                self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
+            if offline:
+                # no access to central store. Set all files to none.
+                default_value = 'none'
+                for list_name in list_names:
+                    for det in self.det_list:
+                        getattr(self, '{}_list'.format(list_name))[det] = default_value
+            else:
+                sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
+                lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
+                gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
+                sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
+                ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
+                dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
+                pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
+                rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
+                lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
+                for det in self.det_list:
+                    sbfiles = glob(os.path.join(sb_dir, '*fits'))
+                    self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
+                    linfiles = glob(os.path.join(lin_dir, '*fits'))
+                    longdet = deepcopy(det)
+                    if '5' in det:
+                        longdet = det.replace('5', 'LONG')
+                    self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
 
-                gainfiles = glob(os.path.join(gain_dir, '*fits'))
-                self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
+                    gainfiles = glob(os.path.join(gain_dir, '*fits'))
+                    self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
 
-                satfiles = glob(os.path.join(sat_dir, '*fits'))
-                self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
+                    satfiles = glob(os.path.join(sat_dir, '*fits'))
+                    self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
 
-                ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
-                self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
+                    ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
+                    self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
 
-                distfiles = glob(os.path.join(dist_dir, '*asdf'))
-                self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
+                    distfiles = glob(os.path.join(dist_dir, '*asdf'))
+                    self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
 
-                pamfiles = glob(os.path.join(pam_dir, '*fits'))
-                self.pam_list[det] = [d for d in pamfiles if det in d][0]
+                    pamfiles = glob(os.path.join(pam_dir, '*fits'))
+                    self.pam_list[det] = [d for d in pamfiles if det in d][0]
 
-                self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
-                self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
+                    self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
+                    self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
         elif self.instrument.lower() in ['niriss', 'nirspec', 'miri']:
             # directory containing NIRISS reference files

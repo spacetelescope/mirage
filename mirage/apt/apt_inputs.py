@@ -139,8 +139,6 @@ class AptInput:
         obs_start = []
         if len(unique_instrument_names) == 1: # only one instrument
             if unique_instrument_names[0] == 'nircam':
-
-
                 obs_pav3 = []
                 obs_sw_ptsrc = []
                 obs_sw_galcat = []
@@ -195,12 +193,13 @@ class AptInput:
                     # Determine if this is a newly-generated yaml that
                     # include separate FilterConfig# keys
                     obstab_keys = self.obstab['Observation1'].keys()
-                    filter_configs = any(['FilterConfig' in k for k in  obstab_keys])
+                    filter_configs = any(['FilterConfig' in k for k in obstab_keys])
                     if filter_configs:
                         # If so, match up with the filter configuration using
                         # the exposure number
                         exposure = int(exp[-2:])
                         filter_config = 'FilterConfig{}'.format(exposure)
+                        filter_config = [k for k in obslist.keys() if 'FilterConfig' in k][0]  # HACK JSA
                         obslist = obslist[filter_config]
 
                     # Read parameters from yaml
@@ -369,7 +368,7 @@ class AptInput:
         combined.update(dict2)
         return combined
 
-    def create_input_table(self):
+    def create_input_table(self, verbose=False):
         """MAIN FUNCTION"""
         # Expand paths to full paths
         self.input_xml = os.path.abspath(self.input_xml)
@@ -405,7 +404,8 @@ class AptInput:
         # for key in tab.keys():
         #     print('{:<25}: number of elements is {:>5}'.format(key, len(tab[key])))
 
-        if (np.all(np.array(tab['PrimaryDithers']).astype(int) == 1) and np.all(np.array(tab['ImageDithers']).astype(int) == 1)): # NIRCam and NIRISS dither names
+        # if (np.all(np.array(tab['PrimaryDithers']).astype(int) == 1) and np.all(np.array(tab['ImageDithers']).astype(int) == 1)): # NIRCam and NIRISS dither names
+        if (np.all(np.in1d(np.array(tab['PrimaryDithers']).astype(int), np.array([0,1]))) and np.all(np.in1d(np.array(tab['ImageDithers']).astype(int), np.array([0,1])))): # NIRCam and NIRISS dither names
             # skip step if no dithers are included
             xmltab = tab
         else:
@@ -424,12 +424,11 @@ class AptInput:
         # Combine the dictionaries
         obstab = self.combine_dicts(xmltab, pointing_tab)
 
-        verbose = False
+        # verbose = False
         if verbose:
             print('Summary of observation dictionary:')
             for key in obstab.keys():
                 print('{:<25}: number of elements is {:>5}'.format(key, len(obstab[key])))
-            # for key in
 
 
         # Add epoch and catalog information
@@ -463,9 +462,9 @@ class AptInput:
         else:
             self.exposure_tab = self.expand_for_detectors(obstab)
 
-
-        # for key in self.exposure_tab.keys():
-        #     print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
+        if verbose:
+            for key in self.exposure_tab.keys():
+                print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
         detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
@@ -582,7 +581,7 @@ class AptInput:
                     for j in range(reps):
                         expanded[key].append(indict[key][i])
 
-        if not np.all(np.array(indict['ImageDithers']).astype(int) == 1):
+        if (not np.all(np.array(indict['ImageDithers'])==0)) and (not np.all(np.array(indict['ImageDithers']).astype(int) == 1)):
             # use astropy table operations to expand dithers while maintaining parallels in sync
             # implementation assumes that only one instrument is used in parallel
 

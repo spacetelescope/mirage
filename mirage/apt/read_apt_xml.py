@@ -116,7 +116,7 @@ class ReadAPTXML():
 
         # Proposal ID
         try:
-            prop_id = '{:05d}'.format(proposal_info.find(self.apt + 'ProposalID').text)
+            prop_id = '{:05d}'.format(np.int(proposal_info.find(self.apt + 'ProposalID').text))
         except:
             prop_id = '{:05d}'.format(propid_default)
 
@@ -222,7 +222,7 @@ class ReadAPTXML():
                                                                                   i_obs + 1))
 
             prop_params = [pi_name, prop_id, prop_title, prop_category,
-                           science_category, coordparallel, i_obs]
+                           science_category, coordparallel, i_obs, obs_label]
 
             proposal_parameter_dictionary = {'PI_Name': pi_name, 'ProposalID': prop_id,
                                              'Title': prop_title,
@@ -240,11 +240,12 @@ class ReadAPTXML():
             # If template is NircamImaging or NircamEngineeringImaging
             if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 self.read_imaging_template(template, template_name, obs, prop_params)
-                # complement dictionary entries
-                number_of_entries = len(self.APTObservationParams['ProposalID'])
-                self.APTObservationParams['ObservationName'] = [obs_label] * number_of_entries
+                # self.APTObservationParams['ObservationName'] = [obs_label] * number_of_entries
                 # self.APTObservationParams['ImageDithers'] = [1] * number_of_entries
                 exposures_dictionary = copy.deepcopy(self.APTObservationParams)
+                # complement dictionary entries
+                number_of_entries = len(self.APTObservationParams['ProposalID'])
+                # exposures_dictionary['ObservationName'] = [obs_label] * number_of_entries
                 # 1/0
 
             elif template_name in ['NirissExternalCalibration', 'NirspecImaging', 'MiriMRS']:
@@ -340,6 +341,15 @@ class ReadAPTXML():
                 print('Dictionary currently holds {} exposures'.format(number_of_exposures))
                 print(self.APTObservationParams['Instrument'])
 
+
+        for key, item in self.APTObservationParams.items():
+            if len(item) == 0:
+                # self.APTObservationParams.pop
+                # self.APTObservationParams[key] = [None] * len(self.APTObservationParams['Instrument'])
+                self.APTObservationParams[key] = [0] * len(self.APTObservationParams['Instrument'])
+
+            # if key not in 'FilterWheel ReadoutPatternShort ReadoutPatternLong Wavelength DitherPatternType EtcIdLong EtcIdShort ImageDithers Dither ParallelInstrument PupilWheel Filter ApertureOverride GroupsShort GroupsLong IntegrationsLong IntegrationsShort Exposures'.split():
+
         return self.APTObservationParams
 
 
@@ -421,6 +431,7 @@ class ReadAPTXML():
         dictionary['TileNumber'].append(tup[22])
         dictionary['APTTemplate'].append(tup[23])
         dictionary['Instrument'].append(tup[24])
+        dictionary['ObservationName'].append(tup[25])
         return dictionary
 
 
@@ -566,7 +577,7 @@ class ReadAPTXML():
 
         """
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
 
         # Set namespace
         ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
@@ -634,13 +645,13 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, 1, template_name, instrument)
+                          i_obs + 1, 1, template_name, instrument, obs_label)
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
 
     def read_commissioning_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
 
         # Set namespace
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscCommissioning}"
@@ -700,7 +711,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name, 'NIRCAM')
+                              i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -709,7 +720,7 @@ class ReadAPTXML():
 
     def read_globalalignment_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
 
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscGlobalAlignment}"
 
@@ -783,7 +794,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, j + 1, template_name, 'NIRCAM')
+                          i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
 
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -792,7 +803,7 @@ class ReadAPTXML():
 
     def read_coarsephasing_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
 
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscCoarsePhasing}"
 
@@ -850,7 +861,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name, 'NIRCAM')
+                              i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -860,7 +871,7 @@ class ReadAPTXML():
 
     def read_finephasing_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
 
         ns = "{http://www.stsci.edu/JWST/APT/Template/WfscFinePhasing}"
 
@@ -998,7 +1009,7 @@ class ReadAPTXML():
                                   pdither, sdithtype, sdither, sfilt, lfilt,
                                   rpatt, grps, ints, short_pupil,
                                   long_pupil, grismval, coordparallel,
-                                  i_obs + 1, j + 1, template_name, 'NIRCAM')
+                                  i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
 
                     self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                     self.obs_tuple_list.append(tup_to_add)
@@ -1009,7 +1020,7 @@ class ReadAPTXML():
 
     def read_wfss_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
 
         # Set namespace
         ns = "{http://www.stsci.edu/JWST/APT/Template/NircamWfss}"
@@ -1076,7 +1087,7 @@ class ReadAPTXML():
                               sdither, sfilt, lfilt, rpatt, groups,
                               integrations, short_pupil, long_pupil,
                               grismvalue, coordparallel,
-                              i_obs + 1, 1, template_name, instrument)
+                              i_obs + 1, 1, template_name, instrument, obs_label)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -1115,7 +1126,7 @@ class ReadAPTXML():
                                      pdither, sdithtype, sdither, sfilt, lfilt,
                                      rpatt, grps, ints, short_pupil, long_pupil,
                                      grismvalue, coordparallel,
-                                     i_obs + 1, 1, template_name, instrument)
+                                     i_obs + 1, 1, template_name, instrument, obs_label)
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, direct_tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
 
