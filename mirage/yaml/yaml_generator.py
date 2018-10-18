@@ -1047,7 +1047,7 @@ class SimInput:
                     self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
                     self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
-        elif self.instrument.lower() in ['niriss', 'nirspec', 'miri']:
+        elif self.instrument.lower() in ['niriss', 'nirspec', 'miri', 'fgs']:
             # directory containing NIRISS reference files
             #HACK: add FGS files temporarily
 

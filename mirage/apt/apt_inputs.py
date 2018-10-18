@@ -38,6 +38,7 @@ July 2017 - V0: Initial version. Bryan Hilbert
 Feb 2018  - V1: Updated to work for multiple filter pairs per observation
             Lauren Chambers
 August 2018 - V2: Replaced manual Ra, Dec calculations with pysiaf functionality
+October 2018 - Major modifications to read programs of all science instruments and parallels
 '''
 import copy
 import os
@@ -105,10 +106,10 @@ class AptInput:
         return intab
 
     def add_observation_info(self, intab):
-        """
-        Add information about each observation. Catalog names,
-        dates, PAV3 values, etc., which are retrieved from the
-        observation list yaml file.
+        """Add information about each observation.
+
+        Catalog names, dates, PAV3 values, etc., which are retrieved from the observation list
+        yaml file.
 
         Parameters
         ----------
@@ -120,10 +121,11 @@ class AptInput:
         intab : obj
             Updated table with information from the observation list
             yaml file added.
-        """
 
+        """
         with open(self.observation_table, 'r') as infile:
             self.obstab = yaml.load(infile)
+        1/0
 
         onames = []
         onums = []
@@ -132,11 +134,17 @@ class AptInput:
             onums.append(observation)
         onames = np.array(onames)
 
-        OBSERVATION_LIST_FIELDS = 'Name Date PAV3 Filter PointSourceCatalog GalaxyCatalog ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList MovingTargetSersic MovingTargetExtended MovingTargetConvolveExtended MovingTargetToTrack BackgroundRate'.split()
+        OBSERVATION_LIST_FIELDS = 'Name Date PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
+                                  'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
+                                  'MovingTargetSersic MovingTargetExtended ' \
+                                  'MovingTargetConvolveExtended MovingTargetToTrack ' \
+                                  'BackgroundRate'.split()
 
         unique_instrument_names = [name.lower() for name in np.unique(intab['Instrument'])]
 
         obs_start = []
+        obs_pav3 = []
+
         if len(unique_instrument_names) == 1: # only one instrument
             if unique_instrument_names[0] == 'nircam':
                 obs_pav3 = []
@@ -293,7 +301,11 @@ class AptInput:
                 # intab['epoch_start_date'] = obs_start
 
         else:
-            if ('fgs' in unique_instrument_names and 'niriss' in unique_instrument_names) | ('fgs' in unique_instrument_names and 'miri' in unique_instrument_names) | ('fgs' in unique_instrument_names and 'nirspec' in unique_instrument_names):
+            if ('fgs' in unique_instrument_names and 'niriss' in unique_instrument_names) | \
+                    ('fgs' in unique_instrument_names and 'miri' in unique_instrument_names) | \
+                    ('fgs' in unique_instrument_names and 'nirspec' in unique_instrument_names):
+                # | \('fgs' in unique_instrument_names and 'nircam' in unique_instrument_names):
+
                 for key in OBSERVATION_LIST_FIELDS:
                     intab[key] = []
 
@@ -321,6 +333,106 @@ class AptInput:
                 # intab['epoch_start_date'] = obs_start
 
             else:
+                nircam_mapping = {'ptsrc': 'PointSourceCatalog',
+                                  'galcat': 'GalaxyCatalog',
+                                  'ext': 'ExtendedCatalog',
+                                  'extscl': 'ExtendedScale',
+                                  'extcent': 'ExtendedCenter',
+                                  'movptsrc': 'MovingTargetList',
+                                  'movgal': 'MovingTargetSersic',
+                                  'movext': 'MovingTargetExtended',
+                                  'movconv': 'MovingTargetConvolveExtended',
+                                  'solarsys': 'MovingTargetToTrack',
+                                  'bkgd': 'BackgroundRate',
+                                  }
+
+                # initialize dictionaries
+                for key in OBSERVATION_LIST_FIELDS:
+                    intab[key] = []
+                for channel in ['SW', 'LW']:
+                    for name, item in nircam_mapping.items():
+                        key = '{}_{}'.format(channel.lower(), name)
+                        intab[key] = []
+
+                for j, obs_label in enumerate(intab['obs_label']):
+                # for j, obs_name in enumerate(intab['ObservationName']):
+                    instrument = intab['Instrument'][j]
+
+                    match = np.where(obs_label == onames)[0]
+                    # match = np.where(obs_name == onames)[0]
+                    if len(match) == 0:
+                        # raise ValueError("No valid epoch line found for observation {} "
+                        #                  "in observation table ({}).".format(obs_name, onames))
+                        raise ValueError("No valid epoch line found for observation {} "
+                                         "in observation table ({}).".format(obs_label, onames))
+
+                    # Match observation from observation table yaml file with observatoins
+                    # from  APT XML/pointing; extract the date and PAV3
+                    obslist = self.obstab[onums[match[0]]]
+                    obs_start.append(obslist['Date'].strftime('%Y-%m-%d'))
+                    obs_pav3.append(obslist['PAV3'])
+
+                    if instrument.lower() != 'nircam':
+                        for key in OBSERVATION_LIST_FIELDS:
+                            if key == 'Date':
+                                value = obslist[key].strftime('%Y-%m-%d')
+                            else:
+                                value = str(obslist[key])
+
+                            intab[key].append(value)
+                    else:
+                        # Determine if this is a newly-generated yaml that
+                        # include separate FilterConfig# keys
+                        obstab_keys = self.obstab['Observation1'].keys()
+                        filter_configs = any(['FilterConfig' in k for k in obstab_keys])
+                        if filter_configs:
+                            # If so, match up with the filter configuration using
+                            # the exposure number
+                            # exposure = int(exp[-2:])
+                            # filter_config = 'FilterConfig{}'.format(exposure)
+                            filter_config = [k for k in obslist.keys() if 'FilterConfig' in k][0]  # HACK JSA
+                            obslist = obslist[filter_config]
+
+                        for channel in ['SW', 'LW']:
+                            for name, item in nircam_mapping.items():
+                                key = '{}_{}'.format(channel.lower(), name)
+                                # print()
+                                if item in 'ExtendedScale ExtendedCenter MovingTargetConvolveExtended BackgroundRate'.split():
+                                    intab[key].append(obslist[channel][item])
+                                else:
+                                    intab[key].append(self.full_path(obslist[channel][item]))
+
+
+
+                    # 1/0
+
+                # obs_sw_ptsrc.append(self.full_path(obslist['SW']['PointSourceCatalog']))
+                # obs_sw_galcat.append(self.full_path(obslist['SW']['GalaxyCatalog']))
+                # obs_sw_ext.append(self.full_path(obslist['SW']['ExtendedCatalog']))
+                # obs_sw_movptsrc.append(self.full_path(obslist['SW']['MovingTargetList']))
+                # obs_sw_movgal.append(self.full_path(obslist['SW']['MovingTargetSersic']))
+                # obs_sw_movext.append(self.full_path(obslist['SW']['MovingTargetExtended']))
+                # obs_sw_solarsys.append(self.full_path(obslist['SW']['MovingTargetToTrack']))
+
+                # obs_sw_extscl.append(obslist['SW']['ExtendedScale'])
+                # obs_sw_extcent.append(obslist['SW']['ExtendedCenter'])
+                # obs_sw_movconv.append(obslist['SW']['MovingTargetConvolveExtended'])
+                # obs_sw_bkgd.append(obslist['SW']['BackgroundRate'])
+
+
+
+                # obs_lw_ptsrc.append(self.full_path(obslist['LW']['PointSourceCatalog']))
+                # obs_lw_galcat.append(self.full_path(obslist['LW']['GalaxyCatalog']))
+                # obs_lw_ext.append(self.full_path(obslist['LW']['ExtendedCatalog']))
+                # obs_lw_extscl.append(obslist['LW']['ExtendedScale'])
+                # obs_lw_extcent.append(obslist['LW']['ExtendedCenter'])
+                # obs_lw_movptsrc.append(self.full_path(obslist['LW']['MovingTargetList']))
+                # obs_lw_movgal.append(self.full_path(obslist['LW']['MovingTargetSersic']))
+                # obs_lw_movext.append(self.full_path(obslist['LW']['MovingTargetExtended']))
+                # obs_lw_movconv.append(obslist['LW']['MovingTargetConvolveExtended'])
+                # obs_lw_solarsys.append(self.full_path(obslist['LW']['MovingTargetToTrack']))
+                # obs_lw_bkgd.append(obslist['LW']['BackgroundRate'])
+
                 raise NotImplementedError
 
         intab['epoch_start_date'] = obs_start
@@ -558,7 +670,8 @@ class AptInput:
         # number of dither positions
         # keys = np.array(indict.keys())
         keys = indict.keys()
-        if not np.all(np.array(indict['PrimaryDithers']).astype(int) == 1):
+        if np.all(np.unique(indict['Instrument']) == 'NIRCAM'):
+        # if not np.all(np.array(indict['PrimaryDithers']).astype(int) == 1):
             # NIRCam exposures
             for i in range(len(indict['PrimaryDithers'])):
                 arr = np.array([item[i] for item in indict.values()])
@@ -581,7 +694,8 @@ class AptInput:
                     for j in range(reps):
                         expanded[key].append(indict[key][i])
 
-        if (not np.all(np.array(indict['ImageDithers'])==0)) and (not np.all(np.array(indict['ImageDithers']).astype(int) == 1)):
+        else:
+        # if (not np.all(np.array(indict['ImageDithers'])==0)) and (not np.all(np.array(indict['ImageDithers']).astype(int) == 1)):
             # use astropy table operations to expand dithers while maintaining parallels in sync
             # implementation assumes that only one instrument is used in parallel
 
@@ -590,12 +704,22 @@ class AptInput:
             expanded_table = None #copy.deepcopy(table)
 
             for i, row in enumerate(table['row']):
+                instrument = table['Instrument'][i]
+                if instrument in ['NIRCAM']:
+                    dither_key_name = 'PrimaryDithers'
+                elif instrument in ['NIRCAM', 'MIRI', 'NIRSPEC']:
+                    dither_key_name = 'ImageDithers'
+                number_of_dithers = np.int(table[dither_key_name][i])
+
                 if (table['CoordinatedParallel'][i] == 'true') and (not table['ParallelInstrument'][i]):
                     dither_table = table[i:i + 2]
 
-                    if (table['ImageDithers'][i] > 1):
+
+                    # if (table['ImageDithers'][i] > 1):
+                    if (number_of_dithers > 1):
                         #replicate parallel observation n times
-                        dither_table = vstack([dither_table]*(table['ImageDithers'][i]))
+                        # dither_table = vstack([dither_table]*(table['ImageDithers'][i]))
+                        dither_table = vstack([dither_table]*number_of_dithers)
 
                     if expanded_table is None:
                         expanded_table = dither_table
@@ -603,7 +727,8 @@ class AptInput:
                         expanded_table = vstack((expanded_table, dither_table))
                 elif (table['CoordinatedParallel'][i] == 'false'):
                     # add row multiplied by number of dithers
-                    dither_table = vstack([table[i]]*table['ImageDithers'][i])
+                    # dither_table = vstack([table[i]]*table['ImageDithers'][i])
+                    dither_table = vstack([table[i]]*number_of_dithers)
                     if expanded_table is None:
                         expanded_table = dither_table
                     else:
@@ -668,7 +793,7 @@ class AptInput:
         else:
             return os.path.abspath(os.path.expandvars(in_path))
 
-    def get_pointing_info(self, file, propid=0, verbose=True):
+    def get_pointing_info(self, file, propid=0, verbose=False):
         """Read in information from APT's pointing file.
 
         Parameters
@@ -761,7 +886,7 @@ class AptInput:
                         obsnum, visitnum = v.split(':')
                         obsnum = str(obsnum).zfill(3)
                         visitnum = str(visitnum).zfill(3)
-                        if skip is True:
+                        if (skip is True) and (verbose):
                             print('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
@@ -842,7 +967,8 @@ class AptInput:
                             act_counter += 1
 
                     except ValueError as e:
-                        print('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
+                        if verbose:
+                            print('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
                         pass
 
         pointing = {'exposure': exp, 'dither': dith, 'aperture': aperture,

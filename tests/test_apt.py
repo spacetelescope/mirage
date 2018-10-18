@@ -20,6 +20,7 @@ import pytest
 
 from mirage.yaml import write_observationlist, yaml_generator
 
+# for debugging
 # from mirage.apt import read_apt_xml, apt_inputs
 # from mirage.utils import siaf_interface
 # import importlib
@@ -56,7 +57,7 @@ def RunAllAPTTemplates(instrument):
     obs_results = observation_data.findall('.//' + APT_NAMESPACE + 'Observation')
     n_obs = len(obs_results)
 
-    # Locate catalogs for target(s)
+    # Locate catalogs for target(s) (one catalog per observation and channel)
     sw_cats = [os.path.join(TESTS_DIR, 'test_data', '2MASS_RA273.09deg_Dec65.60deg.list')] * n_obs
     lw_cats = [os.path.join(TESTS_DIR, 'test_data', 'WISE_RA273.09deg_Dec65.60deg.list')] * n_obs
 
@@ -135,6 +136,6 @@ def test_RunNIRCamAPTTemplates():
     '''
     RunAllAPTTemplates('NIRCam')
 
-
+# for debugging
 # if __name__ == '__main__':
 #     RunAllAPTTemplates('NIRCam')

@@ -18,6 +18,7 @@ import pytest
 import shutil
 
 from mirage.yaml import write_observationlist, yaml_generator
+# for debugging
 from mirage.apt import read_apt_xml, apt_inputs
 from mirage.utils import siaf_interface
 import importlib
@@ -28,8 +29,6 @@ importlib.reload( apt_inputs )
 importlib.reload( siaf_interface )
 
 
-
-# os.environ['MIRAGE_DATA'] = ''
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
@@ -87,18 +86,18 @@ def test_complete_input_generation():
     temporary_directory()
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
-    for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
+    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
-    # for instrument in ['NIRCam']:
+    for instrument in ['NIRCam']:
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['1088', '1087', 'm31_field_test_observation']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
-            apt_file_seeds = ['NIRCamTest']
+            apt_file_seeds = ['1144-OTE-10', 'NIRCamTest']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
@@ -115,7 +114,6 @@ def test_complete_input_generation():
             apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             apt_xml_dict = write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name, verbose=True)
-            # print(apt_xml_dict)
             yam = yaml_generator.SimInput()
             yam.input_xml = apt_file_xml
             yam.pointing_file = apt_file_pointing
@@ -133,5 +131,6 @@ def test_complete_input_generation():
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
 
-# if __name__ == '__main__':
-#     test_complete_input_generation()
+# for debugging
+if __name__ == '__main__':
+    test_complete_input_generation()
