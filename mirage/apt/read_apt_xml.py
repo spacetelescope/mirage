@@ -493,7 +493,7 @@ class ReadAPTXML():
 
         if prime_instrument in ['NIRCAM', 'FGS']:
             dither_key_name = 'PrimaryDithers'
-        elif prime_instrument in ['NIRCAM', 'MIRI', 'NIRSPEC']:
+        elif prime_instrument in ['NIRISS', 'MIRI', 'NIRSPEC']:
             dither_key_name = 'ImageDithers'
         # number of dithers defaults to 1
         number_of_dithers = 1
@@ -527,8 +527,8 @@ class ReadAPTXML():
                     exposure_dict = {}
                     exposure_dict['DitherPatternType'] = DitherPatternType
                     # exposure_dict['ImageDithers'] = np.int(ImageDithers)
-                    # if number_of_dithers is None:
-                    #     number_of_dithers = 0
+                    if number_of_dithers is None:
+                        number_of_dithers = 1
                     exposure_dict[dither_key_name] = np.int(number_of_dithers)
                     for exposure_parameter in exposure:
                         parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]

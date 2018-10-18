@@ -125,7 +125,6 @@ class AptInput:
         """
         with open(self.observation_table, 'r') as infile:
             self.obstab = yaml.load(infile)
-        1/0
 
         onames = []
         onums = []
@@ -705,9 +704,9 @@ class AptInput:
 
             for i, row in enumerate(table['row']):
                 instrument = table['Instrument'][i]
-                if instrument in ['NIRCAM']:
+                if instrument in ['NIRCAM', 'FGS']:
                     dither_key_name = 'PrimaryDithers'
-                elif instrument in ['NIRCAM', 'MIRI', 'NIRSPEC']:
+                elif instrument in ['NIRISS', 'MIRI', 'NIRSPEC']:
                     dither_key_name = 'ImageDithers'
                 number_of_dithers = np.int(table[dither_key_name][i])
 

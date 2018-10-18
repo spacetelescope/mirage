@@ -87,10 +87,10 @@ def test_complete_input_generation():
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
-    # for instrument in ['NIRISS']:
+    for instrument in ['NIRISS']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
-    for instrument in ['NIRCam']:
+    # for instrument in ['NIRCam']:
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
