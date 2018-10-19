@@ -21,32 +21,31 @@ from asdf import AsdfFile
 import scipy.signal as s1
 import numpy as np
 from photutils import detect_sources
+from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
+import astropy.units as u
+import pysiaf
 
 from . import moving_targets
 from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
+from ..utils import siaf_interface
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         'niriss': ["imaging"],
+         'niriss': ["imaging", "ami"],
          'fgs': ["imaging"]}
-TRACKING_LIST = ['sidereal','non-sidereal']
+TRACKING_LIST = ['sidereal', 'non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
                'niriss': 'NIS',
                'fgs': 'FGS'}
-PIXELSCALE = {'nircam': {'sw':0.031, 'lw':0.063},
-              'niriss': 0.065,
-              'fgs': 0.065}
-FULL_ARRAY_SIZE = {'nircam': 2048,
-                   'niriss': 2048,
-                   'fgs':2048}
 ALLOWEDOUTPUTFORMATS = ['DMS']
 WFE_OPTIONS = ['predicted', 'requirements']
 WFEGROUP_OPTIONS = np.arange(5)
+
 
 class Catalog_seed():
     def __init__(self):
@@ -103,11 +102,10 @@ class Catalog_seed():
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
         self.params['Output']['file'] = self.basename + self.params['Output']['file'][-5:]
-
-        self.readSubarrayDefinitionFile()
-        self.checkParams()
-        self.getSubarrayBounds()
-        self.instrument_specific_dicts(self.params['Inst']['instrument'].lower())
+        self.subdict = utils.read_subarray_definition_file(self.params['Reffiles']['subarray_defs'])
+        self.check_params()
+        self.params = utils.get_subarray_info(self.params, self.subdict)
+        self.coord_transform = self.read_distortion_reffile()
 
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
@@ -264,16 +262,6 @@ class Catalog_seed():
 
         extradiffy = ffextra - subextray
         extradiffx = ffextra - subextrax
-
-
-        print(self.subarray_bounds)
-        print(ffextra)
-        print(subextrax, subextray)
-        print(extradiffx, extradiffy)
-        print(seeddim)
-        print(nx)
-        print(extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1)
-
         exbounds = [extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1]
 
 
@@ -357,7 +345,6 @@ class Catalog_seed():
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
-
     def fullPaths(self):
         # Expand all input paths to be full paths
         # This is to allow for easier Condor-ization of
@@ -365,7 +352,7 @@ class Catalog_seed():
         pathdict = {'Reffiles':['dark', 'linearized_darkfile', 'superbias',
                                 'subarray_defs', 'linearity',
                                 'saturation', 'gain', 'pixelflat',
-                                'illumflat', 'astrometric', 'distortion_coeffs', 'ipc',
+                                'illumflat', 'ipc', 'astrometric',
                                 'crosstalk', 'occult', 'pixelAreaMap',
                                 'flux_cal', 'readpattdefs', 'filter_throughput'],
                     'simSignals':['pointsource', 'psfpath', 'galaxyListFile', 'extended',
@@ -402,21 +389,31 @@ class Catalog_seed():
 
     def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
         # Convert object magnitude to counts/sec
+        #
+        # For NIRISS AMI mode, the count rate values calculated need to be
+        # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
+        # throughput of the NRM, while the 0.84 value is the throughput of the
+        # imaging CLEARP element that is in place in the pupil wheel for the
+        # normal imaging observations.
+        if self.params['Inst']['mode'] in ['ami']:
+            count_scale = 0.15 / 0.84
+        else:
+            count_scale = 1.
         if magsys.lower() == 'abmag':
             try:
-                return 10**((mag + 48.6) / -2.5) / photfnu
+                return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
             except:
                 raise ValueError(("AB mag to countrate conversion failed."
                                   "magnitude = {}, photfnu = {}".format(mag, photfnu)))
         if magsys.lower() == 'vegamag':
             try:
-                return 10**((self.vegazeropoint - mag) / 2.5)
+                return count_scale * (10**((self.vegazeropoint - mag) / 2.5))
             except:
                 raise ValueError(("Vega mag to countrate conversion failed."
                                   "magnitude = {}".format(mag)))
         if magsys.lower() == 'stmag':
             try:
-                return 10**((mag + 21.1) / -2.5) / photflam
+                return count_scale * (10**((mag + 21.099934378) / -2.5) / photflam)
             except:
                 raise ValueError(("ST mag to countrate conversion failed."
                                   "magnitude = {}, photflam = {}".format(mag, photflam)))
@@ -686,7 +683,7 @@ class Catalog_seed():
         # are in arcsec or pixels. If in arcsec, change to pixels
         if 'radius' in mtlist.colnames:
             if 'radius_pixels' not in mtlist.meta['comments'][0:4]:
-                mtlist['radius'] /= self.pixscale[0]
+                mtlist['radius'] /= self.siaf.XSciScale
 
         # If galaxies are present, change position angle from degrees
         # to radians
@@ -772,22 +769,6 @@ class Catalog_seed():
                 mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel #* (1./365.25/24.)
                 pixvelflag = trackingPixVelFlag
 
-        # Get necessary information for coordinate transformations
-        coord_transform = None
-        if self.runStep['astrometric']:
-            # Read in the CRDS-format distortion reference file
-            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
-                coord_transform = dist_file.tree['model']
-        else:
-            coord_transform = self.simple_coord_transform()
-
-        # Using the requested RA,Dec of the reference pixel, along with the
-        # V2,V3 of the reference pixel, and the requested roll angle of the telescope,
-        # create a matrix that can be used to translate between V2,V3 and RA,Dec
-        # for any pixel.
-        # v2,v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        attitude_matrix = self.getAttitudeMatrix()
-
         # Exposure times for all frames
         numints = self.params['Readout']['nint']
         numgroups = self.params['Readout']['ngroup']
@@ -829,20 +810,15 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        print(("Stripping out sources with initial positions that are more than 4096 pixels from"
-               " the detector."))
-        print("{} sources in original input catalog {}.".format(len(mtlist), file))
-        indexes, mtlist  = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
-        print("{} sources in filtered input catalog.".format(len(mtlist)))
+        indexes, mtlist = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
 
         for index, entry in zip(indexes, mtlist):
             # For each object, calculate x,y or RA,Dec of initial position
-            pixelx, pixely, ra, dec, ra_str, dec_str = self.getPositions(
-                entry['x_or_RA'], entry['y_or_Dec'], attitude_matrix,
-                coord_transform, pixelFlag)
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
+                entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
 
             # Now generate a list of x,y position in each frame
-            if pixvelflag == False:
+            if pixvelflag is False:
                 # Calculate the RA,Dec in each frame
                 # input velocities are arcsec/hour. ra/dec are in units of degrees,
                 # so divide velocities by 3600^2.
@@ -853,8 +829,7 @@ class Catalog_seed():
                 y_frames = []
                 for in_ra, in_dec in zip(ra_frames, dec_frames):
                     # Calculate the x,y position at each frame
-                    px, py, pra, pdec, pra_str, pdec_str = self.getPositions(
-                        in_ra, in_dec, attitude_matrix, coord_transform, False)
+                    px, py, pra, pdec, pra_str, pdec_str = self.get_positions(in_ra, in_dec, False, 4096)
                     x_frames.append(px)
                     y_frames.append(py)
                 x_frames = np.array(x_frames)
@@ -973,102 +948,6 @@ class Catalog_seed():
                     moving_segmap.segmap += indseg
         return mt_integration, moving_segmap.segmap
 
-    def simple_coord_transform(self):
-        """
-        For the case where the distortion reference file is not provided,
-        generate a simple coordinate transform function that does not include
-        distortion
-
-        "Forward" transform = science -> ideal -> V2,V3
-
-        Parameters:
-        -----------
-        None
-
-        Returns:
-        --------
-        returns : astropy.modeling.Polynomial2D
-            Compound model containing the necessary functions
-            to transform coordinates assuming no distortion
-        """
-        xshift = Shift(0. - self.refpix_pos["x"])
-        yshift = Shift(0. - self.refpix_pos["y"])
-        pixelscalex = self.xsciscale
-        pixelscaley = self.ysciscale
-
-        # Science to Ideal transform
-        cx = {}
-        cx["c0_0"] = 0.
-        cx["c1_0"] = pixelscalex
-        cx["c1_1"] = 0.
-        cx["c0_1"] = 0.
-        x_sci_to_ideal_func = Polynomial2D(2, **cx)
-
-        cy = {}
-        cy["c0_0"] = 0.
-        cy["c1_0"] = 0.
-        cy["c1_1"] = 0.
-        cy["c0_1"] = pixelscaley
-        y_sci_to_ideal_func = Polynomial2D(2, **cy)
-
-        # Ideal to V2, V3 transform
-        parity = self.parity
-        v3_ideal_y_angle = self.v3yang
-
-        xc = {}
-        yc = {}
-        xc['c0_0'] = 0.
-        yc['c0_0'] = 0.
-        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
-        xc['c0_1'] = np.sin(v3_ideal_y_angle)
-        yc['c1_0'] = (0.-parity) * np.sin(v3_ideal_y_angle)
-        yc['c0_1'] = np.cos(v3_ideal_y_angle)
-        x_ideal_to_v2v3_func = Polynomial2D(1, **xc)
-        y_ideal_to_v2v3_func = Polynomial2D(1, **yc)
-
-        # Ideal to Science transform
-        cx = {}
-        cx["c0_0"] = 0.
-        cx["c1_0"] = 1./ pixelscalex
-        cx["c1_1"] = 0.
-        cx["c0_1"] = 0.
-        x_ideal_to_sci_func = Polynomial2D(2, **cx)
-
-        cy = {}
-        cy["c0_0"] = 0.
-        cy["c1_0"] = 0.
-        cy["c1_1"] = 0.
-        cy["c0_1"] = 1./ pixelscaley
-        y_ideal_to_sci_func = Polynomial2D(2, **cy)
-
-        # V2, V3 to Ideal transform
-        xc = {}
-        yc = {}
-        xc['c0_0'] = 0.
-        yc['c0_0'] = 0.
-        xc['c1_0'] = parity * np.cos(v3_ideal_y_angle)
-        xc['c0_1'] = parity * (0. - np.sin(v3_ideal_y_angle))
-        yc['c1_0'] = np.sin(v3_ideal_y_angle)
-        yc['c0_1'] = np.cos(v3_ideal_y_angle)
-        x_v2v3_to_ideal_func = Polynomial2D(1, **xc)
-        y_v2v3_to_ideal_func = Polynomial2D(1, **yc)
-
-        # Shift by V2ref, V3ref
-        v2shift = Shift(self.v2_ref)
-        v3shift= Shift(self.v2_ref)
-
-        #Now create a compound model for each with the appropriate
-        #inverse
-        sci2idl = Mapping([0,1,0,1]) | x_sci_to_ideal_func & y_sci_to_ideal_func
-        sci2idl.inverse = Mapping([0,1,0,1]) | x_ideal_to_sci_func & y_ideal_to_sci_func
-
-        idl2v2v3 = Mapping([0,1,0,1]) | x_ideal_to_v2v3_func & y_ideal_to_v2v3_func
-        idl2v2v3.inverse = Mapping([0,1,0,1]) | x_v2v3_to_ideal_func & y_v2v3_to_ideal_func
-
-        core_model = sci2idl | idl2v2v3
-        model = xshift & yshift | core_model | v2shift & v3shift
-        return model
-
     def on_detector(self,xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
         and final image dimensions, determine whether the stamp
@@ -1101,44 +980,80 @@ class Catalog_seed():
             status = 'off'
         return status
 
-    def getPositions(self, inx, iny, matrix, transform, pixelflag):
-        #input a row containing x,y or ra,dec values, and figure out
-        #x,y, RA, Dec, and RA string and Dec string
+    def get_positions(self, input_x, input_y, pixel_flag, max_source_distance):
+        """ Given an input position ( (x,y) or (RA,Dec) ) for a source, calculate
+        the corresponding detector (x,y), RA, Dec, and provide RA and Dec strings.
+
+        Parameters
+        ----------
+
+        input_x : str
+            Detector x coordinate or RA of source. RA can be in decimal degrees or
+            (e.g 10:23:34.2 or 10h23m34.2s)
+
+        input_y : str
+            Detector y coordinate or Dec of source. Dec can be in decimal degrees
+            or (e.g. 10d:23m:34.2s)
+
+        pixel_flag : bool
+            True if input_x and input_y are in units of pixels. False if they are
+            in the RA, Dec coordinate system.
+
+        max_source_distance : float
+            Maximum number of pixels from the aperture's reference location to keep
+            a source. Sources very far off the detector will cause the calculation of
+            RA, Dec to hang.
+
+        Returns
+        -------
+
+        pixelx : float
+            Detector x coordinate of source
+
+        pixely : float
+            Detector y coordinate of source
+
+        ra : float
+            RA of source (degrees)
+
+        dec : float
+            Dec of source (degrees)
+
+        ra_string : str
+            String representation of RA
+
+        dec_string : str
+            String representation of Dec
+        """
         try:
-            entry0 = float(inx)
-            entry1 = float(iny)
-            if not pixelflag:
-                ra_str, dec_str = self.makePos(entry0, entry1)
-                ra = entry0
-                dec = entry1
+            entry0 = float(input_x)
+            entry1 = float(input_y)
+            if not pixel_flag:
+                ra_string, dec_string = self.makePos(entry0, entry1)
+                ra_number = entry0
+                dec_number = entry1
         except:
             # if inputs can't be converted to floats, then
             # assume we have RA/Dec strings. Convert to floats.
-            ra_str = inx
-            dec_str = iny
-            ra, dec = self.parseRADec(ra_str, dec_str)
+            ra_string = input_x
+            dec_string = input_y
+            ra_number, dec_number = utils.parse_RA_Dec(ra_string, dec_string)
 
         # Case where point source list entries are given with RA and Dec
-        if not pixelflag:
+        if not pixel_flag:
 
             # If distortion is to be included - either with or without the full set of coordinate
             # translation coefficients
-            if self.runStep['astrometric']:
-                pixelx, pixely = self.RADecToXY_astrometric(ra, dec, matrix, transform)
-            else:
-                # No distortion at all - "manual mode"
-                pixelx, pixely = self.RADecToXY_manual(ra, dec)
+            pixel_x, pixel_y = self.RADecToXY_astrometric(ra_number, dec_number)
 
         else:
             # Case where the point source list entry locations are given in units of pixels
             # In this case we have the source position, and RA/Dec are calculated only so
             # they can be written out into the output source list file.
-
-            pixelx = entry0
-            pixely = entry1
-
-            ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, matrix, transform)
-        return pixelx, pixely, ra, dec, ra_str, dec_str
+            pixel_x = entry0
+            pixel_y = entry1
+            ra_number, dec_number, ra_string, dec_string = self.XYToRADec(pixel_x, pixel_y)
+        return pixel_x, pixel_y, ra_number, dec_number, ra_string, dec_string
 
     def nonsidereal_CRImage(self, file):
         """
@@ -1416,51 +1331,51 @@ class Catalog_seed():
 
         return signalimage, segmentation_map
 
-    def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
-        '''from the table of distortion coefficients, get the coeffs that correspond
-        to the requested transformation and return as a list for x and another for y
-        '''
-        match = table['AperName'] == aperture
-        if np.any(match) == False:
-            raise ValueError("Aperture name {} not found in input CSV file.".format(aperture))
+    #def getDistortionCoefficients(self, table, from_sys, to_sys, aperture):
+    #    '''from the table of distortion coefficients, get the coeffs that correspond
+    #    to the requested transformation and return as a list for x and another for y
+    #    '''
+    #    match = table['AperName'] == aperture
+    #    if np.any(match) == False:
+    #        raise ValueError("Aperture name {} not found in input CSV file.".format(aperture))
 
-        row = table[match]
+    #    row = table[match]
 
-        if ((from_sys == 'science') & (to_sys == 'ideal')):
-            label = 'Sci2Idl'
-        elif ((from_sys == 'ideal') & (to_sys == 'science')):
-            label = 'Idl2Sci'
-        else:
-            raise ValueError(("WARNING: from_sys of {} and to_sys of {} not "
-                              "a valid transformation.".format(from_sys, to_sys)))
+    #    if ((from_sys == 'science') & (to_sys == 'ideal')):
+    #        label = 'Sci2Idl'
+    #    elif ((from_sys == 'ideal') & (to_sys == 'science')):
+    #        label = 'Idl2Sci'
+    #    else:
+    #        raise ValueError(("WARNING: from_sys of {} and to_sys of {} not "
+    #                          "a valid transformation.".format(from_sys, to_sys)))
 
-        # get the coefficients, return as list
-        X_cols = [c for c in row.colnames if label + 'X' in c]
-        Y_cols = [c for c in row.colnames if label + 'Y' in c]
-        x_coeffs = [row[c].data[0] for c in X_cols]
-        y_coeffs = [row[c].data[0] for c in Y_cols]
+    #    # get the coefficients, return as list
+    #    X_cols = [c for c in row.colnames if label + 'X' in c]
+    #    Y_cols = [c for c in row.colnames if label + 'Y' in c]
+    #    x_coeffs = [row[c].data[0] for c in X_cols]
+    #    y_coeffs = [row[c].data[0] for c in Y_cols]
 
-        # Strip off masked coefficients, where the column exists but there
-        # is no corresponding coefficient in the SIAF
-        x_coeffs = [c for c in x_coeffs if np.isfinite(c)]
-        y_coeffs = [c for c in y_coeffs if np.isfinite(c)]
-        #x_coeffs = [c if np.isfinite(c) else 0. for c in x_coeffs]
-        #y_coeffs = [c if np.isfinite(c) else 0. for c in y_coeffs]
+    #    # Strip off masked coefficients, where the column exists but there
+    #    # is no corresponding coefficient in the SIAF
+    #    x_coeffs = [c for c in x_coeffs if np.isfinite(c)]
+    #    y_coeffs = [c for c in y_coeffs if np.isfinite(c)]
+    #    #x_coeffs = [c if np.isfinite(c) else 0. for c in x_coeffs]
+    #    #y_coeffs = [c if np.isfinite(c) else 0. for c in y_coeffs]
 
-        # Also get the V2, V3 values of the reference pixel
-        v2ref = row['V2Ref'].data[0]
-        v3ref = row['V3Ref'].data[0]
+    #    # Also get the V2, V3 values of the reference pixel
+    #    v2ref = row['V2Ref'].data[0]
+    #    v3ref = row['V3Ref'].data[0]
 
-        # Get parity and V3 Y angle info
-        parity = row['VIdlParity'].data[0]
-        yang = row['V3IdlYAngle'].data[0]
-        v3scixang = row['V3SciXAngle'].data[0]
+    #    # Get parity and V3 Y angle info
+    #    parity = row['VIdlParity'].data[0]
+    #    yang = row['V3IdlYAngle'].data[0]
+    #    v3scixang = row['V3SciXAngle'].data[0]
 
-        # Get pixel scale info - not used but needs to be in output
-        xsciscale = row['XSciScale'].data[0]
-        ysciscale = row['YSciScale'].data[0]
+    #    # Get pixel scale info - not used but needs to be in output
+    #    xsciscale = row['XSciScale'].data[0]
+    #    ysciscale = row['YSciScale'].data[0]
 
-        return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
+    #    return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
 
     def getPointSourceList(self, filename):
         # read in the list of point sources to add, and adjust the
@@ -1534,27 +1449,6 @@ class Catalog_seed():
         xc = (self.subarray_bounds[2] + self.subarray_bounds[0]) / 2.
         yc = (self.subarray_bounds[3] + self.subarray_bounds[1]) / 2.
 
-        # Location of the subarray's reference pixel.
-        xrefpix = self.refpix_pos['x']
-        yrefpix = self.refpix_pos['y']
-
-        # center positions, sub-array sizes in pixels
-        # now offset the field center to array center for astrometric distortion corrections
-        coord_transform = None
-        if self.runStep['astrometric']:
-            # Read in the CRDS-format distortion reference file
-            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
-                coord_transform = dist_file.tree['model']
-        else:
-            coord_transform = self.simple_coord_transform()
-
-        # Using the requested RA, Dec of the reference pixel, along with the
-        # V2, V3 of the reference pixel, and the requested roll angle of the telescope
-        # create a matrix that can be used to translate between V2, V3 and RA, Dec
-        # for any pixel.
-        # v2, v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        attitude_matrix = self.getAttitudeMatrix()
-
         #Define the min and max source locations (in pixels) that fall onto the subarray
         #Include the effects of a requested grism_direct image, and also keep sources that
         #will only partially fall on the subarray
@@ -1591,75 +1485,32 @@ class Catalog_seed():
         pslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
                       "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
-        start_time = time.time()
-        times = []
-
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
-        indexes, lines  = self.remove_outside_fov_sources(indexes, lines, pixelflag, 2048)
+        indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
+        start_time = time.time()
+        times = []
+        time_reported = False
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
             try:
-            #line below (if 1>0) used to keep the block
-            # of code below at correct indent for the try: above
-            # the try: is commented out for code testing.
-            #if 1 > 0:
                 # Warn user of how long this calcuation might take...
-                if index < 100:
+                if len(times) < 100:
                     elapsed_time = time.time() - start_time
                     times.append(elapsed_time)
                     start_time = time.time()
-                elif index == 100:
+                elif len(times) == 100 and time_reported is False:
                     avg_time = np.mean(times)
                     total_time = len(indexes) * avg_time
                     print(("Expected time to process {} sources: {:.2f} seconds "
                            "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                    time_reported = True
 
-                try:
-                    entry0 = float(values['x_or_RA'])
-                    entry1 = float(values['y_or_Dec'])
-                    if not pixelflag:
-                        ra_str, dec_str = self.makePos(entry0, entry1)
-                        ra = entry0
-                        dec = entry1
-                except:
-                    # if inputs can't be converted to floats, then
-                    # assume we have RA/Dec strings. Convert to floats.
-                    ra_str = values['x_or_RA']
-                    dec_str = values['y_or_Dec']
-                    ra, dec = self.parseRADec(ra_str, dec_str)
-
-                # Case where point source list entries are given with RA and Dec
-                if not pixelflag:
-
-                    # If distortion is to be included - either with or without the full set of coordinate
-                    # translation coefficients
-                    #if self.runStep['astrometric']:
-
-                    # Same function call regardless of whether distortion file is provided or not
-                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-                    #else:
-                    #    # No distortion at all - "manual mode"
-                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
-
-                else:
-                    # Case where the point source list entry locations are given in units of pixels
-                    # In this case we have the source position, and RA/Dec are calculated only so
-                    # they can be written out into the output source list file.
-
-                    # Assume that the input x and y values are coordinate values
-                    # WITHIN THE SPECIFIED SUBARRAY. So for example, a source in the file
-                    # at 0, 0 when you are making a SUB160 ramp will fall on the lower left
-                    # corner of the SUB160 subarray, NOT the lower left corner of the full
-                    # frame.
-
-                    pixelx = entry0
-                    pixely = entry1
-
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
-                                                              coord_transform)
+                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                              values['y_or_Dec'],
+                                                                              pixelflag, 4096)
 
                 # Get the input magnitude of the point source
                 mag = float(values['magnitude'])
@@ -1668,30 +1519,9 @@ class Catalog_seed():
                     # set up an entry for the output table
                     entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
-                    # translate magnitudes to countrate
-                    # scale = 10.**(0.4*(15.0-mag))
-
-                    # get the countrate that corresponds to a 15th magnitude star for this filter
-                    # if self.params['Readout']['pupil'][0].upper() == 'F':
-                    #    usefilt = 'pupil'
-                    # else:
-                    #    usefilt = 'filter'
-                    # cval = self.countvalues[self.params['Readout'][usefilt]]
-                    #
-                    # DEAL WITH THIS LATER, ONCE PYSYNPHOT IS INCLUDED WITH PIPELINE DIST?
-                    # if cval == 0:
-                    #    print("Countrate value for {} is zero in {}.".format(self.params['Readout'][usefilt], self.parameters['phot_file']))
-                    #    print("Eventually attempting to calculate value using pysynphot.")
-                    #    print("but pysynphot is not present in jwst build 6, so pushing off to later...")
-                    #    sys.exit()
-                    #    cval = self.findCountrate(self.params['Readout'][usefilt])
-                    #
-                    # translate to counts in single frame at requested array size
-                    # framecounts = scale*cval*self.frametime
-                    # countrate = scale*cval
-
                     # Calculate the countrate for the source
-                    countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu, photflam=self.photflam)
+                    countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
+                                                      photflam=self.photflam)
                     framecounts = countrate * self.frametime
 
                     # add the countrate and the counts per frame to pointSourceList
@@ -1728,6 +1558,8 @@ class Catalog_seed():
         view of the detector. This can be a fairly rough cut. We just need to remove sources
         that are very far from the detector.
 
+        CURRENTLY NOT USED
+
         Parameters:
         -----------
         index : list
@@ -1754,23 +1586,39 @@ class Catalog_seed():
         source : Table
             astropy Table containing filtered list of sources
         """
+        catalog_x = source['x_or_RA']
+        catalog_y = source['y_or_Dec']
+
         if pixflag:
             minx = 0 - delta_pixels
-            maxx = 2 * delta_pixels
+            maxx = self.output_dims[1] + delta_pixels
             miny = 0 - delta_pixels
-            maxy = 2 * delta_pixels
+            maxy = self.output_dims[0] + delta_pixels
+            good = ((catalog_x > minx) & (catalog_x < maxx) & (catalog_y > miny) & (catalog_y < maxy))
         else:
-            delta_degrees = (delta_pixels * self.pixscale[0]) / 3600.
-            minx = self.ra - delta_degrees
-            maxx = self.ra + delta_degrees
-            miny = self.dec - delta_degrees
-            maxy = self.dec + delta_degrees
+            delta_degrees = (delta_pixels * self.siaf.XSciScale) / 3600. * u.deg
+            reference = SkyCoord(ra=self.ra * u.deg, dec=self.dec * u.deg)
 
-        x = source['x_or_RA']
-        y = source['y_or_Dec']
-        good = ((x > minx) & (x < maxx) & (y > miny) & (y < maxy))
+            # Need to determine the units of the RA values.
+            # Dec units should always be degrees whether or not they are in decimal
+            # or DD:MM:SS or DDd:MMm:SSs formats.
+            dec_unit = u.deg
+            try:
+                # if it can be converted to a float, assume decimal degrees
+                entry0 = float(catalog_x[0])
+                ra_unit = u.deg
+            except ValueError:
+                # if it cannot be converted to a float, then the unit is 'hour'
+                ra_unit = 'hour'
+
+            # Assume that units are consisent within each column. (i.e. no mixing of
+            # 12h:23m:34.5s and 189.87463 degrees within a column)
+            catalog = SkyCoord(ra=catalog_x, dec=catalog_y, unit=(ra_unit, dec_unit))
+            good = np.where(reference.separation(catalog) < delta_degrees)[0]
+
         filtered_sources = source[good]
         filtered_indexes = index[good]
+
         return filtered_indexes, filtered_sources
 
     def makePointSourceImage(self, pointSources):
@@ -1820,6 +1668,7 @@ class Catalog_seed():
             # This depends on the sub-pixel offsets above
             a_in = interval * int(numperpix*xfract + 0.5) - 0.5
             b_in = interval * int(numperpix*yfract + 0.5) - 0.5
+
             astr = "{0:.{1}f}".format(a_in, 2)
             bstr = "{0:.{1}f}".format(b_in, 2)
 
@@ -1973,14 +1822,6 @@ class Catalog_seed():
 
         return gtab, pflag, msys
 
-    def getAttitudeMatrix(self):
-        # create an attitude_matrix from the distortion reference file model and other info
-        # calculate a local roll angle for the aperture
-        self.local_roll = set_telescope_pointing.compute_local_roll(self.params['Telescope']['rotation'], self.ra, self.dec, self.v2_ref, self.v3_ref)
-        # create attitude_matrix
-        attitude_matrix = rotations.attitude(self.refpix_pos['v2'], self.refpix_pos['v3'], self.ra, self.dec, self.local_roll)
-        return attitude_matrix
-
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
         # values hh:mm:ss
@@ -2005,119 +1846,45 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
+        # The following fixes a format issue; it is not clear why the signa
+        # can have spaces around it in view of the above format string, but
+        # that is what happens.
+        alpha2 = alpha2.replace("0+0",'+')
+        delta2 = alpha2.replace("0+0",'+')
+        alpha2 = alpha2.replace("0-0",'-')
+        delta2 = alpha2.replace("0-0",'-')
         return alpha2, delta2
 
-    def parseRADec(self, rastr, decstr):
-        # convert the input RA and Dec strings to floats
-        try:
-            rastr = rastr.lower()
-            rastr = rastr.replace("h", ":")
-            rastr = rastr.replace("m", ":")
-            rastr = rastr.replace("s", "")
-            decstr = decstr.lower()
-            decstr = decstr.replace("d", ":")
-            decstr = decstr.replace("m", ":")
-            decstr = decstr.replace("s", "")
+    def RADecToXY_astrometric(self, ra, dec):
+        """Translate backwards, RA, Dec to V2, V3. If a distortion reference file is
+        provided, use that. Otherwise fall back to pysiaf.
 
-            values = rastr.split(":")
-            ra0 = 15.*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
+        Parameters:
+        -----------
+        ra : float
+            Right ascention value, in degrees, to be translated.
 
-            values = decstr.split(":")
-            if "-" in values[0]:
-                sign = -1
-                values[0] = values[0].replace("-", " ")
-            else:
-                sign =  +1
-            dec0 = sign*(int(values[0]) + int(values[1])/60. + float(values[2])/3600.)
-            return ra0, dec0
-        except:
-            raise ValueError("Error parsing RA, Dec strings: {} {}".format(rastr, decstr))
+        dec : float
+            Declination value, in degrees, to be translated.
 
-    def RADecToXY_astrometric(self, ra, dec, attitude_matrix, coord_transform):
-        # Translate backwards, RA, Dec to V2, V3
-        pixelv2, pixelv3 = rotations.getv2v3(attitude_matrix, ra, dec)
+        Returns:
+        --------
+        pixelx : float
+            X coordinate value in the aperture corresponding to the input location
 
-        if self.runStep['distortion_coeffs']:
-            # If the full set of distortion coefficients are provided, then
-            # use those to make the exact transformation from the 'ideal'
-            # to 'science' coordinate systems
+        pixely : float
+            Y coordinate value in the aperture corresponding to the input location
+        """
+        loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
 
-            # Now V2, V3 to undistorted angular distance from the reference pixel
-            xidl = self.v2v32idlx(pixelv2 - self.v2_ref, pixelv3 - self.v3_ref)
-            yidl = self.v2v32idly(pixelv2 - self.v2_ref, pixelv3 - self.v3_ref)
-
-            # Finally, undistorted distances to distorted pixel values
-            ncoeff = len(self.x_sci2idl)
-            if ncoeff == 21:
-                polynomial_order = 5
-            elif ncoeff == 15:
-                polynomial_order = 4
-            elif ncoeff == 10:
-                polynomial_order = 3
-            else:
-                raise ValueError(("WARNING: {} science to ideal coefficients read in from "
-                                  "SIAF. Not sure what polynomial order this corresponds to."
-                                  .format(ncoeff)))
-
-            deltapixelx, deltapixely, err, iter = polynomial.invert(self.x_sci2idl, self.y_sci2idl,
-                                                                    xidl, yidl, polynomial_order)
-            pixelx = deltapixelx + self.refpix_pos['x']
-            pixely = deltapixely + self.refpix_pos['y']
-
+        if self.coord_transform is not None:
+            # Use the distortion reference file to translate from V2, V3 to RA, Dec
+            pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
         else:
-            # If the full set of distortion coefficients are not provided,
-            # then we fall back to the coordinate transform provided by the
-            # distortion reference file. These results are not exact, and
-            # become less accurate the farther the source is from the center
-            # of the detector. Results can be incorrect by ~20 pixels in the
-            # corners of the detector.
-
-            # Now go backwards from V2, V3 to distorted pixels
-            # deltapixelx, deltapixely = coord_transform.inverse(pixelv2-self.refpix_pos['v2'], pixelv3-self.refpix_pos['v3'])
-            pixelx, pixely = coord_transform.inverse(pixelv2, pixelv3)
-
-        return pixelx, pixely
-
-    def RADecToXY_manual(self, ra, dec):
-        # In this case, the sources are provided as an RA, Dec list,
-        # but no astrometry information is provided. So assume an average
-        # pixel scale and calculate the pixel position of the source from that.
-        # This obviously does not include distortion, and is kind of a last
-        # resort.
-        ra_source = ra * 3600.
-        dec_source = dec * 3600.
-
-        #dist_between, deltaang = self.object_separation([self.ra, self.dec],
-        #                                               [ra_source, dec_source])
-
-        #simple_wcs_obj = {}
-        #simple_wcs_obj["CRPIX1"] = self.refpix_pos["x"]
-        #simple_wcs_obj["CRPIX2"] = self.refpix_pos["y"]
-        #simple_wcs_obj["CRVAL1"] =
-        #simple_wcs_obj["CRVAL2"] =
-        #simple_wcs_obj["CTYPE1"] =
-        #simple_wcs_obj["CTYPE2"] =
-        #simple_wcs_obj["CD1_1"] =
-        #simple_wcs_obj["CD1_2"] =
-        #simple_wcs_obj["CD2_1"] =
-        #simple_wcs_obj["CD2_2"] =
-
-        #wcs_obj = astropy.wcs.WCS(header = simple_wcs_obj)
-        deltara, deltadec = self.object_separation([self.ra, self.dec],
-                                                   [ra_source, dec_source], wcs_obj)
-        # Now translate to deltax and deltay if the
-        # position angle is non-zero
-        #tot_ang = deltaang + (0. - self.params['Telescope']['rotation'] * np.pi / 180.)
-
-        #deltax = dist_between * np.sin(tot_ang) / self.pixscale[0]
-        #deltay = dist_between * np.cos(tot_ang) / self.pixscale[0]
-
-        #pixelx = self.refpix_pos['x'] + deltax
-        #pixely = self.refpix_pos['y'] + deltay
-
-
-
-
+            pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
+            # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
+            pixelx -= 1
+            pixely -= 1
         return pixelx, pixely
 
     def object_separation(self, radec1, radec2, wcs):
@@ -2149,35 +1916,42 @@ class Catalog_seed():
         sepra, sepdec = c1.spherical_offsets_to(c2).to_pixel(wcs)
         return sepra, sepdec
 
-    def XYToRADec(self, pixelx, pixely, attitude_matrix, coord_transform):
-        # Translate a given x, y location on the detector
-        # to RA, Dec
+    def XYToRADec(self, pixelx, pixely):
+        """Translate a given x, y location on the detector to RA, Dec. If a
+        distortion reference file is provided, use that. Otherwise fall back to
+        using pysiaf.
 
-        # If distortion is to be included
-        # if self.runStep['astrometric']:
-        if coord_transform is not None:
-            # Transform distorted pixels to V2, V3
-            # deltav2, deltav3 = coord_transform(pixelx-self.refpix_pos['x'], pixely-self.refpix_pos['y'])
-            # pixelv2 = deltav2 + self.refpix_pos['v2']
-            # pixelv3 = deltav3 + self.refpix_pos['v3']
-            pixelv2, pixelv3 = coord_transform(pixelx, pixely)
+        Parameters:
+        -----------
+        pixelx : float
+            X coordinate value in the aperture
 
-            # Now translate V2, V3 to RA, Dec
-            ra, dec = rotations.pointing(attitude_matrix, pixelv2, pixelv3)
+        pixely : float
+            Y coordinate value in the aperture
 
+        Returns:
+        --------
+        ra : float
+            Right ascention value in degrees
+
+        dec : float
+            Declination value in degrees
+
+        ra_str : str
+            Right ascention value in HH:MM:SS
+
+        dec_str : str
+            Declination value in DD:MM:SS
+        """
+        if self.coord_transform is not None:
+            loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
-            # Without including distortion.
-            # Fall back to "manual" calculations
-            dist_between = np.sqrt((pixelx - self.refpix_pos['x'])**2 + (pixely - self.refpix_pos['y'])**2)
-            deltaang = np.arctan2(pixely, pixelx)
+            # Use SIAF to do the calucations if the distortion reffile is not present.
+            # In this case, add 1 to the input pixel values since SIAF works in a 1-indexed
+            # coordinate system.
+            loc_v2s, loc_v3s = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
 
-            tot_ang = deltaang + (self.parms['Telescope']['rotation'] * np.pi / 180.)
-
-            deltara = dist_between * np.sin(tot_ang) / self.pixoscale[0]
-            deltadec = dist_between * np.cos(tot_ang) / self.pixscale[0]
-
-            ra = self.ra + deltara
-            dec = self.dec + deltadec
+        ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
 
         # Translate the RA/Dec floats to strings
         ra_str, dec_str = self.makePos(ra, dec)
@@ -2248,8 +2022,8 @@ class Catalog_seed():
         maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
         minx = 0
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
-        ny = self.subarray_bounds[3] - self.subarray_bounds[1]
-        nx = self.subarray_bounds[2] - self.subarray_bounds[0]
+        ny = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
+        nx = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
 
         #Expand the limits if a grism direct image is being made
         if self.params['Output']['grism_source_image'] == True:
@@ -2262,23 +2036,6 @@ class Catalog_seed():
 
             nx = np.int(nx * self.grism_direct_factor)
             ny = np.int(ny * self.grism_direct_factor)
-
-        # Create transform matrix for galaxy sources
-        # Read in the CRDS-format distortion reference file
-        coord_transform = None
-        if self.runStep['astrometric']:
-            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
-                coord_transform = dist_file.tree['model']
-        else:
-            coord_transform = self.simple_coord_transform()
-
-        # Using the requested RA, Dec of the reference pixel, along with the
-        # V2, V3 of the reference pixel, and the requested roll angle of the telescope
-        # create a matrix that can be used to translate between V2, V3 and RA, Dec
-        # for any pixel
-        # v2, v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        # attitude_matrix = rotations.attitude(self.refpix_pos['v2'], self.refpix_pos['v3'], self.ra, self.dec, self.params['Telescope']["rotation"])
-        attitude_matrix = self.getAttitudeMatrix()
 
         # If an index column is present use that, otherwise
         # create one
@@ -2297,12 +2054,17 @@ class Catalog_seed():
         self.maxindex = np.max(indexes)
         print("after galaxies, max index is {}".format(self.maxindex))
 
+        # Check the source list and remove any sources that are well outside the
+        # field of view of the detector. These sources cause the coordinate
+        # conversion to hang.
+        indexes, galaxylist = self.remove_outside_fov_sources(indexes, galaxylist, pixelflag, 4096)
+
         # Loop over galaxy sources
         for index, source in zip(indexes, galaxylist):
 
             # If galaxy radii are given in units of arcseconds, translate to pixels
-            if radiusflag == False:
-                source['radius'] /= self.pixscale[0]
+            if radiusflag is False:
+                source['radius'] /= self.siaf.XSciScale
 
             # how many pixels beyond the nominal subarray edges can a source be located and
             # still have it fall partially on the subarray? Galaxy stamps are nominally set to
@@ -2316,82 +2078,21 @@ class Catalog_seed():
             outminx = minx - edgex
             outmaxx = maxx + edgex
 
-            try:
-                entry0 = float(source['x_or_RA'])
-                entry1 = float(source['y_or_Dec'])
-                if not pixelflag:
-                    ra_str, dec_str = self.makePos(entry0, entry1)
-                    ra = entry0
-                    dec = entry1
-            except:
-                # if inputs can't be converted to floats, then
-                # assume we have RA/Dec strings. Convert to floats.
-                ra_str = source['x_or_RA']
-                dec_str = source['y_or_Dec']
-                ra, dec = self.parseRADec(ra_str, dec_str)
-
-            # case where point source list entries are given with RA and Dec
-            if not pixelflag:
-
-                # if distortion is to be included
-                #if self.runStep['astrometric']:
-
-                # Call is the same regardless of whether distortion reference file
-                # is given or not
-                pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-
-                #else:
-                #    # No distortion. Fall back to "manual" calculations
-                #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
-
-            else:
-                # case where the point source list entry locations are given in units of pixels
-                # In this case we have the source position, and RA/Dec are calculated only so
-                # they can be written out into the output source list file.
-
-                # Assume that the input x and y values are coordinate values
-                # WITHIN THE SPECIFIED SUBARRAY. So for example, a source in the file
-                # at 0, 0 when you are making a SUB160 ramp will fall on the lower left
-                # corner of the SUB160 subarray, NOT the lower left corner of the full
-                # frame.
-
-                pixelx = entry0
-                pixely = entry1
-
-                ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix, coord_transform)
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(source['x_or_RA'],
+                                                                          source['y_or_Dec'],
+                                                                          pixelflag, 4096)
 
             # only keep the source if the peak will fall within the subarray
             if pixely > outminy and pixely < outmaxy and pixelx > outminx and pixelx < outmaxx:
 
-                pixelv2, pixelv3 = rotations.getv2v3(attitude_matrix, ra, dec)
-                entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, pixelv2, pixelv3, source['radius'], source['ellipticity'], source['pos_angle'], source['sersic_index']]
+                pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
+                entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, pixelv2, pixelv3,
+                         source['radius'], source['ellipticity'], source['pos_angle'], source['sersic_index']]
 
                 # Now look at the input magnitude of the point source
                 # append the mag and pixel position to the list of ra, dec
                 mag = float(source['magnitude'])
                 entry.append(mag)
-
-                # translate magnitudes to countrate
-                # scale = 10.**(0.4*(15.0-mag))
-
-                # get the countrate that corresponds to a 15th magnitude star for this filter
-                # if self.params['Readout']['pupil'][0].upper() == 'F':
-                #    usefilt = 'pupil'
-                # else:
-                #    usefilt = 'filter'
-                # cval = self.countvalues[self.params['Readout'][usefilt]]
-
-                # DEAL WITH THIS LATER, ONCE PYSYNPHOT IS INCLUDED WITH PIPELINE DIST?
-                # if cval == 0:
-                #    print("Countrate value for {} is zero in {}.".format(self.params['Readout'][usefilt], self.parameters['phot_file']))
-                #    print("Eventually attempting to calculate value using pysynphot.")
-                #    print("but pysynphot is not present in jwst build 6, so pushing off to later...")
-                #    sys.exit()
-                #    cval = self.findCountrate(self.params['Readout'][usefilt])
-
-                # translate to counts in single frame at requested array size
-                # framecounts = scale*cval*self.frametime
-                # rate = scale*cval
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
                 rate = self.mag_to_countrate(magsystem, mag, photfnu=self.photfnu, photflam=self.photflam)
@@ -2447,8 +2148,10 @@ class Catalog_seed():
         # Scale such that the total number of counts in the galaxy matches the input
         summedcounts = np.sum(img)
         if summedcounts == 0:
-            print('in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
-        factor = totalcounts / summedcounts
+            print('Zero counts in image in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
+            factor = 0.
+        else:
+            factor = totalcounts / summedcounts
         img = img * factor
 
         # Crop image down such that it contains 99.95% of the total signal
@@ -2473,6 +2176,11 @@ class Catalog_seed():
         cropped image
         """
         totsignal = np.sum(stamp)
+        # In the case of no signal, return the original stamp image.
+        # This can happen for some Sersic profile parameters when the galaxy
+        # is very small compared to the pixel size.
+        if totsignal == 0.:
+            return stamp
         yd, xd = stamp.shape
         mid = np.int(xd / 2)
         for rad in range(mid):
@@ -2541,7 +2249,7 @@ class Catalog_seed():
 
         # create attitude matrix so we can calculate the North->V3 angle for
         # each galaxy
-        attitude_matrix = self.getAttitudeMatrix()
+        # attitude_matrix = self.getAttitudeMatrix()
 
         # For each entry, create an image, and place it onto the final output image
         for entry in galaxylist:
@@ -2554,9 +2262,8 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            north_to_east_V3ang = rotations.posangle(attitude_matrix, entry['V2'], entry['V3'])
-            # xposang = (0-self.v3scixang) - (north_to_east_V3ang - entry['pos_angle'])
-            xposang = 0. - (self.v3scixang - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
+            north_to_east_V3ang = rotations.posangle(self.attitude_matrix, entry['V2'], entry['V3'])
+            xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
 
             # first create the galaxy image
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], xposang*np.pi/180., entry['counts_per_frame_e'])
@@ -2647,27 +2354,6 @@ class Catalog_seed():
         xc = (self.subarray_bounds[2] + self.subarray_bounds[0]) / 2.
         yc = (self.subarray_bounds[3] + self.subarray_bounds[1]) / 2.
 
-        # Location of the subarray's reference pixel.
-        xrefpix = self.refpix_pos['x']
-        yrefpix = self.refpix_pos['y']
-
-        # center positions, sub-array sizes in pixels
-        # now offset the field center to array center for astrometric distortion corrections
-        coord_transform = None
-        if self.runStep['astrometric']:
-            # Read in the CRDS-format distortion reference file
-            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
-                coord_transform = dist_file.tree['model']
-        else:
-            coord_transform = self.simple_coord_transform()
-
-        # Using the requested RA, Dec of the reference pixel, along with the
-        # V2, V3 of the reference pixel, and the requested roll angle of the telescope
-        # create a matrix that can be used to translate between V2, V3 and RA, Dec
-        # for any pixel.
-        # v2, v3 need to be in arcsec, and RA, Dec, and roll all need to be in degrees
-        attitude_matrix = self.getAttitudeMatrix()
-
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
         eslist.write(("# Field center (degrees): %13.8f %14.8f y axis rotation angle "
@@ -2705,57 +2391,13 @@ class Catalog_seed():
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
             try:
-            #line below (if 1>0) used to keep the block of code below at correct indent for the try: above
-            #the try: is commented out for code testing.
-            #if 1>0:
-                try:
-                    entry0 = float(values['x_or_RA'])
-                    entry1 = float(values['y_or_Dec'])
-
-                    if not pixelflag:
-                        ra_str, dec_str = self.makePos(entry0, entry1)
-                        ra = entry0
-                        dec = entry1
-                except:
-                    # if inputs can't be converted to floats, then
-                    # assume we have RA/Dec strings. Convert to floats.
-                    ra_str = values['x_or_RA']
-                    dec_str = values['y_or_Dec']
-                    ra, dec = self.parseRADec(ra_str, dec_str)
-
-                # Case where point source list entries are given with RA and Dec
-                if not pixelflag:
-
-                    # If distortion is to be included - either with or without the full set of coordinate
-                    # translation coefficients
-                    #if self.runStep['astrometric']:
-                    # Same function call regardless of whether distortion file is provided or not
-                    pixelx, pixely = self.RADecToXY_astrometric(ra, dec, attitude_matrix, coord_transform)
-                    #else:
-                    #    # No distortion at all - "manual mode"
-                    #    pixelx, pixely = self.RADecToXY_manual(ra, dec)
-
-                else:
-                    # Case where the point source list entry locations are given in units of pixels
-                    # In this case we have the source position, and RA/Dec are calculated only so
-                    # they can be written out into the output source list file.
-
-                    # Assume that the input x and y values are coordinate values
-                    # WITHIN THE SPECIFIED SUBARRAY. So for example, a source in the file
-                    # at 0, 0 when you are making a SUB160 ramp will fall on the lower left
-                    # corner of the SUB160 subarray, NOT the lower left corner of the full
-                    # frame.
-
-                    pixelx = entry0
-                    pixely = entry1
-
-                    ra, dec, ra_str, dec_str = self.XYToRADec(pixelx, pixely, attitude_matrix,
-                                                              coord_transform)
-
+                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                              values['y_or_Dec'],
+                                                                              pixelflag, 4096)
                 # Get the input magnitude
                 try:
                     mag = float(values['magnitude'])
-                except:
+                except ValueError:
                     mag = None
 
                 # Now find out how large the extended source image is, so we
@@ -3007,7 +2649,7 @@ class Catalog_seed():
             print("WARNING: unable to open {}".format(self.paramfile))
             sys.exit()
 
-    def checkParams(self):
+    def check_params(self):
         """Check input parameters for expected datatypes, values"""
         # Check instrument name
         if self.params['Inst']['instrument'].lower() not in INST_LIST:
@@ -3021,7 +2663,7 @@ class Catalog_seed():
         else:
             raise ValueError(("WARNING: unrecognized mode {} for {}. Must be one of: {}"
                    .format(self.params['Inst']['mode'],
-                           self.params['Inst']['instrument'],possibleModes)))
+                           self.params['Inst']['instrument'], possibleModes)))
 
         # Check telescope tracking entry
         self.params['Telescope']['tracking'] = self.params['Telescope']['tracking'].lower()
@@ -3064,7 +2706,7 @@ class Catalog_seed():
         self.runStep['pixelflat'] = self.checkRunStep(self.params['Reffiles']['pixelflat'])
         self.runStep['illuminationflat'] = self.checkRunStep(self.params['Reffiles']['illumflat'])
         self.runStep['astrometric'] = self.checkRunStep(self.params['Reffiles']['astrometric'])
-        self.runStep['distortion_coeffs'] = self.checkRunStep(self.params['Reffiles']['distortion_coeffs'])
+        # self.runStep['distortion_coeffs'] = self.checkRunStep(self.params['Reffiles']['distortion_coeffs'])
         self.runStep['ipc'] = self.checkRunStep(self.params['Reffiles']['ipc'])
         self.runStep['crosstalk'] = self.checkRunStep(self.params['Reffiles']['crosstalk'])
         self.runStep['occult'] = self.checkRunStep(self.params['Reffiles']['occult'])
@@ -3087,28 +2729,37 @@ class Catalog_seed():
         if self.params['simSignals']['galaxyListFile'] == 'None':
             print('No galaxy catalog provided in yaml file.')
 
-        # create table that will contain filters/quantum yield/and vegamag=15 countrates
-        # self.makeFilterTable()
-
         # Read in list of zeropoints/photflam/photfnu
         self.zps = ascii.read(self.params['Reffiles']['flux_cal'])
 
         # Determine the instrument module and detector from the aperture name
         aper_name = self.params['Readout']['array_name']
         try:
-            detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
-            module = detector[0]
+            # previously detector was e.g. 'A1'. Let's make it NRCA1 to be more in
+            # line with other instrument formats
+            # detector = self.subdict[self.subdict['AperName'] == aper_name]['Detector'][0]
+            # module = detector[0]
+            detector = aper_name.split('_')[0]
+            shortdetector = detector
+            if self.params["Inst"]["instrument"].lower() == 'nircam':
+                module = detector[3]
+                shortdetector = detector[3:]
+            elif self.params["Inst"]["instrument"].lower() == 'niriss':
+                module = detector[0]
+            elif self.params["Inst"]["instrument"].lower() == 'fgs':
+                detector = detector.replace("FGS", "GUIDER")
+                module = detector[0]
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-        # In the future we expect zeropoints to be detector dependent, as they currently
-        # are for FGS. So if we are working with NIRCAM or NIRISS, manually add a Detector key
-        # to the dictionary as a placeholder.
+        # In the future we expect zeropoints to be detector dependent, as they
+        # currently are for FGS. So if we are working with NIRCAM or NIRISS,
+        # manually add a Detector key to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
 
-        # make sure the requested filter is allowed. For imaging, all filters are allowed.
-        # In the future, other modes will be more restrictive
+        # Make sure the requested filter is allowed. For imaging, all filters
+        # are allowed. In the future, other modes will be more restrictive
         if self.params['Readout']['pupil'][0].upper() == 'F':
             usefilt = 'pupil'
         else:
@@ -3122,15 +2773,16 @@ class Catalog_seed():
             self.params['Readout']['pupil'] = 'NA'
 
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
-            raise ValueError(("WARNING: requested filter {} is not in the list of "
-                   "possible filters.".format(self.params['Readout'][usefilt])))
+            raise ValueError(("WARNING: requested filter {} is not in the list"
+                              " of possible filters."
+                              .format(self.params['Readout'][usefilt])))
 
         # Get the photflambda and photfnu values that go with
         # the filter
         mtch = ((self.zps['Detector'] == detector) &
                 (self.zps['Filter'] == self.params['Readout'][usefilt]) &
                 (self.zps['Module'] == module))
-        self.vegazeropoint=self.zps['VEGAMAG'][mtch][0]
+        self.vegazeropoint = self.zps['VEGAMAG'][mtch][0]
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
@@ -3159,7 +2811,7 @@ class Catalog_seed():
                                                        '/zero/'
             else:
                 if self.params['Inst']['instrument'].lower() != 'fgs':
-                    psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, detector,
+                    psfname = '{}{}_x{}_y{}_{}_{}_{}'.format(basename, shortdetector,
                                                              'psfxpos', 'psfypos',
                                                              self.params['Readout'][usefilt].lower(),
                                                              str(wfe), str(wfegroup))
@@ -3171,7 +2823,7 @@ class Catalog_seed():
                 psfname = psfname.replace('psfxpos', '1024')
                 psfname = psfname.replace('psfypos', '1024')
                 if self.params['Inst']['instrument'].lower() != 'fgs':
-                    pathaddition = "{}/{}/{}".format(detector,
+                    pathaddition = "{}/{}/{}".format(shortdetector,
                                                      self.params['Readout'][usefilt].lower(),
                                                      str(wfe))
                 else:
@@ -3179,6 +2831,16 @@ class Catalog_seed():
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
+                # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF
+                # files are in a separate directory and have the altered file names
+                # compared to imaging.  Hence one can point to the same base
+                # directory to run both imaging and NRM models.
+                #
+                # This set-up requires that the NRM PSF library files be placed in a directory named NIS_NRM under the
+                # PSF path given in the .yaml file, just as the NIRISS imaging PSF library files need to be placed in a
+                # directory named NIS under the specified PSF path.
+                if self.params['Inst']['mode'] in ['ami']:
+                    self.psfname = self.psfname.replace('NIS','NIS_NRM')
         else:
             # case where psfPath is None. In this case, create a PSF on the fly to use
             # for adding sources
@@ -3204,43 +2866,6 @@ class Catalog_seed():
         totalsignal = np.sum(self.centerpsf)
         self.centerpsf /= totalsignal
 
-        # ASTROMETRY
-        # Read in the distortion coefficients file if present. These will provide a more exact
-        # transform from RA, Dec to x, y than the astrometric distortion reference file above.
-        # The file above can be off by ~20 pixels in the corners of the array. This file will give
-        # exact answers
-        if self.runStep['distortion_coeffs'] == True:
-            if os.path.isfile(self.params['Reffiles']['distortion_coeffs']):
-                distortionTable = ascii.read(self.params['Reffiles']['distortion_coeffs'], header_start=1, format='csv')
-            else:
-                raise FileNotFoundError(("WARNING: Input distortion coefficients file {} "
-                                         "does not exist."
-                                         .format(self.params['Reffiles']['distortion_coeffs'])))
-
-            # read in coefficients for the forward 'science' to 'ideal' coordinate transformation.
-            # 'science' is in units of distorted pixels, while 'ideal' is the undistorted
-            # angular distance from the reference pixel
-            ap_name = self.params['Readout']['array_name']
-
-            self.x_sci2idl, self.y_sci2idl, self.v2_ref, self.v3_ref, \
-                self.parity, self.v3yang, self.xsciscale, self.ysciscale, \
-                self.v3scixang = self.getDistortionCoefficients(distortionTable,
-                                                                'science', 'ideal', ap_name)
-
-            #Generate the coordinate transform for V2, V3 to 'ideal'
-            siaf = ascii.read(self.params['Reffiles']['distortion_coeffs'], header_start=1, format='csv')
-
-            match = siaf['AperName'] == ap_name
-            if not np.any(match):
-                raise ValueError("Aperture name {} not found in input CSV file.".format(ap_name))
-
-            siaf_row = siaf[match]
-
-            self.v2v32idlx, self.v2v32idly = read_siaf_table.\
-                                             get_siaf_v2v3_transform(siaf_row,
-                                                                     ap_name,
-                                                                     to_system='ideal')
-
         #convert the input RA and Dec of the pointing position into floats
         #check to see if the inputs are in decimal units or hh:mm:ss strings
         try:
@@ -3248,8 +2873,8 @@ class Catalog_seed():
 
             self.dec = float(self.params['Telescope']['dec'])
         except:
-            self.ra, self.dec = self.parseRADec(self.params['Telescope']['ra'],
-                                                self.params['Telescope']['dec'])
+            self.ra, self.dec = utils.parse_RA_Dec(self.params['Telescope']['ra'],
+                                                   self.params['Telescope']['dec'])
 
         if abs(self.dec) > 90. or self.ra < 0. or self.ra > 360. or \
            self.ra is None or self.dec is None:
@@ -3258,18 +2883,27 @@ class Catalog_seed():
         # make sure the rotation angle is a float
         try:
             self.params['Telescope']["rotation"] = float(self.params['Telescope']["rotation"])
-        except:
+        except ValueError:
             print(("ERROR: bad rotation value {}, setting to zero."
                    .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
+
+        siaf_inst = self.params['Inst']['instrument']
+        if siaf_inst.lower() == 'nircam':
+            siaf_inst = 'NIRCam'
+        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+                                                                       self.params['Readout']['array_name'],
+                                                                       self.ra, self.dec,
+                                                                       self.params['Telescope']['rotation'])
 
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']
 
-        try:
+        if np.isreal(self.params['simSignals']['bkgdrate']):
             self.params['simSignals']['bkgdrate'] = float(self.params['simSignals']['bkgdrate'])
-        except:
+        else:
             if self.params['simSignals']['bkgdrate'].lower() in bkgdrate_options:
                 print(("Calculating background rate using jwst_background "
                        "based on {} level".format(self.params['simSignals']['bkgdrate'])))
@@ -3385,8 +3019,7 @@ class Catalog_seed():
         # the directory tree under the directory specified by the MIRAGE_DATA
         # environment variable. If not, assume the input is a full path
         # and check there.
-        rlist = [['Reffiles', 'astrometric'],
-                 ['Reffiles', 'distortion_coeffs']]
+        rlist = [['Reffiles', 'astrometric']]
         plist = [['simSignals', 'psfpath']]
         ilist = [['simSignals', 'pointsource'],
                  ['simSignals', 'galaxyListFile'],
@@ -3395,8 +3028,8 @@ class Catalog_seed():
                  ['simSignals', 'movingTargetSersic'],
                  ['simSignals', 'movingTargetExtended'],
                  ['simSignals', 'movingTargetToTrack']]
-        for ref in rlist:
-            self.ref_check(ref)
+        # for ref in rlist:
+        #    self.ref_check(ref)
         for path in plist:
             self.path_check(path)
         for inp in ilist:
@@ -3478,67 +3111,57 @@ class Catalog_seed():
                    "Setting to {}".format(value, typ, default)))
             return default
 
-    def readSubarrayDefinitionFile(self):
-        # read in the file that contains a list of subarray names and positions on the detector
+    #def read_subarray_definition_file(self):
+    #    # read in the file that contains a list of subarray names and positions on the detector
 
-        try:
-            self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-        except:
-            raise RuntimeError("Error: could not read in subarray definitions file: {}".format(self.params['Reffiles']['subarray_defs']))
+    #    try:
+    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
+    #    except:
+    #        raise RuntimeError(("Error: could not read in subarray definitions file: {}"
+    #                            .format(self.params['Reffiles']['subarray_defs'])))
 
-    def getSubarrayBounds(self):
-        # find the bounds of the requested subarray
-        if self.params['Readout']['array_name'] in self.subdict['AperName']:
-            mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
-            self.subarray_bounds = [self.subdict['xstart'].data[mtch][0], self.subdict['ystart'].data[mtch][0], self.subdict['xend'].data[mtch][0], self.subdict['yend'].data[mtch][0]]
-            self.refpix_pos = {'x':self.subdict['refpix_x'].data[mtch][0], 'y':self.subdict['refpix_y'][mtch][0], 'v2':self.subdict['refpix_v2'].data[mtch][0], 'v3':self.subdict['refpix_v3'].data[mtch][0]}
-
-            namps = self.subdict['num_amps'].data[mtch][0]
-            if namps != 0:
-                self.params['Readout']['namp'] = namps
-            else:
-                if ((self.params['Readout']['namp'] == 1) or
-                    (self.params['Readout']['namp'] == 4)):
-                    print(("CAUTION: Aperture {} can be used with either "
-                           "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
-                    print("or a 4-amp readout. The difference is a factor of 4 in")
-                    print(("readout time. You have requested {} amps."
-                           .format(self.params['Readout']['namp'])))
-                else:
-                    raise ValueError(("WARNING: {} requires the number of amps "
-                                      "to be 1 or 4. You have requested {}."
-                                      .format(self.params['Readout']['array_name'],
-                                              self.params['Readout']['namp'])))
-        else:
-            raise ValueError(("WARNING: subarray name {} not found in the "
-                              "subarray dictionary {}."
-                              .format(self.params['Readout']['array_name'],
-                                      self.params['Reffiles']['subarray_defs'])))
-
-    def instrument_specific_dicts(self, instrument):
-        # get instrument-specific values for things that
-        # don't need to be in the parameter file
-
-        # array size of a full frame image
-        self.ffsize = FULL_ARRAY_SIZE[instrument]
-
-        # pixel scale - return as a 2-element list, with pixscale for x and y.
-        if instrument.lower() == 'nircam':
-            filt = self.params['Readout']['filter']
-            fnum = int(filt[1:4])
-            if fnum < 230:
-                channel = 'sw'
-            else:
-                channel = 'lw'
-            self.pixscale = [PIXELSCALE[instrument][channel], PIXELSCALE[instrument][channel]]
-        else:
-            self.pixscale = [PIXELSCALE[instrument], PIXELSCALE[instrument]]
+    #def get_subarray_info(self):
+    #    # Find aperture-specific information from the subarray information config file
+    #    if self.params['Readout']['array_name'] in self.subdict['AperName']:
+    #        mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
+    #        namps = self.subdict['num_amps'].data[mtch][0]
+    #        if namps != 0:
+    #            self.params['Readout']['namp'] = namps
+    #        else:
+    #            if ((self.params['Readout']['namp'] == 1) or
+    #               (self.params['Readout']['namp'] == 4)):
+    #                print(("CAUTION: Aperture {} can be used with either "
+    #                       "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
+    #                print("or a 4-amp readout. The difference is a factor of 4 in")
+    #                print(("readout time. You have requested {} amps."
+    #                       .format(self.params['Readout']['namp'])))
+    #            else:
+    #                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
+    #                                  "'Readout':'namp' in the input yaml file to one of these values."
+    #                                  .format(self.params['Readout']['array_name'])))
+    #    else:
+    #        raise ValueError(("WARNING: subarray name {} not found in the "
+    #                          "subarray dictionary {}."
+    #                          .format(self.params['Readout']['array_name'],
+    #                                  self.params['Reffiles']['subarray_defs'])))
 
     def read_filter_throughput(self, file):
         '''Read in the ascii file containing the filter
         throughput curve'''
         tab = ascii.read(file)
         return tab['Wavelength_microns'].data, tab['Throughput'].data
+
+    def read_distortion_reffile(self):
+        """Read in the CRDS-format distortion reference file and save
+        the coordinate transformation model
+        """
+        coord_transform = None
+        if self.runStep['astrometric']:
+            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
+                coord_transform = dist_file.tree['model']
+        # else:
+        #    coord_transform = self.simple_coord_transform()
+        return coord_transform
 
     def calculate_background(self, ra, dec, ffile, level='medium'):
         '''Use the JWST background calculator to come up with
@@ -3601,7 +3224,7 @@ class Catalog_seed():
 
         # Divide by pixel area in steradians to get
         # MJy/str per ADU/s
-        pixel_area = self.xsciscale * u.arcsec * self.ysciscale * u.arcsec
+        pixel_area = self.siaf.XSciScale * u.arcsec * self.siaf.YSciScale * u.arcsec
         mjy_str = mjy / pixel_area.to(u.steradian)
 
         # Convert the background signal from MJy/str

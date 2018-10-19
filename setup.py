@@ -1,10 +1,32 @@
 #!/usr/bin/env python
 import os
+import pkgutil
 import subprocess
 import sys
 from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.test import test as TestCommand
 
+
+if not pkgutil.find_loader('relic'):
+    relic_local = os.path.exists('relic')
+    relic_submodule = (relic_local and
+                       os.path.exists('.gitmodules') and
+                       not os.listdir('relic'))
+    try:
+        if relic_submodule:
+            subprocess.check_call(['git', 'submodule', 'update', '--init', '--recursive'])
+        elif not relic_local:
+            subprocess.check_call(['git', 'clone', 'https://github.com/spacetelescope/relic.git'])
+
+        sys.path.insert(1, 'relic')
+    except subprocess.CalledProcessError as e:
+        print(e)
+        exit(1)
+
+import relic.release
+
+version = relic.release.get_info()
+relic.release.write_template(version, 'mirage')
 
 
 # allows you to build sphinx docs from the package
@@ -45,6 +67,7 @@ except ImportError:
             print('!\n! Sphinx is not installed!\n!', file=sys.stderr)
             exit(1)
 
+
 class PyTest(TestCommand):
     def finalize_options(self):
         TestCommand.finalize_options(self)
@@ -74,15 +97,15 @@ except ImportError:
 
 setup(
     name='mirage',
-    version='2.0.1',
+    version=version.pep386,
     description='Create simulated JWST data',
     long_description=('A tool to create simulated NIRCam, NIRISS,'
-                        'and FGS exposures'
-                        'using an input dark current exposure and a'
-                        'noiseless seed image, which can be produced'
-                        'from source catalogs. Data can optionally be'
-                        'dispersed as well, to simulate wide field'
-                        'slitless data files.'),
+                      'and FGS exposures'
+                      'using an input dark current exposure and a'
+                      'noiseless seed image, which can be produced'
+                      'from source catalogs. Data can optionally be'
+                      'dispersed as well, to simulate wide field'
+                      'slitless data files.'),
     author='STScI (Hilbert, Volk, Chambers, Sahlmann et al.)',
     author_email='hilbert@stsci.edu',
     url='https://github.com/spacetelescope/mirage',
@@ -99,7 +122,8 @@ setup(
     package_data={'mirage': ['tests/test_data/*/*.yaml',
                              'tests/test_data/*/*.list',
                              'tests/test_data/*/*.xml',
-                             'tests/test_data/*/*.pointing']
+                             'tests/test_data/*/*.pointing',
+                             'config/*.*']
                   },
     install_requires=[
         'astropy>=1.2',
@@ -109,6 +133,7 @@ setup(
         'asdf>=1.2.0',
         'scipy>=0.17',
         'photutils>=0.4.0',
+        'pysiaf>=0.1.11'
     ],
     include_package_data=True,
     cmdclass={

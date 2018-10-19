@@ -12,16 +12,15 @@ Use
 """
 
 import os
+import pkg_resources
 import pytest
 
 from mirage import imaging_simulator as im
 
-# os.environ['MIRAGE_DATA'] = ''
-os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/FGS')
+os.environ['TEST_FGS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/FGS')
 
-@pytest.mark.xfail
+
 def test_fgs_imaging():
     m = im.ImgSim()
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/FGS/fgs_imaging_example.yaml')
     m.create()
-
