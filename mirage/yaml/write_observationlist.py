@@ -81,7 +81,8 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
 
     # set default values (should be changed eventually)
     date = '2019-07-04'
-    PAV3 = '0.'
+    # PAV3 = '0.'
+    PAV3 = '161.'
     GalaxyCatalog = 'None'
     ExtendedCatalog = 'None'
     ExtendedScale = '1.0'

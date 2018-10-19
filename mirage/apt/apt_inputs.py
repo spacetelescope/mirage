@@ -276,7 +276,7 @@ class AptInput:
                     intab['LongFilter'] = obs_lw_filt
 
             # NIRISS case
-            elif unique_instrument_names[0] == 'niriss':
+            elif unique_instrument_names[0] in ['niriss', 'fgs']:
                 for key in OBSERVATION_LIST_FIELDS:
                     intab[key] = []
 
@@ -500,6 +500,7 @@ class AptInput:
             readxml_obj = read_apt_xml.ReadAPTXML()
             tab = readxml_obj.read_xml(self.input_xml)
 
+
         # This affects on NIRCam exposures (right?)
         # If the number of dithers is set to '3TIGHT'
         # (currently only used in NIRCam)
@@ -573,11 +574,16 @@ class AptInput:
         else:
             self.exposure_tab = self.expand_for_detectors(obstab)
 
+        verbose=True
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
         detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
+        # if len(self.exposure_tab['epoch_start_date']) == 0: # FOR FGS TEST
+        #     self.exposure_tab['epoch_start_date'] = ['2019-01-01']
+        #     self.exposure_tab['PAV3'] = [161.]
+
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
         print('Wrote exposure table to {}'.format(detectors_file))
 

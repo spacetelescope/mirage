@@ -981,6 +981,22 @@ class SimInput:
             self.configfiles['refpix_config'] = 'refpix.cfg'
             self.configfiles['linearity_config'] = 'linearity.cfg'
             self.configfiles['filter_throughput'] = 'placeholder.txt'
+        elif self.instrument.lower() == 'fgs':
+            self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
+            self.psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
+            self.psfbasename = 'fgs'
+            self.psfpixfrac = 0.1
+            self.configfiles['subarray_def_file'] = 'guider_subarrays.list'
+            self.configfiles['fluxcal'] = 'guider_zeropoints.list'
+            self.configfiles['filtpupil_pairs'] = 'guider_filter_dummy.txt'
+            self.configfiles['readpatt_def_file'] = 'guider_readout_pattern.txt'
+            self.configfiles['crosstalk'] = 'guider_xtalk_zeros.txt'
+            self.configfiles['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles['saturation_config'] = 'saturation.cfg'
+            self.configfiles['superbias_config'] = 'superbias.cfg'
+            self.configfiles['refpix_config'] = 'refpix.cfg'
+            self.configfiles['linearity_config'] = 'linearity.cfg'
+            self.configfiles['filter_throughput'] = 'placeholder.txt'
         else:
             self.psfpixfrac = 0
             self.psfbasename = 'N/A'
@@ -1104,7 +1120,8 @@ class SimInput:
                     self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
                     self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
                     self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
-                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                    # self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                    self.astrometric_list[det] = 'none'
                     self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
                     self.lindark_list[det] = [None]
 
@@ -1164,7 +1181,7 @@ class SimInput:
         """
         instrument = input['Instrument']
         # select the right filter
-        if input['detector'] == 'NIS':
+        if input['detector'] in ['NIS', 'FGS']:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             catkey = ''
