@@ -166,18 +166,27 @@ def test_saving(tmpdir):
 def test_setting_inputs():
     """Test that no errors are raised when filters and detectors can be set different ways"""
 
+    # Pass strings for filter and detector
     inst1 = CreatePSFLibrary(instrument="NIRCam", filters="F090W", detectors="NRCA4",
                              num_psfs=1, fov_pixels=1, oversample=2, save=False)
     grid1 = inst1.create_files()
+
+    # Pass a list of filters
     inst2 = CreatePSFLibrary(instrument="NIRCam", filters=["F090W", "F140M"], detectors="NRCA4",
                              num_psfs=1, fov_pixels=1, oversample=2, save=False)
     grid2 = inst2.create_files()
+
+    # Pass lists for filter and detector
     inst3 = CreatePSFLibrary(instrument="NIRCam", filters=["F090W"], detectors=["NRCA4"],
                              num_psfs=1, fov_pixels=1, oversample=2, save=False)
     grid3 = inst3.create_files()
+
+    # Pass the name "longwave" to both filter and detector
     inst4 = CreatePSFLibrary(instrument="NIRCam", filters="longwave", detectors="longwave",
                              num_psfs=1, fov_pixels=1, oversample=2, save=False)
     grid4 = inst4.create_files()
+
+    # Pass the name "shortwave" to both filter and detector
     # inst5 = CreatePSFLibrary(instrument="NIRCam", filters="shortwave", detectors="shortwave",
     #                          num_psfs=1, fov_pixels=1, oversample=2, save=False)
     # grid5 = inst5.create_files()  # This case takes 6min alone to run - excluding for time
@@ -194,4 +203,5 @@ def test_setting_inputs():
     # assert len(grid5) == 13
     # assert grid5[0][0].data.shape == (8, 1, 1, 2, 2)
 
+    # Check that passing strings and lists produces the same result
     assert np.array_equal(grid1[0][0].data, grid3[0][0].data)
