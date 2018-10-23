@@ -2203,7 +2203,7 @@ class Observation():
             # gainim[zs] = 1.0
 
     def read_parameter_file(self):
-        """Read in the yaml parameter file (main input to Mirage"""
+        """Read in the yaml parameter file (main input to Mirage)."""
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)

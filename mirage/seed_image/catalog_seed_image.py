@@ -1495,7 +1495,8 @@ class Catalog_seed():
         time_reported = False
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
-            try:
+            # try:
+            if 1:
                 # Warn user of how long this calcuation might take...
                 if len(times) < 100:
                     elapsed_time = time.time() - start_time
@@ -1514,7 +1515,6 @@ class Catalog_seed():
 
                 # Get the input magnitude of the point source
                 mag = float(values['magnitude'])
-
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
                     # set up an entry for the output table
                     entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
@@ -1534,8 +1534,8 @@ class Catalog_seed():
 
                     # write out positions, distances, and counts to the output file
                     pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts))
-            except:
-                pass
+            # except:
+            #     pass
         self.n_pointsources = len(pointSourceList)
         print("Number of point sources found within the requested aperture: {}".format(self.n_pointsources))
         # close the output file

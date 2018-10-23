@@ -290,15 +290,6 @@ class SimInput:
         ipc = []
         pam = []
 
-        # for i, instrument in enumerate(self.info['Instrument']):
-        #     if instrument.lower() == 'niriss':
-        #         self.info['detector'][i] = 'NIS'
-        #
-        #
-        # # if self.instrument.lower() == 'nircam':
-        # if self.instrument.lower() == 'niriss':
-        #     self.info['detector'] = ['NIS']
-        #     # detector_labels = ['NIS']
         detector_labels = self.info['detector']
 
         for det in detector_labels:
@@ -372,7 +363,11 @@ class SimInput:
         # Now go through the lists one element at a time
         # and create a yaml file for each.
         yamls = []
-        for i in range(len(detector_labels)):
+        # for i in range(len(detector_labels)):
+        for i, instrument in enumerate(self.info['Instrument']):
+            if instrument.lower() not in 'fgs nircam niriss'.split():
+                # do not write files for MIRI and NIRSpec
+                continue
             file_dict = {}
             for key in self.info:
                 file_dict[key] = self.info[key][i]
@@ -380,7 +375,9 @@ class SimInput:
             # break dither number into numbers for primary
             # and subpixel dithers
             tot_dith = np.int(file_dict['dither'])
-            primarytot = np.int(file_dict['PrimaryDithers'])
+            # primarytot = np.int(file_dict['PrimaryDithers'])
+            primarytot = np.int(file_dict['number_of_dithers'])
+
             if file_dict['SubpixelPositions'].upper() == 'NONE':
                 subpixtot = 1
             else:
@@ -397,6 +394,7 @@ class SimInput:
             file_dict['crosstalk_file'] = self.global_crosstalk_files[self.info['Instrument'][i].lower()]
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[self.info['Instrument'][i].lower()]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[self.info['Instrument'][i].lower()]
+            file_dict['psfpath'] = self.global_psfpath[self.info['Instrument'][i].lower()]
 
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
@@ -454,7 +452,7 @@ class SimInput:
         base : str
             JWST formatted filename base (excluding pipeline step suffix and ".fits")
         """
-        proposal_id = input_obj['ProposalID']
+        proposal_id = '{0:05d}'.format(int(input_obj['ProposalID']))
         observation = input_obj['obs_num']
         visit_number = input_obj['visit_num']
         visit_group = input_obj['visit_group']
@@ -646,36 +644,47 @@ class SimInput:
         self.global_crosstalk_files = {}
         self.global_filtpupilcombo_files = {}
         self.global_flux_cal_files = {}
+        self.global_psfpath = {}
         # self.global_filter_throughput_files = {} ?
 
-        for instrument in 'niriss fgs nircam'.split():
+        for instrument in 'niriss fgs nircam miri nirspec'.split():
             if instrument.lower() == 'niriss':
                 readout_pattern_file = 'niriss_readout_pattern.txt'
                 subarray_def_file = 'niriss_subarrays.list'
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
+                psfpath = os.path.join(self.datadir, 'niriss/webbpsf_library')
             elif instrument.lower() == 'fgs':
                 readout_pattern_file = 'guider_readout_pattern.txt'
                 subarray_def_file = 'guider_subarrays.list'
                 crosstalk_file = 'guider_xtalk_zeros.txt'
                 filtpupilcombo_file = 'guider_filter_dummy.list'
                 flux_cal_file = 'guider_zeropoints.list'
+                psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
             elif instrument.lower() == 'nircam':
                 readout_pattern_file = 'nircam_read_pattern_definitions.list'
                 subarray_def_file = 'NIRCam_subarray_definitions.list'
                 crosstalk_file = 'xtalk20150303g0.errorcut.txt'
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
                 flux_cal_file = 'NIRCam_zeropoints.list'
-
-            self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-            self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
+                psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
+            else:
+                readout_pattern_file = 'N/A'
+                subarray_def_file = 'N/A'
+                crosstalk_file = 'N/A'
+                filtpupilcombo_file = 'N/A'
+                flux_cal_file = 'N/A'
+                psfpath = 'N/A'
+            if instrument in 'niriss fgs nircam'.split():
+                self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
+                self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
             self.global_subarray_definition_files[instrument] = os.path.join(self.modpath, 'config', subarray_def_file)
             self.global_readout_pattern_files[instrument] = os.path.join(self.modpath, 'config', readout_pattern_file)
             self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
             self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
             self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
-
+            self.global_psfpath[instrument] = psfpath
 
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
@@ -704,13 +713,7 @@ class SimInput:
         # Get visit, activity_id info for first exposure
         actid = self.info['act_id'][0]
         visit = self.info['visit_num'][0]
-        obsname = self.info['obs_label'][0]
-
-        # Read in file containing subarray definitions
-        subarray_def = self.get_subarray_defs()
-
-        # Now read in readpattern definitions
-        readpatt_def = self.get_readpattern_defs()
+        # obsname = self.info['obs_label'][0]
 
         # for i in range(len(self.info['Module'])):
         for i, instrument in enumerate(self.info['Instrument']):
@@ -727,137 +730,140 @@ class SimInput:
             groups = np.int(self.info['Groups'][i])
             integrations = np.int(self.info['Integrations'][i])
 
-            # self.global_subarray_definitions = {}
-            # # need smarter implementation for programe with several/parallel instruments
-            # if instrument.lower() == 'niriss':
-            #     readout_pattern_file = 'niriss_readout_pattern.txt'
-            #     subarray_def_file = 'niriss_subarrays.list'
-            #     self.global_subarray_definitions['niriss'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-            # elif instrument.lower() == 'fgs':
-            #     readout_pattern_file = 'guider_readout_pattern.txt'
-            #     subarray_def_file = 'guider_subarrays.list'
-            #     self.global_subarray_definitions['fgs'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-            # elif instrument.lower() == 'nircam':
-            #     readout_pattern_file = 'nircam_read_pattern_definitions.list'
-            #     subarray_def_file = 'NIRCam_subarray_definitions.list'
-            #     self.global_subarray_definitions['nircam'] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-
-            readpatt_def = self.global_readout_patterns[instrument.lower()]
-            subarray_def = self.global_subarray_definitions[instrument.lower()]
-
-            match2 = readpatt == readpatt_def['name']
-            if np.sum(match2) == 0:
-                raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
-                                    .format(readpatt)))
-
-            # Now get nframe and nskip so we know how many frames in a group
-            fpg = np.int(readpatt_def['nframe'][match2][0])
-            spg = np.int(readpatt_def['nskip'][match2][0])
-            nframe.append(fpg)
-            nskip.append(spg)
-
-            # Get the aperture name. For non-NIRCam instruments,
-            # this is simply the self.info['aperture']. But for NIRCam,
-            # we need to be careful of entries like NRCBS_FULL, which is used
-            # for observations using all 4 shortwave B detectors. In that case,
-            # we need to build the aperture name from the combination of detector
-            # and subarray name.
-            # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
-            #     aperture = self.info['aperture']
-            # else:
-            #     sub = self.info['Subarray'][i]
-            #     det = 'NRC' + self.info['detector'][i]
-            #     aperture = det + '_' + sub
-
-            aperture = self.info['aperture'][i]
-
-
-            # Get the number of amps from the subarray definition file
-            match = aperture == subarray_def['AperName']
-
-            # JSA: not sure when this is needed
-            # if np.sum(match) == 0:
-            #     aperture = [apername for apername, name in
-            #                 np.array(subarray_def['AperName', 'Name']) if
-            #                 (sub in apername) or (sub in name)]
-            #
-            #     match = aperture == subarray_def['AperName']
-            #
-            #     if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
-            #         raise ValueError('Cannot combine detector {} and subarray {}\
-            #             into valid aperture name.'.format(det, sub))
-            #     # We don't want aperture as a list
-            #     aperture = aperture[0]
-
-            # print(aperture)
-
-            amp = subarray_def['num_amps'][match][0]
-            namp.append(amp)
-
-            # same activity ID
-            if next_actid == actid:
-                # in this case, the start time should remain the same
+            if instrument.lower() in ['miri', 'nirspec']:
+                nframe.append(0)
+                nskip.append(0)
+                namp.append(0)
                 date_obs.append(base_date)
                 time_obs.append(base_time)
                 expstart.append(base.mjd)
-                # print(actid, visit, obsname, base_date, base_time)
-                continue
 
-            epoch_date = self.info['epoch_start_date'][i]
-            epoch_time = deepcopy(epoch_base_time0)
-            # new epoch - update the base time
-            if epoch_date != epoch_base_date:
-                epoch_base_date = deepcopy(epoch_date)
-                base = Time(epoch_base_date + 'T' + epoch_base_time)
+            else:
+                # Now read in readpattern definitions
+                readpatt_def = self.global_readout_patterns[instrument.lower()]
+
+                # Read in file containing subarray definitions
+                subarray_def = self.global_subarray_definitions[instrument.lower()]
+
+                match2 = readpatt == readpatt_def['name']
+                if np.sum(match2) == 0:
+                    raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
+                                        .format(readpatt)))
+
+                # Now get nframe and nskip so we know how many frames in a group
+                fpg = np.int(readpatt_def['nframe'][match2][0])
+                spg = np.int(readpatt_def['nskip'][match2][0])
+                nframe.append(fpg)
+                nskip.append(spg)
+
+                # Get the aperture name. For non-NIRCam instruments,
+                # this is simply the self.info['aperture']. But for NIRCam,
+                # we need to be careful of entries like NRCBS_FULL, which is used
+                # for observations using all 4 shortwave B detectors. In that case,
+                # we need to build the aperture name from the combination of detector
+                # and subarray name.
+                # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
+                #     # aperture = self.info['aperture']
+                #
+                # elif np.all(np.unique(self.info['Instrument']) == 'NIRCAM'):
+                #     sub = self.info['Subarray'][i]
+                #     det = 'NRC' + self.info['detector'][i]
+                #     aperture = det + '_' + sub
+
+                aperture = self.info['aperture'][i]
+                if 'NRC' == aperture[0:3]:
+                    sub = self.info['Subarray'][i]
+                    det = 'NRC' + self.info['detector'][i]
+                    aperture = det + '_' + sub
+
+
+
+                # Get the number of amps from the subarray definition file
+                match = aperture == subarray_def['AperName']
+
+                # needed for NIRCam case
+                if np.sum(match) == 0:
+                    aperture = [apername for apername, name in
+                                np.array(subarray_def['AperName', 'Name']) if
+                                (sub in apername) or (sub in name)]
+
+                    match = aperture == subarray_def['AperName']
+
+                    if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+                        raise ValueError('Cannot combine detector {} and subarray {}\
+                            into valid aperture name.'.format(det, sub))
+                    # We don't want aperture as a list
+                    aperture = aperture[0]
+
+                # print(aperture)
+
+                amp = subarray_def['num_amps'][match][0]
+                namp.append(amp)
+
+                # same activity ID
+                if next_actid == actid:
+                    # in this case, the start time should remain the same
+                    date_obs.append(base_date)
+                    time_obs.append(base_time)
+                    expstart.append(base.mjd)
+                    # print(actid, visit, obsname, base_date, base_time)
+                    continue
+
+                epoch_date = self.info['epoch_start_date'][i]
+                epoch_time = deepcopy(epoch_base_time0)
+                # new epoch - update the base time
+                if epoch_date != epoch_base_date:
+                    epoch_base_date = deepcopy(epoch_date)
+                    base = Time(epoch_base_date + 'T' + epoch_base_time)
+                    base_date, base_time = base.iso.split()
+                    basereset = True
+                    date_obs.append(base_date)
+                    time_obs.append(base_time)
+                    expstart.append(base.mjd)
+                    actid = deepcopy(next_actid)
+                    visit = deepcopy(next_visit)
+                    obsname = deepcopy(next_obsname)
+                    continue
+
+                # new visit
+                if next_visit != visit:
+                    # visit break. Larger overhead
+                    overhead = visit_overhead
+                elif ((next_actid > actid) & (next_visit == visit)):
+                    # same visit, new activity. Smaller overhead
+                    overhead = act_overhead
+                else:
+                    # should never get in here
+                    raise NotImplementedError()
+
+                # For cases where the base time needs to change
+                # continue down here
+                siaf_inst = self.info['Instrument'][i].upper()
+                if siaf_inst == 'NIRCAM':
+                    siaf_inst = "NIRCam"
+                siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
+
+                # Calculate the readout time for a single frame
+                frametime = calc_frame_time(siaf_inst, aperture,
+                                            siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
+
+                # Estimate total exposure time
+                exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
+
+                # Delta should include the exposure time, plus overhead
+                delta = TimeDelta(exptime + overhead, format='sec')
+                base += delta
                 base_date, base_time = base.iso.split()
-                basereset = True
+
+                # Add updated dates and times to the list
                 date_obs.append(base_date)
                 time_obs.append(base_time)
                 expstart.append(base.mjd)
+
+                # increment the activity ID and visit
                 actid = deepcopy(next_actid)
                 visit = deepcopy(next_visit)
                 obsname = deepcopy(next_obsname)
-                continue
-
-            # new visit
-            if next_visit != visit:
-                # visit break. Larger overhead
-                overhead = visit_overhead
-            elif ((next_actid > actid) & (next_visit == visit)):
-                # same visit, new activity. Smaller overhead
-                overhead = act_overhead
-            else:
-                # should never get in here
-                raise NotImplementedError()
-
-            # For cases where the base time needs to change
-            # continue down here
-            siaf_inst = self.info['Instrument'][i].upper()
-            if siaf_inst == 'NIRCAM':
-                siaf_inst = "NIRCam"
-            siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
-
-            # Calculate the readout time for a single frame
-            frametime = calc_frame_time(siaf_inst, aperture,
-                                        siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
-
-            # Estimate total exposure time
-            exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
-
-            # Delta should include the exposure time, plus overhead
-            delta = TimeDelta(exptime + overhead, format='sec')
-            base += delta
-            base_date, base_time = base.iso.split()
-
-            # Add updated dates and times to the list
-            date_obs.append(base_date)
-            time_obs.append(base_time)
-            expstart.append(base.mjd)
-
-            # increment the activity ID and visit
-            actid = deepcopy(next_actid)
-            visit = deepcopy(next_visit)
-            obsname = deepcopy(next_obsname)
 
         self.info['date_obs'] = date_obs
         self.info['time_obs'] = time_obs
@@ -946,7 +952,7 @@ class SimInput:
         # Prepare to find files listed as 'config'
         # and set up PSF path
         self.configfiles = {}
-        if self.instrument == 'nircam':
+        if self.instrument.lower() == 'nircam':
             self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
             self.psfbasename = 'nircam'
             self.psfpixfrac = 0.25
@@ -977,60 +983,108 @@ class SimInput:
             self.configfiles['refpix_config'] = 'refpix.cfg'
             self.configfiles['linearity_config'] = 'linearity.cfg'
             self.configfiles['filter_throughput'] = 'placeholder.txt'
+        elif self.instrument.lower() == 'fgs':
+            self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
+            self.psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
+            self.psfbasename = 'fgs'
+            self.psfpixfrac = 0.1
+            self.configfiles['subarray_def_file'] = 'guider_subarrays.list'
+            self.configfiles['fluxcal'] = 'guider_zeropoints.list'
+            self.configfiles['filtpupil_pairs'] = 'guider_filter_dummy.txt'
+            self.configfiles['readpatt_def_file'] = 'guider_readout_pattern.txt'
+            self.configfiles['crosstalk'] = 'guider_xtalk_zeros.txt'
+            self.configfiles['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles['saturation_config'] = 'saturation.cfg'
+            self.configfiles['superbias_config'] = 'superbias.cfg'
+            self.configfiles['refpix_config'] = 'refpix.cfg'
+            self.configfiles['linearity_config'] = 'linearity.cfg'
+            self.configfiles['filter_throughput'] = 'placeholder.txt'
         else:
-            raise RuntimeError('Instrument {} is not supported'.format(instrument))
+            self.psfpixfrac = 0
+            self.psfbasename = 'N/A'
+            # raise RuntimeError('Instrument {} is not supported'.format(instrument))
+            print('WARNING: Instrument {} is not supported as PRIME. Looking for parallels.'.format(instrument))
 
-        self.superbias_list = {}
-        self.linearity_list = {}
-        self.gain_list = {}
-        self.saturation_list = {}
-        self.ipc_list = {}
-        self.astrometric_list = {}
-        self.pam_list = {}
-        self.dark_list = {}
-        self.lindark_list = {}
+
+        # create empty lists
+        list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
+        for list_name in list_names:
+            setattr(self, '{}_list'.format(list_name), {})
+        # self.superbias_list = {}
+        # self.linearity_list = {}
+        # self.gain_list = {}
+        # self.saturation_list = {}
+        # self.ipc_list = {}
+        # self.astrometric_list = {}
+        # self.pam_list = {}
+        # self.dark_list = {}
+        # self.lindark_list = {}
 
         if self.instrument.lower() == 'nircam':
             self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-            sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
-            lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
-            gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
-            sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
-            ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
-            dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
-            pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
-            rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
-            lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
-            for det in self.det_list:
-                sbfiles = glob(os.path.join(sb_dir, '*fits'))
-                self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
-                linfiles = glob(os.path.join(lin_dir, '*fits'))
-                longdet = deepcopy(det)
-                if '5' in det:
-                    longdet = det.replace('5', 'LONG')
-                self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
+            if offline:
+                # no access to central store. Set all files to none.
+                default_value = 'none'
+                for list_name in list_names:
+                    for det in self.det_list:
+                        getattr(self, '{}_list'.format(list_name))[det] = default_value
+            else:
+                sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
+                lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
+                gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
+                sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
+                ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
+                dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
+                pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
+                rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
+                lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
+                for det in self.det_list:
+                    sbfiles = glob(os.path.join(sb_dir, '*fits'))
+                    self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
+                    linfiles = glob(os.path.join(lin_dir, '*fits'))
+                    longdet = deepcopy(det)
+                    if '5' in det:
+                        longdet = det.replace('5', 'LONG')
+                    self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
 
-                gainfiles = glob(os.path.join(gain_dir, '*fits'))
-                self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
+                    gainfiles = glob(os.path.join(gain_dir, '*fits'))
+                    self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
 
-                satfiles = glob(os.path.join(sat_dir, '*fits'))
-                self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
+                    satfiles = glob(os.path.join(sat_dir, '*fits'))
+                    self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
 
-                ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
-                self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
+                    ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
+                    self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
 
-                distfiles = glob(os.path.join(dist_dir, '*asdf'))
-                self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
+                    distfiles = glob(os.path.join(dist_dir, '*asdf'))
+                    self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
 
-                pamfiles = glob(os.path.join(pam_dir, '*fits'))
-                self.pam_list[det] = [d for d in pamfiles if det in d][0]
+                    pamfiles = glob(os.path.join(pam_dir, '*fits'))
+                    self.pam_list[det] = [d for d in pamfiles if det in d][0]
 
-                self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
-                self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
+                    self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
+                    self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
-        elif self.instrument.lower() == 'niriss':
+        elif self.instrument.lower() in ['niriss', 'nirspec', 'miri', 'fgs']:
             # directory containing NIRISS reference files
             #HACK: add FGS files temporarily
+
+            if self.instrument.lower() in ['nirspec', 'miri']:
+                for key in 'subarray_def_file fluxcal filtpupil_pairs readpatt_def_file crosstalk ' \
+                           'dq_init_config saturation_config superbias_config refpix_config ' \
+                           'linearity_config filter_throughput'.split():
+                    self.configfiles[key] = 'N/A'
+                default_value = 'none'
+                for det in ['NRS', 'MIR']:
+                    self.ipc_list[det] = default_value
+                    self.dark_list[det] = default_value
+                    self.superbias_list[det] = default_value
+                    self.linearity_list[det] = default_value
+                    self.gain_list[det] = default_value
+                    self.saturation_list[det] = default_value
+                    self.astrometric_list[det] = default_value
+                    self.pam_list[det] = default_value
+                    self.lindark_list[det] = default_value
 
             if offline:
                 # no access to central store. Set all files to none.
@@ -1068,7 +1122,8 @@ class SimInput:
                     self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
                     self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
                     self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
-                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                    # self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                    self.astrometric_list[det] = 'none'
                     self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
                     self.lindark_list[det] = [None]
 
@@ -1128,7 +1183,11 @@ class SimInput:
         """
         instrument = input['Instrument']
         # select the right filter
-        if input['detector'] == 'NIS':
+        if input['detector'] in ['NIS', 'FGS']:
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            catkey = ''
+        elif input['detector'] in ['NRS', 'MIR']:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             catkey = ''
@@ -1171,10 +1230,10 @@ class SimInput:
             f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
             f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
-            if self.instrument.lower() == 'nircam':
+            if instrument.lower() == 'nircam':
                 apunder = input['aperture'].find('_')
                 full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
-            if self.instrument.lower() == 'niriss':
+            if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
 
@@ -1184,6 +1243,14 @@ class SimInput:
             # config = ascii.read(subarray_def_file)
 
             config = self.global_subarray_definitions[instrument.lower()]
+
+
+            # HACK JSA
+            if full_ap in ['NRCA1_DHSPIL', 'NRCA2_DHSPIL', 'NRCA4_DHSPIL', 'NRCA5_DHSPIL']:
+                full_ap = 'NRCA3_DHSPIL'
+            elif full_ap in ['NRCB1_DHSPIL', 'NRCB2_DHSPIL', 'NRCB3_DHSPIL', 'NRCB5_DHSPIL']:
+                full_ap = 'NRCB4_DHSPIL'
+
 
             if full_ap not in config['AperName']:
                 full_ap_new = [apername for apername, name in
@@ -1248,6 +1315,13 @@ class SimInput:
             elif instrument.lower() == 'niriss':
                 f.write('  suffix: IPC_NIRISS_{}    # Suffix of library file names\n'.format(
                     detector_label))
+            elif instrument.lower() == 'fgs':
+                if detector_label == 'G1':
+                    detector_string = 'GUIDER1'
+                elif detector_label == 'G2':
+                    detector_string = 'GUIDER2'
+                f.write('  suffix: IPC_FGS_{}    # Suffix of library file names\n'.format(
+                    detector_string))
             f.write('  seed: {}                 # Seed for random number generator\n'.format(np.random.randint(1, 2**32-2)))
             f.write('\n')
             f.write('simSignals:\n')
@@ -1278,8 +1352,8 @@ class SimInput:
 
             f.write(('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'
                      .format(PointSourceCatalog)))
-            f.write('  psfpath: {}   #Path to PSF library\n'.format(self.psfpath))
-            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(self.psfbasename))
+            f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
+            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
             f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
                      'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac)))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))

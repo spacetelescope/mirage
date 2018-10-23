@@ -43,6 +43,8 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     if instrument.lower() == 'nircam':
         import os
         print("NOTE: Using pre-delivery SIAF data")
+        if instrument == 'NIRCAM':
+            instrument = 'NIRCam'
         pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, instrument)
         siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture_name]
     else:
@@ -63,8 +65,12 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     fullframesize = siaf.XDetSize
 
     # Subarray boundaries in full frame coordinates
-    xcorner, ycorner = sci_subarray_corners(instrument, aperture_name)
-    subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
+    try:
+        xcorner, ycorner = sci_subarray_corners(instrument, aperture_name)
+        subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
+    except (RuntimeError, TypeError) as e: # e.g. NIRSpec NRS_FULL_MSA aperture
+        print('get_siaf_information raised error:\n{}\nIgnoring it.'.format(e))
+        subarray_boundaries = [0, 0, 0, 0]
     return siaf, local_roll, att_matrix, fullframesize, subarray_boundaries
 
 
