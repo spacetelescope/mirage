@@ -1,14 +1,16 @@
-import astropy.convolution
-import numpy as np
 import os
+
+import astropy.convolution
+from astropy.io import fits
+import numpy as np
 import pytest
 import webbpsf
-from astropy.io import fits
+
 from mirage.psf.psf_library import CreatePSFLibrary
 
 
 # @pytest.mark.skip()
-def test_all():
+def test_all_filters_and_detectors():
     """Check that setting filters and detectors to all works"""
 
     # Case 1: Setting filters="all" and "detectors="all"

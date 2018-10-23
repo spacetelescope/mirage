@@ -1,10 +1,10 @@
-import astropy.convolution
 import itertools
-import numpy as np
 import os
-import webbpsf
-from astropy.io import fits
 
+import astropy.convolution
+from astropy.io import fits
+import numpy as np
+import webbpsf
 
 class CreatePSFLibrary:
 
