@@ -203,6 +203,7 @@ class ReadAPTXML():
                 label = 'None'
 
             if verbose:
+                print('+'*100)
                 print('Observation `{}` labelled `{}` uses template `{}`'.format(observation_number, label, template_name))
                 number_of_exposures = len(flatten_list(self.APTObservationParams['Instrument']))
                 print('Dictionary currently holds {} exposures'.format(number_of_exposures))
@@ -259,23 +260,23 @@ class ReadAPTXML():
             # 1/0
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # If template is NircamImaging or NircamEngineeringImaging
-            if template_name in ['NircamEngineeringImaging']:
-            # if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
-                exposures_dictionary = self.read_imaging_template(template, template_name, obs, prop_params)
-                # exposures_dictionary = copy.deepcopy(self.APTObservationParams)
-                if coordparallel == 'true':
+            # if template_name in ['ircamEngineeringImaging']:
+            # # if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
+            #     exposures_dictionary = self.read_imaging_template(template, template_name, obs, prop_params)
+            #     # exposures_dictionary = copy.deepcopy(self.APTObservationParams)
+            #     if coordparallel == 'true':
+            #
+            #         parallel_exposures_dictionary = self.read_parallel_exposures(obs,
+            #                                                                 exposures_dictionary,
+            #                                                                 proposal_parameter_dictionary,
+            #                                                                 verbose=verbose)
+            #         exposures_dictionary = self.append_dictionary(exposures_dictionary,
+            #                                                       parallel_exposures_dictionary,
+            #                                                       braid=True)
+            #     self.APTObservationParams = self.append_dictionary(self.APTObservationParams,
+            #                                                            exposures_dictionary)
 
-                    parallel_exposures_dictionary = self.read_parallel_exposures(obs,
-                                                                            exposures_dictionary,
-                                                                            proposal_parameter_dictionary,
-                                                                            verbose=verbose)
-                    exposures_dictionary = self.append_dictionary(exposures_dictionary,
-                                                                  parallel_exposures_dictionary,
-                                                                  braid=True)
-                self.APTObservationParams = self.append_dictionary(self.APTObservationParams,
-                                                                       exposures_dictionary)
-
-            elif template_name in ['NircamImaging', 'NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
+            if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
                 if coordparallel == 'true':
                     parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary, proposal_parameter_dictionary, verbose=verbose)
@@ -300,6 +301,7 @@ class ReadAPTXML():
                     #     parallel_exposures_dictionary[dither_key_name] = exposures_dictionary[dither_key_name]
                     # 1/0
                     exposures_dictionary = self.append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
+                    # 1/0
                 self.APTObservationParams = self.append_dictionary(self.APTObservationParams, exposures_dictionary)
                 # 1/0
                 # number_of_exposures = len(flatten_list(self.APTObservationParams['Instrument']))
@@ -507,6 +509,7 @@ class ReadAPTXML():
             if template_name == 'FgsExternalCalibration':
                 instrument = 'FGS'
             prime_instrument = obs.find(self.apt + 'Instrument').text
+            print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
         else:
             instrument = obs.find(self.apt + 'Instrument').text
             parallel_instrument = False
@@ -538,13 +541,13 @@ class ReadAPTXML():
         # ImageDithers = 1
 
 
-        if prime_instrument.lower() == 'nircam':
+        if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
 
             # store Module, Subarray, ... fields
             observation_dict = {}
             for field in template:
-                print('{} {}'.format(field.tag, field.text))
+            #     print('{} {}'.format(field.tag, field.text))
                 # if 'Filters ' in key:
                 #     continue
                 key = field.tag.split(ns)[1]
@@ -603,8 +606,8 @@ class ReadAPTXML():
                 for element in filter_config:
                     key = element.tag.split(ns)[1]
                     value = element.text
-                    if verbose:
-                        print('{} {}'.format(key, value))
+                    # if verbose:
+                    #     print('{} {}'.format(key, value))
                     if key == 'ShortFilter':
                         if ' + ' in value:
                             split_ind = value.find(' + ')
@@ -653,7 +656,7 @@ class ReadAPTXML():
                     exposures_dictionary[key].append(value)
 
 
-            print(exposures_dictionary)
+            # print(exposures_dictionary)
             # 1/0
 
         else:

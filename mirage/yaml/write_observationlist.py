@@ -96,96 +96,192 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
     # assemble string that will constitute the yaml content
     text_out = ["# Observation list created by write_observationlist.py\n\n"]
 
-    # loop over instruments and exposures (allows for multiple instruments and parallels)
-    for instrument in used_instruments:
-        exposure_indices = np.where(np.array(xml_dict['Instrument']) == instrument)[0]
-        # 1/0
-        for exposure_index in exposure_indices:
-            text = [
-                "Observation{}:\n".format(xml_dict['ObservationID'][exposure_index]),
-                "  Name: '{}'\n".format(xml_dict['ObservationName'][exposure_index]),
-                "  Date: {}\n".format(date),
-                "  PAV3: {}\n".format(PAV3),
+    text = ['']
+    entry_number = 0  # running number for every entry in the observation list
+
+    observation_numbers = np.unique(xml_dict['ObservationID'])
+    for observation_index, observation_number in enumerate(observation_numbers):
+        first_index = xml_dict['ObservationID'].index(observation_number)
+        text += [
+            "Observation{}:\n".format(observation_number),
+            "  Name: '{}'\n".format(xml_dict['ObservationName'][first_index])
             ]
-
-            # 'ImageDithers' and 'PrimaryDithers' are either 0 (when not set), or 1 (default), or N (when set)
-            number_of_dithers = np.max([np.int(xml_dict['ImageDithers'][exposure_index]), np.int(xml_dict['PrimaryDithers'][exposure_index])])
-            # if np.int(xml_dict['PrimaryDithers'][exposure_index]) == 0:
-            #     number_of_dithers = np.int(xml_dict['ImageDithers'][exposure_index])
-            # elif np.int(xml_dict['ImageDithers'][exposure_index]) == 0:
-            #     number_of_dithers = np.int(xml_dict['PrimaryDithers'][exposure_index])
-            # else:
-            #     raise ValueError('Both PrimaryDithers and ImageDithers are not zero.')
-
-            if instrument in ['NIRCAM', 'WFSC']:
-
-                # set default values
-                BackgroundRate_sw = '0.5'
-                BackgroundRate_lw = '1.2'
-
-                sw_filt = xml_dict['ShortFilter'][exposure_index]
-                lw_filt = xml_dict['LongFilter'][exposure_index]
-                # i_obs = xml_dict['ObservationID'][exposure_index]-1
-                unique_observation_index = unique_observation_ids.index(xml_dict['ObservationID'][exposure_index])
-
+        for index in np.where(np.array(xml_dict['ObservationID']) == observation_number)[0]:
+            number_of_dithers = np.int(xml_dict['number_of_dithers'][index])
+            instrument = xml_dict['Instrument'][index]
+            for dither_index in range(number_of_dithers):
                 text += [
-                    # "  FilterConfig{}:\n".format(i_obs+1),
-                    "  FilterConfig{}:\n".format(exposure_index),
-                    "    SW:\n",
-                    "      Filter: {}\n".format(sw_filt),
-                    "      PointSourceCatalog: {}\n".format(ps_cat_sw[unique_observation_index]),
-                    "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
-                    "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
-                    "      ExtendedScale: {}\n".format(ExtendedScale),
-                    "      ExtendedCenter: {}\n".format(ExtendedCenter),
-                    "      MovingTargetList: {}\n".format(MovingTargetList),
-                    "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
-                    "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
-                    "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
-                    "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
-                    "      BackgroundRate: {}\n".format(BackgroundRate_sw),
-                    "    LW:\n",
-                    "      Filter: {}\n".format(lw_filt),
-                    "      PointSourceCatalog: {}\n".format(ps_cat_lw[unique_observation_index]),
-                    "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
-                    "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
-                    "      ExtendedScale: {}\n".format(ExtendedScale),
-                    "      ExtendedCenter: {}\n".format(ExtendedCenter),
-                    "      MovingTargetList: {}\n".format(MovingTargetList),
-                    "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
-                    "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
-                    "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
-                    "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
-                    "      BackgroundRate: {}\n\n".format(BackgroundRate_lw)
+                    "  EntryNumber: {}\n".format(entry_number),
+                    "    Instrument: {}\n".format(instrument),
+                    "    Date: {}\n".format(date),
+                    "    PAV3: {}\n".format(PAV3),
+                    "    DitherIndex: {}\n".format(dither_index),
                 ]
-                # multiply by the number of dithers
-                text_out += text * number_of_dithers
 
-            elif instrument in ['NIRISS', 'FGS', 'NIRSPEC', 'MIRI']:
-                # set default values
-                BackgroundRate = '0.5'
+                if instrument in ['NIRCAM', 'WFSC']:
 
-                text += [
-                    "  Filter: {}\n".format(xml_dict['FilterWheel'][exposure_index]),
-                    "  PointSourceCatalog: {}\n".format(catalog_files[exposure_index]),
-                    "  GalaxyCatalog: {}\n".format(GalaxyCatalog),
-                    "  ExtendedCatalog: {}\n".format(ExtendedCatalog),
-                    "  ExtendedScale: {}\n".format(ExtendedScale),
-                    "  ExtendedCenter: {}\n".format(ExtendedCenter),
-                    "  MovingTargetList: {}\n".format(MovingTargetList),
-                    "  MovingTargetSersic: {}\n".format(MovingTargetSersic),
-                    "  MovingTargetExtended: {}\n".format(MovingTargetExtended),
-                    "  MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
-                    "  MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
-                    "  BackgroundRate: {}\n".format(BackgroundRate),
-                ]
-                # multiply by the number of dithers
-                text_out += text * number_of_dithers
+                    # set default values
+                    BackgroundRate_sw = '0.5'
+                    BackgroundRate_lw = '1.2'
+
+                    sw_filt = xml_dict['ShortFilter'][index]
+                    lw_filt = xml_dict['LongFilter'][index]
+                    # unique_observation_index = unique_observation_ids.index(
+                    #     xml_dict['ObservationID'][exposure_index])
+
+                    text += [
+                        "    FilterConfig:\n",
+                        # "  FilterConfig{}:\n".format(exposure_index),
+                        "      SW:\n",
+                        "        Filter: {}\n".format(sw_filt),
+                        "        PointSourceCatalog: {}\n".format(
+                            ps_cat_sw[observation_index]),
+                        "        GalaxyCatalog: {}\n".format(GalaxyCatalog),
+                        "        ExtendedCatalog: {}\n".format(ExtendedCatalog),
+                        "        ExtendedScale: {}\n".format(ExtendedScale),
+                        "        ExtendedCenter: {}\n".format(ExtendedCenter),
+                        "        MovingTargetList: {}\n".format(MovingTargetList),
+                        "        MovingTargetSersic: {}\n".format(MovingTargetSersic),
+                        "        MovingTargetExtended: {}\n".format(MovingTargetExtended),
+                        "        MovingTargetConvolveExtended: {}\n".format(
+                            MovingTargetConvolveExtended),
+                        "        MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+                        "        BackgroundRate: {}\n".format(BackgroundRate_sw),
+                        "      LW:\n",
+                        "        Filter: {}\n".format(lw_filt),
+                        "        PointSourceCatalog: {}\n".format(
+                            ps_cat_lw[observation_index]),
+                        "        GalaxyCatalog: {}\n".format(GalaxyCatalog),
+                        "        ExtendedCatalog: {}\n".format(ExtendedCatalog),
+                        "        ExtendedScale: {}\n".format(ExtendedScale),
+                        "        ExtendedCenter: {}\n".format(ExtendedCenter),
+                        "        MovingTargetList: {}\n".format(MovingTargetList),
+                        "        MovingTargetSersic: {}\n".format(MovingTargetSersic),
+                        "        MovingTargetExtended: {}\n".format(MovingTargetExtended),
+                        "        MovingTargetConvolveExtended: {}\n".format(
+                            MovingTargetConvolveExtended),
+                        "        MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+                        "        BackgroundRate: {}\n\n".format(BackgroundRate_lw)
+                    ]
+
+                elif instrument in ['NIRISS', 'FGS', 'NIRSPEC', 'MIRI']:
+                    # set default values
+                    BackgroundRate = '0.5'
+
+                    text += [
+                        "    Filter: {}\n".format(xml_dict['FilterWheel'][index]),
+                        "    PointSourceCatalog: {}\n".format(catalog_files[index]),
+                        "    GalaxyCatalog: {}\n".format(GalaxyCatalog),
+                        "    ExtendedCatalog: {}\n".format(ExtendedCatalog),
+                        "    ExtendedScale: {}\n".format(ExtendedScale),
+                        "    ExtendedCenter: {}\n".format(ExtendedCenter),
+                        "    MovingTargetList: {}\n".format(MovingTargetList),
+                        "    MovingTargetSersic: {}\n".format(MovingTargetSersic),
+                        "    MovingTargetExtended: {}\n".format(MovingTargetExtended),
+                        "    MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
+                        "    MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+                        "    BackgroundRate: {}\n\n".format(BackgroundRate),
+                    ]
+
+                entry_number += 1
+
+    text_out += text
+
+
+
+
+
+    #         # loop over instruments and exposures (allows for multiple instruments and parallels)
+    # for instrument in used_instruments:
+    #     exposure_indices = np.where(np.array(xml_dict['Instrument']) == instrument)[0]
+    #     # 1/0
+    #     for exposure_index in exposure_indices:
+    #         text = [
+    #             "Observation{}:\n".format(xml_dict['ObservationID'][exposure_index]),
+    #             "  Name: '{}'\n".format(xml_dict['ObservationName'][exposure_index]),
+    #             "  Date: {}\n".format(date),
+    #             "  PAV3: {}\n".format(PAV3),
+    #         ]
+    #
+    #         # 'ImageDithers' and 'PrimaryDithers' are either 0 (when not set), or 1 (default), or N (when set)
+    #         number_of_dithers = np.max([np.int(xml_dict['ImageDithers'][exposure_index]), np.int(xml_dict['PrimaryDithers'][exposure_index])])
+    #         # if np.int(xml_dict['PrimaryDithers'][exposure_index]) == 0:
+    #         #     number_of_dithers = np.int(xml_dict['ImageDithers'][exposure_index])
+    #         # elif np.int(xml_dict['ImageDithers'][exposure_index]) == 0:
+    #         #     number_of_dithers = np.int(xml_dict['PrimaryDithers'][exposure_index])
+    #         # else:
+    #         #     raise ValueError('Both PrimaryDithers and ImageDithers are not zero.')
+    #
+    #         if instrument in ['NIRCAM', 'WFSC']:
+    #
+    #             # set default values
+    #             BackgroundRate_sw = '0.5'
+    #             BackgroundRate_lw = '1.2'
+    #
+    #             sw_filt = xml_dict['ShortFilter'][exposure_index]
+    #             lw_filt = xml_dict['LongFilter'][exposure_index]
+    #             # i_obs = xml_dict['ObservationID'][exposure_index]-1
+    #             unique_observation_index = unique_observation_ids.index(xml_dict['ObservationID'][exposure_index])
+    #
+    #             text += [
+    #                 # "  FilterConfig{}:\n".format(i_obs+1),
+    #                 "  FilterConfig{}:\n".format(exposure_index),
+    #                 "    SW:\n",
+    #                 "      Filter: {}\n".format(sw_filt),
+    #                 "      PointSourceCatalog: {}\n".format(ps_cat_sw[unique_observation_index]),
+    #                 "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
+    #                 "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
+    #                 "      ExtendedScale: {}\n".format(ExtendedScale),
+    #                 "      ExtendedCenter: {}\n".format(ExtendedCenter),
+    #                 "      MovingTargetList: {}\n".format(MovingTargetList),
+    #                 "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
+    #                 "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
+    #                 "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
+    #                 "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+    #                 "      BackgroundRate: {}\n".format(BackgroundRate_sw),
+    #                 "    LW:\n",
+    #                 "      Filter: {}\n".format(lw_filt),
+    #                 "      PointSourceCatalog: {}\n".format(ps_cat_lw[unique_observation_index]),
+    #                 "      GalaxyCatalog: {}\n".format(GalaxyCatalog),
+    #                 "      ExtendedCatalog: {}\n".format(ExtendedCatalog),
+    #                 "      ExtendedScale: {}\n".format(ExtendedScale),
+    #                 "      ExtendedCenter: {}\n".format(ExtendedCenter),
+    #                 "      MovingTargetList: {}\n".format(MovingTargetList),
+    #                 "      MovingTargetSersic: {}\n".format(MovingTargetSersic),
+    #                 "      MovingTargetExtended: {}\n".format(MovingTargetExtended),
+    #                 "      MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
+    #                 "      MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+    #                 "      BackgroundRate: {}\n\n".format(BackgroundRate_lw)
+    #             ]
+    #             # multiply by the number of dithers
+    #             text_out += text * number_of_dithers
+    #
+    #         elif instrument in ['NIRISS', 'FGS', 'NIRSPEC', 'MIRI']:
+    #             # set default values
+    #             BackgroundRate = '0.5'
+    #
+    #             text += [
+    #                 "  Filter: {}\n".format(xml_dict['FilterWheel'][exposure_index]),
+    #                 "  PointSourceCatalog: {}\n".format(catalog_files[exposure_index]),
+    #                 "  GalaxyCatalog: {}\n".format(GalaxyCatalog),
+    #                 "  ExtendedCatalog: {}\n".format(ExtendedCatalog),
+    #                 "  ExtendedScale: {}\n".format(ExtendedScale),
+    #                 "  ExtendedCenter: {}\n".format(ExtendedCenter),
+    #                 "  MovingTargetList: {}\n".format(MovingTargetList),
+    #                 "  MovingTargetSersic: {}\n".format(MovingTargetSersic),
+    #                 "  MovingTargetExtended: {}\n".format(MovingTargetExtended),
+    #                 "  MovingTargetConvolveExtended: {}\n".format(MovingTargetConvolveExtended),
+    #                 "  MovingTargetToTrack: {}\n".format(MovingTargetToTrack),
+    #                 "  BackgroundRate: {}\n".format(BackgroundRate),
+    #             ]
+    #             # multiply by the number of dithers
+    #             text_out += text * number_of_dithers
 
     f = open(yaml_file, 'w')
     for line in text_out:
         f.write(line)
     f.close()
-    print('\nSuccessfully wrote {} exposures to {}'.format(number_of_exposures, yaml_file))
+    # print('\nSuccessfully wrote {} exposures to {}'.format(number_of_exposures, yaml_file))
+    print('\nWrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number+1, yaml_file))
 
     return xml_dict
