@@ -23,6 +23,25 @@ import numpy as np
 from ..apt import read_apt_xml
 
 
+def dictionary_slice(dictionary, index):
+    """Return a dictionary with only the i'th element from every list stored in a key.
+
+    Parameters
+    ----------
+    dictionary
+    index
+
+    Returns
+    -------
+
+    """
+    new_dict = {}
+    for key in dictionary.keys():
+        new_dict[key] = [dictionary[key][index]]
+    return new_dict
+
+
+
 def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_lw=None,
                verbose=False):
     """Write observation list file (required mirage input) on the basis of APT files.
@@ -58,11 +77,18 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
         for key in xml_dict.keys():
             print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
 
+    # create an expanded dictionary that contains lists of parameters expanded for dithers
+    expanded_dict = None
+
+
     # array of unique instrument names
     used_instruments = np.unique(xml_dict['Instrument'])
     unique_observation_ids = np.unique(xml_dict['ObservationID']).tolist()
     number_of_observations = len(unique_observation_ids)
     number_of_exposures = len(xml_dict['ObservationID'])
+
+    entry_numbers = []
+
 
     # temporary fix for NIRCam
     if ('NIRCAM' in used_instruments) and (ps_cat_sw is None):
@@ -111,13 +137,16 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
             instrument = xml_dict['Instrument'][index]
             for dither_index in range(number_of_dithers):
                 text += [
-                    "  EntryNumber: {}\n".format(entry_number),
+                    "  EntryNumber{}:\n".format(entry_number),
                     "    Instrument: {}\n".format(instrument),
                     "    Date: {}\n".format(date),
                     "    PAV3: {}\n".format(PAV3),
                     "    DitherIndex: {}\n".format(dither_index),
                 ]
-
+                if expanded_dict is None:
+                    expanded_dict = dictionary_slice(xml_dict, index)
+                else:
+                    expanded_dict = read_apt_xml.append_dictionary(expanded_dict, dictionary_slice(xml_dict, index))
                 if instrument in ['NIRCAM', 'WFSC']:
 
                     # set default values
@@ -183,11 +212,12 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
                         "    BackgroundRate: {}\n\n".format(BackgroundRate),
                     ]
 
+                entry_numbers.append(entry_number)
                 entry_number += 1
 
     text_out += text
 
-
+    expanded_dict['entry_number'] = entry_numbers
 
 
 
@@ -282,6 +312,7 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
         f.write(line)
     f.close()
     # print('\nSuccessfully wrote {} exposures to {}'.format(number_of_exposures, yaml_file))
-    print('\nWrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number+1, yaml_file))
+    print('\nWrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number, yaml_file))
 
-    return xml_dict
+    # return xml_dict
+    return expanded_dict

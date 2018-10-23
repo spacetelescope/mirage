@@ -375,7 +375,9 @@ class SimInput:
             # break dither number into numbers for primary
             # and subpixel dithers
             tot_dith = np.int(file_dict['dither'])
-            primarytot = np.int(file_dict['PrimaryDithers'])
+            # primarytot = np.int(file_dict['PrimaryDithers'])
+            primarytot = np.int(file_dict['number_of_dithers'])
+
             if file_dict['SubpixelPositions'].upper() == 'NONE':
                 subpixtot = 1
             else:
@@ -1241,6 +1243,14 @@ class SimInput:
             # config = ascii.read(subarray_def_file)
 
             config = self.global_subarray_definitions[instrument.lower()]
+
+
+            # HACK JSA
+            if full_ap in ['NRCA1_DHSPIL', 'NRCA2_DHSPIL', 'NRCA4_DHSPIL', 'NRCA5_DHSPIL']:
+                full_ap = 'NRCA3_DHSPIL'
+            elif full_ap in ['NRCB1_DHSPIL', 'NRCB2_DHSPIL', 'NRCB3_DHSPIL', 'NRCB5_DHSPIL']:
+                full_ap = 'NRCB4_DHSPIL'
+
 
             if full_ap not in config['AperName']:
                 full_ap_new = [apername for apername, name in
