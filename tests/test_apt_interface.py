@@ -87,10 +87,10 @@ def test_complete_input_generation():
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
-    for instrument in ['NIRISS']:
+    # for instrument in ['NIRISS']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
-    # for instrument in ['NIRCam']:
+    for instrument in ['NIRCam']:
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
@@ -114,6 +114,7 @@ def test_complete_input_generation():
             apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             apt_xml_dict = write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name, verbose=True)
+            1/0
             yam = yaml_generator.SimInput()
             yam.input_xml = apt_file_xml
             yam.pointing_file = apt_file_pointing

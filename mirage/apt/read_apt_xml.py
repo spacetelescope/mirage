@@ -52,6 +52,9 @@ class ReadAPTXML():
                           'ObservationID', 'TileNumber', 'APTTemplate',
                           'ApertureOverride', 'ObservationName',
                           'DitherPatternType', 'ImageDithers', # NIRISS
+                          # 'Number', # the observation number  = ObservationID
+                          'number_of_dithers', # uniform name across instruments
+                          'FiducialPointOverride',
                           ]
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
                              'ReadoutPattern', 'Groups', 'Integrations',
@@ -70,6 +73,7 @@ class ReadAPTXML():
         for key in self.APTObservationParams_keys:
             self.APTObservationParams[key] = []
         self.empty_exposures_dictionary = copy.deepcopy(self.APTObservationParams)
+        self.observation_info = OrderedDict()
 
     def read_xml(self, infile, verbose=False):
         """Read in the .xml file from APT, and output dictionary of parameters.
@@ -146,19 +150,26 @@ class ReadAPTXML():
 
         # Find all observations (but use only those that use NIRCam or are WFSC)
         observation_data = tree.find(self.apt + 'DataRequests')
-        obs_results = observation_data.findall('.//' + self.apt + 'Observation')
-
-        observations = []
-        i_observations = []
-        obs_indices = range(len(obs_results))
-        for o, i_obs in zip(obs_results, obs_indices):
-            if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC', 'NIRISS', 'MIRI', 'NIRSPEC', 'FGS']:
-                observations.append(o)
-                i_observations.append(i_obs)
+        # obs_results = observation_data.findall('.//' + self.apt + 'Observation')
+        observation_list = observation_data.findall('.//' + self.apt + 'Observation')
+        # observation_numbers = [np.int(obs.find(self.apt + 'Number').text) for obs in observation_list]
 
 
-        # Get parameters out!
-        for i_obs, obs in zip(i_observations, observations):
+
+        # 1/0
+        # observations = []
+        # i_observations = []
+        # obs_indices = range(len(obs_results))
+        # for o, i_obs in zip(obs_results, obs_indices):
+        #     if o.find(self.apt + 'Instrument').text in ['NIRCAM', 'WFSC', 'NIRISS', 'MIRI', 'NIRSPEC', 'FGS']:
+        #         observations.append(o)
+        #         i_observations.append(i_obs)
+
+
+        # Loop through observatiobs, get parameters
+        # for i_obs, obs in zip(i_observations, observations):
+        for i_obs, obs in enumerate(observation_list):
+            observation_number = np.int(obs.find(self.apt + 'Number').text)
 
             # Create empty list that will be populated with a tuple of parameters
             # for every observation
@@ -168,10 +179,6 @@ class ReadAPTXML():
             template = obs.find(self.apt + 'Template')[0]
             template_name = etree.QName(template).localname
 
-            if verbose:
-                print('Observation {}: {}'.format(i_obs, template_name))
-                number_of_exposures = len(flatten_list(self.APTObservationParams['Instrument']))
-                print('Dictionary currently holds {} exposures'.format(number_of_exposures))
 
             # Are all the templates in the XML file something that we can handle?
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
@@ -195,6 +202,12 @@ class ReadAPTXML():
             else:
                 label = 'None'
 
+            if verbose:
+                print('Observation `{}` labelled `{}` uses template `{}`'.format(observation_number, label, template_name))
+                number_of_exposures = len(flatten_list(self.APTObservationParams['Instrument']))
+                print('Dictionary currently holds {} exposures'.format(number_of_exposures))
+
+
             # Get coordinated parallel
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
             CoordinatedParallelSet = None
@@ -210,6 +223,11 @@ class ReadAPTXML():
             # DitherPatternType = obs.find(self.apt + 'DitherPatternType').text
             # ImageDithers = obs.find(self.apt + 'ImageDithers').text
 
+            # extract visit numbers
+            visit_numbers = [np.int(element.items()[0][1]) for element in obs if
+                             element.tag.split(self.apt)[1] == 'Visit']
+
+
 
             # Determine pointing offset?
             offset = obs.find('.//' + self.apt + 'Offset')
@@ -221,18 +239,19 @@ class ReadAPTXML():
             if (offset_x != 0) or (offset_y != 0):
                 print('* * * OFFSET OF ({}, {}) IN OBS {} NOT APPLIED ***'.format(offset_x,
                                                                                   offset_y,
-                                                                                  i_obs + 1))
+                                                                                  observation_number))
 
             prop_params = [pi_name, prop_id, prop_title, prop_category,
-                           science_category, coordparallel, i_obs, obs_label]
+                           science_category, coordparallel, observation_number, obs_label]
 
             proposal_parameter_dictionary = {'PI_Name': pi_name, 'ProposalID': prop_id,
                                              'Title': prop_title,
                                              'Proposal_category': prop_category,
                                              'Science_category': science_category,
                                              'CoordinatedParallel': coordparallel,
-                                             'ObservationID': i_obs,
+                                             'ObservationID': observation_number,
                                              'ObservationName': obs_label,
+                                             # 'number_of_dithers': number_of_dithers,
                                              # 'DitherPatternType': DitherPatternType,
                                              # 'ImageDithers': ImageDithers
                                              }
@@ -240,7 +259,8 @@ class ReadAPTXML():
             # 1/0
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # If template is NircamImaging or NircamEngineeringImaging
-            if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
+            if template_name in ['NircamEngineeringImaging']:
+            # if template_name in ['NircamImaging', 'NircamEngineeringImaging']:
                 exposures_dictionary = self.read_imaging_template(template, template_name, obs, prop_params)
                 # exposures_dictionary = copy.deepcopy(self.APTObservationParams)
                 if coordparallel == 'true':
@@ -255,7 +275,7 @@ class ReadAPTXML():
                 self.APTObservationParams = self.append_dictionary(self.APTObservationParams,
                                                                        exposures_dictionary)
 
-            elif template_name in ['NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
+            elif template_name in ['NircamImaging', 'NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
                 if coordparallel == 'true':
                     parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary, proposal_parameter_dictionary, verbose=verbose)
@@ -335,17 +355,34 @@ class ReadAPTXML():
                 n_tiles = n_tiles_phasing
 
             # Get observation name, if there is one
-            if label == 'None':
-                label = ''
-            else:
-                label = '({})'.format(label)
+            # if label == 'None':
+            #     label = ''
+            # else:
+            #     label = '({})'.format(label)
+            #
+            label = obs_label
 
-            print("Found {} tile(s) for observation {} {}".format(n_tiles, i_obs + 1, label))
+            print("Found {} tile(s) for observation {} {}".format(n_tiles, observation_number, label))
+            print('Found {} visits with numbers: {}'.format(len(visit_numbers), visit_numbers))
+
+            self.observation_info[observation_number] = {}
+            self.observation_info[observation_number]['visit_numbers'] = visit_numbers
+
+            all_visit_numbers = [self.observation_info[key]['visit_numbers'] for key in self.observation_info.keys()]
+            all_visit_numbers = [item for sublist in all_visit_numbers for item in sublist]  # flatten list of lists
+
+
+            # print(self.APTObservationParams['number_of_dithers'])
+            # 1/0
+            number_of_exposures = np.sum([np.int(s) for s in self.APTObservationParams['number_of_dithers']])
+            # number_of_exposures = np.sum([np.int(s) for s in self.APTObservationParams['PrimaryDithers']])
+            # assert number_of_exposures == len(all_visit_numbers)
+            # 1/0
 
             if verbose:
                 # number_of_exposures = len(flatten_list(self.APTObservationParams['Instrument']))
-                number_of_exposures = len(self.APTObservationParams['Instrument'])
-                print('Dictionary currently holds {} exposures'.format(number_of_exposures))
+                number_of_entries = len(self.APTObservationParams['Instrument'])
+                print('Dictionary currently holds {} entries'.format(number_of_entries))
                 print(self.APTObservationParams['Instrument'])
 
 
@@ -487,7 +524,8 @@ class ReadAPTXML():
         # if parallel:
         #     ns = "{{http://www.stsci.edu/JWST/APT/FirstCoordinatedTemplate/{}}}".format(template_name)
         # else:
-        ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
+        # ns = "{{http://www.stsci.edu/JWST/APT/Template/{}}}".format(template_name)
+        ns = "{{{}/Template/{}}}".format(self.apt.replace('{','').replace('}',''), template_name)
 
         DitherPatternType = None
 
@@ -499,79 +537,208 @@ class ReadAPTXML():
         number_of_dithers = 1
         # ImageDithers = 1
 
-        for element in template:
-            # print(element)
-            element_tag_stripped = element.tag.split(ns)[1]
-            if verbose:
-                print('{} {}'.format(element_tag_stripped, element.text))
+
+        if prime_instrument.lower() == 'nircam':
+            # NIRCam uses FilterConfig structure to specifiy exposure parameters
+
+            # store Module, Subarray, ... fields
+            observation_dict = {}
+            for field in template:
+                print('{} {}'.format(field.tag, field.text))
+                # if 'Filters ' in key:
+                #     continue
+                key = field.tag.split(ns)[1]
+                value = field.text
+                observation_dict[key] = value
+
             # 1/0
-            # for NIRISS loop through exposures and collect exposure parameters
-            if element_tag_stripped == 'DitherPatternType':
-                DitherPatternType = element.text
-            elif element_tag_stripped == 'ImageDithers':
-                # ImageDithers = element.text
-                number_of_dithers = element.text
-            elif element_tag_stripped == 'PrimaryDithers':
-                number_of_dithers = element.text
-            elif element_tag_stripped == 'Dithers':
-                DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
-                # number of dithers
-                # ImageDithers = int(DitherPatternType[0])
-                number_of_dithers = int(DitherPatternType[0])
 
-            if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
-                    ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
-                    ((instrument.lower() == 'miri') and (element_tag_stripped == 'ExposureList'))| \
-                    ((instrument.lower() == 'nirspec') and (element_tag_stripped == 'Exposures')):
-                for exposure in element.findall(ns + 'Exposure'):
-                    exposure_dict = {}
-                    exposure_dict['DitherPatternType'] = DitherPatternType
-                    # exposure_dict['ImageDithers'] = np.int(ImageDithers)
-                    if number_of_dithers is None:
-                        number_of_dithers = 1
-                    exposure_dict[dither_key_name] = np.int(number_of_dithers)
-                    for exposure_parameter in exposure:
-                        parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
-                        if verbose:
-                            print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
-                        exposure_dict[parameter_tag_stripped] = exposure_parameter.text
+            # Set parameters that are constant for all imaging obs
+            # typeflag = template_name
+            # typeflag = 'imaging'
+            # grismval = 'N/A'
+            # # short_pupil = 'CLEAR'
+            #
+            # # Find observation-specific parameters
+            # mod = template.find(ns + 'Module').text
+            # subarr = template.find(ns + 'Subarray').text
+            # pdithtype = template.find(ns + 'PrimaryDitherType').text
 
-                    # fill dictionary to return
-                    for key in self.APTObservationParams_keys:
-                        if key in exposure_dict.keys():
-                            value = exposure_dict[key]
-                            # print(key)
-                        elif key in proposal_parameter_dictionary.keys():
-                            value = proposal_parameter_dictionary[key]
-                            # print(key)
-                        elif key == 'Instrument':
-                            value = instrument
-                        elif key == 'ParallelInstrument':
-                            value = parallel_instrument
+            # Determine if there is an aperture override
+            # mod, subarr = self.check_for_aperture_override(obs, mod, subarr, proposal_parameter_dictionary['ObservationID'])
+            override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+            FiducialPointOverride = False
+            if override is not None:
+                FiducialPointOverride = True
+
+            observation_dict['FiducialPointOverride'] = str(FiducialPointOverride)
+
+            if dither_key_name in observation_dict.keys():
+                number_of_dithers = observation_dict[dither_key_name]
+            else:
+                # try:
+                #     number_of_dithers = template.find(ns + dither_key_name).text
+                # except:
+                print('Element {} not found, use default value.'.format(dither_key_name))
+
+            # sdithtype = template.find(ns + 'SubpixelDitherType').text
+            #
+            # try:
+            #     sdither = template.find(ns + 'SubpixelPositions').text
+            # except:
+            #     try:
+            #         stemp = template.find(ns + 'CoordinatedParallelSubpixelPositions').text
+            #         sdither = np.int(stemp[0])
+            #     except:
+            #         sdither = '1'
+
+            # Find filter parameters for all filter configurations within obs
+            filter_configs = template.findall('.//' + ns + 'FilterConfig')
+            # 1/0
+            verbose = True
+            # loop over filter configurations
+            for filter_config_index, filter_config in enumerate(filter_configs):
+                filter_config_dict = {}
+                print('Filter config index {}'.format(filter_config_index))
+                for element in filter_config:
+                    key = element.tag.split(ns)[1]
+                    value = element.text
+                    if verbose:
+                        print('{} {}'.format(key, value))
+                    if key == 'ShortFilter':
+                        if ' + ' in value:
+                            split_ind = value.find(' + ')
+                            ShortPupil = value[0:split_ind]
+                            value = value[split_ind + 1:]
                         else:
-                            value = str(None)
+                            ShortPupil = 'CLEAR'
+                        filter_config_dict['ShortPupil'] = ShortPupil
+                    elif key == 'LongFilter':
+                        if ' + ' in value:
+                            split_ind = value.find(' + ')
+                            LongPupil = value[0:split_ind]
+                            value = value[split_ind + 1:]
+                        else:
+                            LongPupil = 'CLEAR'
+                        filter_config_dict['LongPupil'] = LongPupil
 
-                        if (key in ['PrimaryDithers', 'ImageDithers']) and ((value is None) or (value == 'None')):
-                            value = '1'
+                    filter_config_dict[key] = value
 
-                        elif (key == 'Mode') and (template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
-                            value = 'imaging'
+                for key in self.APTObservationParams_keys:
+                    if key in filter_config_dict.keys():
+                        value = filter_config_dict[key]
+                    elif key in observation_dict.keys():
+                        value = observation_dict[key]
+                    elif key in proposal_parameter_dictionary.keys():
+                        value = proposal_parameter_dictionary[key]
+                    elif key == 'Instrument':
+                        value = instrument
+                    elif key == 'ParallelInstrument':
+                        value = parallel_instrument
+                    elif key == 'number_of_dithers':
+                        value = str(number_of_dithers)
+                    elif key == 'FiducialPointOverride':
+                        value = str(FiducialPointOverride)
+                    else:
+                        value = str(None)
+
+                    # if (key in ['PrimaryDithers', 'ImageDithers']) and (
+                    #     (value is None) or (value == 'None')):
+                    #     value = '1'
+                    #
+                    # elif (key == 'Mode') and (
+                    #     template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
+                    #     value = 'imaging'
+
+                    exposures_dictionary[key].append(value)
 
 
-                        exposures_dictionary[key].append(value)
+            print(exposures_dictionary)
+            # 1/0
 
-                    # add keys that were not defined in self.APTObservationParams_keys
-                    # (to be fixed in Class.__init__ later )
-                    for key in exposure_dict.keys():
-                        if key not in self.APTObservationParams_keys:
-                            # if key not yet present, create entry
-                            if key not in exposures_dictionary.keys():
-                                exposures_dictionary[key] = [str(exposure_dict[key])]
+        else:
+            # verbose = True
+            for element in template:
+                # print(element)
+                element_tag_stripped = element.tag.split(ns)[1]
+                if verbose:
+                    print('{} {}'.format(element_tag_stripped, element.text))
+                # 1/0
+                # for NIRISS loop through exposures and collect exposure parameters
+                if element_tag_stripped == 'DitherPatternType':
+                    DitherPatternType = element.text
+                elif element_tag_stripped == 'ImageDithers':
+                    # ImageDithers = element.text
+                    number_of_dithers = element.text
+                elif element_tag_stripped == 'PrimaryDithers':
+                    number_of_dithers = element.text
+                elif element_tag_stripped == 'Dithers':
+                    DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
+                    # number of dithers
+                    # ImageDithers = int(DitherPatternType[0])
+                    number_of_dithers = int(DitherPatternType[0])
+
+                # Different SI conventions of how to list exposure parameters
+                if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
+                        ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
+                        ((instrument.lower() == 'miri') and (element_tag_stripped == 'ExposureList'))| \
+                        ((instrument.lower() == 'nirspec') and (element_tag_stripped == 'Exposures')):
+                    for exposure in element.findall(ns + 'Exposure'):
+                        exposure_dict = {}
+                        exposure_dict['DitherPatternType'] = DitherPatternType
+                        # exposure_dict['ImageDithers'] = np.int(ImageDithers)
+                        if number_of_dithers is None:
+                            number_of_dithers = 1
+                        exposure_dict[dither_key_name] = np.int(number_of_dithers)
+                        for exposure_parameter in exposure:
+                            parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
+                            if verbose:
+                                print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
+                            exposure_dict[parameter_tag_stripped] = exposure_parameter.text
+
+                        exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
+                        # 1/0
+                        # fill dictionary to return
+                        for key in self.APTObservationParams_keys:
+                            if key in exposure_dict.keys():
+                                value = exposure_dict[key]
+                                # print(key)
+                            elif key in proposal_parameter_dictionary.keys():
+                                value = proposal_parameter_dictionary[key]
+                                # print(key)
+                            elif key == 'Instrument':
+                                value = instrument
+                            elif key == 'ParallelInstrument':
+                                value = parallel_instrument
+                            elif key == 'number_of_dithers':
+                                value = str(number_of_dithers)
+                            # elif key == 'number_of_dithers':
+                            #     value = number_of_dithers
                             else:
-                                exposures_dictionary[key].append(str(exposure_dict[key]))
+                                value = str(None)
 
-        # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
-        # self.APTObservationParams = exposures_dictionary
+                            if (key in ['PrimaryDithers', 'ImageDithers']) and ((value is None) or (value == 'None')):
+                                value = '1'
+
+                            elif (key == 'Mode') and (template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
+                                value = 'imaging'
+
+
+
+                            exposures_dictionary[key].append(value)
+
+                        # add keys that were not defined in self.APTObservationParams_keys
+                        # (to be fixed in Class.__init__ later )
+                        for key in exposure_dict.keys():
+                            if key not in self.APTObservationParams_keys:
+                                # if key not yet present, create entry
+                                if key not in exposures_dictionary.keys():
+                                    exposures_dictionary[key] = [str(exposure_dict[key])]
+                                else:
+                                    exposures_dictionary[key].append(str(exposure_dict[key]))
+
+            # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
+            # self.APTObservationParams = exposures_dictionary
 
         for key in exposures_dictionary.keys():
             if type(exposures_dictionary[key]) is not list:
@@ -670,7 +837,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, 1, template_name, instrument, obs_label)
+                          i_obs, 1, template_name, instrument, obs_label)
             exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
             # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -743,7 +910,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
+                              i_obs , j + 1, template_name, 'NIRCAM', obs_label)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -826,7 +993,7 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
+                          i_obs, j + 1, template_name, 'NIRCAM', obs_label)
 
             self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -893,7 +1060,7 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
+                              i_obs, j + 1, template_name, 'NIRCAM', obs_label)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -1041,7 +1208,7 @@ class ReadAPTXML():
                                   pdither, sdithtype, sdither, sfilt, lfilt,
                                   rpatt, grps, ints, short_pupil,
                                   long_pupil, grismval, coordparallel,
-                                  i_obs + 1, j + 1, template_name, 'NIRCAM', obs_label)
+                                  i_obs, j + 1, template_name, 'NIRCAM', obs_label)
 
                     self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                     self.obs_tuple_list.append(tup_to_add)
@@ -1119,7 +1286,7 @@ class ReadAPTXML():
                               sdither, sfilt, lfilt, rpatt, groups,
                               integrations, short_pupil, long_pupil,
                               grismvalue, coordparallel,
-                              i_obs + 1, 1, template_name, instrument, obs_label)
+                              i_obs, 1, template_name, instrument, obs_label)
 
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -1158,7 +1325,7 @@ class ReadAPTXML():
                                      pdither, sdithtype, sdither, sfilt, lfilt,
                                      rpatt, grps, ints, short_pupil, long_pupil,
                                      grismvalue, coordparallel,
-                                     i_obs + 1, 1, template_name, instrument, obs_label)
+                                     i_obs, 1, template_name, instrument, obs_label)
                 self.APTObservationParams = self.add_exposure(self.APTObservationParams, direct_tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
 
@@ -1189,7 +1356,7 @@ class ReadAPTXML():
                     i_sub = [mod in name for name in np.array(config['AperName'])]
                     i_sub = np.where(i_sub)[0]
                     if len(i_sub) > 1 or len(i_sub) == 0:
-                        raise ValueError('Unable to match FiducialPointOverride {} to valid aperture in observation {}.'.format(mod, i_obs + 1))
+                        raise ValueError('Unable to match FiducialPointOverride {} to valid aperture in observation {}.'.format(mod, i_obs))
 
                 subarr = config[i_sub]['Name']
                 if type(subarr) != np.str_: # Don't know why, but astropy tables aren't behaving
