@@ -346,6 +346,13 @@ class ReadAPTXML():
                 exposures_dictionary = self.read_wfss_template(template, template_name, obs, prop_params)
 
 
+            else:
+                print('SKIPPED: Observation `{}` labelled `{}` uses template `{}`'.format(observation_number,
+                                                                                 label,
+                                                                                 template_name))
+                continue
+
+
             if verbose:
                 print('Dictionary read from template has {} entries.'.format(len(exposures_dictionary['Instrument'])))
                 print(exposures_dictionary['number_of_dithers'])
@@ -662,8 +669,8 @@ class ReadAPTXML():
                         exposure_dict[dither_key_name] = np.int(number_of_dithers)
                         for exposure_parameter in exposure:
                             parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
-                            if verbose:
-                                print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
+                            # if verbose:
+                            #     print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
                             exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
                         exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
