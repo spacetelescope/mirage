@@ -305,8 +305,8 @@ class ReadAPTXML():
 
             if verbose:
                 print('Dictionary read from template has {} entries.'.format(len(exposures_dictionary['Instrument'])))
-                print(exposures_dictionary['number_of_dithers'])
-                print(exposures_dictionary['Instrument'])
+                # print(exposures_dictionary['number_of_dithers'])
+                # print(exposures_dictionary['Instrument'])
 
             # set default number of dithers to one, for downstream processing
             for i, n_dither in enumerate(exposures_dictionary['number_of_dithers']):

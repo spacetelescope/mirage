@@ -307,11 +307,10 @@ class AptInput:
         # Add epoch and catalog information
         obstab = self.add_observation_info(obstab)
 
-        verbose = True
-        if verbose:
-            print('Summary of observation dictionary:')
-            for key in obstab.keys():
-                print('{:<25}: number of elements is {:>5}'.format(key, len(obstab[key])))
+        # if verbose:
+        #     print('Summary of observation dictionary:')
+        #     for key in obstab.keys():
+        #         print('{:<25}: number of elements is {:>5}'.format(key, len(obstab[key])))
 
         # NIRCam case: Expand for detectors. Create one entry in each list for each
         # detector, rather than a single entry for 'ALL' or 'BSALL'
@@ -341,7 +340,6 @@ class AptInput:
         else:
             self.exposure_tab = self.expand_for_detectors(obstab)
 
-        verbose=True
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
