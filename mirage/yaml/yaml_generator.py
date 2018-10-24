@@ -1002,23 +1002,12 @@ class SimInput:
         else:
             self.psfpixfrac = 0
             self.psfbasename = 'N/A'
-            # raise RuntimeError('Instrument {} is not supported'.format(instrument))
             print('WARNING: Instrument {} is not supported as PRIME. Looking for parallels.'.format(instrument))
-
 
         # create empty lists
         list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
         for list_name in list_names:
             setattr(self, '{}_list'.format(list_name), {})
-        # self.superbias_list = {}
-        # self.linearity_list = {}
-        # self.gain_list = {}
-        # self.saturation_list = {}
-        # self.ipc_list = {}
-        # self.astrometric_list = {}
-        # self.pam_list = {}
-        # self.dark_list = {}
-        # self.lindark_list = {}
 
         if self.instrument.lower() == 'nircam':
             self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
@@ -1066,9 +1055,6 @@ class SimInput:
                     self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
         elif self.instrument.lower() in ['niriss', 'nirspec', 'miri', 'fgs']:
-            # directory containing NIRISS reference files
-            #HACK: add FGS files temporarily
-
             if self.instrument.lower() in ['nirspec', 'miri']:
                 for key in 'subarray_def_file fluxcal filtpupil_pairs readpatt_def_file crosstalk ' \
                            'dq_init_config saturation_config superbias_config refpix_config ' \
@@ -1122,8 +1108,11 @@ class SimInput:
                     self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
                     self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
                     self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
+
+                    # suspecting that the FGS wcs reference file has a problem
                     # self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
                     self.astrometric_list[det] = 'none'
+
                     self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
                     self.lindark_list[det] = [None]
 
@@ -1214,8 +1203,6 @@ class SimInput:
             outfilebase = self.create_output_name(input)
             outfile = "{}{}{}".format(outfilebase, fulldetector, '_uncal.fits')
             yamlout = "{}{}{}".format(outfilebase, fulldetector, '.yaml')
-            # outfile = input['observation_id'] + '_' + fulldetector + '_uncal.fits'
-            # yamlout = input['observation_id'] + '_' + fulldetector + '.yaml'
 
         yamlout = os.path.join(self.output_dir, yamlout)
         with open(yamlout, 'w') as f:
@@ -1236,16 +1223,9 @@ class SimInput:
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
-
-            # yaml_path = os.path.dirname(os.path.realpath(__file__))
-            # modpath = os.path.split(yaml_path)[0]
-            # subarray_def_file = os.path.join(modpath, 'config', self.configfiles['subarray_def_file'])
-            # config = ascii.read(subarray_def_file)
-
             config = self.global_subarray_definitions[instrument.lower()]
 
-
-            # HACK JSA
+            # This functionality was previously implemented elsewhere
             if full_ap in ['NRCA1_DHSPIL', 'NRCA2_DHSPIL', 'NRCA4_DHSPIL', 'NRCA5_DHSPIL']:
                 full_ap = 'NRCA3_DHSPIL'
             elif full_ap in ['NRCB1_DHSPIL', 'NRCB2_DHSPIL', 'NRCB3_DHSPIL', 'NRCB5_DHSPIL']:
