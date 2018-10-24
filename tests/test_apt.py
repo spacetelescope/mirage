@@ -40,7 +40,7 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-
+@pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
     '''Parse the given APT files and create a set of .yamls for a given
     instrument
@@ -74,7 +74,7 @@ def RunAllAPTTemplates(instrument):
     observationlist_file = os.path.join(out_dir, instrument + '_observationlist.yaml')
     # write_observationlist.write_yaml(xml_file, pointing_file, observationlist_file,
     #                                  ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
-    write_observationlist.write_yaml(xml_file, observationlist_file, None,
+    apt_xml_dict = write_observationlist.write_yaml(xml_file, observationlist_file, None,
                                      ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
 
     # Create a series of data simulator input yaml files
@@ -89,7 +89,7 @@ def RunAllAPTTemplates(instrument):
     yam.datatype = 'linear'
     yam.reffile_setup(offline=True)
     yam.set_global_definitions()
-    yam.create_inputs()
+    yam.create_inputs(apt_xml_dict=apt_xml_dict)
 
     # Ensure that some of the expected files have been created
     assert os.path.exists(os.path.join(out_dir, 'Observation_table_for_' +
@@ -137,5 +137,5 @@ def test_RunNIRCamAPTTemplates():
     RunAllAPTTemplates('NIRCam')
 
 # for debugging
-# if __name__ == '__main__':
-#     RunAllAPTTemplates('NIRCam')
+if __name__ == '__main__':
+    RunAllAPTTemplates('NIRCam')

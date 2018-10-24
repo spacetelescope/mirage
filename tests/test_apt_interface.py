@@ -85,20 +85,22 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
-    # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
+    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
-    for instrument in ['NIRCam']:
+    # for instrument in ['NIRCam']:
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['1088', '1087', 'm31_field_test_observation']
+            # apt_file_seeds = ['1088']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
-            # apt_file_seeds = ['1144-OTE-10', 'NIRCamTest']
-            apt_file_seeds = ['1144-OTE-10']
+            apt_file_seeds = ['1144-OTE-10', 'NIRCamTest']
+            # apt_file_seeds = ['NIRCamTest']
+            # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
@@ -133,5 +135,5 @@ def test_complete_input_generation():
             assert len(valid_instrument_list) == len(yfiles)
 
 # for debugging
-if __name__ == '__main__':
-    test_complete_input_generation()
+# if __name__ == '__main__':
+#     test_complete_input_generation()

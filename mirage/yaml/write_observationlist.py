@@ -18,6 +18,7 @@ TODO
     - Clarify use and role of FilterConfig
 
 """
+from astropy.table import Table, vstack
 import numpy as np
 
 from ..apt import read_apt_xml
@@ -39,6 +40,99 @@ def dictionary_slice(dictionary, index):
     for key in dictionary.keys():
         new_dict[key] = [dictionary[key][index]]
     return new_dict
+
+
+def expand_for_dithers(indict, verbose=True):
+    """Expand a given dictionary to create one entry for each dither.
+
+    Supports parallel observations.
+
+    Moved here and modified from apt_inputs.py
+
+    Parameters
+    ----------
+    indict :dict
+        dictionary of observations
+
+    Returns
+    -------
+    expanded : dict
+        Dictionary, expanded to include a separate entry for
+        each dither
+    """
+    expanded = {}
+    for key in indict:
+        expanded[key] = []
+
+    # Loop over entries in dict and duplicate by the
+    # number of dither positions
+    # keys = indict.keys()
+    # if np.all(np.unique(indict['Instrument']) == 'NIRCAM'):
+    # # if not np.all(np.array(indict['PrimaryDithers']).astype(int) == 1):
+    #     # NIRCam exposures
+    #     for i in range(len(indict['PrimaryDithers'])):
+    #         arr = np.array([item[i] for item in indict.values()])
+    #         entry = dict(zip(keys, arr))
+    #
+    #         # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
+    #         subpix = entry['SubpixelPositions']
+    #         if subpix in ['0', 'NONE']:
+    #             subpix = [[1]]
+    #         if subpix == '4-Point':
+    #             subpix = [[4]]
+    #         if subpix == '9-Point':
+    #             subpix = [[9]]
+    #
+    #         primary = entry['PrimaryDithers']
+    #         if primary == '0':
+    #             primary = [1]
+    #         reps = np.int(subpix[0][0]) * np.int(primary[0])
+    #         for key in keys:
+    #             for j in range(reps):
+    #                 expanded[key].append(indict[key][i])
+
+
+    # use astropy table operations to expand dithers while maintaining parallels in sync
+    # implementation assumes that only one instrument is used in parallel
+    table = Table(indict)
+    table['row'] = np.arange(len(table))
+    expanded_table = None #copy.deepcopy(table)
+
+    for i, row in enumerate(table['row']):
+        number_of_dithers = np.int(table['number_of_dithers'][i])
+
+        if (table['CoordinatedParallel'][i] == 'true') and (not table['ParallelInstrument'][i]):
+            dither_table = table[i:i + 2]
+
+            if (number_of_dithers > 1):
+                #replicate parallel observation n times
+                dither_table = vstack([dither_table]*number_of_dithers)
+
+            if expanded_table is None:
+                expanded_table = dither_table
+            else:
+                expanded_table = vstack((expanded_table, dither_table))
+        elif (table['CoordinatedParallel'][i] == 'false'):
+            # add row multiplied by number of dithers
+            # dither_table = vstack([table[i]]*table['ImageDithers'][i])
+            dither_table = vstack([table[i]]*number_of_dithers)
+            if expanded_table is None:
+                expanded_table = dither_table
+            else:
+                expanded_table = vstack((expanded_table, dither_table))
+
+    # set number of dithers to 1 after expansion
+    expanded_table['number_of_dithers'] = np.ones(len(expanded_table))
+
+    expanded = {}
+    for key in expanded_table.colnames:
+        expanded[key] = np.array(expanded_table[key]).tolist()
+
+    if verbose:
+        print('Number of entries before expanding dithers: {}'.format(len(table)))
+        print('Number of entries after expanding dithers:  {}'.format(len(expanded_table)))
+
+    return expanded
 
 
 
@@ -72,13 +166,15 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
     readxml_obj = read_apt_xml.ReadAPTXML()
 
     xml_dict = readxml_obj.read_xml(xml_file, verbose=verbose)
-    if verbose:
-        print('Summary of observation dictionary:')
-        for key in xml_dict.keys():
-            print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
+    # if verbose:
+    #     print('Summary of observation dictionary:')
+    #     for key in xml_dict.keys():
+    #         print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
 
     # create an expanded dictionary that contains lists of parameters expanded for dithers
-    expanded_dict = None
+    xml_dict = expand_for_dithers(xml_dict)
+
+    return_dict = None
 
 
     # array of unique instrument names
@@ -100,10 +196,10 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
     if (catalog_files is not None) and (len(catalog_files) == 1):
         catalog_files = catalog_files * number_of_exposures
 
-    if verbose:
-        print('Summary of dictionary extracted from {}'.format(xml_file))
-        for key in xml_dict.keys():
-            print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
+    # if verbose:
+    #     print('Summary of dictionary extracted from {}'.format(xml_file))
+    #     for key in xml_dict.keys():
+    #         print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
 
     # set default values (should be changed eventually)
     date = '2019-07-04'
@@ -125,6 +221,7 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
     text = ['']
     entry_number = 0  # running number for every entry in the observation list
 
+
     observation_numbers = np.unique(xml_dict['ObservationID'])
     for observation_index, observation_number in enumerate(observation_numbers):
         first_index = xml_dict['ObservationID'].index(observation_number)
@@ -143,10 +240,10 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
                     "    PAV3: {}\n".format(PAV3),
                     "    DitherIndex: {}\n".format(dither_index),
                 ]
-                if expanded_dict is None:
-                    expanded_dict = dictionary_slice(xml_dict, index)
+                if return_dict is None:
+                    return_dict = dictionary_slice(xml_dict, index)
                 else:
-                    expanded_dict = read_apt_xml.append_dictionary(expanded_dict, dictionary_slice(xml_dict, index))
+                    return_dict = read_apt_xml.append_dictionary(return_dict, dictionary_slice(xml_dict, index))
                 if instrument in ['NIRCAM', 'WFSC']:
 
                     # set default values
@@ -217,7 +314,7 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
 
     text_out += text
 
-    expanded_dict['entry_number'] = entry_numbers
+    return_dict['entry_number'] = entry_numbers
 
 
 
@@ -315,4 +412,4 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
     print('\nWrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number, yaml_file))
 
     # return xml_dict
-    return expanded_dict
+    return return_dict

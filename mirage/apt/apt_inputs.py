@@ -576,9 +576,9 @@ class AptInput:
         # (currently only used in NIRCam)
         # remove 'TIGHT' from the entries and leave
         # only the number behind
-        tight = [True if 'TIGHT' in str(val) else False for val in tab['PrimaryDithers']]
-        if np.any(tight):
-            tab = self.tight_dithers(tab)
+        # tight = [True if 'TIGHT' in str(val) else False for val in tab['PrimaryDithers']]
+        # if np.any(tight):
+        #     tab = self.tight_dithers(tab)
 
         # Expand the dictionary for multiple dithers. Expand such that there
         # is one entry in each list for each exposure, rather than one entry
