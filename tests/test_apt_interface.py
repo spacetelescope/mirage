@@ -98,7 +98,8 @@ def test_complete_input_generation():
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             # apt_file_seeds = ['1144-OTE-10', 'NIRCamTest']
-            apt_file_seeds = ['1144-OTE-10']
+            apt_file_seeds = ['NIRCamTest']
+            # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
