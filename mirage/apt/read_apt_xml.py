@@ -459,7 +459,7 @@ class ReadAPTXML():
             # loop over filter configurations
             for filter_config_index, filter_config in enumerate(filter_configs):
                 filter_config_dict = {}
-                print('Filter config index {}'.format(filter_config_index))
+                # print('Filter config index {}'.format(filter_config_index))
                 for element in filter_config:
                     key = element.tag.split(ns)[1]
                     value = element.text
