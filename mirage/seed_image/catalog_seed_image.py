@@ -640,13 +640,13 @@ class Catalog_seed():
         return non_sidereal_ramp, nonsidereal_segmap
 
 
-    def readMTFile(self, file):
+    def readMTFile(self, filename):
         """
         Read in moving target list file
 
         Arguments:
         ----------
-        file : str
+        filename : str
             name of moving target catalog file
 
         Returns:
@@ -659,7 +659,7 @@ class Catalog_seed():
                 are in units of pixels/hour. If false, arcsec/hour
             magsys -- magnitude system of the moving target magnitudes
         """
-        mtlist = ascii.read(file, comment='#')
+        mtlist = ascii.read(filename, comment='#')
 
         # Convert all relevant columns to floats
         for col in mtlist.colnames:
@@ -698,11 +698,13 @@ class Catalog_seed():
         # If not, assume AB mags
         msys = 'abmag'
 
-        condition=('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
+        condition = ('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
         if condition:
             msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
             msys = msys.lower()
 
+        # Select the appropriate magnitude column for the filter being simulated, if necessary
+        mtlist = self.select_magnitude_column(mtlist, filename)
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
     def basic_get_image(self, filename):
@@ -1867,7 +1869,7 @@ class Catalog_seed():
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            condition = ('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
             if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
@@ -1875,7 +1877,82 @@ class Catalog_seed():
         except:
             raise IOError("WARNING: Unable to open the source list file {}".format(filename))
 
+        # Select the appropriate magnitude column for the filter being simulated, if necessary
+        gtab = self.select_magnitude_column(gtab, filename)
         return gtab, pflag, msys
+
+    def select_magnitude_column(self, catalog, catalog_file_name):
+        """Keep only the magnitude column from the input catalog that matches the filter
+        being simulated. Rename that column to "magnitude".
+
+        Parameters
+        ----------
+
+        catalog : astropy.table.Table
+            Source catalog
+
+        catalog_file_name : str
+            Name of the catalog file. Used only when raising errors.
+
+        Returns
+        -------
+
+        catalog : astropy.table.Table
+            Modified table where all magnitude columns other than the one of ineterest
+            have been removed.
+        """
+        # Get the column names from the catalog
+        mag_cols = [col.lower() for col in catalog.colnames if 'magnitude' in col.lower()]
+        num_mag_cols = len(mag_cols)
+        orig_mag_cols = [col for col in catalog.colnames if 'magnitude' not col.lower()]
+
+        # If there is only a single column called "magnitude" then use that.
+        # This is equivalent to the single filter catalogs previously allowed.
+        if "magnitude" in mag_cols and num_mag_cols == 1:
+            return catalog
+        elif (("magnitude" not in mag_cols) or (("magnitude" in mag_cols) and num_mag_cols > 1)):
+            # Determine whether to use the pupil or the filter name to when searching for column names
+            if self.params['Readout']['pupil'][0].upper() == 'F':
+                usefilt = 'pupil'
+            else:
+                usefilt = 'filter'
+            filter_name = self.params['Inst'][usefilt].lower()
+
+            # Find the column for the given filter
+            present = [True for colname in mag_cols if filter_name in colname]
+            if any(present):
+                present_array = np.array(present).astype(np.int)
+                num_true = np.sum(present_array)
+                if num_true > 1:
+                    # If there is more than one column for the filter, raise an error.
+                    raise ValueError(("WARNING: catalog {} has multiple magnitude columns for {}"
+                                      .format(catalog_file_name, filter_name)))
+                else:
+                    # Extract the matching column and rename to 'magnitude'
+                    match = np.where(present_array == 1)[0][0]
+                    mag_column = copy(catalog[mag_cols[match]])
+                    mag_column.name = 'magnitude'
+
+            else:
+                if "magnitude" in mag_cols:
+                    # If there are no columns for the given filter but there is a generic "magnitude"
+                    # column, then print a warning, but continue using the "magnitude" column
+                    print(("WARNING: catalog {} does not have a magnitude column specifically for {}, "
+                           "but does have a generic 'magnitude' column. Continuing on using that."
+                           .format(catalog_file_name, filter_name)))
+                    mag_column = copy(catalog['magnitude'])
+
+                else:
+                    # If there are no columns for the given filter and no generic "magnitude" column,
+                    # raise an error.
+                    raise ValueError(("WARNING: catalog {} has no magnitude column for {}"
+                                      .format(catalog_file_name, filter_name)))
+
+            # Remove unused magnitude columns from table and add new 'magnitude' column
+            for orig in orig_mag_cols:
+                catalog.remove_column(orig)
+                catalog.add_column(mag_column)
+        return catalog
 
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
@@ -2042,9 +2119,10 @@ class Catalog_seed():
                 msys = msys.lower()
 
         except:
-            print("WARNING: Unable to open the galaxy source list file {}".format(filename))
-            sys.exit()
+            raise IOError("WARNING: Unable to open the galaxy source list file {}".format(filename))
 
+        # Select the appropriate magnitude column for the filter being simulated, if necessary
+        gtab = self.select_magnitude_column(gtab, filename)
         return gtab, pflag, rpflag, msys
 
 
