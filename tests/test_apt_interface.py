@@ -92,6 +92,7 @@ def test_complete_input_generation():
     # for instrument in ['MIRI']:
     # for instrument in ['NIRCam']:
 
+        print('='*100)
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['1088', '1087', 'm31_field_test_observation']

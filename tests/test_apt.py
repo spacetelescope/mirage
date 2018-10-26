@@ -40,7 +40,7 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-@pytest.mark.xfail
+# @pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
     '''Parse the given APT files and create a set of .yamls for a given
     instrument
@@ -130,12 +130,12 @@ def test_environment_variable():
                                     "from the Mirage package."
 
 
-# @pytest.mark.xfail
+@pytest.mark.xfail
 def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''
     RunAllAPTTemplates('NIRCam')
 
 # for debugging
-if __name__ == '__main__':
-    RunAllAPTTemplates('NIRCam')
+# if __name__ == '__main__':
+#     RunAllAPTTemplates('NIRCam')
