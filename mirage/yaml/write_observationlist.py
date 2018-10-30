@@ -147,11 +147,11 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
     yaml_file : str
         output_file
     catalog_files : str or list(str)
-        path to file(s) that contain the catalog of sources.
+        filename(s) that contain the catalog of sources.
     ps_cat_sw : str or list(str)
-        NIRCam SW catalog, one per observations
+        NIRCam SW catalog, one per observation
     ps_cat_lw : str or list(str)
-        NIRCam LW catalog, one per observations
+        NIRCam LW catalog, one per observation
 
     Returns
     -------
@@ -163,6 +163,12 @@ def write_yaml(xml_file, yaml_file, catalog_files=None, ps_cat_sw=None, ps_cat_l
         Read default values from configuration file
 
     """
+    if (catalog_files is not None) and (type(catalog_files) is str):
+        catalog_files = [catalog_files]
+
+    if (catalog_files is not None) and (type(catalog_files) is str):
+        catalog_files = [catalog_files]
+
     if (catalog_files is not None) and (type(catalog_files) is str):
         catalog_files = [catalog_files]
 

@@ -1225,11 +1225,16 @@ class SimInput:
 
             config = self.global_subarray_definitions[instrument.lower()]
 
-            # This functionality was previously implemented elsewhere
-            if full_ap in ['NRCA1_DHSPIL', 'NRCA2_DHSPIL', 'NRCA4_DHSPIL', 'NRCA5_DHSPIL']:
-                full_ap = 'NRCA3_DHSPIL'
-            elif full_ap in ['NRCB1_DHSPIL', 'NRCB2_DHSPIL', 'NRCB3_DHSPIL', 'NRCB5_DHSPIL']:
-                full_ap = 'NRCB4_DHSPIL'
+
+
+
+            # This functionality was previously implemented elsewhere (shoudl not be necessary)
+            # if full_ap in ['NRCA1_DHSPIL', 'NRCA2_DHSPIL', 'NRCA4_DHSPIL', 'NRCA5_DHSPIL']:
+            #     full_ap = 'NRCA3_DHSPIL'
+            # elif full_ap in ['NRCB1_DHSPIL', 'NRCB2_DHSPIL', 'NRCB3_DHSPIL', 'NRCB5_DHSPIL']:
+            #     full_ap = 'NRCB4_DHSPIL'
+
+
 
 
             if full_ap not in config['AperName']:

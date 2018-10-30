@@ -29,8 +29,6 @@ argparse, lxml, astropy, numpy, collections
 JWST Calibration pipeline (only for the use of set_telescope_pointing.py)
 in order to translate PAV3 values to local roll angles for each detector.
 
-rotations.py - Colin Cox's module of WCS-related functions
-
 
 HISTORY:
 
@@ -53,7 +51,6 @@ from pysiaf import rotations
 import yaml
 
 from . import read_apt_xml
-from ..utils import rotations
 from ..utils import siaf_interface
 
 
