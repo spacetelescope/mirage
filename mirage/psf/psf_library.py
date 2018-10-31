@@ -27,9 +27,80 @@ class CreatePSFLibrary:
         Class to create a PSF library in the following format:
             For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
             (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
-            is the 2D PSF.
+            is the 2D PSF. This class must be run separately for each instrument.
 
-        This class must be run separately for each instrument.
+        Parameters
+        ----------
+        instrument : str
+            The name of the instrument you want to run. Can be any capitalization. Can
+            only run 1 instrument at a time. Right now this class is only set up for NIRCam,
+            NIRISS, and FGS (they are 2048x2048)
+
+        filters : str or list
+            Which filter(s) you want to create a library for.
+
+            Can be a string of 1 filter name, a list of filter names (as strings), or
+            the default "all" will run through all the filters in the filter_list
+            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
+            webbpsf expects. See also special case for NIRCam. Default is "all"
+
+        detectors : str or list
+            Which detector(s) you want to create a library for.
+
+            Can be a string of 1 detector name, a list of detector names (as strings), or
+            the default "all" will run through all the detectors in the detector_list
+            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
+            webbpsf expects. See also special case for NIRCam. Default is "all"
+
+        num_psfs : int
+            The total number of fiducial PSFs to be created and saved in the files. This
+            number must be a square number. Default is 16.
+            E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
+
+        psf_location : tuple
+            If num_psfs = 1, then this is used to set the (y,x) location of that PSF.
+            Default is (1024,1024).
+
+        add_distortion : bool
+            If True, the PSF will have distortions applied: the geometric distortion from
+            the detectors (using data from SIAF) and the rotation of the detectors with
+            respect to the focal plane. Default is True.
+
+        fov_pixels : int
+            The field of view in undersampled detector pixels used by WebbPSF when
+            creating the PSFs. Default is 101 pixels.
+
+        oversample : int
+            The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
+
+        opd_type : str
+            The type of OPD map you would like to use to create the PSFs. Options are
+            "predicted" or "requirements" where the predicted map is of the expected
+            WFE and the requirements map is slightly more conservative (has slightly
+            larger WFE). Default is "requirements"
+
+        opd_number : int
+            The realization of the OPD map pulled from the OPD file. Options are an
+            integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
+            the telescope included in the OPD map file. Default is 0.
+
+        save : bool
+            True/False boolean if you want to save your file
+
+        fileloc : str
+            Where to save your file if "save" keyword is set to True. Default of None
+            will save in the current directory
+
+        filename : str
+            The name to save your current file under if "save" keyword is set to True.
+            Default of None will save it in the form: "INSTR_FILT_fovp####_samp#_npsf##.fits"
+
+        overwrite : bool
+            True/False boolean to overwrite the output file if it already exists.
+
+        **kwargs
+            This can be used to add any extra arguments to the webbpsf calc_psf() method
+            call.
 
         Special Case for NIRCam:
         For NIRCam, you can set detectors and filters with multiple options.
@@ -44,79 +115,6 @@ class CreatePSFLibrary:
         If you choose individual filters and detectors, they must match in
         shortwave or longwave. Mismatched lists of short and long wave filters and
         detectors will result in an error.
-
-        Parameters
-        ----------
-        instrument: str
-            The name of the instrument you want to run. Can be any capitalization. Can
-            only run 1 instrument at a time. Right now this class is only set up for NIRCam,
-            NIRISS, and FGS (they are 2048x2048)
-
-        filters: str or list
-            Which filter(s) you want to create a library for.
-
-            Can be a string of 1 filter name, a list of filter names (as strings), or
-            the default "all" will run through all the filters in the filter_list
-            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
-            webbpsf expects. See also special case for NIRCam. Default is "all"
-
-        detectors: str or list
-            Which detector(s) you want to create a library for.
-
-            Can be a string of 1 detector name, a list of detector names (as strings), or
-            the default "all" will run through all the detectors in the detector_list
-            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
-            webbpsf expects. See also special case for NIRCam. Default is "all"
-
-        num_psfs: int
-            The total number of fiducial PSFs to be created and saved in the files. This
-            number must be a square number. Default is 16.
-            E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
-
-        psf_location: tuple
-            If num_psfs = 1, then this is used to set the (y,x) location of that PSF.
-            Default is (1024,1024).
-
-        add_distortion: bool
-            If True, the PSF will have distortions applied: the geometric distortion from
-            the detectors (using data from SIAF) and the rotation of the detectors with
-            respect to the focal plane. Default is True.
-
-        fov_pixels: int
-            The field of view in undersampled detector pixels used by WebbPSF when
-            creating the PSFs. Default is 101 pixels.
-
-        oversample: int
-            The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
-
-        opd_type: str
-            The type of OPD map you would like to use to create the PSFs. Options are
-            "predicted" or "requirements" where the predicted map is of the expected
-            WFE and the requirements map is slightly more conservative (has slightly
-            larger WFE). Default is "requirements"
-
-        opd_number: int
-            The realization of the OPD map pulled from the OPD file. Options are an
-            integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
-            the telescope included in the OPD map file. Default is 0.
-
-        save: bool
-            True/False boolean if you want to save your file
-
-        fileloc: str
-            Where to save your file if "save" keyword is set to True. Default of None
-            will save in the current directory
-
-        filename: str
-            The name to save your current file under if "save" keyword is set to True.
-            Default of None will save it in the form: "INSTR_FILT_fovp####_samp#_npsf##.fits"
-
-        overwrite: bool
-            True/False boolean to overwrite the output file if it already exists.
-
-        **kwargs
-            This can be used to add any extra arguments to the webbpsf calc_psf() method
-            call.
 
         Use
         ---
@@ -182,7 +180,7 @@ class CreatePSFLibrary:
         raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
 
     def _set_detectors(self, filter):
-        """ Get the list of detectors to include in the PSF library files """
+        """Get the list of detectors to include in the PSF library files"""
 
         # Set detector list to loop over
         if self.detector_input == "all":
@@ -212,7 +210,7 @@ class CreatePSFLibrary:
         return detector_list
 
     def _set_filters(self):
-        """ Get the list of filters to create PSF library files for """
+        """Get the list of filters to create PSF library files for"""
 
         # Set filter list to loop over
         if self.filter_input == "all":
@@ -237,7 +235,7 @@ class CreatePSFLibrary:
         return filter_list
 
     def _set_psf_locations(self, num_psfs, psf_location):
-        """ Set the locations on the detector of the fiducial PSFs. Assumes a 2048x2048 detector"""
+        """Set the locations on the detector of the fiducial PSFs. Assumes a 2048x2048 detector"""
 
         # The locations these PSFs should be centered on for a 2048x2048 detector
         self.num_psfs = num_psfs
@@ -268,12 +266,11 @@ class CreatePSFLibrary:
         (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
         is the 2D PSF.
 
-        Returns:
+        Returns
         -------
         This saves out the library files if requested and then returns a list of all the
         hdulist objects created (each in the form of [SCA, j, i, y, x], 1 per filter
         requested).
-
         """
 
         # Set extension to read based on distortion choice
