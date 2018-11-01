@@ -1,0 +1,78 @@
+# APT Output Product
+# 
+# APT Version: Version 25.4.4 
+# Date: Thu Oct 25 15:27:38 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1069 (NRC21_pid1069_2018_rev2.aptx)
+
+========================================
+* Module B at center, FGS1 (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -33.158  -36.338  -55.143 -528.954  +54.842  -36.338 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -33.358  -30.338  -54.945 -522.954  +54.642  -30.338 DITHER     SCIENCE        0      0  6.003           
+  1    1   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -33.158  -36.338  -55.143 -528.954  +54.842  -36.338 FILTER     SCIENCE        0      0  6.003           
+  1    1   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -33.358  -30.338  -54.945 -522.954  +54.642  -30.338 DITHER     SCIENCE        0      0  6.003           
+  1    1   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -33.158  -36.338  -55.143 -528.954  +54.842  -36.338 FILTER     SCIENCE        0      0  6.003           
+  1    1   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -33.358  -30.338  -54.945 -522.954  +54.642  -30.338 DITHER     SCIENCE        0      0  6.003           
+** Visit 1:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    2   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -34.024  +29.328  -54.307 -463.288  +53.976  +29.328 TILE       SCIENCE        0      0  0.000 (base)
+  1    2   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -34.224  +35.328  -54.110 -457.288  +53.776  +35.328 DITHER     SCIENCE        0      0  6.003           
+  1    2   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -34.024  +29.328  -54.307 -463.288  +53.976  +29.328 FILTER     SCIENCE        0      0  6.003           
+  1    2   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -34.224  +35.328  -54.110 -457.288  +53.776  +35.328 DITHER     SCIENCE        0      0  6.003           
+  1    2   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -34.024  +29.328  -54.307 -463.288  +53.976  +29.328 FILTER     SCIENCE        0      0  6.003           
+  1    2   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  -34.224  +35.328  -54.110 -457.288  +53.776  +35.328 DITHER     SCIENCE        0      0  6.003           
+** Visit 1:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    3   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +27.358  +30.138 -115.690 -462.507 +115.358  +30.138 TILE       SCIENCE        0      0  0.000 (base)
+  1    3   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +27.158  +36.138 -115.492 -456.507 +115.158  +36.138 DITHER     SCIENCE        0      0  6.003           
+  1    3   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +27.358  +30.138 -115.690 -462.507 +115.358  +30.138 FILTER     SCIENCE        0      0  6.003           
+  1    3   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +27.158  +36.138 -115.492 -456.507 +115.158  +36.138 DITHER     SCIENCE        0      0  6.003           
+  1    3   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +27.358  +30.138 -115.690 -462.507 +115.358  +30.138 FILTER     SCIENCE        0      0  6.003           
+  1    3   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +27.158  +36.138 -115.492 -456.507 +115.158  +36.138 DITHER     SCIENCE        0      0  6.003           
+** Visit 1:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    4   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +28.224  -35.528 -116.525 -528.173 +116.224  -35.528 TILE       SCIENCE        0      0  0.000 (base)
+  1    4   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +28.024  -29.528 -116.328 -522.173 +116.024  -29.528 DITHER     SCIENCE        0      0  6.003           
+  1    4   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +28.224  -35.528 -116.525 -528.173 +116.224  -35.528 FILTER     SCIENCE        0      0  6.003           
+  1    4   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +28.024  -29.528 -116.328 -522.173 +116.024  -29.528 DITHER     SCIENCE        0      0  6.003           
+  1    4   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +28.224  -35.528 -116.525 -528.173 +116.224  -35.528 FILTER     SCIENCE        0      0  6.003           
+  1    4   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  +88.000   +0.000  +28.024  -29.528 -116.328 -522.173 +116.024  -29.528 DITHER     SCIENCE        0      0  6.003           
+
+========================================
+* Module A at center, FGS2 (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -33.158  -36.338 +120.858 -528.873 -121.158  -36.338 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -33.358  -30.338 +121.055 -522.873 -121.358  -30.338 DITHER     SCIENCE        0      0  6.003           
+  1    1   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -33.158  -36.338 +120.858 -528.873 -121.158  -36.338 FILTER     SCIENCE        0      0  6.003           
+  1    1   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -33.358  -30.338 +121.055 -522.873 -121.358  -30.338 DITHER     SCIENCE        0      0  6.003           
+  1    1   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -33.158  -36.338 +120.858 -528.873 -121.158  -36.338 FILTER     SCIENCE        0      0  6.003           
+  1    1   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -33.358  -30.338 +121.055 -522.873 -121.358  -30.338 DITHER     SCIENCE        0      0  6.003           
+** Visit 2:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    2   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -34.024  +29.328 +121.693 -463.206 -122.024  +29.328 TILE       SCIENCE        0      0  0.000 (base)
+  1    2   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -34.224  +35.328 +121.890 -457.206 -122.224  +35.328 DITHER     SCIENCE        0      0  6.003           
+  1    2   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -34.024  +29.328 +121.693 -463.206 -122.024  +29.328 FILTER     SCIENCE        0      0  6.003           
+  1    2   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -34.224  +35.328 +121.890 -457.206 -122.224  +35.328 DITHER     SCIENCE        0      0  6.003           
+  1    2   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -34.024  +29.328 +121.693 -463.206 -122.024  +29.328 FILTER     SCIENCE        0      0  6.003           
+  1    2   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  -34.224  +35.328 +121.890 -457.206 -122.224  +35.328 DITHER     SCIENCE        0      0  6.003           
+** Visit 2:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    3   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +27.358  +30.138  +60.311 -462.425  -60.642  +30.138 TILE       SCIENCE        0      0  0.000 (base)
+  1    3   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +27.158  +36.138  +60.508 -456.425  -60.842  +36.138 DITHER     SCIENCE        0      0  6.003           
+  1    3   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +27.358  +30.138  +60.311 -462.425  -60.642  +30.138 FILTER     SCIENCE        0      0  6.003           
+  1    3   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +27.158  +36.138  +60.508 -456.425  -60.842  +36.138 DITHER     SCIENCE        0      0  6.003           
+  1    3   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +27.358  +30.138  +60.311 -462.425  -60.642  +30.138 FILTER     SCIENCE        0      0  6.003           
+  1    3   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +27.158  +36.138  +60.508 -456.425  -60.842  +36.138 DITHER     SCIENCE        0      0  6.003           
+** Visit 2:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    4   1    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +28.224  -35.528  +59.475 -528.092  -59.776  -35.528 TILE       SCIENCE        0      0  0.000 (base)
+  1    4   1    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +28.024  -29.528  +59.672 -522.092  -59.976  -29.528 DITHER     SCIENCE        0      0  6.003           
+  1    4   2    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +28.224  -35.528  +59.475 -528.092  -59.776  -35.528 FILTER     SCIENCE        0      0  6.003           
+  1    4   2    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +28.024  -29.528  +59.672 -522.092  -59.976  -29.528 DITHER     SCIENCE        0      0  6.003           
+  1    4   3    1 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +28.224  -35.528  +59.475 -528.092  -59.776  -35.528 FILTER     SCIENCE        0      0  6.003           
+  1    4   3    2 NRCALL_FULL               2 LMC-ASTR  +80.48750  -69.49750  -88.000   +0.000  +28.024  -29.528  +59.672 -522.092  -59.976  -29.528 DITHER     SCIENCE        0      0  6.003           
+
+

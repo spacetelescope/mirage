@@ -17,11 +17,59 @@ Dependencies
     placed in mirage/config/ directory.
 """
 
+import copy
 import json
 import os
 import re
 
 from astropy.io import ascii as asc
+
+
+def append_dictionary(base_dictionary, added_dictionary, braid=False):
+    """Append the content of added_dictionary key-by-key to the base_dictionary.
+
+    This assumes that the keys refer to lists.
+
+    Parameters
+    ----------
+    base_dictionary : dict
+    added_dictionary : dict
+    braid : bool
+        If true, the elements of added_dictionary are added in alternating sequence.
+        This is used to synchronize parallel observations with the pointing file.
+
+    Returns
+    -------
+    new_dictionary : dict
+        Dictionary where every key holds a list of lists
+
+    """
+    new_dictionary = copy.deepcopy(base_dictionary)
+
+    # extract an arbitrary key name
+    first_key = [key for i, key in enumerate(base_dictionary.keys()) if i == 0][0]
+
+    # Insert keys from added_dictionary that are not yet present in base_dictionary
+    for key in added_dictionary.keys():
+        if key not in base_dictionary.keys():
+            new_dictionary[key] = ['None'] * len(base_dictionary[first_key])
+
+    # Append the items
+    for key in new_dictionary.keys():
+        if key not in added_dictionary.keys():
+            continue
+        # print('{} {}'.format(key, new_dictionary[key]))
+        if len(new_dictionary[key]) == 0:
+            new_dictionary[key] = added_dictionary[key]
+        else:
+            if braid:
+                # solution from https://stackoverflow.com/questions/3678869/pythonic-way-to-combine-two-lists-in-an-alternating-fashion
+                new_dictionary[key] = [sub[i] for i in range(len(added_dictionary[key])) for sub in
+                                       [new_dictionary[key], added_dictionary[key]]]
+            else:
+                new_dictionary[key] = new_dictionary[key] + added_dictionary[key]
+
+    return new_dictionary
 
 
 def calc_frame_time(instrument, aperture, xdim, ydim, amps):

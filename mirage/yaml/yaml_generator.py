@@ -93,18 +93,40 @@ import pysiaf
 
 from ..apt import apt_inputs
 from ..utils.utils import calc_frame_time
-
+from .generate_observationlist import get_observation_dict
 
 ENV_VAR = 'MIRAGE_DATA'
 
 
 class SimInput:
-    def __init__(self):
+    def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
+                 use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False):
+        """Initialize instance. Read APT xml and pointing files if provided.
+
+        Also sets the reference files definitions for all instruments.
+
+        Parameters
+        ----------
+        input_xml : str
+            Filename of xml file exported by APT
+        pointing_file : str
+            Filename of pointing file exported by APT
+        datatype : str
+        use_JWST_pipeline : bool
+
+        """
         self.info = {}
-        self.input_xml = None
-        self.pointing_file = None
-        self.datatype = 'linear'
+        self.input_xml = input_xml
+        self.pointing_file = pointing_file
+        self.datatype = datatype
+        self.use_JWST_pipeline = use_JWST_pipeline
+        self.catalogs = catalogs
+        self.observation_list_file = observation_list_file
+        self.verbose = verbose
+
         self.output_dir = './'
+        self.simdata_output_dir = './'
+
         self.table_file = None
         self.use_nonstsci_names = False
         self.subarray_def_file = 'config'
@@ -119,13 +141,28 @@ class SimInput:
         self.linearity_config = 'config'
         self.filter_throughput = 'config'
         self.observation_table = None
-        self.use_JWST_pipeline = True
         self.use_linearized_darks = False
-        self.simdata_output_dir = './'
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
+
+        # Expand the MIRAGE_DATA environment variable
+        self.expand_env_var()
+
+        # Get the path to the 'MIRAGE' package
+        self.modpath = pkg_resources.resource_filename('mirage', '')
+
+        self.set_global_definitions()
+
+        if (input_xml is not None) and (catalogs is not None):
+
+            if self.observation_list_file is None:
+                self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
+            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose)
+
+
+
 
     def add_catalogs(self):
         """
@@ -940,12 +977,6 @@ class SimInput:
         instrument : str
             Name of instrument
         """
-
-        # Expand the MIRAGE_DATA environment variable
-        self.expand_env_var()
-
-        # Get the path to the 'MIRAGE' package
-        self.modpath = pkg_resources.resource_filename('mirage', '')
 
         self.instrument = instrument.lower()
 

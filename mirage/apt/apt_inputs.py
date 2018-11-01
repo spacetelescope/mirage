@@ -267,7 +267,7 @@ class AptInput:
         main_dir = os.path.split(self.input_xml)[0]
 
         # if APT.xml content has already been generated during observation list creation
-        # (write_observationlist.py) load it here
+        # (generate_observationlist.py) load it here
         if self.apt_xml_dict is not None:
             tab = self.apt_xml_dict
         else:

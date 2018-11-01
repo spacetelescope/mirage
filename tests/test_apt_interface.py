@@ -17,13 +17,13 @@ import os
 import pytest
 import shutil
 
-from mirage.yaml import write_observationlist, yaml_generator
+from mirage.yaml import generate_observationlist, yaml_generator
 # for debugging
 from mirage.apt import read_apt_xml, apt_inputs
 from mirage.utils import siaf_interface
 import importlib
 importlib.reload( yaml_generator )
-importlib.reload( write_observationlist )
+importlib.reload(generate_observationlist)
 importlib.reload( read_apt_xml )
 importlib.reload( apt_inputs )
 importlib.reload( siaf_interface )
@@ -74,7 +74,7 @@ def test_observation_list_generation_minimal():
     # Write observationlist.yaml
     observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-    write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name)
+    generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, source_list_file_name)
 
     assert os.path.isfile(source_list_file_name)
 
@@ -85,12 +85,14 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
+
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
+    for instrument in ['misc']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
-    for instrument in ['NIRCam']:
+    # for instrument in ['NIRCam']:
 
         print('='*100)
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
@@ -111,30 +113,64 @@ def test_complete_input_generation():
             apt_file_seeds = ['1171']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
+        elif instrument == 'misc':
+            apt_xml_files = glob.glob(os.path.join(apt_dir, '*/*.xml'))
+            # apt_file_seeds = [os.path.basename(f).split('.')[0] for f in apt_xml_files]
+            apt_file_seeds = [f.split(apt_dir)[1] for f in apt_xml_files]
+            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
+
+
+        catalogs = {}
+        for instrument_name in 'fgs nircam niriss miri nirspec'.split():
+            if instrument_name.lower() != 'nircam':
+                catalogs[instrument_name.lower()] = source_list_file_name
+            else:
+                catalogs[instrument_name.lower()] = {}
+                catalogs[instrument_name.lower()]['sw'] = source_list_file_name
+                catalogs[instrument_name.lower()]['lw'] = source_list_file_name
+            catalogs['FGS'.lower()] = source_list_file_name
+
         for apt_file_seed in apt_file_seeds:
+
+
+            if '.xml' in apt_file_seed:
+                apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
+                apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
+                # observation_list_file = os.path.join(TEMPORARY_DIR, '{}_{}_observation_list.yaml'.format(instrument.lower(), apt_file_seed.replace('/', '_').split('.')[0]))
+                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
+
+            else:
+                # observation_list_file = os.path.join(TEMPORARY_DIR, '{}_{}_observation_list.yaml'.format(instrument.lower(), apt_file_seed))
+                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed))
+                apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
+                apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
+
+
+            print('Processing program {}'.format(apt_file_xml))
             # Write observationlist.yaml
-            observation_list_file = os.path.join(TEMPORARY_DIR, '{}_{}_observation_list.yaml'.format(instrument.lower(), apt_file_seed))
-
-            apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-            apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
-
-            apt_xml_dict = write_observationlist.write_yaml(apt_file_xml, observation_list_file, source_list_file_name, verbose=True)
-            yam = yaml_generator.SimInput()
-            yam.input_xml = apt_file_xml
-            yam.pointing_file = apt_file_pointing
+            # apt_xml_dict = generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs, verbose=True)
+            # yam = yaml_generator.SimInput(observation_list_file=observation_list_file)
+            yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
+                                          catalogs=catalogs, observation_list_file=observation_list_file, verbose=True)
+            # 1/0
+            # yam.input_xml = apt_file_xml
+            # yam.pointing_file = apt_file_pointing
             yam.output_dir = TEMPORARY_DIR
             yam.simdata_output_dir = TEMPORARY_DIR
-            yam.observation_table = observation_list_file
-            yam.use_JWST_pipeline = True
-            yam.use_linearized_darks = False
-            yam.datatype = 'linear'
-            yam.reffile_setup(instrument=instrument, offline=True)
-            yam.set_global_definitions()
-            yam.create_inputs(apt_xml_dict=apt_xml_dict)
+            # yam.observation_table = observation_list_file
+            # yam.use_JWST_pipeline = True
+            # yam.use_linearized_darks = False
+            # yam.datatype = 'linear'
+            # yam.reffile_setup(instrument=instrument, offline=True)
+            yam.reffile_setup(offline=True)
+            # yam.set_global_definitions()
+            # yam.create_inputs(apt_xml_dict=apt_xml_dict)
+            yam.create_inputs()
 
             yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
+            1/0
 
 # for debugging
 if __name__ == '__main__':
