@@ -1882,8 +1882,11 @@ class Catalog_seed():
         return gtab, pflag, msys
 
     def select_magnitude_column(self, catalog, catalog_file_name):
-        """Keep only the magnitude column from the input catalog that matches the filter
-        being simulated. Rename that column to "magnitude".
+        """Select the appropriate column to use for source magnitudes from the input source catalog. If there
+        is a specific column to use for magnitudes (e.g. nircam_f200w_magnitude) then copy into a generic
+        'magnitude' column. If the input catalog does not have a column name specific to the instrument and
+        filter, but does have a generic 'magnitude' column, then use that. If neither are present, raise
+        an error.
 
         Parameters
         ----------
@@ -1898,60 +1901,40 @@ class Catalog_seed():
         -------
 
         catalog : astropy.table.Table
-            Modified table where all magnitude columns other than the one of ineterest
-            have been removed.
+            Modified table where the specific column to use for magnitudes (e.g. nircam_f200w_magnitude)
+            has been copied into a generic 'magnitude' column. If the input catalog does not have a column
+            name specific to the instrument and filter, but does have a generic 'magnitude' column, then
+            use that. If neither are present, raise an error
         """
-        # Get the column names from the catalog
-        mag_cols = [col.lower() for col in catalog.colnames if 'magnitude' in col.lower()]
-        num_mag_cols = len(mag_cols)
-        orig_mag_cols = [col for col in catalog.colnames if 'magnitude' not col.lower()]
+        # Determine the filter name to look for
+        if self.params['Readout']['pupil'][0].upper() == 'F':
+            usefilt = 'pupil'
+        else:
+            usefilt = 'filter'
+        filter_name = self.params['Inst'][usefilt].lower()
 
-        # If there is only a single column called "magnitude" then use that.
-        # This is equivalent to the single filter catalogs previously allowed.
-        if "magnitude" in mag_cols and num_mag_cols == 1:
-            return catalog
-        elif (("magnitude" not in mag_cols) or (("magnitude" in mag_cols) and num_mag_cols > 1)):
-            # Determine whether to use the pupil or the filter name to when searching for column names
-            if self.params['Readout']['pupil'][0].upper() == 'F':
-                usefilt = 'pupil'
-            else:
-                usefilt = 'filter'
-            filter_name = self.params['Inst'][usefilt].lower()
+        # Construct the column header to look for
+        specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(), filter_name)
 
-            # Find the column for the given filter
-            present = [True for colname in mag_cols if filter_name in colname]
-            if any(present):
-                present_array = np.array(present).astype(np.int)
-                num_true = np.sum(present_array)
-                if num_true > 1:
-                    # If there is more than one column for the filter, raise an error.
-                    raise ValueError(("WARNING: catalog {} has multiple magnitude columns for {}"
-                                      .format(catalog_file_name, filter_name)))
-                else:
-                    # Extract the matching column and rename to 'magnitude'
-                    match = np.where(present_array == 1)[0][0]
-                    mag_column = copy(catalog[mag_cols[match]])
-                    mag_column.name = 'magnitude'
+        if specific_mag_col in catalog.colnames:
+            mag_column = copy(catalog[specific_mag_col])
+            mag_column.name = 'magnitude'
+            # If there is an existing 'magnitude' column, remove it
+            try:
+                catalog.remove_column('magnitude')
+            except KeyError:
+                pass
 
-            else:
-                if "magnitude" in mag_cols:
-                    # If there are no columns for the given filter but there is a generic "magnitude"
-                    # column, then print a warning, but continue using the "magnitude" column
-                    print(("WARNING: catalog {} does not have a magnitude column specifically for {}, "
-                           "but does have a generic 'magnitude' column. Continuing on using that."
-                           .format(catalog_file_name, filter_name)))
-                    mag_column = copy(catalog['magnitude'])
-
-                else:
-                    # If there are no columns for the given filter and no generic "magnitude" column,
-                    # raise an error.
-                    raise ValueError(("WARNING: catalog {} has no magnitude column for {}"
-                                      .format(catalog_file_name, filter_name)))
-
-            # Remove unused magnitude columns from table and add new 'magnitude' column
-            for orig in orig_mag_cols:
-                catalog.remove_column(orig)
-                catalog.add_column(mag_column)
+            # Add our redefinted 'magnitude' column
+            catalog.add_column(mag_column)
+        elif 'magnitude' in catalog.colnames:
+            print(("WARNING: catalog {} does not have a magnitude column {}, "
+                   "but does have a generic 'magnitude' column. Continuing on using that."
+                   .format(catalog_file_name, specific_mag_col)))
+        else:
+            raise ValueError(("WARNING: catalog {} has no magnitude column specifically for {} {}, "
+                              "nor a generic 'magnitude' column. Unable to proceed."
+                              .format(catalog_file_name, self.params['Inst']['instrument'], filter_name)))
         return catalog
 
     def makePos(self, alpha1, delta1):
