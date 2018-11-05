@@ -181,6 +181,9 @@ class Catalog_seed():
             ('FULL' not in self.params['Readout']['array_name'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
          
+        # Save the combined static + moving targets ramp
+        self.saveSeedImage()
+       
         # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
         # ramp simulation.  Set the mode back to "imaging".
         if self.params['Inst']['mode'] in ["pom"]:
@@ -188,8 +191,6 @@ class Catalog_seed():
             self.seed_segmap = np.copy(self.seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
             self.params['Inst']['mode'] = "imaging"
          
-        # Save the combined static + moving targets ramp
-        self.saveSeedImage()
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
