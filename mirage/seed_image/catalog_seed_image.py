@@ -431,7 +431,7 @@ class Catalog_seed():
             yd, xd = input1.shape
             numints = self.params['Readout']['nint']
             num_frames = self.params['Readout']['ngroup'] * \
-                         (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+                (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print("Countrate image of synthetic signals being converted to "
                   "RAPID/NISRAPID integration with {} frames.".format(num_frames))
             input1_ramp = np.zeros((numints, num_frames, yd, xd))
@@ -468,7 +468,7 @@ class Catalog_seed():
             # print("RA velocity of {} and dec_val of {}".format(ra_vel, dec_vel))
 
         if self.runStep['movingTargets']:
-            #print('Starting moving targets for point sources!')
+            print("Adding moving point sources to seed image.")
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],
                                                                        'pointSource',
                                                                        MT_tracking=tracking,
@@ -477,12 +477,11 @@ class Catalog_seed():
             # Multiply by pixel area map since these sources are trailed across detector
             mov_targs_ptsrc *= self.pam
             mov_targs_ramps.append(mov_targs_ptsrc)
-            #print("Moving target segmap, min, max {}, {}".format(np.min(mt_ptsrc_segmap), np.max(mt_ptsrc_segmap)))
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
         # moving target using a sersic object
         if self.runStep['movingTargetsSersic']:
-            #print("Moving targets, sersic!")
+            print("Adding moving galaxies to seed image.")
             mov_targs_sersic, mt_galaxy_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],
                                                                          'galaxies',
                                                                          MT_tracking=tracking,
@@ -498,7 +497,7 @@ class Catalog_seed():
 
         # moving target using an extended object
         if self.runStep['movingTargetsExtended']:
-            #print("Extended moving targets!!!")
+            print("Adding moving extended sources to seed image.")
             mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],
                                                                    'extended',
                                                                    MT_tracking=tracking,
@@ -518,7 +517,7 @@ class Catalog_seed():
             mov_targs_integration = mov_targs_ramps[0]
             if len(mov_targs_ramps) > 1:
                 for i in range(1, len(mov_targs_ramps)):
-                    mov_targs_integration += mov_targs_ramps[0]
+                    mov_targs_integration += mov_targs_ramps[i]
         return mov_targs_integration, mov_targs_segmap
 
     def calcCoordAdjust(self):
@@ -532,8 +531,12 @@ class Catalog_seed():
         if self.params['Output']['grism_source_image']:
             self.coord_adjust['x'] = self.grism_direct_factor
             self.coord_adjust['y'] = self.grism_direct_factor
-            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[2] - self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[3] - self.subarray_bounds[1] + 1) / 2.)
+            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[2] -
+                                                   self.subarray_bounds[0] + 1) / 2.)
+            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[3] -
+                                                   self.subarray_bounds[1] + 1) / 2.)
 
     def non_sidereal_seed(self):
         """
@@ -555,8 +558,7 @@ class Catalog_seed():
         totframes = ns_group * (ns_nframe + ns_nskip)
         tmptimes = self.frametime * np.arange(1, totframes + 1)
 
-        #non_sidereal_ramp = np.zeros((totframes, ns_yd, ns_xd))
-        non_sidereal_ramp = np.zeros((ns_int, ns_group, ns_yd, ns_xd))
+        non_sidereal_ramp = np.zeros((ns_int, totframes, ns_yd, ns_xd))
         for i in range(totframes):
             for integ in range(ns_int):
                 non_sidereal_ramp[integ, i, :, :] = nonsidereal_countrate * tmptimes[i]
@@ -567,11 +569,11 @@ class Catalog_seed():
         # the exposure.
         mtt_data_list = []
         mtt_data_segmap = None
-        #mtt_zero_list = []
 
         if self.runStep['pointsource']:
             # Now ptsrc is a list, which we need to provide to
             # movingTargetInputs
+            print("Adding moving background point sources to seed image.")
             mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],
                                                                   'pointSource',
                                                                   MT_tracking=True,
@@ -590,6 +592,7 @@ class Catalog_seed():
                    .format(self.params['simSignals']['pointsource'])))
 
         if self.runStep['galaxies']:
+            print("Adding moving background galaxies to seed image.")
             mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],
                                                                         'galaxies',
                                                                         MT_tracking=True,
@@ -608,6 +611,7 @@ class Catalog_seed():
                    format(self.params['simSignals']['galaxyListFile'])))
 
         if self.runStep['extendedsource']:
+            print("Adding moving background extended sources to seed image.")
             mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'],
                                                               'extended',
                                                               MT_tracking=True,
@@ -721,16 +725,49 @@ class Catalog_seed():
         data, header = fits.getdata(filename, header=True)
         return data, header
 
-    def movingTargetInputs(self, file, input_type, MT_tracking=False,
+    def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False):
         """Read in listfile of moving targets and perform needed
         calculations to get inputs for moving_targets.py
 
-        input_type can be 'pointSource','galaxies', or 'extended'
+        Parameters
+        ----------
+
+        filename : str
+            Name of catalog contining moving target sources
+
+        input_type : str
+            Specifies type of sources. Can be 'pointSource','galaxies', or 'extended'
+
+        MT_tracking : bool
+            If True, observation is non-sidereal (i.e. telescope is tracking the moving target)
+
+        tracking_ra_vel : float
+            Velocity of the moving target in the detector x or right ascension direction.
+            Units are pixels/hour or arcsec/hour depending on trackingPixVelFlag.
+
+        tracking_dec_vel : float
+            Velocity of moving target in the detector y or declination direction.
+            Units are pixels/hour or arcsec/hour depending on trackingPixVelFlag.
+
+        trackingPixVelFlag : bool
+            If True, tracking_ra_vel and tracking_dec_vel are in units of pixels/hour, and
+            velocities are in the detector x and y directions, respectively.
+            If False, velocity untis are arcsec/hour and directions are RA, and Dec.
+
+        Returns
+        -------
+
+        mt_integration : numpy.ndarray
+            4D array containing moving target seed image
+
+        moving_segmap.segmap : numpy.ndarray
+            2D array containing segmentation map that goes with the seed image.
+            Segmentation map is based on the final frame in the seed image.
         """
         # Read input file - should be able to use for all modes
-        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(file)
+        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(filename)
 
         # If the input catalog has an index column
         # use that, otherwise add one
@@ -748,7 +785,7 @@ class Catalog_seed():
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
 
-        if MT_tracking == True:
+        if MT_tracking is True:
             # Here, we are tracking a non-sidereal target.
             try:
                 # If there are moving targets on top of the non-
@@ -760,13 +797,13 @@ class Catalog_seed():
                 # target. If it doesn't, then we have sidereal
                 # targets, and we can simply set their velocity
                 # as the inverse of that being tracked.
-                mtlist['x_or_RA_velocity'] -= tracking_ra_vel #* (1./365.25/24.)
-                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel #* (1./365.25/24.)
+                mtlist['x_or_RA_velocity'] -= tracking_ra_vel
+                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel
                 pixvelflag = trackingPixVelFlag
             except:
                 print('Setting velocity of targets equal to the non-sidereal tracking velocity')
-                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel #* (1./365.25/24.)
-                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel #* (1./365.25/24.)
+                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel
+                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel
                 pixvelflag = trackingPixVelFlag
 
         # Exposure times for all frames
@@ -789,17 +826,15 @@ class Catalog_seed():
             # Add the resets for all but the first and last integrations
             total_frames += (numresets * (numints - 1))
 
-        frameexptimes = self.frametime * np.arange(-1,total_frames)
+        frameexptimes = self.frametime * np.arange(-1, total_frames)
 
-        #output image dimensions
-        #dims = np.array(self.dark.data[0,0,:,:].shape)
+        # output image dimensions
         dims = self.nominal_dims
         newdimsx = np.int(dims[1] * self.coord_adjust['x'])
         newdimsy = np.int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
-        #mt_integration = np.zeros((len(frameexptimes)-1, newdimsy, newdimsx))
-        mt_integration = np.zeros((numints, numgroups * frames_per_group, newdimsy, newdimsx))
+        mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
 
         # Corresponding (2D) segmentation map
         moving_segmap = segmap.SegMap()
@@ -812,8 +847,12 @@ class Catalog_seed():
         # conversion to hang.
         indexes, mtlist = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
 
+        times = []
+        obj_counter = 0
+        time_reported = False
         for index, entry in zip(indexes, mtlist):
-            # For each object, calculate x,y or RA,Dec of initial position
+            start_time = time.time()
+             # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
                 entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
 
@@ -873,7 +912,8 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
             elif input_type == 'galaxies':
-                stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], entry['pos_angle'], 1.)
+                stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
+                                           entry['pos_angle'], 1.)
                 # Convolve the galaxy with the instrument PSF
                 stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
@@ -902,16 +942,13 @@ class Catalog_seed():
             # outputarrayxsize, outputarrayysize
             # (maybe without the values that will be the same to each entry.
 
-            #entryList = (stamp,ra,dec,entry[3]/3600.,entry[4]/3600.,self.frametime,numframes,subsample_factor,outx,outy)
-            #entryList = (stamp,x_frames,y_frames,self.frametime,subsample_factor,outx,outy)
-
             # Need to feed info into moving_targets one integration at a time.
             # No need to feed in the reset frames, but they are necessary
             # before this point in order to get the timing and positions
             # correct.
             for integ in range(numints):
-                framestart = integ * (frames_per_group * numgroups) + integ
-                frameend = framestart + (frames_per_group * numgroups) + 1
+                framestart = integ * total_frames + integ
+                frameend = framestart + total_frames + 1
 
                 # Now check to see if the stamp image overlaps the output
                 # aperture for this integration only. Above we removed sources
@@ -928,17 +965,14 @@ class Catalog_seed():
                 mt = moving_targets.MovingTarget()
                 mt.subsampx = 3
                 mt.subsampy = 3
-                #mt_source = mt.create(stamp, x_frames, y_frames, self.frametime, newdimsx, newdimsy)
-                #print("Prepping to input to moving_targets: integ: {}, framestart: {}, frameend: {}, xframelen: {}, yframelen: {}, {}, {}, {}".format(integ,framestart,frameend,len(x_frames),len(y_frames),newdimsx,newdimsy,stamp.shape))
 
                 mt_source = mt.create(stamp, x_frames[framestart:frameend],
                                       y_frames[framestart:frameend],
                                       self.frametime, newdimsx, newdimsy)
-                #mt_integration += mt_source
                 mt_integration[integ, :, :, :] += mt_source
 
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                     noiseval += self.grism_background
 
                 if input_type in ['pointSource', 'galaxies']:
@@ -946,27 +980,48 @@ class Catalog_seed():
                 else:
                     indseg = self.seg_from_photutils(mt_source[-1, :, :], index, noiseval)
                     moving_segmap.segmap += indseg
+
+            # Check the elapsed time for creating each object
+            elapsed_time = time.time() - start_time
+            times.append(elapsed_time)
+            if obj_counter > 3 and not time_reported:
+                avg_time = np.mean(times)
+                total_time = len(indexes) * avg_time
+                print(("Expected time to process {} sources: {:.2f} seconds "
+                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                time_reported = True
+            obj_counter += 1
         return mt_integration, moving_segmap.segmap
 
-    def on_detector(self,xloc, yloc, stampdim, finaldim):
+    def on_detector(self, xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
         and final image dimensions, determine whether the stamp
         image will overlap at all with the final image, or
         completely miss it.
 
-        Arguments:
-        ----------
-        xloc -- list of x-coordinate locations of source
-        yloc -- list of y-coordinate locations of source
-        stampdim -- tuple of x,y dimension lengths of stamp image
-        finaldim -- tuple of x,y dimension lengths of final image
+        Parameters
+        ---------
 
-        Returns:
-        --------
-        state of stamp image:
-        "on" -- stamp image fully or partially overlaps the final
-             image for at least one xloc, yloc pair
-        "off" -- stamp image never overlaps with final image
+        xloc : list
+            X-coordinate locations of source
+
+        yloc : list
+            Y-coordinate locations of source
+
+        stampdim : tuple
+            (x,y) dimension lengths of stamp image
+
+        finaldim : tuple
+            (x,y) dimension lengths of final image
+
+        Returns
+        -------
+
+        status : str
+            state of stamp image:
+            "on" -- stamp image fully or partially overlaps the final
+                 image for at least one xloc, yloc pair
+            "off" -- stamp image never overlaps with final image
         """
         status = 'on'
         stampx, stampy = stampdim
@@ -976,7 +1031,7 @@ class Catalog_seed():
         stampmaxy = np.max(yloc + (stampy / 2))
         finalx, finaly = finaldim
         if ((stampminx > finalx) or (stampmaxx < 0) or
-            (stampminy > finaly) or (stampmaxy < 0)):
+           (stampminy > finaly) or (stampmaxy < 0)):
             status = 'off'
         return status
 
@@ -1846,6 +1901,13 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
+        # The following fixes a format issue; it is not clear why the signa
+        # can have spaces around it in view of the above format string, but
+        # that is what happens.
+        alpha2 = alpha2.replace("0+0",'+')
+        delta2 = alpha2.replace("0+0",'+')
+        alpha2 = alpha2.replace("0-0",'-')
+        delta2 = alpha2.replace("0-0",'-')
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
@@ -2141,8 +2203,10 @@ class Catalog_seed():
         # Scale such that the total number of counts in the galaxy matches the input
         summedcounts = np.sum(img)
         if summedcounts == 0:
-            print('in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
-        factor = totalcounts / summedcounts
+            print('Zero counts in image in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
+            factor = 0.
+        else:
+            factor = totalcounts / summedcounts
         img = img * factor
 
         # Crop image down such that it contains 99.95% of the total signal
@@ -2167,6 +2231,11 @@ class Catalog_seed():
         cropped image
         """
         totsignal = np.sum(stamp)
+        # In the case of no signal, return the original stamp image.
+        # This can happen for some Sersic profile parameters when the galaxy
+        # is very small compared to the pixel size.
+        if totsignal == 0.:
+            return stamp
         yd, xd = stamp.shape
         mid = np.int(xd / 2)
         for rad in range(mid):
