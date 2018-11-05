@@ -1020,12 +1020,18 @@ class SimInput:
                 self.configfiles[instrument]['readpatt_def_file'] = 'guider_readout_pattern.txt'
                 self.configfiles[instrument]['crosstalk'] = 'guider_xtalk_zeros.txt'
 
-            self.configfiles[instrument]['dq_init_config'] = 'dq_init.cfg'
-            self.configfiles[instrument]['saturation_config'] = 'saturation.cfg'
-            self.configfiles[instrument]['superbias_config'] = 'superbias.cfg'
-            self.configfiles[instrument]['refpix_config'] = 'refpix.cfg'
-            self.configfiles[instrument]['linearity_config'] = 'linearity.cfg'
-            self.configfiles[instrument]['filter_throughput'] = 'placeholder.txt'
+            # self.configfiles[instrument]['dq_init_config'] = 'dq_init.cfg'
+            # self.configfiles[instrument]['saturation_config'] = 'saturation.cfg'
+            # self.configfiles[instrument]['superbias_config'] = 'superbias.cfg'
+            # self.configfiles[instrument]['refpix_config'] = 'refpix.cfg'
+            # self.configfiles[instrument]['linearity_config'] = 'linearity.cfg'
+            # self.configfiles[instrument]['filter_throughput'] = 'placeholder.txt'
+            self.configfiles[instrument]['dq_init_config'] = os.path.join(self.modpath, 'config', 'dq_init.cfg')
+            self.configfiles[instrument]['saturation_config'] = os.path.join(self.modpath, 'config', 'saturation.cfg')
+            self.configfiles[instrument]['superbias_config'] = os.path.join(self.modpath, 'config', 'superbias.cfg')
+            self.configfiles[instrument]['refpix_config'] = os.path.join(self.modpath, 'config', 'refpix.cfg')
+            self.configfiles[instrument]['linearity_config'] = os.path.join(self.modpath, 'config', 'linearity.cfg')
+            self.configfiles[instrument]['filter_throughput'] = os.path.join(self.modpath, 'config', 'placeholder.txt')
 
         for instrument in 'miri nirspec'.split():
             self.configfiles[instrument] = {}
@@ -1446,6 +1452,9 @@ class SimInput:
             f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
+
+        # if instrument.lower()=='niriss':
+        #     1/0
         return yamlout
 
     def add_options(self, parser=None, usage=None):
