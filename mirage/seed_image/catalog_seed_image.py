@@ -1906,7 +1906,7 @@ class Catalog_seed():
             The name of the catalog column to use for source magnitudes
         """
         # Determine the filter name to look for
-        if self.params['Inst']['instrument'].lower() in [nircam, niriss]:
+        if self.params['Inst']['instrument'].lower() in ['nircam', 'niriss']:
             if self.params['Readout']['pupil'][0].upper() == 'F':
                 usefilt = 'pupil'
             else:
