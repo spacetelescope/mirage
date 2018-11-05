@@ -19,6 +19,7 @@ TODO
 
 """
 import collections
+import copy
 
 from astropy.table import Table, vstack
 import numpy as np
@@ -200,25 +201,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
         Read default values from configuration file
 
     """
-
-    # catalog_files : str or list(str)
-    #     filename(s) that contain the catalog of sources.
-    # ps_cat_sw : str or list(str)
-    #     NIRCam SW catalog, one per observation
-    # ps_cat_lw : str or list(str)
-    #     NIRCam LW catalog, one per observation
-    #
-    #
-    # if (catalog_files is not None) and (type(catalog_files) is str):
-    #     catalog_files = [catalog_files]
-    #
-    # if (catalog_files is not None) and (type(catalog_files) is str):
-    #     catalog_files = [catalog_files]
-    #
-    # if (catalog_files is not None) and (type(catalog_files) is str):
-    #     catalog_files = [catalog_files]
-
-
+    # avoid side effects
+    catalogs = copy.deepcopy(catalogs)
 
     # Read in filters from APT .xml file
     readxml_obj = read_apt_xml.ReadAPTXML()
@@ -248,6 +232,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
         raise ValueError('Please provide a catalog dictionary.')
 
     for key in catalogs.keys():
+        catalog_file_list = None
+        catalog_files = None
         if key.lower() == 'nircam':
             # check that a dictionary is provided for nircam
             if not isinstance(catalogs[key], collections.Mapping):
@@ -259,13 +245,18 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                         catalog_file_list = [catalog_files] * number_of_observations
                         catalogs[key][module_key] = catalog_file_list
 
+                    if len(catalogs[key][module_key]) != number_of_observations:
+                        raise RuntimeError('Please specify one catalog per observation for {}'.format(key.lower()))
+
         else:
             catalog_files = catalogs[key]
             if isinstance(catalog_files, str):
                 catalog_file_list = [catalog_files] * number_of_observations
                 catalogs[key] = catalog_file_list
 
-
+            if len(catalogs[key]) != number_of_observations:
+                raise RuntimeError(
+                    'Please specify one catalog per observation for {}'.format(key.lower()))
 
     # # temporary fix for NIRCam
     # if ('NIRCAM' in used_instruments) and (ps_cat_sw is None):
@@ -365,7 +356,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
                 elif instrument.lower() in ['niriss', 'fgs', 'nirspec', 'miri']:
                     text += [
-                        "    Filter: {}\n".format(xml_dict['FilterWheel'][index]), # PupilWheel?
+                        "    Filter: {}\n".format(xml_dict['FilterWheel'][index]),
+                        "    Pupil: {}\n".format(xml_dict['PupilWheel'][index]),
                         "    PointSourceCatalog: {}\n".format(catalogs[instrument.lower()][observation_index]),
                         "    BackgroundRate: {}\n".format(default_values['BackgroundRate']),
                         ]

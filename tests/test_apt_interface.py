@@ -126,7 +126,6 @@ def test_complete_input_generation():
             apt_file_seeds = [f.split(apt_dir)[1] for f in apt_xml_files]
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
-
         catalogs = {}
         for instrument_name in 'fgs nircam niriss miri nirspec'.split():
             if instrument_name.lower() == 'nircam':
@@ -161,12 +160,7 @@ def test_complete_input_generation():
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
                                           catalogs=catalogs, observation_list_file=observation_list_file,
                                           verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR)
-            # 1/0
-            # yam.input_xml = apt_file_xml
-            # yam.pointing_file = apt_file_pointing
-            # yam.output_dir = TEMPORARY_DIR
-            # yam.simdata_output_dir = TEMPORARY_DIR
-            # yam.observation_list_file = observation_list_file
+
             # yam.use_JWST_pipeline = True
             # yam.use_linearized_darks = False
             # yam.datatype = 'linear'
