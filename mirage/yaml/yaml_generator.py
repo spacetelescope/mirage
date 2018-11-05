@@ -1231,23 +1231,15 @@ class SimInput:
             f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
             if instrument.lower() == 'nircam':
-                apunder = input['aperture'].find('_')
-                full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
+                if input['aperture'] in ['NRCA3_DHSPIL', 'NRCB4_DHSPIL']:
+                    full_ap = input['aperture']
+                else:
+                    apunder = input['aperture'].find('_')
+                    full_ap = 'NRC' + input['detector'] + '_' + input['aperture'][apunder + 1:]
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
             config = self.global_subarray_definitions[instrument.lower()]
-
-
-
-
-            # This functionality was previously implemented elsewhere (shoudl not be necessary)
-            # if full_ap in ['NRCA1_DHSPIL', 'NRCA2_DHSPIL', 'NRCA4_DHSPIL', 'NRCA5_DHSPIL']:
-            #     full_ap = 'NRCA3_DHSPIL'
-            # elif full_ap in ['NRCB1_DHSPIL', 'NRCB2_DHSPIL', 'NRCB3_DHSPIL', 'NRCB5_DHSPIL']:
-            #     full_ap = 'NRCB4_DHSPIL'
-
-
 
 
             if full_ap not in config['AperName']:

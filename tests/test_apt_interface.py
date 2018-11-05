@@ -66,17 +66,19 @@ def test_observation_list_generation_minimal():
 
     instrument = 'NIRISS'
 
+    catalogs = {}
     if instrument == 'NIRISS':
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         apt_file_seed = '1087_minimal'
         source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
+        catalogs[instrument.lower()] = source_list_file_name
 
     # Write observationlist.yaml
     observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-    generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, source_list_file_name)
+    generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs=catalogs)
 
-    assert os.path.isfile(source_list_file_name)
+    assert os.path.isfile(observation_list_file)
 
 
 def test_complete_input_generation():
@@ -127,13 +129,12 @@ def test_complete_input_generation():
 
         catalogs = {}
         for instrument_name in 'fgs nircam niriss miri nirspec'.split():
-            if instrument_name.lower() != 'nircam':
-                catalogs[instrument_name.lower()] = source_list_file_name
-            else:
+            if instrument_name.lower() == 'nircam':
                 catalogs[instrument_name.lower()] = {}
                 catalogs[instrument_name.lower()]['sw'] = source_list_file_name
                 catalogs[instrument_name.lower()]['lw'] = source_list_file_name
-            catalogs['FGS'.lower()] = source_list_file_name
+            else:
+                catalogs[instrument_name.lower()] = source_list_file_name
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             # if i<2:
@@ -181,5 +182,5 @@ def test_complete_input_generation():
             # 1/0
 
 # for debugging
-if __name__ == '__main__':
-    test_complete_input_generation()
+# if __name__ == '__main__':
+#     test_complete_input_generation()

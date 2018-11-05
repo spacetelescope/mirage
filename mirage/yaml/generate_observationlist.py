@@ -246,6 +246,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     # ensure that catalog files are lists with number of elements matching the number of observations
     if not isinstance(catalogs, collections.Mapping):
         raise ValueError('Please provide a catalog dictionary.')
+
     for key in catalogs.keys():
         if key.lower() == 'nircam':
             # check that a dictionary is provided for nircam
