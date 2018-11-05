@@ -139,6 +139,9 @@ def test_complete_input_generation():
             # if i<2:
             #     continue
 
+            obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
+            for file in obs_yaml_files:
+                os.remove(file)
 
             if '.xml' in apt_file_seed:
                 apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])

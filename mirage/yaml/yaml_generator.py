@@ -1028,6 +1028,7 @@ class SimInput:
             self.configfiles[instrument]['filter_throughput'] = 'placeholder.txt'
 
         for instrument in 'miri nirspec'.split():
+            self.configfiles[instrument] = {}
             self.psfpixfrac[instrument] = 0
             self.psfbasename[instrument] = 'N/A'
 
@@ -1104,29 +1105,29 @@ class SimInput:
             else:  # niriss and fgs
                 for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
                                                '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
 
                     elif det == 'G2':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
                                                '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
 
                     elif det == 'NIS':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
                                                '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
-                    self.superbias_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
-                    self.linearity_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
-                    self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
-                    self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
+                    self.superbias_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'superbias/*superbias*.fits'))[0]
+                    self.linearity_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'linearity/*linearity*.fits'))[0]
+                    self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
+                    self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
 
-                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
+                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir[instrument], 'distortion/*distortion*.asdf'))[0]
                     # suspecting that the FGS wcs reference file has a problem
                     # self.astrometric_list[instrument][det] = 'none'
 
-                    self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
+                    self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'pam/*area*.fits'))[0]
                     self.lindark_list[instrument][det] = [None]
 
 
@@ -1345,7 +1346,7 @@ class SimInput:
             f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
             f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
             f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
-                     'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac)))
+                     'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac[instrument.lower()])))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
             f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
             f.write(('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies '

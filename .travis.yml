@@ -65,4 +65,5 @@ install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 script:
+  install: travis_wait mvn install
     - $MAIN_CMD $SETUP_CMD
