@@ -36,7 +36,7 @@ from ..utils import siaf_interface
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         'niriss': ["imaging", "ami"],
+         'niriss': ["imaging", "ami", "pom"],
          'fgs': ["imaging"]}
 TRACKING_LIST = ['sidereal', 'non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
@@ -119,6 +119,18 @@ class Catalog_seed():
         self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],
                                                           self.coord_adjust['x']])).astype(np.int)
 
+        # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
+        if self.params['Inst']['mode'] in ["pom"]:
+            self.output_dims = [2322,2322]
+            self.coord_adjust['x'] = 2322/2048
+            self.coord_adjust['y'] = 2322/2048
+            self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
+                                                  (self.subarray_bounds[2] -
+                                                   self.subarray_bounds[0] + 1) / 2.)
+            self.coord_adjust['yoffset'] = np.int((self.coord_adjust['y'] - 1.) *
+                                                  (self.subarray_bounds[3] -
+                                                   self.subarray_bounds[1] + 1) / 2.)
+
         # calculate the exposure time of a single frame, based on the size of the subarray
         #self.calcFrameTime()
         self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'], self.params['Readout']['array_name'],
@@ -168,7 +180,14 @@ class Catalog_seed():
         if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
             ('FULL' not in self.params['Readout']['array_name'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
-
+         
+        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
+        # ramp simulation.  Set the mode back to "imaging".
+        if self.params['Inst']['mode'] in ["pom"]:
+            self.seedimage = np.copy(self.seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+            self.seed_segmap = np.copy(self.seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+            self.params['Inst']['mode'] = "imaging"
+         
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
         # Return info in a tuple
@@ -226,7 +245,7 @@ class Catalog_seed():
         # If we are making a grism direct image, we need to embed the true pixel area
         # map in an array of the appropriate dimension, where any pixels outside the
         # actual aperture are set to 1.0
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             mapshape = pam.shape
             #cannot use this: g, yd, xd = signalramp.shape
             #need to update dimensions: self.pam = np.ones((yd, xd))
@@ -1248,7 +1267,7 @@ class Catalog_seed():
 
     def addedSignals(self):
         # Generate a signal rate image from input sources
-        if self.params['Output']['grism_source_image'] == False:
+        if (self.params['Output']['grism_source_image'] == False) and (not self.params['Inst']['mode'] in ["pom"]):
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
@@ -1516,7 +1535,7 @@ class Catalog_seed():
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
         # Expand the limits if a grism direct image is being made
-        if self.params['Output']['grism_source_image'] == True:
+        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
             extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -2081,7 +2100,7 @@ class Catalog_seed():
         nx = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
 
         #Expand the limits if a grism direct image is being made
-        if self.params['Output']['grism_source_image'] == True:
+        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
             extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -2278,7 +2297,7 @@ class Catalog_seed():
         # expand if a grism source image is being made
         xfact = 1
         yfact = 1
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             # xfact = self.grism_direct_factor
             # yfact = self.grism_direct_factor
             # elif
@@ -2298,7 +2317,7 @@ class Catalog_seed():
         # Adjust the coordinate system of the galaxy list if working with a grism direct image output
         deltax = 0
         deltay = 0
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             deltax = np.int((dims[1] - origxd) / 2)
             deltay = np.int((dims[0] - origyd) / 2)
 
@@ -2482,7 +2501,7 @@ class Catalog_seed():
                 maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
                 # Expand the limits if a grism direct image is being made
-                if self.params['Output']['grism_source_image'] == True:
+                if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
                     extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
                     miny -= extrapixy
                     maxy += extrapixy
