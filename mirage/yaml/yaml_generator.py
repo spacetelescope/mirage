@@ -100,7 +100,8 @@ ENV_VAR = 'MIRAGE_DATA'
 
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
-                 use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False):
+                 use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
+                 output_dir='./', simdata_output_dir='./'):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -123,24 +124,23 @@ class SimInput:
         self.catalogs = catalogs
         self.observation_list_file = observation_list_file
         self.verbose = verbose
-
-        self.output_dir = './'
-        self.simdata_output_dir = './'
+        self.output_dir = output_dir
+        self.simdata_output_dir = simdata_output_dir
 
         self.table_file = None
         self.use_nonstsci_names = False
-        self.subarray_def_file = 'config'
-        self.readpatt_def_file = 'config'
-        self.crosstalk = 'config'
-        self.filtpupil_pairs = 'config'
-        self.fluxcal = 'config'
-        self.dq_init_config = 'config'
-        self.saturation_config = 'config'
-        self.superbias_config = 'config'
-        self.refpix_config = 'config'
-        self.linearity_config = 'config'
-        self.filter_throughput = 'config'
-        self.observation_table = None
+        # self.subarray_def_file = 'config'
+        # self.readpatt_def_file = 'config'
+        # self.crosstalk = 'config'
+        # self.filtpupil_pairs = 'config'
+        # self.fluxcal = 'config'
+        # self.dq_init_config = 'config'
+        # self.saturation_config = 'config'
+        # self.superbias_config = 'config'
+        # self.refpix_config = 'config'
+        # self.linearity_config = 'config'
+        # self.filter_throughput = 'config'
+        self.observation_list_file = None
         self.use_linearized_darks = False
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
@@ -161,7 +161,7 @@ class SimInput:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose)
 
-
+        # 1/0
 
 
     def add_catalogs(self):
@@ -268,13 +268,13 @@ class SimInput:
                 self.multiple_catalog_match(filter, cattype, match)
             return match[0]
 
-    def create_inputs(self, apt_xml_dict=None):
+    def create_inputs(self):
         """Create observation table """
         self.path_defs()
 
         if ((self.input_xml is not None) &
            (self.pointing_file is not None) &
-           (self.observation_table is not None)):
+           (self.observation_list_file is not None)):
 
             # Define directories and paths
             indir, infile = os.path.split(self.input_xml)
@@ -283,11 +283,11 @@ class SimInput:
                                       '_with_yaml_parameters.csv')
 
             # Read XML file and make observation table
-            apt = apt_inputs.AptInput()
-            apt.input_xml = self.input_xml
-            apt.pointing_file = self.pointing_file
-            apt.observation_table = self.observation_table
-            apt.apt_xml_dict = apt_xml_dict
+            apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file)
+            # apt.input_xml = self.input_xml
+            # apt.pointing_file = self.pointing_file
+            apt.observation_list_file = self.observation_list_file
+            apt.apt_xml_dict = self.apt_xml_dict
             apt.output_dir = self.output_dir
             apt.create_input_table()
 
@@ -327,18 +327,18 @@ class SimInput:
         ipc = []
         pam = []
 
-        detector_labels = self.info['detector']
-
-        for det in detector_labels:
-            darks.append(self.get_dark(det))
-            lindarks.append(self.get_lindark(det))
-            superbias.append(self.get_reffile(self.superbias_list, det))
-            linearity.append(self.get_reffile(self.linearity_list, det))
-            saturation.append(self.get_reffile(self.saturation_list, det))
-            gain.append(self.get_reffile(self.gain_list, det))
-            astrometric.append(self.get_reffile(self.astrometric_list, det))
-            ipc.append(self.get_reffile(self.ipc_list, det))
-            pam.append(self.get_reffile(self.pam_list, det))
+        # detector_labels = self.info['detector']
+        # for det in detector_labels:
+        for instrument, det in zip([s.lower() for s in self.info['Instrument']], self.info['detector']):
+            darks.append(self.get_dark(instrument, det))
+            lindarks.append(self.get_lindark(instrument, det))
+            superbias.append(self.get_reffile(self.superbias_list[instrument], det))
+            linearity.append(self.get_reffile(self.linearity_list[instrument], det))
+            saturation.append(self.get_reffile(self.saturation_list[instrument], det))
+            gain.append(self.get_reffile(self.gain_list[instrument], det))
+            astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
+            ipc.append(self.get_reffile(self.ipc_list[instrument], det))
+            pam.append(self.get_reffile(self.pam_list[instrument], det))
         self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
@@ -548,7 +548,7 @@ class SimInput:
         # If no inverted kernel was found, just return the first file
         return (inputipc[0], True)
 
-    def get_dark(self, detector):
+    def get_dark(self, instrument, detector):
         """Return the name of a dark current file to use as input
         based on the detector being used
 
@@ -562,14 +562,14 @@ class SimInput:
         files : str
             Name of a dark current file to use for this detector
         """
-        files = self.dark_list[detector]
+        files = self.dark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
         else:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
 
-    def get_lindark(self, detector):
+    def get_lindark(self, instrument, detector):
         """
         Return the name of a linearized dark current file to
         use as input based on the detector being used
@@ -584,7 +584,7 @@ class SimInput:
         files : str
             Name of a linearized dark current file to use for this detector
         """
-        files = self.lindark_list[detector]
+        files = self.lindark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
         else:
@@ -951,26 +951,28 @@ class SimInput:
         self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
         if self.table_file is not None:
             self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
-        self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
-        self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
-        self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
-        self.fluxcal = self.set_config(self.fluxcal, 'fluxcal')
-        self.filter_throughput = self.set_config(self.filter_throughput, 'filter_throughput')
-        self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init_config')
-        self.refpix_config = self.set_config(self.refpix_config, 'refpix_config')
-        self.saturation_config = self.set_config(self.saturation_config, 'saturation_config')
-        self.superbias_config = self.set_config(self.superbias_config, 'superbias_config')
-        self.linearity_config = self.set_config(self.linearity_config, 'linearity_config')
 
-        if self.observation_table is not None:
-            self.observation_table = os.path.abspath(os.path.expandvars(self.observation_table))
-        if self.crosstalk not in [None, 'config']:
-            self.crosstalk = os.path.abspath(os.path.expandvars(self.crosstalk))
-        elif self.crosstalk == 'config':
-            self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
+        # 1/0
+        # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
+        # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
+        # self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
+        # self.fluxcal = self.set_config(self.fluxcal, 'fluxcal')
+        # self.filter_throughput = self.set_config(self.filter_throughput, 'filter_throughput')
+        # self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init_config')
+        # self.refpix_config = self.set_config(self.refpix_config, 'refpix_config')
+        # self.saturation_config = self.set_config(self.saturation_config, 'saturation_config')
+        # self.superbias_config = self.set_config(self.superbias_config, 'superbias_config')
+        # self.linearity_config = self.set_config(self.linearity_config, 'linearity_config')
 
-    def reffile_setup(self, instrument='nircam', offline=False):
-        """Create lists of reference files associate with each detector
+        if self.observation_list_file is not None:
+            self.observation_list_file = os.path.abspath(os.path.expandvars(self.observation_list_file))
+        # if self.crosstalk not in [None, 'config']:
+        #     self.crosstalk = os.path.abspath(os.path.expandvars(self.crosstalk))
+        # elif self.crosstalk == 'config':
+        #     self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
+
+    def reffile_setup(self, offline=False):
+        """Create lists of reference files associate with each detector.
 
         Parameters
         ----------
@@ -978,77 +980,81 @@ class SimInput:
             Name of instrument
         """
 
-        self.instrument = instrument.lower()
+        # self.instrument = instrument.lower()
 
         # Prepare to find files listed as 'config'
         # and set up PSF path
-        self.configfiles = {}
-        if self.instrument.lower() == 'nircam':
-            self.psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
-            self.psfbasename = 'nircam'
-            self.psfpixfrac = 0.25
-            self.configfiles['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
-            self.configfiles['fluxcal'] = 'NIRCam_zeropoints.list'
-            self.configfiles['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
-            self.configfiles['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
-            self.configfiles['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
-            self.configfiles['dq_init_config'] = 'dq_init.cfg'
-            self.configfiles['saturation_config'] = 'saturation.cfg'
-            self.configfiles['superbias_config'] = 'superbias.cfg'
-            self.configfiles['refpix_config'] = 'refpix.cfg'
-            self.configfiles['linearity_config'] = 'linearity.cfg'
-            self.configfiles['filter_throughput'] = 'placeholder.txt'
-        elif self.instrument.lower() == 'niriss':
-            self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
-            self.psfpath = os.path.join(self.datadir, 'niriss/webbpsf_library')
-            self.psfbasename = 'niriss'
-            self.psfpixfrac = 0.1
-            self.configfiles['subarray_def_file'] = 'niriss_subarrays.list'
-            self.configfiles['fluxcal'] = 'niriss_zeropoints.list'
-            self.configfiles['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
-            self.configfiles['readpatt_def_file'] = 'niriss_readout_pattern.txt'
-            self.configfiles['crosstalk'] = 'niriss_xtalk_zeros.txt'
-            self.configfiles['dq_init_config'] = 'dq_init.cfg'
-            self.configfiles['saturation_config'] = 'saturation.cfg'
-            self.configfiles['superbias_config'] = 'superbias.cfg'
-            self.configfiles['refpix_config'] = 'refpix.cfg'
-            self.configfiles['linearity_config'] = 'linearity.cfg'
-            self.configfiles['filter_throughput'] = 'placeholder.txt'
-        elif self.instrument.lower() == 'fgs':
-            self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
-            self.psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
-            self.psfbasename = 'fgs'
-            self.psfpixfrac = 0.1
-            self.configfiles['subarray_def_file'] = 'guider_subarrays.list'
-            self.configfiles['fluxcal'] = 'guider_zeropoints.list'
-            self.configfiles['filtpupil_pairs'] = 'guider_filter_dummy.txt'
-            self.configfiles['readpatt_def_file'] = 'guider_readout_pattern.txt'
-            self.configfiles['crosstalk'] = 'guider_xtalk_zeros.txt'
-            self.configfiles['dq_init_config'] = 'dq_init.cfg'
-            self.configfiles['saturation_config'] = 'saturation.cfg'
-            self.configfiles['superbias_config'] = 'superbias.cfg'
-            self.configfiles['refpix_config'] = 'refpix.cfg'
-            self.configfiles['linearity_config'] = 'linearity.cfg'
-            self.configfiles['filter_throughput'] = 'placeholder.txt'
-        else:
-            self.psfpixfrac = 0
-            self.psfbasename = 'N/A'
-            print('WARNING: Instrument {} is not supported as PRIME. Looking for parallels.'.format(instrument))
 
-        # create empty lists
+        # set up as dictionary of dictionaries
+        self.configfiles = {}
+        self.psfpath = {}
+        self.psfbasename = {}
+        self.psfpixfrac = {}
+        self.reference_file_dir = {}
+
+        for instrument in 'nircam niriss fgs'.split():
+            self.configfiles[instrument] = {}
+            self.psfpath[instrument] = os.path.join(self.datadir, instrument, 'webbpsf_library')
+            self.psfbasename[instrument] = instrument
+            self.reference_file_dir[instrument] = os.path.join(self.datadir, instrument, 'reference_files')
+
+            if instrument == 'nircam':
+                self.psfpixfrac[instrument] = 0.25
+                self.configfiles[instrument]['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
+                self.configfiles[instrument]['fluxcal'] = 'NIRCam_zeropoints.list'
+                self.configfiles[instrument]['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
+                self.configfiles[instrument]['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
+                self.configfiles[instrument]['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
+            elif instrument == 'niriss':
+                self.psfpixfrac[instrument] = 0.1
+                self.configfiles[instrument]['subarray_def_file'] = 'niriss_subarrays.list'
+                self.configfiles[instrument]['fluxcal'] = 'niriss_zeropoints.list'
+                self.configfiles[instrument]['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
+                self.configfiles[instrument]['readpatt_def_file'] = 'niriss_readout_pattern.txt'
+                self.configfiles[instrument]['crosstalk'] = 'niriss_xtalk_zeros.txt'
+            elif instrument == 'fgs':
+                self.psfpixfrac[instrument] = 0.1
+                self.configfiles[instrument]['subarray_def_file'] = 'guider_subarrays.list'
+                self.configfiles[instrument]['fluxcal'] = 'guider_zeropoints.list'
+                self.configfiles[instrument]['filtpupil_pairs'] = 'guider_filter_dummy.txt'
+                self.configfiles[instrument]['readpatt_def_file'] = 'guider_readout_pattern.txt'
+                self.configfiles[instrument]['crosstalk'] = 'guider_xtalk_zeros.txt'
+
+            self.configfiles[instrument]['dq_init_config'] = 'dq_init.cfg'
+            self.configfiles[instrument]['saturation_config'] = 'saturation.cfg'
+            self.configfiles[instrument]['superbias_config'] = 'superbias.cfg'
+            self.configfiles[instrument]['refpix_config'] = 'refpix.cfg'
+            self.configfiles[instrument]['linearity_config'] = 'linearity.cfg'
+            self.configfiles[instrument]['filter_throughput'] = 'placeholder.txt'
+
+        for instrument in 'miri nirspec'.split():
+            self.psfpixfrac[instrument] = 0
+            self.psfbasename[instrument] = 'N/A'
+
+        # create empty dictionaries
         list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
         for list_name in list_names:
             setattr(self, '{}_list'.format(list_name), {})
 
-        if self.instrument.lower() == 'nircam':
-            self.det_list = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+        self.det_list = {}
+        self.det_list['nircam'] = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+        self.det_list['niriss'] = ['NIS']
+        self.det_list['fgs'] = ['G1', 'G2']
+        self.det_list['nirspec'] = ['NRS']
+        self.det_list['miri'] = ['MIR']
+
+        for instrument in 'nircam niriss fgs miri nirspec'.split():
+            for list_name in list_names:
+                getattr(self, '{}_list'.format(list_name))[instrument] = {}
+
             if offline:
                 # no access to central store. Set all files to none.
                 default_value = 'none'
                 for list_name in list_names:
-                    for det in self.det_list:
-                        getattr(self, '{}_list'.format(list_name))[det] = default_value
-            else:
+                    for det in self.det_list[instrument]:
+                        getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
+
+            elif instrument == 'nircam':
                 sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
                 lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
                 gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
@@ -1058,94 +1064,70 @@ class SimInput:
                 pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
                 rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
                 lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
-                for det in self.det_list:
+                for det in self.det_list[instrument]:
                     sbfiles = glob(os.path.join(sb_dir, '*fits'))
-                    self.superbias_list[det] = [d for d in sbfiles if 'NRC' + det in d][0]
+                    self.superbias_list[instrument][det] = [d for d in sbfiles if 'NRC' + det in d][0]
                     linfiles = glob(os.path.join(lin_dir, '*fits'))
                     longdet = deepcopy(det)
                     if '5' in det:
                         longdet = det.replace('5', 'LONG')
-                    self.linearity_list[det] = [d for d in linfiles if 'NRC' + longdet in d][0]
+                    self.linearity_list[instrument][det] = [d for d in linfiles if 'NRC' + longdet in d][0]
 
                     gainfiles = glob(os.path.join(gain_dir, '*fits'))
-                    self.gain_list[det] = [d for d in gainfiles if 'NRC' + det in d][0]
+                    self.gain_list[instrument][det] = [d for d in gainfiles if 'NRC' + det in d][0]
 
                     satfiles = glob(os.path.join(sat_dir, '*fits'))
-                    self.saturation_list[det] = [d for d in satfiles if 'NRC' + det in d][0]
+                    self.saturation_list[instrument][det] = [d for d in satfiles if 'NRC' + det in d][0]
 
                     ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
-                    self.ipc_list[det] = [d for d in ipcfiles if 'NRC' + det in d][0]
+                    self.ipc_list[instrument][det] = [d for d in ipcfiles if 'NRC' + det in d][0]
 
                     distfiles = glob(os.path.join(dist_dir, '*asdf'))
-                    self.astrometric_list[det] = [d for d in distfiles if 'NRC' + det in d][0]
+                    self.astrometric_list[instrument][det] = [d for d in distfiles if 'NRC' + det in d][0]
 
                     pamfiles = glob(os.path.join(pam_dir, '*fits'))
-                    self.pam_list[det] = [d for d in pamfiles if det in d][0]
+                    self.pam_list[instrument][det] = [d for d in pamfiles if det in d][0]
 
-                    self.dark_list[det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
-                    self.lindark_list[det] = glob(os.path.join(lindark_dir, det, '*.fits'))
+                    self.dark_list[instrument][det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
+                    self.lindark_list[instrument][det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
-        elif self.instrument.lower() in ['niriss', 'nirspec', 'miri', 'fgs']:
-            if self.instrument.lower() in ['nirspec', 'miri']:
+            elif instrument in ['nirspec', 'miri']:
                 for key in 'subarray_def_file fluxcal filtpupil_pairs readpatt_def_file crosstalk ' \
                            'dq_init_config saturation_config superbias_config refpix_config ' \
                            'linearity_config filter_throughput'.split():
-                    self.configfiles[key] = 'N/A'
+                    self.configfiles[instrument][key] = 'N/A'
                 default_value = 'none'
-                for det in ['NRS', 'MIR']:
-                    self.ipc_list[det] = default_value
-                    self.dark_list[det] = default_value
-                    self.superbias_list[det] = default_value
-                    self.linearity_list[det] = default_value
-                    self.gain_list[det] = default_value
-                    self.saturation_list[det] = default_value
-                    self.astrometric_list[det] = default_value
-                    self.pam_list[det] = default_value
-                    self.lindark_list[det] = default_value
+                for list_name in list_names:
+                    for det in self.det_list[instrument]:
+                        getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
 
-            if offline:
-                # no access to central store. Set all files to none.
-                default_value = 'none'
-                for det in ['G1', 'G2', 'NIS']:
-                    self.ipc_list[det] = default_value
-                    self.dark_list[det] = default_value
-                    self.superbias_list[det] = default_value
-                    self.linearity_list[det] = default_value
-                    self.gain_list[det] = default_value
-                    self.saturation_list[det] = default_value
-                    self.astrometric_list[det] = default_value
-                    self.pam_list[det] = default_value
-                    self.lindark_list[det] = default_value
-            else:
-                for det in ['G1', 'G2', 'NIS']:
+            else:  # niriss and fgs
+                for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
-                        self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
-                        self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
                                                '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
 
                     elif det == 'G2':
-                        self.reference_file_dir = os.path.join(self.datadir, 'fgs/reference_files')
-                        self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
-                        self.dark_list[det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
                                                '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
 
                     elif det == 'NIS':
-                        self.reference_file_dir = os.path.join(self.datadir, 'niriss/reference_files')
-                        self.ipc_list[det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
-                        self.dark_list[det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
                                                '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
-                    self.superbias_list[det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
-                    self.linearity_list[det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
-                    self.gain_list[det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
-                    self.saturation_list[det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
+                    self.superbias_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'superbias/*superbias*.fits'))[0]
+                    self.linearity_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'linearity/*linearity*.fits'))[0]
+                    self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'gain/*gain*.fits'))[0]
+                    self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'saturation/*saturation*.fits'))[0]
 
+                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
                     # suspecting that the FGS wcs reference file has a problem
-                    # self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir, 'distortion/*distortion*.asdf'))[0]
-                    self.astrometric_list[det] = 'none'
+                    # self.astrometric_list[instrument][det] = 'none'
 
-                    self.pam_list[det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
-                    self.lindark_list[det] = [None]
+                    self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir, 'pam/*area*.fits'))[0]
+                    self.lindark_list[instrument][det] = [None]
 
 
     def set_config(self, file, prop):
@@ -1308,7 +1290,7 @@ class SimInput:
                      'Used only in writing output file\n'.format(input['filtpupilcombo_file'])))
             f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
                      'used when making direct image outputs to be fed into the grism disperser code.\n'.format(input['flux_cal_file'] )))
-            f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.filter_throughput))
+            f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.configfiles[instrument.lower()]['filter_throughput']))
             f.write('\n')
             f.write('nonlin:\n')
             f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')
@@ -1415,11 +1397,11 @@ class SimInput:
             f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
             f.write('\n')
             f.write('newRamp:\n')
-            f.write('  dq_configfile: {}\n'.format(self.dq_init_config))
-            f.write('  sat_configfile: {}\n'.format(self.saturation_config))
-            f.write('  superbias_configfile: {}\n'.format(self.superbias_config))
-            f.write('  refpix_configfile: {}\n'.format(self.refpix_config))
-            f.write('  linear_configfile: {}\n'.format(self.linearity_config))
+            f.write('  dq_configfile: {}\n'.format(self.configfiles[instrument.lower()]['dq_init_config']))
+            f.write('  sat_configfile: {}\n'.format(self.configfiles[instrument.lower()]['saturation_config']))
+            f.write('  superbias_configfile: {}\n'.format(self.configfiles[instrument.lower()]['superbias_config']))
+            f.write('  refpix_configfile: {}\n'.format(self.configfiles[instrument.lower()]['refpix_config']))
+            f.write('  linear_configfile: {}\n'.format(self.configfiles[instrument.lower()]['linearity_config']))
             f.write('\n')
             f.write('Output:\n')
             # f.write('  use_stsci_output_name: {} # Output filename should follow STScI naming conventions (True/False)\n'.format(outtf))
@@ -1492,7 +1474,7 @@ class SimInput:
         parser.add_argument("--superbias_config", help="Superbias subtraction config file", default='config')
         parser.add_argument("--refpix_config", help="Refpix subtraction config file", default='config')
         parser.add_argument("--linearity_config", help="Linearity config file", default='config')
-        parser.add_argument("--observation_table", help="Table file containing epoch start times, telescope roll angles, catalogs for each observation", default=None)
+        parser.add_argument("--observation_list_file", help="Table file containing epoch start times, telescope roll angles, catalogs for each observation", default=None)
         parser.add_argument("--use_JWST_pipeline", help='True/False', action='store_true')
         parser.add_argument("--use_linearized_darks", help='True/False', action='store_true')
         parser.add_argument("--simdata_output_dir", help='Output directory for simulated exposure files', default='./')

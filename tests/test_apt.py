@@ -83,7 +83,7 @@ def RunAllAPTTemplates(instrument):
     yam.pointing_file = pointing_file
     yam.output_dir = out_dir
     yam.simdata_output_dir = out_dir
-    yam.observation_table = observationlist_file
+    yam.observation_list_file = observationlist_file
     yam.use_JWST_pipeline = False
     yam.use_linearized_darks = True
     yam.datatype = 'linear'

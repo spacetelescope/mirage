@@ -100,10 +100,38 @@ def expand_for_dithers(indict, verbose=True):
     table['row'] = np.arange(len(table))
     expanded_table = None #copy.deepcopy(table)
 
+    # if verbose:
+    #     table['ObservationID', 'Instrument', 'CoordinatedParallel', 'ParallelInstrument', 'number_of_dithers'].pprint()
+
+
+    # complication here is to handle cases with unsupported instruments (MIRI, NIRSpec) in parallel
     for i, row in enumerate(table['row']):
         number_of_dithers = np.int(table['number_of_dithers'][i])
+        expand_prime_dithers_only = False
+        expand_parallel_dithers = False
+        # 1/0
 
-        if (table['CoordinatedParallel'][i] == 'true') and (not table['ParallelInstrument'][i]):
+        # skip over parallel observations because they are already accounted for
+        if table['ParallelInstrument'][i]:
+            continue
+
+        try:
+            if (table['CoordinatedParallel'][i] == 'true') and (not table['ParallelInstrument'][i]) \
+                    and (table['ParallelInstrument'][i + 1]) and (table['Instrument'][i] != table['Instrument'][i + 1]):
+                expand_parallel_dithers = True
+            else:
+                expand_prime_dithers_only = True
+
+        except IndexError:  # last row in table is not a parallel
+            expand_prime_dithers_only = True
+
+        if (table['CoordinatedParallel'][i] == 'false'):
+            expand_prime_dithers_only = True
+
+        if expand_prime_dithers_only and expand_parallel_dithers:
+            raise RuntimeError('Possible conflict found when expanding for dithers.')
+
+        if expand_parallel_dithers:
             dither_table = table[i:i + 2]
 
             if (number_of_dithers > 1):
@@ -113,14 +141,18 @@ def expand_for_dithers(indict, verbose=True):
             if expanded_table is None:
                 expanded_table = dither_table
             else:
+                # if verbose:
+                #     print('Parallel: Adding {:>3d} rows to table with {:>3d} rows'.format(len(dither_table), len(expanded_table)))
                 expanded_table = vstack((expanded_table, dither_table))
-        elif (table['CoordinatedParallel'][i] == 'false'):
+
+        elif expand_prime_dithers_only:
             # add row multiplied by number of dithers
-            # dither_table = vstack([table[i]]*table['ImageDithers'][i])
             dither_table = vstack([table[i]]*number_of_dithers)
             if expanded_table is None:
                 expanded_table = dither_table
             else:
+                # print('Prime:    Adding {:>3d} rows to table with {:>3d} rows'.format(len(dither_table),
+                #                                                             len(expanded_table)))
                 expanded_table = vstack((expanded_table, dither_table))
 
     # set number of dithers to 1 after expansion
@@ -134,8 +166,11 @@ def expand_for_dithers(indict, verbose=True):
         print('Number of entries before expanding dithers: {}'.format(len(table)))
         print('Number of entries after expanding dithers:  {}'.format(len(expanded_table)))
 
-    return expanded
+    if verbose:
+        for obs_id in np.unique(expanded_table['ObservationID']):
+            print('Expanded table for Observation {} has {} entries'.format(obs_id, len(np.where(expanded_table['ObservationID']==obs_id)[0])))
 
+    return expanded
 
 
 def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None, verbose=False):

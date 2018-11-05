@@ -748,7 +748,7 @@ class Observation():
                    .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
 
-        # Get SIAF-realted information and subarray bounds
+        # Get SIAF-related information and subarray bounds
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'

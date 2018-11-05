@@ -10,6 +10,8 @@ from lxml import etree
 from astropy.io import ascii
 import numpy as np
 
+from ..utils.utils import append_dictionary
+
 APT_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 PACKAGE_DIR = os.path.dirname(APT_DIR)
 
@@ -187,7 +189,13 @@ class ReadAPTXML():
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
             CoordinatedParallelSet = None
             if coordparallel == 'true':
-                CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
+                try:
+                    CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
+                except AttributeError:
+                    raise RuntimeError('Program does not specify parallels correctly.')
+                    # if verbose:
+                    #     print('No CoordinatedParallelSet found. Set to default.')
+
 
             try:
                 obs_label = obs.find(self.apt + 'Label').text
@@ -266,7 +274,9 @@ class ReadAPTXML():
 
             # set default number of dithers to one, for downstream processing
             for i, n_dither in enumerate(exposures_dictionary['number_of_dithers']):
-                if int(n_dither) == 0:
+                if (template_name == 'NircamEngineeringImaging') and (n_dither == '2PLUS'):
+                    exposures_dictionary['number_of_dithers'][i] = '2'
+                elif int(n_dither) == 0:
                     exposures_dictionary['number_of_dithers'][i] = '1'
 
             # add the exposure dictionary to the main dictionary
@@ -367,6 +377,8 @@ class ReadAPTXML():
                 instrument = 'FGS'
             elif template_name == 'MiriImaging':
                 instrument = 'MIRI'
+            elif template_name == 'NirissImaging':
+                instrument = 'NIRISS'
             prime_instrument = obs.find(self.apt + 'Instrument').text
             print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
         else:
@@ -412,8 +424,12 @@ class ReadAPTXML():
 
             if dither_key_name in observation_dict.keys():
                 number_of_dithers = observation_dict[dither_key_name]
+                if observation_dict['SubpixelDitherType'] in ['3-POINT-WITH-MIRI-F770W']:
+                    number_of_dithers = str(np.int(number_of_dithers) * 3)
             else:
                 print('Element {} not found, use default value.'.format(dither_key_name))
+
+
 
             # Find filter parameters for all filter configurations within obs
             filter_configs = template.findall('.//' + ns + 'FilterConfig')

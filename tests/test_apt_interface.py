@@ -86,12 +86,13 @@ def test_complete_input_generation():
     temporary_directory()
 
 
-    # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI']:
+    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI']:
     # for instrument in ['NIRISS']:
-    for instrument in ['misc']:
+    # for instrument in ['misc']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
+    # for instrument in ['FGS']:
     # for instrument in ['NIRCam']:
 
         print('='*100)
@@ -99,11 +100,12 @@ def test_complete_input_generation():
         if instrument == 'NIRISS':
             apt_file_seeds = ['1088', '1087', 'm31_field_test_observation']
             # apt_file_seeds = ['1088']
+            # apt_file_seeds = ['1087_minimal']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
             # apt_file_seeds = ['NIRCamTest']
-            apt_file_seeds = ['1069']
+            # apt_file_seeds = ['1069']
             # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
@@ -111,6 +113,9 @@ def test_complete_input_generation():
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'MIRI':
             apt_file_seeds = ['1171']
+            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
+        elif instrument == 'FGS':
+            apt_file_seeds = ['MIRAGE-test']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
         elif instrument == 'misc':
@@ -130,7 +135,9 @@ def test_complete_input_generation():
                 catalogs[instrument_name.lower()]['lw'] = source_list_file_name
             catalogs['FGS'.lower()] = source_list_file_name
 
-        for apt_file_seed in apt_file_seeds:
+        for i, apt_file_seed in enumerate(apt_file_seeds):
+            # if i<2:
+            #     continue
 
 
             if '.xml' in apt_file_seed:
@@ -151,13 +158,14 @@ def test_complete_input_generation():
             # apt_xml_dict = generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs, verbose=True)
             # yam = yaml_generator.SimInput(observation_list_file=observation_list_file)
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                          catalogs=catalogs, observation_list_file=observation_list_file, verbose=True)
+                                          catalogs=catalogs, observation_list_file=observation_list_file,
+                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR)
             # 1/0
             # yam.input_xml = apt_file_xml
             # yam.pointing_file = apt_file_pointing
-            yam.output_dir = TEMPORARY_DIR
-            yam.simdata_output_dir = TEMPORARY_DIR
-            # yam.observation_table = observation_list_file
+            # yam.output_dir = TEMPORARY_DIR
+            # yam.simdata_output_dir = TEMPORARY_DIR
+            # yam.observation_list_file = observation_list_file
             # yam.use_JWST_pipeline = True
             # yam.use_linearized_darks = False
             # yam.datatype = 'linear'
@@ -170,7 +178,7 @@ def test_complete_input_generation():
             yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
-            1/0
+            # 1/0
 
 # for debugging
 if __name__ == '__main__':

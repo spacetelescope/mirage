@@ -60,17 +60,19 @@ class AptInput:
     Attributes:
         exposure_tab (TYPE): Description
         input_xml (str): Description
-        observation_table (str): Description
+        observation_list_file (str): Description
         obstab (TYPE): Description
         output_csv (TYPE): Description
         pointing_file (str): Description
     """
 
-    def __init__(self):
-        self.input_xml = ''  # e.g. 'GOODSS_ditheredDatasetTest.xml'
-        self.output_csv = None  # e.g. 'GOODSS_ditheredDatasetTest.csv'
-        self.pointing_file = ''  #  e.g. 'GOODSS_ditheredDatasetTest.pointing'
-        self.observation_table = ''
+    def __init__(self, input_xml=None, pointing_file=None):
+
+        self.input_xml = input_xml
+        self.pointing_file = pointing_file
+
+        self.output_csv = None
+        self.observation_list_file = None
 
     def add_epochs(self, intab):
         """NOT CURRENTLY USED"""
@@ -121,7 +123,7 @@ class AptInput:
             yaml file added.
 
         """
-        with open(self.observation_table, 'r') as infile:
+        with open(self.observation_list_file, 'r') as infile:
             self.obstab = yaml.load(infile)
 
         OBSERVATION_LIST_FIELDS = 'Date PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
@@ -257,23 +259,28 @@ class AptInput:
 
         """
         # Expand paths to full paths
-        self.input_xml = os.path.abspath(self.input_xml)
-        self.pointing_file = os.path.abspath(self.pointing_file)
+        # self.input_xml = os.path.abspath(self.input_xml)
+        # self.pointing_file = os.path.abspath(self.pointing_file)
         if self.output_csv is not None:
             self.output_csv = os.path.abspath(self.output_csv)
-        if self.observation_table is not None:
-            self.observation_table = os.path.abspath(self.observation_table)
+        if self.observation_list_file is not None:
+            self.observation_list_file = os.path.abspath(self.observation_list_file)
 
-        main_dir = os.path.split(self.input_xml)[0]
+        # main_dir = os.path.split(self.input_xml)[0]
 
         # if APT.xml content has already been generated during observation list creation
         # (generate_observationlist.py) load it here
-        if self.apt_xml_dict is not None:
-            tab = self.apt_xml_dict
-        else:
-            # Read in xml file
-            readxml_obj = read_apt_xml.ReadAPTXML()
-            tab = readxml_obj.read_xml(self.input_xml)
+
+        if self.apt_xml_dict is None:
+            raise RuntimeError('self.apt_xml_dict is not defined')
+            # tab = self.apt_xml_dict
+        # if self.apt_xml_dict is not None:
+        # else:
+        #     tab = self.apt_xml_dict
+        # else:
+        #     # Read in xml file
+        #     readxml_obj = read_apt_xml.ReadAPTXML()
+        #     tab = readxml_obj.read_xml(self.input_xml)
 
 
         # This affects on NIRCam exposures (right?)
@@ -289,53 +296,53 @@ class AptInput:
         # for key in tab.keys():
         #     print('{:<25}: number of elements is {:>5}'.format(key, len(tab[key])))
 
-        xmltab = tab
+        # xmltab = tab
 
         # Read in the pointing file and produce dictionary
-        pointing_tab = self.get_pointing_info(self.pointing_file, propid=xmltab['ProposalID'][0])
+        pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
         # Check that the .xml and .pointing files agree
-        assert len(xmltab['ProposalID']) == len(pointing_tab['obs_num']),\
-            'Inconsistent table size from XML file ({}) and pointing file ({}). Something was not processed correctly in apt_inputs.'.format(len(xmltab['ProposalID']), len(pointing_tab['obs_num']))
+        assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
+            'Inconsistent table size from XML file ({}) and pointing file ({}). Something was not processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']), len(pointing_dictionary['obs_num']))
 
         # Combine the dictionaries
-        obstab = self.combine_dicts(xmltab, pointing_tab)
+        observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
 
         # Add epoch and catalog information
-        obstab = self.add_observation_info(obstab)
+        observation_dictionary = self.add_observation_info(observation_dictionary)
 
         # if verbose:
         #     print('Summary of observation dictionary:')
-        #     for key in obstab.keys():
-        #         print('{:<25}: number of elements is {:>5}'.format(key, len(obstab[key])))
+        #     for key in observation_dictionary.keys():
+        #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
         # NIRCam case: Expand for detectors. Create one entry in each list for each
         # detector, rather than a single entry for 'ALL' or 'BSALL'
 
         # test if Module is always 'None', i.e. when NIRCam is not used
-        if obstab['Module'].count('None') == len(obstab['Module']):
+        if observation_dictionary['Module'].count('None') == len(observation_dictionary['Module']):
             # set detector key
-            obstab['detector'] = []
-            for i, instrument in enumerate(obstab['Instrument']):
+            observation_dictionary['detector'] = []
+            for i, instrument in enumerate(observation_dictionary['Instrument']):
                 if instrument.lower() == 'niriss':
-                    obstab['detector'].append('NIS')
+                    observation_dictionary['detector'].append('NIS')
                 elif instrument.lower() == 'nirspec':
-                    obstab['detector'].append('NRS')
+                    observation_dictionary['detector'].append('NRS')
                 elif instrument.lower() == 'nirspec':
-                    if 'NRS1' in obstab['aperture'][i]:
-                        obstab['detector'].append('NRS1')
-                    elif 'NRS2' in obstab['aperture'][i]:
-                        obstab['detector'].append('NRS1')
+                    if 'NRS1' in observation_dictionary['aperture'][i]:
+                        observation_dictionary['detector'].append('NRS1')
+                    elif 'NRS2' in observation_dictionary['aperture'][i]:
+                        observation_dictionary['detector'].append('NRS1')
                 elif instrument.lower() == 'fgs':
-                    if 'FGS1' in obstab['aperture'][i]:
-                        obstab['detector'].append('G1')
-                    elif 'FGS2' in obstab['aperture'][i]:
-                        obstab['detector'].append('G2')
+                    if 'FGS1' in observation_dictionary['aperture'][i]:
+                        observation_dictionary['detector'].append('G1')
+                    elif 'FGS2' in observation_dictionary['aperture'][i]:
+                        observation_dictionary['detector'].append('G2')
                 elif instrument.lower() == 'miri':
-                        obstab['detector'].append('MIR')
-            self.exposure_tab = obstab
+                        observation_dictionary['detector'].append('MIR')
+            self.exposure_tab = observation_dictionary
         else:
-            self.exposure_tab = self.expand_for_detectors(obstab)
+            self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
         if verbose:
             for key in self.exposure_tab.keys():
@@ -352,7 +359,7 @@ class AptInput:
         # Output to a csv file.
         if self.output_csv is None:
             indir, infile = os.path.split(self.input_xml)
-            self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile + '.csv')
+            self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
 
@@ -536,7 +543,7 @@ class AptInput:
                         if (' (' in obslabel) and (')' in obslabel):
                             obslabel = re.split(r' \(|\)', obslabel)[0]
 
-                        skip = False
+                    skip = False
 
                     if line[0:2] == '**':
                         v = elements[2]
@@ -560,6 +567,9 @@ class AptInput:
                                                          or 'NRS' in elements[4]
                                                          or 'MIR' in elements[4])
                             ):
+                            if (elements[18] == 'PARALLEL') and ('MIRI' in elements[4]):
+                                skip = True
+
                             if skip:
                                 act_counter += 1
                                 continue
@@ -706,7 +716,7 @@ class AptInput:
         parser.add_argument("input_xml", help='XML file from APT describing the observations.')
         parser.add_argument("pointing_file", help='Pointing file from APT describing observations.')
         parser.add_argument("--output_csv", help="Name of output CSV file containing list of observations.", default=None)
-        parser.add_argument("--observation_table", help='Ascii file containing a list of observations, times, and roll angles, catalogs', default=None)
+        parser.add_argument("--observation_list_file", help='Ascii file containing a list of observations, times, and roll angles, catalogs', default=None)
         return parser
 
 
