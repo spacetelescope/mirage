@@ -110,7 +110,7 @@ class Catalog_seed():
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
         # outside whose traces will fall into the FOV
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             self.calcCoordAdjust()
 
         #image dimensions
@@ -118,18 +118,6 @@ class Catalog_seed():
                                       self.subarray_bounds[2] - self.subarray_bounds[0] + 1])
         self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],
                                                           self.coord_adjust['x']])).astype(np.int)
-
-        # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
-        if self.params['Inst']['mode'] in ["pom"]:
-            self.output_dims = [2322,2322]
-            self.coord_adjust['x'] = 2322/2048
-            self.coord_adjust['y'] = 2322/2048
-            self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
-                                                  (self.subarray_bounds[2] -
-                                                   self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.coord_adjust['y'] - 1.) *
-                                                  (self.subarray_bounds[3] -
-                                                   self.subarray_bounds[1] + 1) / 2.)
 
         # calculate the exposure time of a single frame, based on the size of the subarray
         #self.calcFrameTime()
@@ -184,16 +172,39 @@ class Catalog_seed():
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
        
-        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
-        # ramp simulation.  Set the mode back to "imaging".
         if self.params['Inst']['mode'] in ["pom"]:
-            self.seedimage = np.copy(self.seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-            self.seed_segmap = np.copy(self.seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-            self.params['Inst']['mode'] = "imaging"
+            self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
          
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
-
+         
+    def extract_full_from_pom(self,seedimage,seed_segmap):
+        """ Given the seed image and segmentation images for the NIRISS POM field of view, 
+        extract the central 2048x2048 pixel area where the detector sits.  The routine is only 
+        called when the mode is "pom".  The mode is set to "imaging" in these routine, as after 
+        the routine is called the subsequent results are the same as when the mode is set to 
+        "imaging" in the parameter file.
+        
+        Parameters:
+        -----------
+        
+        seedimage : numpy.ndarray (float)   dimension 2322x2322 pixels
+        seed_segmap : numpy.ndarray (int)    dimension 2322x2322 pixels
+        
+        Returns:
+        ---------
+        
+        newseedimage : numpy.ndarray (float)  dimension 2048x2048
+        newseed_segmap : numpy.ndarray (int)   dimension 2048x2048
+        
+        """
+        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
+        # ramp simulation.  Set the mode back to "imaging".
+        newseedimage = np.copy(seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+        newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+        self.params['Inst']['mode'] = "imaging" 
+        return newseedimage, newseed_segmap
+         
     def add_detector_to_zeropoints(self, detector):
         """Manually add detector dependence to the zeropoint table for
         NIRCam and NIRISS simualtions. This is being done as a placeholder
@@ -555,6 +566,18 @@ class Catalog_seed():
                                                   (self.subarray_bounds[2] -
                                                    self.subarray_bounds[0] + 1) / 2.)
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[3] -
+                                                   self.subarray_bounds[1] + 1) / 2.)
+                  
+        if self.params['Inst']['mode'] in ["pom"]:
+            # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
+            self.output_dims = [2322,2322]
+            self.coord_adjust['x'] = 2322./2048.
+            self.coord_adjust['y'] = 2322./2048.
+            self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
+                                                  (self.subarray_bounds[2] -
+                                                   self.subarray_bounds[0] + 1) / 2.)
+            self.coord_adjust['yoffset'] = np.int((self.coord_adjust['y'] - 1.) *
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
 
