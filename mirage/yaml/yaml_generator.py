@@ -140,8 +140,8 @@ class SimInput:
         # self.refpix_config = 'config'
         # self.linearity_config = 'config'
         # self.filter_throughput = 'config'
-        self.observation_list_file = None
-        self.use_linearized_darks = False
+        # self.observation_list_file = None
+        self.use_linearized_darks = True
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1

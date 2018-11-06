@@ -412,10 +412,11 @@ class AptInput:
             elif instrument == 'niriss':
                 detectors = ['NIS']
             elif instrument == 'nirspec':
-                if 'NRS1' in input_dictionary['aperture'][index]:
-                    detectors = ['NRS1']
-                elif 'NRS2' in input_dictionary['aperture'][index]:
-                    detectors = ['NRS2']
+                detectors = ['NRS']
+                # if 'NRS1' in input_dictionary['aperture'][index]:
+                #     detectors = ['NRS1']
+                # elif 'NRS2' in input_dictionary['aperture'][index]:
+                #     detectors = ['NRS2']
             elif instrument == 'fgs':
                 if 'FGS1' in input_dictionary['aperture'][index]:
                     detectors = ['G1']
