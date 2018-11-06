@@ -161,8 +161,7 @@ class SimInput:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose)
 
-        # 1/0
-
+        self.reffile_setup()
 
     def add_catalogs(self):
         """

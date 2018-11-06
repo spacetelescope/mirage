@@ -84,6 +84,7 @@ def test_complete_input_generation():
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
     for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
+    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
     # for instrument in ['NIRISS']:
     # for instrument in ['misc']:
     # for instrument in ['NIRSpec']:

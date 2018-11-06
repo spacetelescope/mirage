@@ -320,30 +320,31 @@ class AptInput:
         # detector, rather than a single entry for 'ALL' or 'BSALL'
 
         # test if Module is always 'None', i.e. when NIRCam is not used
-        if observation_dictionary['Module'].count('None') == len(observation_dictionary['Module']):
-            # set detector key
-            observation_dictionary['detector'] = []
-            for i, instrument in enumerate(observation_dictionary['Instrument']):
-                if instrument.lower() == 'niriss':
-                    observation_dictionary['detector'].append('NIS')
-                elif instrument.lower() == 'nirspec':
-                    observation_dictionary['detector'].append('NRS')
-                elif instrument.lower() == 'nirspec':
-                    if 'NRS1' in observation_dictionary['aperture'][i]:
-                        observation_dictionary['detector'].append('NRS1')
-                    elif 'NRS2' in observation_dictionary['aperture'][i]:
-                        observation_dictionary['detector'].append('NRS1')
-                elif instrument.lower() == 'fgs':
-                    if 'FGS1' in observation_dictionary['aperture'][i]:
-                        observation_dictionary['detector'].append('G1')
-                    elif 'FGS2' in observation_dictionary['aperture'][i]:
-                        observation_dictionary['detector'].append('G2')
-                elif instrument.lower() == 'miri':
-                        observation_dictionary['detector'].append('MIR')
-            self.exposure_tab = observation_dictionary
-        else:
-            self.exposure_tab = self.expand_for_detectors(observation_dictionary)
+        # if observation_dictionary['Module'].count('None') == len(observation_dictionary['Module']):
+        #     # set detector key
+        #     observation_dictionary['detector'] = []
+        #     for i, instrument in enumerate(observation_dictionary['Instrument']):
+        #         if instrument.lower() == 'niriss':
+        #             observation_dictionary['detector'].append('NIS')
+        #         elif instrument.lower() == 'nirspec':
+        #             observation_dictionary['detector'].append('NRS')
+        #         elif instrument.lower() == 'nirspec':
+        #             if 'NRS1' in observation_dictionary['aperture'][i]:
+        #                 observation_dictionary['detector'].append('NRS1')
+        #             elif 'NRS2' in observation_dictionary['aperture'][i]:
+        #                 observation_dictionary['detector'].append('NRS1')
+        #         elif instrument.lower() == 'fgs':
+        #             if 'FGS1' in observation_dictionary['aperture'][i]:
+        #                 observation_dictionary['detector'].append('G1')
+        #             elif 'FGS2' in observation_dictionary['aperture'][i]:
+        #                 observation_dictionary['detector'].append('G2')
+        #         elif instrument.lower() == 'miri':
+        #                 observation_dictionary['detector'].append('MIR')
+        #     self.exposure_tab = observation_dictionary
+        # else:
+        self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
+        # print(self.exposure_tab['Instrument'])
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
@@ -363,32 +364,31 @@ class AptInput:
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
 
-    def expand_for_detectors(self, obstab):
-        """
-        Expand dictionary to have one entry per detector, rather than the
+    def expand_for_detectors(self, input_dictionary):
+        """Expand dictionary to have one entry per detector, rather than the
         one line per module that is in the input
 
         Parameters
         ----------
-        obstab : dict
+        input_dictionary : dict
             dictionary containing one entry per module
 
         Returns
         -------
-        finaltab : dict
+        observation_dictionary : dict
             dictionary expanded to have one entry per detector
         """
-        finaltab = {}
-        for key in obstab:
-            finaltab[key] = []
-        finaltab['detector'] = []
+        observation_dictionary = {}
+        for key in input_dictionary:
+            observation_dictionary[key] = []
+        observation_dictionary['detector'] = []
 
-        for index, instrument in enumerate(obstab['Instrument']):
+        for index, instrument in enumerate(input_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
 
                 # Determine module of the observation
-                module = obstab['Module'][index]
+                module = input_dictionary['Module'][index]
                 if module == 'ALL':
                     detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
                 elif module == 'A':
@@ -409,12 +409,45 @@ class AptInput:
                 else:
                     raise ValueError('Unknown module {}'.format(module))
 
-                n_detectors = len(detectors)
-                for key in obstab:
-                    finaltab[key].extend(([obstab[key][index]] * n_detectors))
-                finaltab['detector'].extend(detectors)
+            elif instrument == 'niriss':
+                detectors = ['NIS']
+            elif instrument == 'nirspec':
+                if 'NRS1' in input_dictionary['aperture'][index]:
+                    detectors = ['NRS1']
+                elif 'NRS2' in input_dictionary['aperture'][index]:
+                    detectors = ['NRS2']
+            elif instrument == 'fgs':
+                if 'FGS1' in input_dictionary['aperture'][index]:
+                    detectors = ['G1']
+                elif 'FGS2' in input_dictionary['aperture'][index]:
+                    detectors = ['G2']
+            elif instrument== 'miri':
+                detectors = ['MIR']
 
-        return finaltab
+
+            n_detectors = len(detectors)
+            for key in input_dictionary:
+                observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
+            observation_dictionary['detector'].extend(detectors)
+
+            # elif instrument == 'niriss':
+            #     observation_dictionary['detector'].append('NIS')
+            # elif instrument.lower() == 'nirspec':
+            #     observation_dictionary['detector'].append('NRS')
+            # elif instrument.lower() == 'nirspec':
+            #     if 'NRS1' in observation_dictionary['aperture'][i]:
+            #         observation_dictionary['detector'].append('NRS1')
+            #     elif 'NRS2' in observation_dictionary['aperture'][i]:
+            #         observation_dictionary['detector'].append('NRS1')
+            # elif instrument.lower() == 'fgs':
+            #     if 'FGS1' in observation_dictionary['aperture'][i]:
+            #         observation_dictionary['detector'].append('G1')
+            #     elif 'FGS2' in observation_dictionary['aperture'][i]:
+            #         observation_dictionary['detector'].append('G2')
+            # elif instrument.lower() == 'miri':
+            #     observation_dictionary['detector'].append('MIR')
+
+        return observation_dictionary
 
     def extract_value(self, line):
         """Extract text from xml line

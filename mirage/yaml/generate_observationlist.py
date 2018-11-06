@@ -157,7 +157,12 @@ def expand_for_dithers(indict, verbose=True):
                 expanded_table = vstack((expanded_table, dither_table))
 
     # set number of dithers to 1 after expansion
-    expanded_table['number_of_dithers'] = np.ones(len(expanded_table))
+    expanded_table['number_of_dithers'] = np.ones(len(expanded_table)).astype(np.int)
+
+    # NIRCam cannot handle when PrimaryDithers=None
+    for index, value in enumerate(expanded_table['PrimaryDithers']):
+        if value == 'None':
+            expanded_table['PrimaryDithers'][index] = expanded_table['number_of_dithers'][index]
 
     expanded = {}
     for key in expanded_table.colnames:
@@ -257,16 +262,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
             if len(catalogs[key]) != number_of_observations:
                 raise RuntimeError(
                     'Please specify one catalog per observation for {}'.format(key.lower()))
-
-    # # temporary fix for NIRCam
-    # if ('NIRCAM' in used_instruments) and (ps_cat_sw is None):
-    #     ps_cat_sw = catalog_files * number_of_observations
-    # if ('NIRCAM' in used_instruments) and (ps_cat_lw is None):
-    #     ps_cat_lw = catalog_files * number_of_observations
-    #
-    # # non-NIRCam: if only one catalog is provided, that catalog will be used for all observations
-    # if (catalog_files is not None) and (len(catalog_files) == 1):
-    #     catalog_files = catalog_files * number_of_exposures
 
     # if verbose:
     #     print('Summary of dictionary extracted from {}'.format(xml_file))
