@@ -77,7 +77,6 @@ def test_compare_to_calc_psf():
     convpsf = astropy.convolution.convolve(calcpsf, kernel)
 
     # Compare to make sure they are in fact the same PSF
-    assert gridpsf.shape == calcpsf.shape
     assert np.array_equal(gridpsf, convpsf)
 
 
@@ -165,6 +164,9 @@ def test_saving(tmpdir):
     with fits.open(os.path.join(path, "fgs_fgs_fovp10_samp2_npsf4.fits")) as infile:
         assert infile[0].header == grid[0][0].header
         assert np.array_equal(infile[0].data, grid[0][0].data)
+
+    # Remove temp directory
+    tmpdir.remove()
 
 
 def test_setting_inputs():
