@@ -416,12 +416,13 @@ class CreatePSFLibrary:
                     name = "{}_{}_fovp{}_samp{}_npsf{}.fits".format(self.instr.lower(), filt.lower(),
                                                                     self.fov_pixels, self.oversample,
                                                                     self.num_psfs)
+                    filepath = os.path.join(self.fileloc, name)
                 else:
-                    self.filepath = os.path.join(self.fileloc, self.filename)
+                    filepath = os.path.join(self.fileloc, self.filename)
 
-                print("  Saving file: {}".format(self.filepath))
+                print("  Saving file: {}".format(filepath))
 
-                hdu.writeto(self.filepath, overwrite=self.overwrite)
+                hdu.writeto(filepath, overwrite=self.overwrite)
 
             # Create something to return
             final_list.append(hdu)
