@@ -42,7 +42,6 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     # which are not yet in the PRD
     if instrument.lower() == 'nircam':
         print("NOTE: Using pre-delivery SIAF data for {}".format(aperture_name))
-        1/0
         if instrument == 'NIRCAM':
             instrument = 'NIRCam'
         pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')

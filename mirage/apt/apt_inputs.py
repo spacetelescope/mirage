@@ -316,32 +316,6 @@ class AptInput:
         #     for key in observation_dictionary.keys():
         #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
-        # NIRCam case: Expand for detectors. Create one entry in each list for each
-        # detector, rather than a single entry for 'ALL' or 'BSALL'
-
-        # test if Module is always 'None', i.e. when NIRCam is not used
-        # if observation_dictionary['Module'].count('None') == len(observation_dictionary['Module']):
-        #     # set detector key
-        #     observation_dictionary['detector'] = []
-        #     for i, instrument in enumerate(observation_dictionary['Instrument']):
-        #         if instrument.lower() == 'niriss':
-        #             observation_dictionary['detector'].append('NIS')
-        #         elif instrument.lower() == 'nirspec':
-        #             observation_dictionary['detector'].append('NRS')
-        #         elif instrument.lower() == 'nirspec':
-        #             if 'NRS1' in observation_dictionary['aperture'][i]:
-        #                 observation_dictionary['detector'].append('NRS1')
-        #             elif 'NRS2' in observation_dictionary['aperture'][i]:
-        #                 observation_dictionary['detector'].append('NRS1')
-        #         elif instrument.lower() == 'fgs':
-        #             if 'FGS1' in observation_dictionary['aperture'][i]:
-        #                 observation_dictionary['detector'].append('G1')
-        #             elif 'FGS2' in observation_dictionary['aperture'][i]:
-        #                 observation_dictionary['detector'].append('G2')
-        #         elif instrument.lower() == 'miri':
-        #                 observation_dictionary['detector'].append('MIR')
-        #     self.exposure_tab = observation_dictionary
-        # else:
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
         # print(self.exposure_tab['Instrument'])
@@ -354,7 +328,6 @@ class AptInput:
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
         print('Wrote exposure table to {}'.format(detectors_file))
 
-        1/0
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
         self.ra_dec_update()
 
@@ -387,6 +360,8 @@ class AptInput:
         for index, instrument in enumerate(input_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
+                # NIRCam case: Expand for detectors. Create one entry in each list for each
+                # detector, rather than a single entry for 'ALL' or 'BSALL'
 
                 # Determine module of the observation
                 module = input_dictionary['Module'][index]
@@ -432,22 +407,15 @@ class AptInput:
                 observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
             observation_dictionary['detector'].extend(detectors)
 
-            # elif instrument == 'niriss':
-            #     observation_dictionary['detector'].append('NIS')
-            # elif instrument.lower() == 'nirspec':
-            #     observation_dictionary['detector'].append('NRS')
-            # elif instrument.lower() == 'nirspec':
-            #     if 'NRS1' in observation_dictionary['aperture'][i]:
-            #         observation_dictionary['detector'].append('NRS1')
-            #     elif 'NRS2' in observation_dictionary['aperture'][i]:
-            #         observation_dictionary['detector'].append('NRS1')
-            # elif instrument.lower() == 'fgs':
-            #     if 'FGS1' in observation_dictionary['aperture'][i]:
-            #         observation_dictionary['detector'].append('G1')
-            #     elif 'FGS2' in observation_dictionary['aperture'][i]:
-            #         observation_dictionary['detector'].append('G2')
-            # elif instrument.lower() == 'miri':
-            #     observation_dictionary['detector'].append('MIR')
+
+        #correct NIRCam aperture names
+        for index, instrument in enumerate(observation_dictionary['Instrument']):
+            instrument = instrument.lower()
+            if instrument == 'nircam':
+                detector = 'NRC' + observation_dictionary['detector'][index]
+                sub = observation_dictionary['Subarray'][index]
+                aperture_name = detector + '_' + sub
+                observation_dictionary['aperture'][index] = aperture_name
 
         return observation_dictionary
 
@@ -719,6 +687,7 @@ class AptInput:
             siaf_instrument = self.exposure_tab["Instrument"][i]
             if siaf_instrument == 'NIRSPEC':
                 siaf_instrument = 'NIRSpec'
+
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
