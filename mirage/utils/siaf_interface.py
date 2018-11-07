@@ -17,7 +17,7 @@ Use
         from mirage.utils import siaf_interface
 
 """
-
+import os
 import numpy as np
 
 import pysiaf
@@ -41,11 +41,11 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     # Temporary fix to access good NIRCam distortion coefficients which
     # which are not yet in the PRD
     if instrument.lower() == 'nircam':
-        import os
-        print("NOTE: Using pre-delivery SIAF data")
+        print("NOTE: Using pre-delivery SIAF data for {}".format(aperture_name))
+        1/0
         if instrument == 'NIRCAM':
             instrument = 'NIRCam'
-        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, instrument)
+        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
         siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture_name]
     else:
         siaf = pysiaf.Siaf(instrument)[aperture_name]

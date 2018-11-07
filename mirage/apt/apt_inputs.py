@@ -354,6 +354,7 @@ class AptInput:
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
         print('Wrote exposure table to {}'.format(detectors_file))
 
+        1/0
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
         self.ra_dec_update()
 

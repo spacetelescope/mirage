@@ -272,7 +272,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     # set default values. These are overwritten if defaults argument is present
     default_values = {}
     default_values['Date'] = '2019-07-04'
-    default_values['PAV3'] = '161.'
+    default_values['PAV3'] = '111.'
     default_values['GalaxyCatalog'] = 'None'
     default_values['ExtendedCatalog'] = 'None'
     default_values['ExtendedScale'] = '1.0'
@@ -289,6 +289,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
     default_parameter_name_list = [key for key, item in default_values.items() if key not in 'Date PAV3 BackgroundRate BackgroundRate_sw BackgroundRate_lw'.split()]
 
+    # set default parameters if given as argument
     if parameter_defaults is not None:
         for key in parameter_defaults.keys():
             if key in default_values.keys():
