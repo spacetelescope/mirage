@@ -170,11 +170,14 @@ class CreatePSFLibrary:
         """Raise an error based on mis-matched short/long wave detectors/filters"""
 
         if "short filter" in msg_type.lower():
-            message = "You are trying to apply a shortwave filter ({}) to a longwave detector ({}). ".format(filt, det)
+            message = "You are trying to apply a shortwave filter ({}) to a " \
+                      "longwave detector ({}). ".format(filt, det)
         if "long filter" in msg_type.lower():
-            message = "You are trying to apply a longwave filter ({}) to a shortwave detector ({}). ".format(filt, det)
+            message = "You are trying to apply a longwave filter ({}) to a " \
+                      "shortwave detector ({}). ".format(filt, det)
 
-        raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
+        raise ValueError(message + "Please change these entries so the filter "
+                                   "falls within the detector band.")
 
     def _set_detectors(self, filter):
         """Get the list of detectors to include in the PSF library files"""
@@ -202,7 +205,8 @@ class CreatePSFLibrary:
         if self.detector_input not in ["all", "shortwave", "longwave"]:
             det = set(detector_list).difference(set(self.webb.detector_list))
             if det != set():
-                raise ValueError("Instrument {} doesn't have the detector(s) {}.".format(self.instr, det))
+                raise ValueError("Instrument {} doesn't have the detector(s) "
+                                 "{}.".format(self.instr, det))
 
         return detector_list
 
@@ -227,7 +231,8 @@ class CreatePSFLibrary:
         if self.filter_input not in ["all", "shortwave", "longwave"]:
             filt = set(filter_list).difference(set(self.webb.filter_list))
             if filt != set():
-                raise ValueError("Instrument {} doesn't have the filter(s) {}.".format(self.instr, filt))
+                raise ValueError("Instrument {} doesn't have the filter(s) "
+                                 "{}.".format(self.instr, filt))
 
         return filter_list
 
@@ -307,7 +312,9 @@ class CreatePSFLibrary:
 
                     # Create PSF
                     psf = self.webb.calc_psf(add_distortion=self.add_distortion,
-                                             fov_pixels=self.fov_pixels, oversample=self.oversample, **self._kwargs)
+                                             fov_pixels=self.fov_pixels,
+                                             oversample=self.oversample,
+                                             **self._kwargs)
 
                     # Convolve PSF with a square kernel
                     psf_conv = astropy.convolution.convolve(psf[ext].data, kernel)
@@ -401,13 +408,14 @@ class CreatePSFLibrary:
 
                 # Set file information
                 if self.fileloc is None:
-                    self.fileloc = os.path.expandvars('$MIRAGE_DATA/{}/test_webbpsf_library'.format(self.instr.lower()))
+                    self.fileloc = os.path.expandvars('$MIRAGE_DATA/{}/'
+                                                      'test_webbpsf_library'.format(self.instr.lower()))
 
                 if self.filename is None:
                     # E.g. filename: nircam_f090w_fovp1000_samp5_npsf16.fits
-                    name = "{}_{}_fovp{}_samp{}_npsf{}.fits".format(self.instr.lower(), filt.lower(), self.fov_pixels,
-                                                                    self.oversample, self.num_psfs)
-                    self.filepath = os.path.join(self.fileloc, name)
+                    name = "{}_{}_fovp{}_samp{}_npsf{}.fits".format(self.instr.lower(), filt.lower(),
+                                                                    self.fov_pixels, self.oversample,
+                                                                    self.num_psfs)
                 else:
                     self.filepath = os.path.join(self.fileloc, self.filename)
 

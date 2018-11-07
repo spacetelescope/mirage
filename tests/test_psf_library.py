@@ -13,20 +13,23 @@ def test_all_filters_and_detectors():
     """Check that setting filters and detectors to all works"""
 
     # Case 1: Setting filters="all" and "detectors="all"
-    inst1 = CreatePSFLibrary(instrument="FGS", filters="all", detectors="all", num_psfs=1, save=False)
+    inst1 = CreatePSFLibrary(instrument="FGS", filters="all", detectors="all",
+                             num_psfs=1, save=False)
     grid1 = inst1.create_files()
-    inst2 = CreatePSFLibrary(instrument="FGS", filters="FGS", detectors=["FGS1", "FGS2"], num_psfs=1, save=False)
+    inst2 = CreatePSFLibrary(instrument="FGS", filters="FGS", detectors=["FGS1", "FGS2"],
+                             num_psfs=1, save=False)
     grid2 = inst2.create_files()
 
-    # Check they are the same
+    # Check outputs are the same
     assert np.array_equal(grid1[0][0].data, grid2[0][0].data)
 
     # Case 2: NIRCam should be able to pull all the appropriate detectors based on the filter type (SW vs LW)
     longfilt = "F250M"
     shortfilt = "F140M"
-    inst1 = CreatePSFLibrary(instrument="NIRCam", filters=[shortfilt, longfilt], detectors="all",
-                             num_psfs=1, add_distortion=False, fov_pixels=1, oversample=2, save=False)
-    grid1, grid2 = inst1.create_files()
+    inst3 = CreatePSFLibrary(instrument="NIRCam", filters=[shortfilt, longfilt],
+                             detectors="all", num_psfs=1, add_distortion=False,
+                             fov_pixels=1, oversample=2, save=False)
+    grid1, grid2 = inst3.create_files()
 
     # Check that only and all the SW detectors are in the first file
     det_list = []
@@ -87,31 +90,31 @@ def test_nircam_errors():
     shortdet = "NRCA3"
 
     # Shouldn't error - applying SW to SW and LW to LW
-    inst1 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet, add_distortion=False,
-                             num_psfs=1, fov_pixels=1, save=False)  # no error
+    inst1 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet,
+                             add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # no error
     inst1.create_files()
-    inst2 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=shortdet, add_distortion=False,
-                             num_psfs=1, fov_pixels=1, save=False)  # no error
+    inst2 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=shortdet,
+                             add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # no error
     inst2.create_files()
 
     # Should error - Bad filter/detector combination (LW filt to SW det)
     with pytest.raises(ValueError) as excinfo:
-        inst3 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=shortdet, add_distortion=False,
-                                 num_psfs=1, fov_pixels=1, save=False)  # error
+        inst3 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=shortdet,
+                                 add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # error
         inst3.create_files()
     assert "ValueError" in str(excinfo)
 
     # Should error - Bad filter/detector combination (SW filt to LW det)
     with pytest.raises(ValueError) as excinfo:
-        inst4 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=longdet, add_distortion=False,
-                                 num_psfs=1, fov_pixels=1, save=False)  # error
+        inst4 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=longdet,
+                                 add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # error
         inst4.create_files()
     assert "ValueError" in str(excinfo)
 
     # Should error - Bad num_psfs entry (must be a square number)
     with pytest.raises(ValueError) as excinfo:
-        inst5 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet, add_distortion=False,
-                                 num_psfs=3, fov_pixels=1, save=False)  # error
+        inst5 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet,
+                                 add_distortion=False, num_psfs=3, fov_pixels=1, save=False)  # error
         inst5.create_files()
     assert "ValueError" in str(excinfo)
 
@@ -123,11 +126,13 @@ def test_one_psf():
     fov_pixels = 101
 
     # Create 2 cases with different locations: the default center and a set location
-    inst1 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS", num_psfs=1, add_distortion=True,
-                             oversample=oversample, fov_pixels=fov_pixels, save=False)
+    inst1 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS",
+                             num_psfs=1, add_distortion=True, oversample=oversample,
+                             fov_pixels=fov_pixels, save=False)
     grid1 = inst1.create_files()
-    inst2 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS", num_psfs=1, add_distortion=True,
-                             oversample=oversample, fov_pixels=fov_pixels, psf_location=(0, 10), save=False)
+    inst2 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS",
+                             num_psfs=1, add_distortion=True, oversample=oversample,
+                             fov_pixels=fov_pixels, psf_location=(0, 10), save=False)
     grid2 = inst2.create_files()
 
     assert grid1[0][0].header["DET_YX0"] == "(1024, 1024)"  # the default is the center of the NIS aperture
