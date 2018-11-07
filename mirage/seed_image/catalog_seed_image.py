@@ -192,7 +192,7 @@ class Catalog_seed():
         base_table = copy.deepcopy(self.zps)
         num_entries = len(self.zps)
         det_column = Column(np.repeat(detector, num_entries), name="Detector")
-        base_table.add_column(det_column, index = 0)
+        base_table.add_column(det_column, index=0)
         return base_table
 
     def prepare_PAM(self):
@@ -725,6 +725,36 @@ class Catalog_seed():
         data, header = fits.getdata(filename, header=True)
         return data, header
 
+    def get_index_numbers(self, catalog_table):
+        """Get index numbers associated with the sources in a catalog
+
+        Parameters
+        ----------
+        catalog_table : astropy.table.Table
+            Source catalog read in from an ascii file
+
+        Returns
+        -------
+        indexes : list
+            List of index numbers corresponding to sources in the catalog
+        """
+        # If the input catalog has an index column
+        # use that, otherwise add one
+        if 'index' in catalog_table.colnames:
+            indexes = catalog_table['index']
+        else:
+            indexes = np.arange(1, len(catalog_table['x_or_RA']) + 1)
+        # Make sure there is no 0th object
+        if np.min(indexes) == 0:
+            indexes += 1
+        # Make sure the index numbers don't overlap with any
+        # sources already present. Increment the maxindex
+        # value.
+        if np.min(indexes) <= self.maxindex:
+            indexes += self.maxindex
+        self.maxindex = np.max(indexes)
+        return indexes
+
     def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False):
@@ -771,19 +801,22 @@ class Catalog_seed():
 
         # If the input catalog has an index column
         # use that, otherwise add one
-        if 'index' in mtlist.colnames:
-            indexes = mtlist['index']
-        else:
-            indexes = np.arange(1, len(mtlist['x_or_RA']) + 1)
-        # Make sure there is no 0th object
-        if np.min(indexes) == 0:
-            indexes += 1
-        # Make sure the index numbers don't overlap with any
-        # sources already present. Increment the maxindex
-        # value.
-        if np.min(indexes) <= self.maxindex:
-            indexes += self.maxindex
-        self.maxindex = np.max(indexes)
+        #if 'index' in mtlist.colnames:
+        #    indexes = mtlist['index']
+        #else:
+        #    indexes = np.arange(1, len(mtlist['x_or_RA']) + 1)
+        ## Make sure there is no 0th object
+        #if np.min(indexes) == 0:
+        #    indexes += 1
+        ## Make sure the index numbers don't overlap with any
+        ## sources already present. Increment the maxindex
+        ## value.
+        #if np.min(indexes) <= self.maxindex:
+        #    indexes += self.maxindex
+        #self.maxindex = np.max(indexes)
+
+        indexes = self.get_index_numbers(mtlist)
+
 
         if MT_tracking is True:
             # Here, we are tracking a non-sidereal target.
@@ -1158,11 +1191,11 @@ class Catalog_seed():
         if len(ptsrc_rows) > 0:
             ptsrc = targs[ptsrc_rows]
             if pixFlag:
-                meta0 = 'position_pixel'
+                meta0 = 'position_pixels'
             else:
                 meta0 = ''
             if velFlag:
-                meta1 = 'velocity_pixel'
+                meta1 = 'velocity_pixels'
             else:
                 meta1 = ''
             meta2 = magsys
@@ -1185,11 +1218,11 @@ class Catalog_seed():
         if len(galaxy_rows) > 0:
             galaxies = targs[galaxy_rows]
             if pixFlag:
-                meta0 = 'position_pixel'
+                meta0 = 'position_pixels'
             else:
                 meta0 = ''
             if velFlag:
-                meta1 = 'velocity_pixel'
+                meta1 = 'velocity_pixels'
             else:
                 meta1 = ''
             meta2 = magsys
@@ -1209,11 +1242,11 @@ class Catalog_seed():
             extended = targs[extended_rows]
 
             if pixFlag:
-                meta0 = 'position_pixel'
+                meta0 = 'position_pixels'
             else:
                 meta0 = ''
             if velFlag:
-                meta1 = 'velocity_pixel'
+                meta1 = 'velocity_pixels'
             else:
                 meta1 = ''
             meta2 = magsys
@@ -1484,22 +1517,23 @@ class Catalog_seed():
 
         # If the input catalog has an index column
         # use that, otherwise add one
-        if 'index' in lines.colnames:
-            print('Using point source catalog index numbers')
-            indexes = lines['index']
-        else:
-            print('No point source catalog index numbers. Adding to output: {}.'.format(psfile))
-            indexes = np.arange(1, len(lines['x_or_RA']) + 1)
+        #if 'index' in lines.colnames:
+        #    print('Using point source catalog index numbers')
+        #    indexes = lines['index']
+        #else:
+        #    print('No point source catalog index numbers. Adding to output: {}.'.format(psfile))
+        #    indexes = np.arange(1, len(lines['x_or_RA']) + 1)
         # Make sure there is no 0th object
-        if np.min(indexes) == 0:
-            indexes += 1
+        #if np.min(indexes) == 0:
+        #    indexes += 1
         # Make sure the index numbers don't overlap with any
         # sources already present. Increment the maxindex
         # value.
-        if np.min(indexes) <= self.maxindex:
-            indexes += self.maxindex
-        self.maxindex = np.max(indexes)
-        print("After point sources, max index is {}".format(self.maxindex))
+        #if np.min(indexes) <= self.maxindex:
+        #    indexes += self.maxindex
+        #self.maxindex = np.max(indexes)
+
+        indexes = self.get_index_numbers(lines)
 
         dtor = math.radians(1.)
         nx = (self.subarray_bounds[2] - self.subarray_bounds[0]) + 1
@@ -2083,19 +2117,19 @@ class Catalog_seed():
             pflag = False
             rpflag = False
             try:
-                if 'position_pixel' in gtab.meta['comments'][0:4]:
+                if 'position_pixels' in gtab.meta['comments'][0:4]:
                     pflag = True
             except:
                 pass
             try:
-                if 'radius_pixel' in gtab.meta['comments'][0:4]:
+                if 'radius_pixels' in gtab.meta['comments'][0:4]:
                     rpflag = True
             except:
                 pass
             # Check to see if magnitude system is specified in the comments
             # If not assume AB mags
             msys = 'abmag'
-            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            condition = ('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
             if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
@@ -2104,7 +2138,6 @@ class Catalog_seed():
             raise IOError("WARNING: Unable to open the galaxy source list file {}".format(filename))
 
         return gtab, pflag, rpflag, msys
-
 
     def filterGalaxyList(self, galaxylist, pixelflag, radiusflag, magsystem, catfile):
         # given a list of galaxies (location, size, orientation, magnitude)
@@ -2118,13 +2151,8 @@ class Catalog_seed():
                              dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f',
                                     'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f'))
 
-        #each entry in galaxylist is:
-        #index x_or_RA  y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude
-        #remember that x/y are interpreted as coordinates in the output subarray
-        #NOT full frame coordinates. This is the same as the point source list coords
-
-        # each entry in galaxylist is:
-        # x_or_RA  y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude
+        # Each entry in galaxylist is:
+        # index x_or_RA  y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude
         # remember that x/y are interpreted as coordinates in the output subarray
         # NOT full frame coordinates. This is the same as the point source list coords
 
@@ -2138,8 +2166,8 @@ class Catalog_seed():
         ny = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
         nx = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
 
-        #Expand the limits if a grism direct image is being made
-        if self.params['Output']['grism_source_image'] == True:
+        # Expand the limits if a grism direct image is being made
+        if self.params['Output']['grism_source_image'] is True:
             extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -2152,20 +2180,21 @@ class Catalog_seed():
 
         # If an index column is present use that, otherwise
         # create one
-        if 'index' in galaxylist.colnames:
-            indexes = galaxylist['indexes']
-        else:
-            indexes = np.arange(1, len(galaxylist['radius']) + 1)
+        #if 'index' in galaxylist.colnames:
+        #    indexes = galaxylist['index']
+        #else:
+        #    indexes = np.arange(1, len(galaxylist['radius']) + 1)
         # Make sure there is no 0th object
-        if np.min(indexes) == 0:
-            indexes += 1
+        #if np.min(indexes) == 0:
+        #    indexes += 1
         # Increment the index numbers so that these
         # sources don't overlap with any others already
         # in place
-        if np.min(indexes) <= self.maxindex:
-            indexes += self.maxindex
-        self.maxindex = np.max(indexes)
-        print("after galaxies, max index is {}".format(self.maxindex))
+        #if np.min(indexes) <= self.maxindex:
+        #    indexes += self.maxindex
+        #self.maxindex = np.max(indexes)
+
+        indexes = self.get_index_numbers(galaxylist)
 
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
@@ -2229,9 +2258,12 @@ class Catalog_seed():
 
         if self.n_galaxies == 0:
             if self.n_pointsources == 0:
-                raise ValueError('No point sources or galaxies found in input catalog; empty seed image would be created.')
+                raise ValueError(('No point sources or galaxies found in input catalog; empty seed image '
+                                  'would be created.'))
 
-        filteredList.meta['comments'] = ["Field center (degrees): %13.8f %14.8f y axis rotation angle (degrees): %f  image size: %4.4d %4.4d\n" % (self.ra,self.dec,self.params['Telescope']['rotation'],nx,ny)]
+        filteredList.meta['comments'] = [("Field center (degrees): %13.8f %14.8f y axis rotation angle "
+                                          "(degrees): %f  image size: %4.4d %4.4d\n" %
+                                          (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny))]
         filteredOut = self.basename + '_galaxySources.list'
         filteredList.write(filteredOut, format='ascii', overwrite=True)
         return filteredList
@@ -2257,7 +2289,7 @@ class Catalog_seed():
 
         # Check to see if you've cropped too small and there is still significant signal
         # at the edges
-        mxedge = np.max(np.array([np.max(img[:,-1]),np.max(img[:,0]),np.max(img[0,:]),np.max(img[-1,:])]))
+        mxedge = np.max(np.array([np.max(img[:, -1]), np.max(img[:, 0]), np.max(img[0, :]), np.max(img[-1, :])]))
         if mxedge > 0.001:
             print('Too small!')
 
@@ -2271,7 +2303,7 @@ class Catalog_seed():
         img = img * factor
 
         # Crop image down such that it contains 99.95% of the total signal
-        img = self.crop_galaxy_stamp(img,0.9995)
+        img = self.crop_galaxy_stamp(img, 0.9995)
         return img
 
     def crop_galaxy_stamp(self, stamp, threshold):
@@ -2328,7 +2360,8 @@ class Catalog_seed():
         galaxylist = self.filterGalaxyList(glist, pixflag, radflag, magsys, file)
 
         # galaxylist is a table with columns:
-        # 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'radius', 'ellipticity', 'pos_angle', 'sersic_index', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'
+        # 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'radius', 'ellipticity',
+        # 'pos_angle', 'sersic_index', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'
 
         # final output image
         origyd, origxd = self.nominal_dims
@@ -2379,10 +2412,12 @@ class Catalog_seed():
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
             north_to_east_V3ang = rotations.posangle(self.attitude_matrix, entry['V2'], entry['V3'])
-            xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle'] + 90. + self.params['Telescope']['rotation'])
+            xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle']
+                            + 90. + self.params['Telescope']['rotation'])
 
             # first create the galaxy image
-            stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], xposang*np.pi/180., entry['counts_per_frame_e'])
+            stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
+                                       xposang*np.pi / 180., entry['counts_per_frame_e'])
 
             # convolve the galaxy with the instrument PSF
             stamp = s1.fftconvolve(stamp, psf, mode='same')
@@ -2431,13 +2466,13 @@ class Catalog_seed():
                 galimage[j1:j2, i1:i2] = galimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2]
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                     noiseval += self.grism_background
                 segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
 
             else:
                 pass
-                #print("Source located entirely outside the field of view. Skipping.")
+                # print("Source located entirely outside the field of view. Skipping.")
 
         return galimage, segmentation.segmap
 
@@ -2480,21 +2515,23 @@ class Catalog_seed():
                       "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
         # Add an index column if not present
-        if 'index' in lines.colnames:
-            pass
-        else:
-            print('No extended object catalog index numbers. Adding to output: {}.'.format(eoutcat))
-            indexes = np.arange(1, len(lines['filename']) + 1)
-            lines['index'] = indexes
+        #if 'index' in lines.colnames:
+        #    indexes = lines['index']
+        #else:
+        #    print('No extended object catalog index numbers. Adding to output: {}.'.format(eoutcat))
+        #    indexes = np.arange(1, len(lines['filename']) + 1)
+        #    lines['index'] = indexes
 
         # Make sure there is no 0th source
-        if np.min(indexes) == 0:
-            indexes += 1
+        #if np.min(indexes) == 0:
+        #    indexes += 1
         # Make sure the index numbers don't overlap with
         # sources that are already added
-        if np.min(indexes) <= self.maxindex:
-            indexes += self.maxindex
-        self.maxindex = np.max(indexes)
+        #if np.min(indexes) <= self.maxindex:
+        #    indexes += self.maxindex
+        #self.maxindex = np.max(indexes)
+
+        indexes = self.get_index_numbers(lines)
 
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
@@ -2506,7 +2543,7 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(lines, filename)
 
-        #Loop over input lines in the source list
+        # Loop over input lines in the source list
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
             try:
@@ -2533,12 +2570,12 @@ class Catalog_seed():
                            "Not sure how to proceed. Quitting.".format(values['filename'])))
                     sys.exit()
 
-                #Define the min and max source locations (in pixels) that fall onto the subarray
-                #Inlude the effects of a requested grism_direct image, and also keep sources that
-                #will only partially fall on the subarray
-                #pixel coords here can still be negative and kept if the grism image is being made
+                # Define the min and max source locations (in pixels) that fall onto the subarray
+                # Inlude the effects of a requested grism_direct image, and also keep sources that
+                # will only partially fall on the subarray
+                # pixel coords here can still be negative and kept if the grism image is being made
 
-                #First, coord limits for just the subarray
+                # First, coord limits for just the subarray
 
                 miny = 0
                 maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
@@ -2546,7 +2583,7 @@ class Catalog_seed():
                 maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
                 # Expand the limits if a grism direct image is being made
-                if self.params['Output']['grism_source_image'] == True:
+                if self.params['Output']['grism_source_image'] is True:
                     extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
                     miny -= extrapixy
                     maxy += extrapixy
@@ -2564,7 +2601,7 @@ class Catalog_seed():
                 # Keep only sources within the appropriate bounds
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
 
-                    #set up an entry for the output table
+                    # Set up an entry for the output table
                     entry = [indexnum, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
                     # save the stamp image after normalizing to a total signal of 1.
@@ -2603,7 +2640,8 @@ class Catalog_seed():
                         # magwrite = mag
 
                         # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                        countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu, photflam=self.photflam)
+                        countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
+                                                          photflam=self.photflam)
                         framecounts = countrate * self.frametime
                         magwrite = mag
 
