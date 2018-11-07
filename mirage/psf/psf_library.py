@@ -199,7 +199,7 @@ class CreatePSFLibrary:
         elif type(self.detector_input) is list:
             detector_list = self.detector_input
         else:
-            raise TypeError("Method of setting detectors is not valid - see docstring for options")
+            raise TypeError("Method of setting detectors is not valid.")
 
         # If the user hand chose a detector list, check it's valid for the chosen instrument
         if self.detector_input not in ["all", "shortwave", "longwave"]:
@@ -225,7 +225,7 @@ class CreatePSFLibrary:
         elif type(self.filter_input) is list:
             filter_list = self.filter_input
         else:
-            raise TypeError("Method of setting filters is not valid - see docstring for options")
+            raise TypeError("Method of setting filters is not valid.")
 
         # If the user hand chose a filter list, check it's valid for the chosen instrument
         if self.filter_input not in ["all", "shortwave", "longwave"]:
@@ -384,11 +384,13 @@ class CreatePSFLibrary:
             header["DATAVERS"] = (psf[ext].header["DATAVERS"], "WebbPSF reference data files version ")
 
             # Add descriptor for how the file was made
-            header["COMMENT"] = "For a given instrument, 1 file per filter in the form [SCA, j, i, y, x]"
-            header["COMMENT"] = "where (j,i) is the PSF position on the detector grid (integer "
-            header["COMMENT"] = "positions) and (y,x) is the 2D PSF. The order of the detectors can be "
-            header["COMMENT"] = "found under the  header DETNAME* keywords and the order of the fiducial "
-            header["COMMENT"] = "PSFs ((j,i) and (y,x)) under the header DET_JI*/DET_YX* keywords"
+            # the output file (1 per filter) will contain a 5D array with axes[SCA, j, i, y, x]
+            header["COMMENT"] = "For a given instrument, the output file (1 per filter) will contain "
+            header["COMMENT"] = "a 5D array with axes[SCA, j, i, y, x] where (j,i) is the PSF position "
+            header["COMMENT"] = "on the detector grid (integer positions) and (y,x) is the 2D PSF. The "
+            header["COMMENT"] = "order of the detectors can be found under the  header DETNAME* "
+            header["COMMENT"] = "keywords and the order of the fiducial PSFs ((j,i) and (y,x)) under "
+            header["COMMENT"] = "the header DET_JI*/DET_YX* keywords"
 
             # Add header labels
             header.insert("INSTRUME", ('', ''))
