@@ -6,6 +6,7 @@ from astropy.io import fits
 import numpy as np
 import webbpsf
 
+
 class CreatePSFLibrary:
 
     # Class variables for NIRCam short vs long wave information:
@@ -25,9 +26,10 @@ class CreatePSFLibrary:
         Description
         -----------
         Class to create a PSF library in the following format:
-            For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
-            (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
-            is the 2D PSF. This class must be run separately for each instrument.
+            For a given instrument, the output file (1 per filter) will contain a 5D array
+            with axes [SCA, j, i, y, x] where SCA is the detector, (j,i) is the PSF position
+            on the detector grid (integer positions) and (y,x) is the 2D PSF. This class must
+            be run separately for each instrument.
 
         Parameters
         ----------
@@ -128,10 +130,11 @@ class CreatePSFLibrary:
         """
 
         # Pull correct capitalization of instrument name
-        webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS", "MIRI": "MIRI", "FGS": "FGS"}
+        webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec",
+                             "NIRISS": "NIRISS", "MIRI": "MIRI", "FGS": "FGS"}
         self.instr = webbpsf_name_dict[instrument.upper()]
 
-        # Create instance of instrument in WebbPSF (same as webbpsf.instr)
+        # Create instance of instrument in WebbPSF
         self.webb = getattr(webbpsf, self.instr)()
 
         # Set the filters and detectors based on the inputs
@@ -145,7 +148,7 @@ class CreatePSFLibrary:
         # Set the locations on the detector of the fiducial PSFs
         self.ij_list, self.loc_list, self.location_list = self._set_psf_locations(num_psfs, psf_location)
 
-        # For NIRCam: Check if filters/detectors match in terms of if they are longwave/shortwave
+        # For NIRCam: Check if filters/detectors match in terms of if they are long/shortwave
         if self.instr == "NIRCam":
             for filt, det_list in zip(self.filter_list, self.detector_list):
                 for det in det_list:
@@ -201,7 +204,7 @@ class CreatePSFLibrary:
         else:
             raise TypeError("Method of setting detectors is not valid - see docstring for options")
 
-        # If the user hand chose a detector list, check it's a valid list for the chosen instrument
+        # If the user hand chose a detector list, check it's valid for the chosen instrument
         if self.detector_input not in ["all", "shortwave", "longwave"]:
             det = set(detector_list).difference(set(self.webb.detector_list))
             if det != set():
@@ -226,7 +229,7 @@ class CreatePSFLibrary:
         else:
             raise TypeError("Method of setting filters is not valid - see docstring for options")
 
-        # If the user hand chose a filter list, check it's a valid list for the chosen instrument
+        # If the user hand chose a filter list, check it's valid for the chosen instrument
         if self.filter_input not in ["all", "shortwave", "longwave"]:
             filt = set(filter_list).difference(set(self.webb.filter_list))
             if filt != set():
@@ -262,15 +265,16 @@ class CreatePSFLibrary:
         """
         This method is called in the create_files() method
 
-        For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
-        (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
-        is the 2D PSF.
+        For a given instrument, the output file (1 per filter) will contain a 5D array
+        with axes [SCA, j, i, y, x] where SCA is the detector, (j,i) is the PSF position
+        on the detector grid (integer positions) and (y,x) is the 2D PSF.
 
         Returns
         -------
         This saves out the library files if requested and then returns a list of all the
-        hdulist objects created (each in the form of [SCA, j, i, y, x], 1 per filter
+        hdulist objects created (each with a 5D array of [SCA, j, i, y, x], 1 per filter
         requested).
+
         """
 
         # Set extension to read based on distortion choice
