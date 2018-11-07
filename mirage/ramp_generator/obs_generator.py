@@ -2424,12 +2424,12 @@ class Observation():
             outModel.zeroframe = np.zeros((numint, ys, xs))
 
         # EXPTYPE OPTIONS
-        # exptypes = ['NRC_IMAGE', 'NRC_GRISM', 'NRC_TACQ', 'NRC_CORON',
+        # exptypes = ['NRC_IMAGE', 'NRC_WFSS', 'NRC_TACQ', 'NRC_CORON',
         #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
         # nrc_tacq and nrc_coron are not currently implemented.
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
                    "niriss": {"imaging": "NIS_IMAGE"},
                    "fgs": {"imaging": "FGS_IMAGE"}}
 
@@ -2702,7 +2702,7 @@ class Observation():
             groupextnum = 3
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
                    "niriss": {"imaging": "NIS_IMAGE"},
                    "fgs": {"imaging": "FGS_IMAGE"}}
 

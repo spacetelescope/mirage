@@ -801,22 +801,7 @@ class Catalog_seed():
 
         # If the input catalog has an index column
         # use that, otherwise add one
-        #if 'index' in mtlist.colnames:
-        #    indexes = mtlist['index']
-        #else:
-        #    indexes = np.arange(1, len(mtlist['x_or_RA']) + 1)
-        ## Make sure there is no 0th object
-        #if np.min(indexes) == 0:
-        #    indexes += 1
-        ## Make sure the index numbers don't overlap with any
-        ## sources already present. Increment the maxindex
-        ## value.
-        #if np.min(indexes) <= self.maxindex:
-        #    indexes += self.maxindex
-        #self.maxindex = np.max(indexes)
-
         indexes = self.get_index_numbers(mtlist)
-
 
         if MT_tracking is True:
             # Here, we are tracking a non-sidereal target.
@@ -1517,22 +1502,6 @@ class Catalog_seed():
 
         # If the input catalog has an index column
         # use that, otherwise add one
-        #if 'index' in lines.colnames:
-        #    print('Using point source catalog index numbers')
-        #    indexes = lines['index']
-        #else:
-        #    print('No point source catalog index numbers. Adding to output: {}.'.format(psfile))
-        #    indexes = np.arange(1, len(lines['x_or_RA']) + 1)
-        # Make sure there is no 0th object
-        #if np.min(indexes) == 0:
-        #    indexes += 1
-        # Make sure the index numbers don't overlap with any
-        # sources already present. Increment the maxindex
-        # value.
-        #if np.min(indexes) <= self.maxindex:
-        #    indexes += self.maxindex
-        #self.maxindex = np.max(indexes)
-
         indexes = self.get_index_numbers(lines)
 
         dtor = math.radians(1.)
@@ -1541,10 +1510,10 @@ class Catalog_seed():
         xc = (self.subarray_bounds[2] + self.subarray_bounds[0]) / 2.
         yc = (self.subarray_bounds[3] + self.subarray_bounds[1]) / 2.
 
-        #Define the min and max source locations (in pixels) that fall onto the subarray
-        #Include the effects of a requested grism_direct image, and also keep sources that
-        #will only partially fall on the subarray
-        #pixel coords here can still be negative and kept if the grism image is being made
+        # Define the min and max source locations (in pixels) that fall onto the subarray
+        # Include the effects of a requested grism_direct image, and also keep sources that
+        # will only partially fall on the subarray
+        # pixel coords here can still be negative and kept if the grism image is being made
 
         # First, coord limits for just the subarray
         miny = 0
@@ -2180,20 +2149,6 @@ class Catalog_seed():
 
         # If an index column is present use that, otherwise
         # create one
-        #if 'index' in galaxylist.colnames:
-        #    indexes = galaxylist['index']
-        #else:
-        #    indexes = np.arange(1, len(galaxylist['radius']) + 1)
-        # Make sure there is no 0th object
-        #if np.min(indexes) == 0:
-        #    indexes += 1
-        # Increment the index numbers so that these
-        # sources don't overlap with any others already
-        # in place
-        #if np.min(indexes) <= self.maxindex:
-        #    indexes += self.maxindex
-        #self.maxindex = np.max(indexes)
-
         indexes = self.get_index_numbers(galaxylist)
 
         # Check the source list and remove any sources that are well outside the
@@ -2515,22 +2470,6 @@ class Catalog_seed():
                       "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
         # Add an index column if not present
-        #if 'index' in lines.colnames:
-        #    indexes = lines['index']
-        #else:
-        #    print('No extended object catalog index numbers. Adding to output: {}.'.format(eoutcat))
-        #    indexes = np.arange(1, len(lines['filename']) + 1)
-        #    lines['index'] = indexes
-
-        # Make sure there is no 0th source
-        #if np.min(indexes) == 0:
-        #    indexes += 1
-        # Make sure the index numbers don't overlap with
-        # sources that are already added
-        #if np.min(indexes) <= self.maxindex:
-        #    indexes += self.maxindex
-        #self.maxindex = np.max(indexes)
-
         indexes = self.get_index_numbers(lines)
 
         # Check the source list and remove any sources that are well outside the
