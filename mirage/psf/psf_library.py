@@ -252,8 +252,8 @@ class CreatePSFLibrary:
         if num_psfs == 1:
             # Want this case to be at the specified location
             ij_list = [(0, 0)]
-            loc_list = [psf_location[1], psf_location[0]]  # list of x,y location
-            location_list = [(psf_location[1], psf_location[0])]  # tuple of (x,y)
+            loc_list = [psf_location[::-1]]  # list of x,y location
+            location_list = [(psf_location[::-1])]  # tuple of (x,y)
         else:
             ij_list = list(itertools.product(range(self.length), range(self.length)))
             loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
@@ -345,7 +345,7 @@ class CreatePSFLibrary:
             header["NWAVES"] = (psf[ext].header["NWAVES"], "Number of wavelengths used in calculation")
 
             for k, ij in enumerate(self.ij_list):  # these were originally written out in (i,j) and (x,y)
-                header["DET_JI{}".format(k)] = (str((ij[1], ij[0])), "The #{} PSF's (j,i) detector position".format(k))
+                header["DET_JI{}".format(k)] = (str(ij[::-1]), "The #{} PSF's (j,i) detector position".format(k))
                 header["DET_YX{}".format(k)] = (str((self.location_list[k][1], self.location_list[k][0])),
                                                 "The #{} PSF's (y,x) detector pixel position".format(k))
 
