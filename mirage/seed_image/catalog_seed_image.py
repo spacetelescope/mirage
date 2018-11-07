@@ -640,13 +640,13 @@ class Catalog_seed():
         return non_sidereal_ramp, nonsidereal_segmap
 
 
-    def readMTFile(self, file):
+    def readMTFile(self, filename):
         """
         Read in moving target list file
 
         Arguments:
         ----------
-        file : str
+        filename : str
             name of moving target catalog file
 
         Returns:
@@ -659,7 +659,7 @@ class Catalog_seed():
                 are in units of pixels/hour. If false, arcsec/hour
             magsys -- magnitude system of the moving target magnitudes
         """
-        mtlist = ascii.read(file, comment='#')
+        mtlist = ascii.read(filename, comment='#')
 
         # Convert all relevant columns to floats
         for col in mtlist.colnames:
@@ -698,7 +698,7 @@ class Catalog_seed():
         # If not, assume AB mags
         msys = 'abmag'
 
-        condition=('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
+        condition = ('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
         if condition:
             msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
             msys = msys.lower()
@@ -847,6 +847,9 @@ class Catalog_seed():
         # conversion to hang.
         indexes, mtlist = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(mtlist, filename)
+
         times = []
         obj_counter = 0
         time_reported = False
@@ -922,7 +925,7 @@ class Catalog_seed():
             stamp /= totalsignal
 
             # Scale the stamp image to the requested magnitude
-            rate = self.mag_to_countrate(magsys, entry['magnitude'],
+            rate = self.mag_to_countrate(magsys, entry[mag_column],
                                          photfnu=self.photfnu,
                                          photflam=self.photflam)
             stamp *= rate
@@ -1545,6 +1548,9 @@ class Catalog_seed():
         # conversion to hang.
         indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(lines, filename)
+
         start_time = time.time()
         times = []
         time_reported = False
@@ -1568,7 +1574,7 @@ class Catalog_seed():
                                                                               pixelflag, 4096)
 
                 # Get the input magnitude of the point source
-                mag = float(values['magnitude'])
+                mag = float(values[mag_column])
 
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
                     # set up an entry for the output table
@@ -1867,7 +1873,7 @@ class Catalog_seed():
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            condition = ('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
             if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
@@ -1876,6 +1882,59 @@ class Catalog_seed():
             raise IOError("WARNING: Unable to open the source list file {}".format(filename))
 
         return gtab, pflag, msys
+
+    def select_magnitude_column(self, catalog, catalog_file_name):
+        """Select the appropriate column to use for source magnitudes from the input source catalog. If there
+        is a specific column name constructed as <instrument>_<filter>_magnitude to use for source magnitudes
+        (e.g. nircam_f200w_magnitude) then use that. (NOTE: for FGS we search for a column name of
+        'fgs_magnitude'). If not, check for a generic 'magnitude' column. If neither are present, raise an
+        error.
+
+        Parameters
+        ----------
+
+        catalog : astropy.table.Table
+            Source catalog
+
+        catalog_file_name : str
+            Name of the catalog file. Used only when raising errors.
+
+        Returns
+        -------
+
+        specific_mag_col : str
+            The name of the catalog column to use for source magnitudes
+        """
+        # Determine the filter name to look for
+        if self.params['Inst']['instrument'].lower() in ['nircam', 'niriss']:
+            if self.params['Readout']['pupil'][0].upper() == 'F':
+                usefilt = 'pupil'
+            else:
+                usefilt = 'filter'
+            filter_name = self.params['Readout'][usefilt].lower()
+            # Construct the column header to look for
+            specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(),
+                                                        filter_name)
+
+        elif self.params['Inst']['instrument'].lower() == 'fgs':
+            specific_mag_col = "fgs_magnitude"
+
+        # Search catalog column names.
+        if specific_mag_col in catalog.colnames:
+            print("Using {} column in {} for magnitudes".format(specific_mag_col,
+                                                                os.path.split(catalog_file_name)[1]))
+            return specific_mag_col
+
+        elif 'magnitude' in catalog.colnames:
+            print(("WARNING: Catalog {} does not have a magnitude column called {}, "
+                   "but does have a generic 'magnitude' column. Continuing simulation using that."
+                   .format(os.path.split(catalog_file_name)[1], specific_mag_col)))
+            return "magnitude"
+        else:
+            raise ValueError(("WARNING: Catalog {} has no magnitude column specifically for {} {}, "
+                              "nor a generic 'magnitude' column. Unable to proceed."
+                              .format(os.path.split(catalog_file_name)[1], self.params['Inst']['instrument'],
+                                      filter_name.upper())))
 
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
@@ -2042,13 +2101,12 @@ class Catalog_seed():
                 msys = msys.lower()
 
         except:
-            print("WARNING: Unable to open the galaxy source list file {}".format(filename))
-            sys.exit()
+            raise IOError("WARNING: Unable to open the galaxy source list file {}".format(filename))
 
         return gtab, pflag, rpflag, msys
 
 
-    def filterGalaxyList(self, galaxylist, pixelflag, radiusflag, magsystem):
+    def filterGalaxyList(self, galaxylist, pixelflag, radiusflag, magsystem, catfile):
         # given a list of galaxies (location, size, orientation, magnitude)
         # keep only those which will fall fully or partially on the output array
 
@@ -2114,6 +2172,9 @@ class Catalog_seed():
         # conversion to hang.
         indexes, galaxylist = self.remove_outside_fov_sources(indexes, galaxylist, pixelflag, 4096)
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(galaxylist, catfile)
+
         # Loop over galaxy sources
         for index, source in zip(indexes, galaxylist):
 
@@ -2146,7 +2207,7 @@ class Catalog_seed():
 
                 # Now look at the input magnitude of the point source
                 # append the mag and pixel position to the list of ra, dec
-                mag = float(source['magnitude'])
+                mag = float(source[mag_column])
                 entry.append(mag)
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
@@ -2264,7 +2325,7 @@ class Catalog_seed():
 
         # Extract and save only the entries which will land (fully or partially) on the
         # aperture of the output
-        galaxylist = self.filterGalaxyList(glist, pixflag, radflag, magsys)
+        galaxylist = self.filterGalaxyList(glist, pixflag, radflag, magsys, file)
 
         # galaxylist is a table with columns:
         # 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'radius', 'ellipticity', 'pos_angle', 'sersic_index', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'
@@ -2442,6 +2503,9 @@ class Catalog_seed():
 
         print("After extended sources, max index is {}".format(self.maxindex))
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(lines, filename)
+
         #Loop over input lines in the source list
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
@@ -2451,7 +2515,7 @@ class Catalog_seed():
                                                                               pixelflag, 4096)
                 # Get the input magnitude
                 try:
-                    mag = float(values['magnitude'])
+                    mag = float(values[mag_column])
                 except ValueError:
                     mag = None
 
