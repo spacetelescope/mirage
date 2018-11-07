@@ -28,14 +28,14 @@ def test_all_filters_and_detectors():
                              num_psfs=1, add_distortion=False, fov_pixels=1, oversample=2, save=False)
     grid1, grid2 = inst1.create_files()
 
-    # Check that only and all the SW detectors are in this file
+    # Check that only and all the SW detectors are in the first file
     det_list = []
     for i in range(len(grid1[0].data)):
         det_list.append(grid1[0].header["DETNAME{}".format(i)])
     assert len(grid1[0].data) == len(CreatePSFLibrary.nrca_short_detectors)
     assert set(det_list) == set(CreatePSFLibrary.nrca_short_detectors)
 
-    # Check that only and all the LW detectors are in this file
+    # Check that only and all the LW detectors are in the second file
     det_list = []
     for i in range(len(grid2[0].data)):
         det_list.append(grid2[0].header["DETNAME{}".format(i)])
@@ -44,7 +44,7 @@ def test_all_filters_and_detectors():
 
 
 def test_compare_to_calc_psf():
-    """Check that the output PSF matches calc_psf"""
+    """Check that the output grid has the expected PSFs in the right grid locations by comparing to calc_psf"""
 
     oversample = 2
     fov_pixels = 10
@@ -64,7 +64,7 @@ def test_compare_to_calc_psf():
     posi = int(pos.split()[1][:-1])
     gridpsf = grid[0][0].data[0, posj, posi, :, :]
 
-    # Using header data, create the expected same PSF via calc_psf + convolution
+    # Using grid header data, create the expected same PSF via calc_psf + convolution
     fgs = webbpsf.FGS()
     fgs.detector = "FGS1"
     fgs.filter = "FGS"
@@ -79,7 +79,7 @@ def test_compare_to_calc_psf():
 
 
 def test_nircam_errors():
-    """Check that there are checks for incorrect value setting - particularly with NIRCam"""
+    """Check that there are errors for incorrect value setting - particularly with NIRCam"""
 
     longfilt = "F250M"
     shortfilt = "F140M"
@@ -94,7 +94,7 @@ def test_nircam_errors():
                              num_psfs=1, fov_pixels=1, save=False)  # no error
     inst2.create_files()
 
-    # Should error - Bad filter/detector combination (SW filt to LW det)
+    # Should error - Bad filter/detector combination (LW filt to SW det)
     with pytest.raises(ValueError) as excinfo:
         inst3 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=shortdet, add_distortion=False,
                                  num_psfs=1, fov_pixels=1, save=False)  # error

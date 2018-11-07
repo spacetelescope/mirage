@@ -35,29 +35,27 @@ class CreatePSFLibrary:
         ----------
         instrument : str
             The name of the instrument you want to run. Can be any capitalization. Can
-            only run 1 instrument at a time. Right now this class is only set up for NIRCam,
-            NIRISS, and FGS (they are 2048x2048)
+            only run 1 instrument at a time. This class is only set up for NIRCam,
+            NIRISS, and FGS.
 
         filters : str or list
             Which filter(s) you want to create a library for.
-
             Can be a string of 1 filter name, a list of filter names (as strings), or
-            the default "all" will run through all the filters in the filter_list
-            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
-            webbpsf expects. See also special case for NIRCam. Default is "all"
+            the default "all" will run through all the filters for that instrument.
+            Spelling/capitalization must match what WebbPSF expects. See also special
+            case for NIRCam. Default is "all".
 
         detectors : str or list
             Which detector(s) you want to create a library for.
-
             Can be a string of 1 detector name, a list of detector names (as strings), or
-            the default "all" will run through all the detectors in the detector_list
-            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
-            webbpsf expects. See also special case for NIRCam. Default is "all"
+            the default "all" will run through all the detectors for that instrument.
+            Spelling/capitalization must match what WebbPSF expects. See also special
+            case for NIRCam. Default is "all".
 
         num_psfs : int
             The total number of fiducial PSFs to be created and saved in the files. This
-            number must be a square number. Default is 16.
-            E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
+            must be a square number. Default is 16. E.g. num_psfs = 16 will create a 4x4
+            grid of fiducial PSFs.
 
         psf_location : tuple
             If num_psfs = 1, then this is used to set the (y,x) location of that PSF.
@@ -79,7 +77,7 @@ class CreatePSFLibrary:
             The type of OPD map you would like to use to create the PSFs. Options are
             "predicted" or "requirements" where the predicted map is of the expected
             WFE and the requirements map is slightly more conservative (has slightly
-            larger WFE). Default is "requirements"
+            larger WFE). Default is "requirements".
 
         opd_number : int
             The realization of the OPD map pulled from the OPD file. Options are an
@@ -95,10 +93,11 @@ class CreatePSFLibrary:
 
         filename : str
             The name to save your current file under if "save" keyword is set to True.
-            Default of None will save it in the form: "INSTR_FILT_fovp####_samp#_npsf##.fits"
+            Default of None will save it in the form: "{intr}_{filt}_fovp{}_samp{}_npsf{}.fits"
 
         overwrite : bool
-            True/False boolean to overwrite the output file if it already exists.
+            True/False boolean to overwrite the output file if it already exists. Default
+            is True.
 
         **kwargs
             This can be used to add any extra arguments to the webbpsf calc_psf() method
@@ -110,13 +109,8 @@ class CreatePSFLibrary:
         and the short and long wave filter/detectors will be separated and run in the
         correct pairings.
         If you choose only certain filters (either by name or with "shortwave" or
-        "longwave" to run all the shortwave/longwave filters), you may set detectors
-        to "shortwave" or "longwave" or you can set it to be "all" and the script will
-        pull the all possible detectors (ie either all the shortwave or all the longwave
-        detectors).
-        If you choose individual filters and detectors, they must match in
-        shortwave or longwave. Mismatched lists of short and long wave filters and
-        detectors will result in an error.
+        "longwave"), you may set detectors to "shortwave" or "longwave" or you can
+        set it to be "all" and it will pull the all appropriate SW/LW detectors.
 
         Use
         ---
@@ -173,7 +167,7 @@ class CreatePSFLibrary:
 
     @staticmethod
     def _raise_value_error(msg_type, det, filt):
-        """Raise a specific ValueError based on mis-matched short/long wave detectors/filters"""
+        """Raise an error based on mis-matched short/long wave detectors/filters"""
 
         if "short filter" in msg_type.lower():
             message = "You are trying to apply a shortwave filter ({}) to a longwave detector ({}). ".format(filt, det)
@@ -185,7 +179,7 @@ class CreatePSFLibrary:
     def _set_detectors(self, filter):
         """Get the list of detectors to include in the PSF library files"""
 
-        # Set detector list to loop over
+        # Set detector list
         if self.detector_input == "all":
             if self.instr != "NIRCam":
                 detector_list = self.webb.detector_list
@@ -215,7 +209,7 @@ class CreatePSFLibrary:
     def _set_filters(self):
         """Get the list of filters to create PSF library files for"""
 
-        # Set filter list to loop over
+        # Set filter list
         if self.filter_input == "all":
             filter_list = self.webb.filter_list
         elif self.filter_input == "shortwave":
@@ -248,9 +242,8 @@ class CreatePSFLibrary:
         else:
             raise ValueError("You must choose a square number of fiducial PSFs to create (E.g. 9, 16, etc.)")
 
-        # Set the values
+        # Set the center values
         if num_psfs == 1:
-            # Want this case to be at the specified location
             ij_list = [(0, 0)]
             loc_list = [psf_location[::-1]]  # list of x,y location
             location_list = [(psf_location[::-1])]  # tuple of (x,y)
@@ -263,17 +256,14 @@ class CreatePSFLibrary:
 
     def create_files(self):
         """
-        This method is called in the create_files() method
-
         For a given instrument, the output file (1 per filter) will contain a 5D array
         with axes [SCA, j, i, y, x] where SCA is the detector, (j,i) is the PSF position
         on the detector grid (integer positions) and (y,x) is the 2D PSF.
 
         Returns
         -------
-        This saves out the library files if requested and then returns a list of all the
-        hdulist objects created (each with a 5D array of [SCA, j, i, y, x], 1 per filter
-        requested).
+        This saves out the library files (if requested) and then returns a list of all the
+        hdulist objects created (a 5D array of [SCA, j, i, y, x], 1 per filter requested).
 
         """
 
@@ -289,7 +279,7 @@ class CreatePSFLibrary:
         # Set output mode
         self.webb.options['output_mode'] = 'Oversampled Image'
 
-        # Set OPD Map (pull most recent version with self.webb.opd_list call) - always predicted then requirements
+        # Set OPD Map
         if self.opd_type.lower() == "requirements":
             opd = self.webb.opd_list[1]
         elif self.opd_type.lower() == "predicted":
@@ -300,8 +290,6 @@ class CreatePSFLibrary:
         final_list = []
         for filt, det_list in zip(self.filter_list, self.detector_list):
             print("\nStarting filter: {}".format(filt))
-
-            # Set filter
             self.webb.filter = filt
 
             # Create an array to fill ([SCA, j, i, y, x])
@@ -311,7 +299,6 @@ class CreatePSFLibrary:
             # For every detector
             for k, det in enumerate(det_list):
                 print("  Running detector: {}".format(det))
-
                 self.webb.detector = det
 
                 # For each of the 9 locations on the detector (loc = tuple = (x,y))
@@ -353,7 +340,7 @@ class CreatePSFLibrary:
 
             # The range of location values
             if self.num_psfs == 1:
-                # In this case, loc_list is the single x and y value (x may not equal y)
+                # In this case, loc_list is the single x and y value
                 header["I0_X"] = (self.loc_list[0], "The x pixel value for i=0 (AXIS4)")
                 header["J0_Y"] = (self.loc_list[1], "The y pixel value for j=0 (AXIS3)")
             else:
