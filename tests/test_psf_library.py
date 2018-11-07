@@ -9,7 +9,6 @@ import webbpsf
 from mirage.psf.psf_library import CreatePSFLibrary
 
 
-# @pytest.mark.skip()
 def test_all_filters_and_detectors():
     """Check that setting filters and detectors to all works"""
 
@@ -44,9 +43,9 @@ def test_all_filters_and_detectors():
     assert set(det_list) == set(CreatePSFLibrary.nrca_long_detectors)
 
 
-# @pytest.mark.skip()
 def test_compare_to_calc_psf():
     """Check that the output PSF matches calc_psf"""
+
     oversample = 2
     fov_pixels = 10
 
@@ -79,9 +78,9 @@ def test_compare_to_calc_psf():
     assert np.array_equal(gridpsf, convpsf)
 
 
-# @pytest.mark.skip()
 def test_nircam_errors():
     """Check that there are checks for incorrect value setting - particularly with NIRCam"""
+
     longfilt = "F250M"
     shortfilt = "F140M"
     longdet = "NRCB5"
@@ -117,9 +116,9 @@ def test_nircam_errors():
     assert "ValueError" in str(excinfo)
 
 
-# @pytest.mark.skip()
-def test_onepsf():
+def test_one_psf():
     """Check that setting num_psfs = 1 produces the PSF in the expected location"""
+
     oversample = 2
     fov_pixels = 101
 
@@ -145,7 +144,6 @@ def test_onepsf():
     assert np.array_equal(convpsf, grid2[0][0].data[0, 0, 0, :, :])
 
 
-# @pytest.mark.skip()
 def test_saving(tmpdir):
     """Test saving files works properly"""
 
@@ -164,7 +162,6 @@ def test_saving(tmpdir):
         assert np.array_equal(infile[0].data, grid[0][0].data)
 
 
-# @pytest.mark.skip()
 def test_setting_inputs():
     """Test that no errors are raised when filters and detectors can be set different ways"""
 
@@ -188,10 +185,10 @@ def test_setting_inputs():
                              num_psfs=1, fov_pixels=1, oversample=2, save=False)
     grid4 = inst4.create_files()
 
-    # Pass the name "shortwave" to both filter and detector
+    # # Pass the name "shortwave" to both filter and detector - This case takes 6min alone to run - excluding for time
     # inst5 = CreatePSFLibrary(instrument="NIRCam", filters="shortwave", detectors="shortwave",
     #                          num_psfs=1, fov_pixels=1, oversample=2, save=False)
-    # grid5 = inst5.create_files()  # This case takes 6min alone to run - excluding for time
+    # grid5 = inst5.create_files()
 
     # Length is the number of filters, Shape of those objects follows (det, j, i, y, x)
     assert len(grid1) == 1
