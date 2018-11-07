@@ -250,12 +250,12 @@ class CreatePSFLibrary:
         # Set the center values
         if num_psfs == 1:
             ij_list = [(0, 0)]
-            loc_list = [psf_location[::-1]]  # list of x,y location
-            location_list = [(psf_location[::-1])]  # tuple of (x,y)
+            loc_list = list(psf_location[::-1])  # list of x,y location
+            location_list = [psf_location[::-1]]  # tuple of (x,y)
         else:
             ij_list = list(itertools.product(range(self.length), range(self.length)))
             loc_list = [int(round(num * 2047)) for num in np.linspace(0, 1, self.length, endpoint=True)]
-            location_list = list(itertools.product(loc_list, loc_list))  # list of tuples (x,y) (for webbpsf)
+            location_list = list(itertools.product(loc_list, loc_list))  # list of tuples (x,y) (for WebbPSF)
 
         return ij_list, loc_list, location_list
 
