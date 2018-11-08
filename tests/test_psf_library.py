@@ -141,7 +141,7 @@ def test_one_psf():
                              fov_pixels=fov_pixels, psf_location=(0, 10), save=False)
     grid2 = inst2.create_files()
 
-    assert grid1[0][0].header["DET_YX0"] == "(1024.0, 1024.0)"  # the default is the integer center of the NIS aperture
+    assert grid1[0][0].header["DET_YX0"] == "(1023.0, 1023.0)"  # the default is the integer center of the NIS aperture
     assert grid2[0][0].header["DET_YX0"] == "(0.0, 10.0)"  # (y,x)
 
     # Compare to the WebbPSF calc_psf output to make sure it's placing the PSF in the right location

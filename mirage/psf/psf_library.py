@@ -18,7 +18,7 @@ class CreatePSFLibrary:
     nrca_short_detectors = ['NRCA1', 'NRCA2', 'NRCA3', 'NRCA4', 'NRCB1', 'NRCB2', 'NRCB3', 'NRCB4']
     nrca_long_detectors = ['NRCA5', 'NRCB5']
 
-    def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, psf_location=(1024, 1024),
+    def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, psf_location=(1023, 1023),
                  add_distortion=True, fov_pixels=101, oversample=5, opd_type="requirements", opd_number=0,
                  save=True, fileloc=None, filename=None, overwrite=True,
                  **kwargs):
@@ -59,7 +59,7 @@ class CreatePSFLibrary:
 
         psf_location : tuple
             If num_psfs = 1, then this is used to set the (y,x) location of that PSF.
-            Default is (1024,1024).
+            Default is (1023,1023).
 
         add_distortion : bool
             If True, the PSF will have distortions applied: the geometric distortion from
@@ -247,7 +247,7 @@ class CreatePSFLibrary:
 
         # Set the center values
         if num_psfs == 1:
-            # (1023.5, 1023.5) is the center, but we want an integer location- so default is (1024,1024)
+            # (1023.5, 1023.5) is the center, but we want an integer location- so default is (1023,1023)
             ij_list = [(0, 0)]
             loc_list = list(psf_location[::-1])  # list of x,y location
             location_list = [psf_location[::-1]]  # tuple of (x,y)
