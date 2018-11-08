@@ -472,6 +472,9 @@ class SimInput:
                 if 'B4' in module:
                     n_det = 1
                     module = ' B4'
+                if module == 'SUB96DHSPILA':
+                    n_det = 1
+                    module = ' A3'
             else:
                 # number of detectors
                 n_det = 1

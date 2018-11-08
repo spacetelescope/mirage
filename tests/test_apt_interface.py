@@ -19,14 +19,14 @@ import shutil
 
 from mirage.yaml import generate_observationlist, yaml_generator
 # for debugging
-from mirage.apt import read_apt_xml, apt_inputs
-from mirage.utils import siaf_interface
-import importlib
-importlib.reload( yaml_generator )
-importlib.reload(generate_observationlist)
-importlib.reload( read_apt_xml )
-importlib.reload( apt_inputs )
-importlib.reload( siaf_interface )
+# from mirage.apt import read_apt_xml, apt_inputs
+# from mirage.utils import siaf_interface
+# import importlib
+# importlib.reload( yaml_generator )
+# importlib.reload(generate_observationlist)
+# importlib.reload( read_apt_xml )
+# importlib.reload( apt_inputs )
+# importlib.reload( siaf_interface )
 
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
@@ -83,10 +83,10 @@ def test_complete_input_generation():
 
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
+    for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
     # for instrument in ['NIRISS']:
-    for instrument in ['misc']:
+    # for instrument in ['misc']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
     # for instrument in ['FGS']:
@@ -132,6 +132,7 @@ def test_complete_input_generation():
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
             # if 'OTE08-1142' not in apt_file_seed:
+            # if 'OTE12-1147' not in apt_file_seed:
             #     continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
@@ -148,22 +149,22 @@ def test_complete_input_generation():
                 apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
-            try:
-                print('Processing program {}'.format(apt_file_xml))
-                yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                              catalogs=catalogs, observation_list_file=observation_list_file,
-                                              verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
-                                              offline=True)
-            except RuntimeError as e:
-                print('Skipping {} because of error\n{}'.format(apt_file_xml, e))
+            print('Processing program {}'.format(apt_file_xml))
+            yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
+                                          catalogs=catalogs, observation_list_file=observation_list_file,
+                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
+                                          offline=True)
 
-            # yam.reffile_setup(offline=True)
-            yam.create_inputs()
+            try:
+                yam.create_inputs()
+            except RuntimeError as e:
+                print('\nERROR detected. Skipping {} because of error\n{}\n\n'.format(apt_file_xml, e))
+                continue
 
             yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
 
 # for debugging
-if __name__ == '__main__':
-    test_complete_input_generation()
+# if __name__ == '__main__':
+#     test_complete_input_generation()
