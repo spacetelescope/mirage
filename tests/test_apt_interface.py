@@ -19,14 +19,14 @@ import shutil
 
 from mirage.yaml import generate_observationlist, yaml_generator
 # for debugging
-# from mirage.apt import read_apt_xml, apt_inputs
-# from mirage.utils import siaf_interface
-# import importlib
-# importlib.reload( yaml_generator )
-# importlib.reload(generate_observationlist)
-# importlib.reload( read_apt_xml )
-# importlib.reload( apt_inputs )
-# importlib.reload( siaf_interface )
+from mirage.apt import read_apt_xml, apt_inputs
+from mirage.utils import siaf_interface
+import importlib
+importlib.reload( yaml_generator )
+importlib.reload(generate_observationlist)
+importlib.reload( read_apt_xml )
+importlib.reload( apt_inputs )
+importlib.reload( siaf_interface )
 
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
@@ -86,13 +86,13 @@ def test_complete_input_generation():
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
     # for instrument in ['NIRISS']:
-    # for instrument in ['misc']:
+    for instrument in ['misc']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
     # for instrument in ['FGS']:
-    for instrument in ['NIRCam']:
+    # for instrument in ['NIRCam']:
 
-        print('='*100)
+
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['1088', '1087', 'm31_field_test_observation']
@@ -101,7 +101,7 @@ def test_complete_input_generation():
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
-            apt_file_seeds = ['NIRCamTest']
+            # apt_file_seeds = ['NIRCamTest']
             # apt_file_seeds = ['1069']
             # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
@@ -130,6 +130,9 @@ def test_complete_input_generation():
                 catalogs[instrument_name.lower()] = source_list_file_name
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
+            print('\n\n' + '=' * 100 + '\n')
+            if 'OTE08-1142' not in apt_file_seed:
+                continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
             for file in obs_yaml_files:

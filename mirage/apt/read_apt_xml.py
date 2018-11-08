@@ -313,7 +313,6 @@ class ReadAPTXML():
         if verbose:
             print('Finished reading APT xml file.')
             print('+'*100)
-
         return self.APTObservationParams
 
 
@@ -501,6 +500,14 @@ class ReadAPTXML():
                     DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
                     number_of_dithers = int(DitherPatternType[0])
 
+                # Determine if there is an aperture override
+                override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+                FiducialPointOverride = False
+                if override is not None:
+                    FiducialPointOverride = True
+                #
+                # observation_dict['FiducialPointOverride'] = str(FiducialPointOverride)
+
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
                         ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
@@ -533,6 +540,8 @@ class ReadAPTXML():
                                 value = parallel_instrument
                             elif key == 'number_of_dithers':
                                 value = str(number_of_dithers)
+                            elif key == 'FiducialPointOverride':
+                                value = str(FiducialPointOverride)
                             else:
                                 value = str(None)
 

@@ -1242,7 +1242,8 @@ class SimInput:
             f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
             if instrument.lower() == 'nircam':
-                if input['aperture'] in ['NRCA3_DHSPIL', 'NRCB4_DHSPIL']:
+                # if input['aperture'] in ['NRCA3_DHSPIL', 'NRCB4_DHSPIL']:
+                if 'NRCA3_DHSPIL' in input['aperture'] or 'NRCB4_DHSPIL' in input['aperture']: # in ['NRCA3_DHSPIL', 'NRCB4_DHSPIL']:
                     full_ap = input['aperture']
                 else:
                     apunder = input['aperture'].find('_')

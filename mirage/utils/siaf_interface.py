@@ -42,12 +42,12 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
     # which are not yet in the PRD
     if instrument.lower() == 'nircam':
         print("NOTE: Using pre-delivery SIAF data for {}".format(aperture_name))
-        if instrument == 'NIRCAM':
-            instrument = 'NIRCam'
+        siaf_instrument = 'NIRCam'
         pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
-        siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture_name]
+        siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)[aperture_name]
     else:
-        siaf = pysiaf.Siaf(instrument)[aperture_name]
+        siaf_instrument = instrument
+        siaf = pysiaf.Siaf(siaf_instrument)[aperture_name]
 
     if v2_arcsec is None:
         v2_arcsec = siaf.V2Ref
@@ -65,7 +65,7 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
 
     # Subarray boundaries in full frame coordinates
     try:
-        xcorner, ycorner = sci_subarray_corners(instrument, aperture_name)
+        xcorner, ycorner = sci_subarray_corners(siaf_instrument, aperture_name)
         subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
     except (RuntimeError, TypeError) as e: # e.g. NIRSpec NRS_FULL_MSA aperture
         if verbose:

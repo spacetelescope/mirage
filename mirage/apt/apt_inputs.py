@@ -329,6 +329,7 @@ class AptInput:
         print('Wrote exposure table to {}'.format(detectors_file))
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
+        1/0
         self.ra_dec_update()
 
         # Output to a csv file.
@@ -407,15 +408,35 @@ class AptInput:
                 observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
             observation_dictionary['detector'].extend(detectors)
 
-
         #correct NIRCam aperture names
         for index, instrument in enumerate(observation_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
                 detector = 'NRC' + observation_dictionary['detector'][index]
                 sub = observation_dictionary['Subarray'][index]
-                aperture_name = detector + '_' + sub
+
+                # this should probably better be handled by using the subarray_definitions file upstream
+                if sub == 'SUB96DHSPILA':
+                    aperture_name = 'NRCA3_DHSPIL_SUB96'
+                elif sub == 'SUB96DHSPILB':
+                    aperture_name = 'NRCB4_DHSPIL_SUB96'
+                elif sub == 'SUB96DHSPILB':
+                    aperture_name = 'NRCB4_DHSPIL_SUB96'
+                elif ('NRCB4_DHSPIL' in sub) or ('NRCA3_DHSPIL' in sub):# in ['NRCB4_DHSPIL_SUB96', 'NRCA3_DHSPIL_SUB96']:
+                    aperture_name = sub
+                elif sub == 'SUB8FP1A':
+                    aperture_name = 'NRCA3_FP1_SUB8'
+                elif sub == 'SUB64FP1A':
+                    aperture_name = 'NRCA3_FP1_SUB64'
+                elif sub == 'SUB8FP1B':
+                    aperture_name = 'NRCB4_FP1_SUB8'
+                elif sub == 'SUB64FP1B':
+                    aperture_name = 'NRCB4_FP1_SUB64'
+
+                else:
+                    aperture_name = detector + '_' + sub
                 observation_dictionary['aperture'][index] = aperture_name
+
 
         return observation_dictionary
 
