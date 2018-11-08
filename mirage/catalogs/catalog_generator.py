@@ -1,12 +1,31 @@
 #! /usr/bin/env python
 
 """This module contains functions for creating Mirage-formatted source
-catalogs"""
+catalogs
+
+maybe i should change self.ra to self._ra and same with self.dec, to encourage
+people to use the get_ra() and get_dec() functions
+
+Right now create_table returns a table, which is fine, but would also be nice
+to be able to do:
+
+tab = PointSourceCatalog(stuff)
+tab_ap_format = tab.create_table()
+tab.save() - and have tab.save save the tab_ap_format table
+
+
+Maybe:
+tab = PointSourceCatalog(stuff)
+tab.create_table()  # creates tab.astropy_table or something like that
+tab.save()
+
+"""
 
 import os
 
 from astropy.io import ascii
 from astropy.table import Table, Column
+import numpy as np
 
 
 class PointSourceCatalog():
@@ -23,20 +42,22 @@ class PointSourceCatalog():
         if len(x) != len(y):
             raise ValueError(("WARNING: inconsistent length between x and y inputs."))
         if len(ra) > 0 and len(x) > 0:
-            raise ValueError(("WARNING: Provide either both RA and Dec values, or both x and y values."))
+            raise ValueError(("WARNING: Provide either RA and Dec values, or x and y values."))
 
-        self.ra = ra
-        self.dec = dec
-        self.x = x
-        self.y = y
+        if len(ra) > 0:
+            self.ra = ra
+            self.dec = dec
+        else:
+            self.ra = x
+            self.dec = y
         self.magnitudes = {}
 
         # Determine the units for the location fields. All that Mirage needs to know is whether
         # the units are pixels or not. Degrees vs hour angle is not important at this point.
         if len(ra) > 0:
-            self.location_untis = 'degrees'
+            self.location_units = 'position_RA_Dec'
         if len(x) > 0:
-            self.location_units = 'pixels'
+            self.location_units = 'position_pixels'
 
     def add_magnitude_column(self, magnitude_list, magnitude_system='abmag', instrument='', filter_name=''):
         """Add a list of magnitudes to the catalog
@@ -48,7 +69,6 @@ class PointSourceCatalog():
         # Make sure instrument and filter are allowed values
         instrument = instrument.lower()
         filter_name = filter_name.lower()
-        #self.instrument_check(instrument)
         self.filter_check(instrument, filter_name)
 
         # Create the string for the column header
@@ -84,9 +104,10 @@ class PointSourceCatalog():
             filter_file = 'nircam_filter_pupil_pairings.list'
         elif inst_name == 'niriss':
             filter_file = 'niriss_dual_wheel_list.txt'
-        filter_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../config/', filter_file))
 
         if inst_name in ['nircam', 'niriss']:
+            filter_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../config/',
+                                                            filter_file))
             filter_table = ascii.read(filter_file_path)
             if filt_name.upper() not in filter_table['filter']:
                 raise ValueError("WARNING: {} is not a valid filter for {}.".format(filt_name,
@@ -97,13 +118,17 @@ class PointSourceCatalog():
 
     def instrument_check(self, inst_name):
         """Only certain instrument values are allowed
+        NOT USED - so that we can return J, H, K from searches
         """
         if inst_name not in ['nircam', 'niriss', 'fgs']:
             raise ValueError("WARNING: {} is not a valid instrument.".format(inst_name))
 
     def get_dec(self):
         """Return Dec values from catalog"""
-        return self.dec
+        if self.location_units == 'position_RA_Dec':
+            return self.dec
+        else:
+            return []
 
     def get_magnitudes(self, key):
         """Return the magnitude list (but not mag_sys) associated with the given key
@@ -119,25 +144,33 @@ class PointSourceCatalog():
 
     def get_ra(self):
         """Return RA values from catalog"""
-        return self.ra
+        if self.location_units == 'position_RA_Dec':
+            return self.ra
+        else:
+            return []
 
     def get_x(self):
         """Return x values from catalog"""
-        return self.x
+        if self.location_units == 'position_pixels':
+            return self.ra
+        else:
+            return []
 
     def get_y(self):
         """Return y values from catalog"""
-        return self.y
+        if self.location_units == 'position_pixels':
+            return self.dec
+        else:
+            return []
 
     def create_table(self):
         """Create an astropy table containing the catalog
         """
-        tab = Table()
-        convert self.magnitudes[list(keys)[0]][0] and self.location_units to metadata
-        for key in self.magnitudes:
-            mag_values = self.magnitudes[key][1]
-            mag_column = Column(mag_values, name=key)
-            tab.add_column(mag_column)
+        tab = create_basic_table(self.ra, self.dec, self.magnitudes, self.location_units)
+
+        # Make sure there are at least 4 comment lines at the top
+        tab = pad_table_comments(tab)
+        return tab
 
     def save(self, catalog_table, output_name):
         """Write out the catalog to an ascii file
@@ -146,17 +179,210 @@ class PointSourceCatalog():
         ----------
         something
         """
-        ascii.write(catalog_table, output_name, overwrite=True)
+        catalog_table.write(output_name, format='ascii', overwrite=True)
 
 
 class GalaxyCatalog(PointSourceCatalog):
-    def __init__(self, ra=[], dec=[], x=[], y=[], ellipticity=[], radius=[], sersic_index=[]):
+    def __init__(self, ra=[], dec=[], x=[], y=[], ellipticity=[], radius=[], sersic_index=[],
+                 position_angle=[], radius_units='arcsec'):
         """Create instance of a galaxy catalog
         """
         # Add location information
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
 
         # Add galaxy-specific information
-        self.radius = radius
-        self.ellipticity = ellipticity
-        self.sersic = sersic_index
+        self.morphology = {'radius': radius, 'ellipticity': ellipticity, 'sersic_index': sersic_index,
+                           'pos_angle': position_angle}
+
+        if radius_units not in ['arcsec', 'pixels']:
+            raise ValueError("WARNING: Galaxy radii must be in units of 'arcsec' or 'pixels'.")
+        self.radius_units = radius_units
+
+    def create_table(self):
+        """Create an astropy table containing the catalog
+        """
+        tab = create_basic_table(self.ra, self.dec, self.magnitudes, self.location_units)
+
+        # Add morphology columns
+        for key in self.morphology:
+            values = self.morphology[key]
+            col = Column(values, name=key)
+            tab.add_column(col, index=3)
+
+        # Add magnitude system and position units as metadata
+        tab.meta['comments'].append(self.radius_units)
+
+        # Make sure there are at least 4 comment lines at the top
+        tab = pad_table_comments(tab)
+        return tab
+
+
+class ExtendedCatalog(PointSourceCatalog):
+    def __init__(self, filenames=[], ra=[], dec=[], x=[], y=[]):
+        # Add location information
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+
+        # Add extended source-specific information
+        self.filenames = filenames
+
+    def create_table(self):
+        """Create an astropy table containing the catalog
+        """
+        tab = create_basic_table(self.ra, self.dec, self.magnitudes, self.location_units)
+
+        # Add the filename column
+        file_col = Column(self.filenames)
+        tab.add_column(file_col, index=3)
+
+        # Make sure there are at least 4 comment lines at the top
+        tab = pad_table_comments(tab)
+        return tab
+
+
+class MovingPointSourceCatalog(PointSourceCatalog):
+    def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
+                 y_velocity=[]):
+        # Add location information
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+
+        if len(ra_velocity) > 0 and len(x_velocity) > 0:
+            raise ValueError(("WARNING: Provide either RA and Dec velocities, or x and y "
+                              "velocities, but not both."))
+        # Object velocities
+        if len(ra_velocity) > 0:
+            self.ra_velocity = ra_velocity
+            self.dec_velocity = dec_velocity
+            self.velocity_units = 'velocity_RA_Dec'
+        else:
+            self.ra_velocity = x_velocity
+            self.dec_velocity = y_velocity
+            self.velocity_units = 'velocity_pixels'
+
+    def create_table(self):
+        tab = create_basic_velocity_table(self.ra, self.dec, self.magnitudes, self.location_units,
+                                          self.ra_velocity, self.dec_velocity, self.velocity_units)
+
+        # Make sure there are at least 4 comment lines at the top
+        tab = pad_table_comments(tab)
+        return tab
+
+
+class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
+    def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
+                 y_velocity=[], ellipticity=[], radius=[], sersic_index=[], radius_units='arcsec'):
+        # Add location information
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity)
+        GalaxyCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ellipticity=ellipticity, radius=radius,
+                               sersic_index=sersic_index, radius_units='arcsec')
+
+    def create_table(self):
+        tab = create_basic_velocity_table(self.ra, self.dec, self.magnitudes, self.location_units,
+                                          self.ra_velocity, self.dec_velocity, self.velocity_units)
+        # Add morphology columns
+        for key in self.morphology:
+            values = self.morphology[key]
+            col = Column(values, name=key)
+            tab.add_column(col, index=3)
+
+        # Add magnitude system and position units as metadata
+        tab.meta['comments'].append(self.radius_units)
+        return tab
+
+
+class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
+    def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
+                 y_velocity=[], filenames=[]):
+        # Add location information
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity)
+        ExtendedCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, filenames=filenames)
+
+    def create_table(self):
+        tab = create_basic_velocity_table(self.ra, self.dec, self.magnitudes, self.location_units,
+                                          self.ra_velocity, self.dec_velocity, self.velocity_units)
+        # Add filename column
+        file_col = Column(self.filenames)
+        tab.add_column(file_col, index=3)
+
+        # Make sure there are at least 4 comment lines at the top
+        tab = pad_table_comments(tab)
+        return tab
+
+
+class NonSiderealCatalog(MovingPointSourceCatalog):
+    def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
+                 y_velocity=[], object_type=[]):
+        # Add location information
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+
+        # List of the type of sources in the non-sidereal catalog
+        valid_objects = ['pointSource', 'galaxies', 'extended']
+        for obj in object_type:
+            if obj not in valid_objects:
+                raise ValueError("WARNING: {} must be one of: {}".format(obj, valid_objects))
+        self.object_type = object_type
+
+    def create_table(self):
+        """Create an astropy table containing the catalog
+        """
+        tab = create_basic_velocity_table(self.ra, self.dec, self.magnitudes, self.location_units,
+                                          self.ra_velocity, self.dec_velocity, self.velocity_units)
+        obj_col = Column(self.object_type, name='object')
+        tab.add_column(obj_col, index=1)
+
+        # Make sure there are at least 4 comment lines at the top
+        tab = pad_table_comments(tab)
+        return tab
+
+
+def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_units):
+    """
+    DO IT
+    """
+    ra_vel_col = Column(ra_velocities, name='x_or_RA_velocity')
+    dec_vel_col = Column(dec_velocities, name='y_or_Dec_velocity')
+    input_table.add_columns([ra_vel_col, dec_vel_col], index=3)
+    input_table.meta['comments'].append(self.velocity_units)
+    return input_table
+
+
+def create_basic_table(ra_values, dec_values, magnitudes, location_units):
+    """Create astropy table containing the basic catalog info
+    NOTE THAT THIS IS OUTSIDE CLASSES
+    """
+    basic_table = Table()
+
+    # Add index, filename, RA, Dec or x, y columns
+    index_col = Column(np.arange(1, len(ra_values)+1), name='index')
+    ra_col = Column(ra_values, name='x_or_RA')
+    dec_col = Column(dec_values, name='y_or_Dec')
+    basic_table.add_columns([index_col, ra_col, dec_col])
+
+    # Add magnitude columns
+    for key in magnitudes:
+        mag_values = magnitudes[key][1]
+        mag_sys = magnitudes[key][0]
+        mag_column = Column(mag_values, name=key)
+        basic_table.add_column(mag_column)
+
+    # Add magnitude system and position units as metadata
+    basic_table.meta['comments'] = [location_units, mag_sys]
+    return basic_table
+
+
+def create_basic_velocity_table(ra_values, dec_values, magnitudes, location_units,
+                                ra_velocities, dec_velocities, velocity_units):
+    tab = create_basic_table(ra_values, dec_values, magnitudes, location_units)
+    tab = add_velocity_columns(tab, ra_velocities, dec_velocities, velocity_units)
+    return tab
+
+
+def pad_table_comments(input_table):
+    """do it"""
+    if len(input_table.meta['comments']) > 4:
+        pad = [''] * (4 - len(input_table.meta['comments']))
+        input_table.meta['comments'].extend(pad)
+    return input_table

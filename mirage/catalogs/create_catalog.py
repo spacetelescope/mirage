@@ -39,6 +39,22 @@ def get_2MASS_ptsrc_catalog(ra, dec, box_width):
     return cat
 
 
+#def from_luminosity_function(self, luminosity_function):
+#    more customizable
+
+
+#def galactic_plane(self):
+#    create representative scene looking into galactic galactic_plane
+
+
+#def galactic_bulge(self):
+#    looking into galactic_bulge
+
+
+#def out_of_plane(self):
+#    looking out of the plane of galaxy
+
+
 def filter_bad_ra_dec(table_data):
     """Use the column masks to find which entries have bad RA or Dec values.
     These will be excluded from the Mirage catalog
