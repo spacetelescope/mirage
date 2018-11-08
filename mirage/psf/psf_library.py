@@ -339,8 +339,15 @@ class CreatePSFLibrary:
             header["NWAVES"] = (psf[ext].header["NWAVES"], "Number of wavelengths used in calculation")
 
             for k, ij in enumerate(self.ij_list):  # these were originally written out in (i,j) and (x,y)
+
+                # Even arrays are shifted by 0.5 so they are centered correctly during calc_psf computation
+                # But this needs to be expressed correctly in the header
+                loc = np.asarray(self.location_list[k], dtype=float)
+                if self.fov_pixels % 2 == 0:
+                    loc += 0.5
+
                 header["DET_JI{}".format(k)] = (str(ij[::-1]), "The #{} PSF's (j,i) detector position".format(k))
-                header["DET_YX{}".format(k)] = (str((self.location_list[k][1], self.location_list[k][0])),
+                header["DET_YX{}".format(k)] = (str(tuple(loc[::-1])),
                                                 "The #{} PSF's (y,x) detector pixel position".format(k))
 
             header["NUM_PSFS"] = (self.num_psfs, "The total number of fiducial PSFs")

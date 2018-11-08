@@ -47,7 +47,14 @@ def test_all_filters_and_detectors():
 
 
 def test_compare_to_calc_psf():
-    """Check that the output grid has the expected PSFs in the right grid locations by comparing to calc_psf"""
+    """
+    Check that the output grid has the expected PSFs in the right grid locations by comparing
+    to calc_psf
+
+    This case also uses an even length array, so we'll need to subtract 0.5 from the detector
+    position because grid header has been shifted during calc_psf to account for it being an
+    even length array and this shift shouldn't happen 2x (ie again in calc_psf call below)
+    """
 
     oversample = 2
     fov_pixels = 10
@@ -61,8 +68,8 @@ def test_compare_to_calc_psf():
     psfnum = 1
     loc = grid[0][0].header["DET_YX{}".format(psfnum)]  # (y,x) location
     pos = grid[0][0].header["DET_JI{}".format(psfnum)]  # (j,i) position
-    locy = int(loc.split()[0][1:-1])
-    locx = int(loc.split()[1][:-1])
+    locy = int(float(loc.split()[0][1:-1]) - 0.5)
+    locx = int(float(loc.split()[1][:-1]) - 0.5)
     posj = int(pos.split()[0][1:-1])
     posi = int(pos.split()[1][:-1])
     gridpsf = grid[0][0].data[0, posj, posi, :, :]
@@ -134,8 +141,8 @@ def test_one_psf():
                              fov_pixels=fov_pixels, psf_location=(0, 10), save=False)
     grid2 = inst2.create_files()
 
-    assert grid1[0][0].header["DET_YX0"] == "(1024, 1024)"  # the default is the center of the NIS aperture
-    assert grid2[0][0].header["DET_YX0"] == "(0, 10)"  # (y,x)
+    assert grid1[0][0].header["DET_YX0"] == "(1024.0, 1024.0)"  # the default is the integer center of the NIS aperture
+    assert grid2[0][0].header["DET_YX0"] == "(0.0, 10.0)"  # (y,x)
 
     # Compare to the WebbPSF calc_psf output to make sure it's placing the PSF in the right location
     nis = webbpsf.NIRISS()
