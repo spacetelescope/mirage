@@ -36,7 +36,7 @@ from ..utils import siaf_interface
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         'niriss': ["imaging", "ami"],
+         'niriss': ["imaging", "ami", "pom"],
          'fgs': ["imaging"]}
 TRACKING_LIST = ['sidereal', 'non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
@@ -110,7 +110,7 @@ class Catalog_seed():
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
         # outside whose traces will fall into the FOV
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             self.calcCoordAdjust()
 
         #image dimensions
@@ -168,12 +168,43 @@ class Catalog_seed():
         if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
             ('FULL' not in self.params['Readout']['array_name'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
-
+         
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
+       
+        if self.params['Inst']['mode'] in ["pom"]:
+            self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
+         
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
-
+         
+    def extract_full_from_pom(self,seedimage,seed_segmap):
+        """ Given the seed image and segmentation images for the NIRISS POM field of view, 
+        extract the central 2048x2048 pixel area where the detector sits.  The routine is only 
+        called when the mode is "pom".  The mode is set to "imaging" in these routine, as after 
+        the routine is called the subsequent results are the same as when the mode is set to 
+        "imaging" in the parameter file.
+        
+        Parameters:
+        -----------
+        
+        seedimage : numpy.ndarray (float)   dimension 2322x2322 pixels
+        seed_segmap : numpy.ndarray (int)    dimension 2322x2322 pixels
+        
+        Returns:
+        ---------
+        
+        newseedimage : numpy.ndarray (float)  dimension 2048x2048
+        newseed_segmap : numpy.ndarray (int)   dimension 2048x2048
+        
+        """
+        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
+        # ramp simulation.  Set the mode back to "imaging".
+        newseedimage = np.copy(seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+        newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+        self.params['Inst']['mode'] = "imaging" 
+        return newseedimage, newseed_segmap
+         
     def add_detector_to_zeropoints(self, detector):
         """Manually add detector dependence to the zeropoint table for
         NIRCam and NIRISS simualtions. This is being done as a placeholder
@@ -226,7 +257,7 @@ class Catalog_seed():
         # If we are making a grism direct image, we need to embed the true pixel area
         # map in an array of the appropriate dimension, where any pixels outside the
         # actual aperture are set to 1.0
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             mapshape = pam.shape
             #cannot use this: g, yd, xd = signalramp.shape
             #need to update dimensions: self.pam = np.ones((yd, xd))
@@ -431,7 +462,7 @@ class Catalog_seed():
             yd, xd = input1.shape
             numints = self.params['Readout']['nint']
             num_frames = self.params['Readout']['ngroup'] * \
-                         (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+                (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print("Countrate image of synthetic signals being converted to "
                   "RAPID/NISRAPID integration with {} frames.".format(num_frames))
             input1_ramp = np.zeros((numints, num_frames, yd, xd))
@@ -468,7 +499,7 @@ class Catalog_seed():
             # print("RA velocity of {} and dec_val of {}".format(ra_vel, dec_vel))
 
         if self.runStep['movingTargets']:
-            #print('Starting moving targets for point sources!')
+            print("Adding moving point sources to seed image.")
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],
                                                                        'pointSource',
                                                                        MT_tracking=tracking,
@@ -477,12 +508,11 @@ class Catalog_seed():
             # Multiply by pixel area map since these sources are trailed across detector
             mov_targs_ptsrc *= self.pam
             mov_targs_ramps.append(mov_targs_ptsrc)
-            #print("Moving target segmap, min, max {}, {}".format(np.min(mt_ptsrc_segmap), np.max(mt_ptsrc_segmap)))
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
         # moving target using a sersic object
         if self.runStep['movingTargetsSersic']:
-            #print("Moving targets, sersic!")
+            print("Adding moving galaxies to seed image.")
             mov_targs_sersic, mt_galaxy_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],
                                                                          'galaxies',
                                                                          MT_tracking=tracking,
@@ -498,7 +528,7 @@ class Catalog_seed():
 
         # moving target using an extended object
         if self.runStep['movingTargetsExtended']:
-            #print("Extended moving targets!!!")
+            print("Adding moving extended sources to seed image.")
             mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],
                                                                    'extended',
                                                                    MT_tracking=tracking,
@@ -518,7 +548,7 @@ class Catalog_seed():
             mov_targs_integration = mov_targs_ramps[0]
             if len(mov_targs_ramps) > 1:
                 for i in range(1, len(mov_targs_ramps)):
-                    mov_targs_integration += mov_targs_ramps[0]
+                    mov_targs_integration += mov_targs_ramps[i]
         return mov_targs_integration, mov_targs_segmap
 
     def calcCoordAdjust(self):
@@ -532,8 +562,24 @@ class Catalog_seed():
         if self.params['Output']['grism_source_image']:
             self.coord_adjust['x'] = self.grism_direct_factor
             self.coord_adjust['y'] = self.grism_direct_factor
-            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[2] - self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) * (self.subarray_bounds[3] - self.subarray_bounds[1] + 1) / 2.)
+            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[2] -
+                                                   self.subarray_bounds[0] + 1) / 2.)
+            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
+                                                  (self.subarray_bounds[3] -
+                                                   self.subarray_bounds[1] + 1) / 2.)
+                  
+        if self.params['Inst']['mode'] in ["pom"]:
+            # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
+            self.output_dims = [2322,2322]
+            self.coord_adjust['x'] = 2322./2048.
+            self.coord_adjust['y'] = 2322./2048.
+            self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
+                                                  (self.subarray_bounds[2] -
+                                                   self.subarray_bounds[0] + 1) / 2.)
+            self.coord_adjust['yoffset'] = np.int((self.coord_adjust['y'] - 1.) *
+                                                  (self.subarray_bounds[3] -
+                                                   self.subarray_bounds[1] + 1) / 2.)
 
     def non_sidereal_seed(self):
         """
@@ -555,8 +601,7 @@ class Catalog_seed():
         totframes = ns_group * (ns_nframe + ns_nskip)
         tmptimes = self.frametime * np.arange(1, totframes + 1)
 
-        #non_sidereal_ramp = np.zeros((totframes, ns_yd, ns_xd))
-        non_sidereal_ramp = np.zeros((ns_int, ns_group, ns_yd, ns_xd))
+        non_sidereal_ramp = np.zeros((ns_int, totframes, ns_yd, ns_xd))
         for i in range(totframes):
             for integ in range(ns_int):
                 non_sidereal_ramp[integ, i, :, :] = nonsidereal_countrate * tmptimes[i]
@@ -567,11 +612,11 @@ class Catalog_seed():
         # the exposure.
         mtt_data_list = []
         mtt_data_segmap = None
-        #mtt_zero_list = []
 
         if self.runStep['pointsource']:
             # Now ptsrc is a list, which we need to provide to
             # movingTargetInputs
+            print("Adding moving background point sources to seed image.")
             mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],
                                                                   'pointSource',
                                                                   MT_tracking=True,
@@ -590,6 +635,7 @@ class Catalog_seed():
                    .format(self.params['simSignals']['pointsource'])))
 
         if self.runStep['galaxies']:
+            print("Adding moving background galaxies to seed image.")
             mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],
                                                                         'galaxies',
                                                                         MT_tracking=True,
@@ -608,6 +654,7 @@ class Catalog_seed():
                    format(self.params['simSignals']['galaxyListFile'])))
 
         if self.runStep['extendedsource']:
+            print("Adding moving background extended sources to seed image.")
             mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'],
                                                               'extended',
                                                               MT_tracking=True,
@@ -636,13 +683,13 @@ class Catalog_seed():
         return non_sidereal_ramp, nonsidereal_segmap
 
 
-    def readMTFile(self, file):
+    def readMTFile(self, filename):
         """
         Read in moving target list file
 
         Arguments:
         ----------
-        file : str
+        filename : str
             name of moving target catalog file
 
         Returns:
@@ -655,7 +702,7 @@ class Catalog_seed():
                 are in units of pixels/hour. If false, arcsec/hour
             magsys -- magnitude system of the moving target magnitudes
         """
-        mtlist = ascii.read(file, comment='#')
+        mtlist = ascii.read(filename, comment='#')
 
         # Convert all relevant columns to floats
         for col in mtlist.colnames:
@@ -694,7 +741,7 @@ class Catalog_seed():
         # If not, assume AB mags
         msys = 'abmag'
 
-        condition=('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
+        condition = ('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
         if condition:
             msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
             msys = msys.lower()
@@ -721,16 +768,49 @@ class Catalog_seed():
         data, header = fits.getdata(filename, header=True)
         return data, header
 
-    def movingTargetInputs(self, file, input_type, MT_tracking=False,
+    def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False):
         """Read in listfile of moving targets and perform needed
         calculations to get inputs for moving_targets.py
 
-        input_type can be 'pointSource','galaxies', or 'extended'
+        Parameters
+        ----------
+
+        filename : str
+            Name of catalog contining moving target sources
+
+        input_type : str
+            Specifies type of sources. Can be 'pointSource','galaxies', or 'extended'
+
+        MT_tracking : bool
+            If True, observation is non-sidereal (i.e. telescope is tracking the moving target)
+
+        tracking_ra_vel : float
+            Velocity of the moving target in the detector x or right ascension direction.
+            Units are pixels/hour or arcsec/hour depending on trackingPixVelFlag.
+
+        tracking_dec_vel : float
+            Velocity of moving target in the detector y or declination direction.
+            Units are pixels/hour or arcsec/hour depending on trackingPixVelFlag.
+
+        trackingPixVelFlag : bool
+            If True, tracking_ra_vel and tracking_dec_vel are in units of pixels/hour, and
+            velocities are in the detector x and y directions, respectively.
+            If False, velocity untis are arcsec/hour and directions are RA, and Dec.
+
+        Returns
+        -------
+
+        mt_integration : numpy.ndarray
+            4D array containing moving target seed image
+
+        moving_segmap.segmap : numpy.ndarray
+            2D array containing segmentation map that goes with the seed image.
+            Segmentation map is based on the final frame in the seed image.
         """
         # Read input file - should be able to use for all modes
-        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(file)
+        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(filename)
 
         # If the input catalog has an index column
         # use that, otherwise add one
@@ -748,7 +828,7 @@ class Catalog_seed():
             indexes += self.maxindex
         self.maxindex = np.max(indexes)
 
-        if MT_tracking == True:
+        if MT_tracking is True:
             # Here, we are tracking a non-sidereal target.
             try:
                 # If there are moving targets on top of the non-
@@ -760,13 +840,13 @@ class Catalog_seed():
                 # target. If it doesn't, then we have sidereal
                 # targets, and we can simply set their velocity
                 # as the inverse of that being tracked.
-                mtlist['x_or_RA_velocity'] -= tracking_ra_vel #* (1./365.25/24.)
-                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel #* (1./365.25/24.)
+                mtlist['x_or_RA_velocity'] -= tracking_ra_vel
+                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel
                 pixvelflag = trackingPixVelFlag
             except:
                 print('Setting velocity of targets equal to the non-sidereal tracking velocity')
-                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel #* (1./365.25/24.)
-                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel #* (1./365.25/24.)
+                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel
+                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel
                 pixvelflag = trackingPixVelFlag
 
         # Exposure times for all frames
@@ -789,17 +869,15 @@ class Catalog_seed():
             # Add the resets for all but the first and last integrations
             total_frames += (numresets * (numints - 1))
 
-        frameexptimes = self.frametime * np.arange(-1,total_frames)
+        frameexptimes = self.frametime * np.arange(-1, total_frames)
 
-        #output image dimensions
-        #dims = np.array(self.dark.data[0,0,:,:].shape)
+        # output image dimensions
         dims = self.nominal_dims
         newdimsx = np.int(dims[1] * self.coord_adjust['x'])
         newdimsy = np.int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
-        #mt_integration = np.zeros((len(frameexptimes)-1, newdimsy, newdimsx))
-        mt_integration = np.zeros((numints, numgroups * frames_per_group, newdimsy, newdimsx))
+        mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
 
         # Corresponding (2D) segmentation map
         moving_segmap = segmap.SegMap()
@@ -812,8 +890,15 @@ class Catalog_seed():
         # conversion to hang.
         indexes, mtlist = self.remove_outside_fov_sources(indexes, mtlist, pixelFlag, 4096)
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(mtlist, filename)
+
+        times = []
+        obj_counter = 0
+        time_reported = False
         for index, entry in zip(indexes, mtlist):
-            # For each object, calculate x,y or RA,Dec of initial position
+            start_time = time.time()
+             # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
                 entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
 
@@ -873,7 +958,8 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
             elif input_type == 'galaxies':
-                stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'], entry['pos_angle'], 1.)
+                stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
+                                           entry['pos_angle'], 1.)
                 # Convolve the galaxy with the instrument PSF
                 stamp = s1.fftconvolve(stamp, self.centerpsf, mode='same')
 
@@ -882,7 +968,7 @@ class Catalog_seed():
             stamp /= totalsignal
 
             # Scale the stamp image to the requested magnitude
-            rate = self.mag_to_countrate(magsys, entry['magnitude'],
+            rate = self.mag_to_countrate(magsys, entry[mag_column],
                                          photfnu=self.photfnu,
                                          photflam=self.photflam)
             stamp *= rate
@@ -902,16 +988,13 @@ class Catalog_seed():
             # outputarrayxsize, outputarrayysize
             # (maybe without the values that will be the same to each entry.
 
-            #entryList = (stamp,ra,dec,entry[3]/3600.,entry[4]/3600.,self.frametime,numframes,subsample_factor,outx,outy)
-            #entryList = (stamp,x_frames,y_frames,self.frametime,subsample_factor,outx,outy)
-
             # Need to feed info into moving_targets one integration at a time.
             # No need to feed in the reset frames, but they are necessary
             # before this point in order to get the timing and positions
             # correct.
             for integ in range(numints):
-                framestart = integ * (frames_per_group * numgroups) + integ
-                frameend = framestart + (frames_per_group * numgroups) + 1
+                framestart = integ * total_frames + integ
+                frameend = framestart + total_frames + 1
 
                 # Now check to see if the stamp image overlaps the output
                 # aperture for this integration only. Above we removed sources
@@ -928,17 +1011,14 @@ class Catalog_seed():
                 mt = moving_targets.MovingTarget()
                 mt.subsampx = 3
                 mt.subsampy = 3
-                #mt_source = mt.create(stamp, x_frames, y_frames, self.frametime, newdimsx, newdimsy)
-                #print("Prepping to input to moving_targets: integ: {}, framestart: {}, frameend: {}, xframelen: {}, yframelen: {}, {}, {}, {}".format(integ,framestart,frameend,len(x_frames),len(y_frames),newdimsx,newdimsy,stamp.shape))
 
                 mt_source = mt.create(stamp, x_frames[framestart:frameend],
                                       y_frames[framestart:frameend],
                                       self.frametime, newdimsx, newdimsy)
-                #mt_integration += mt_source
                 mt_integration[integ, :, :, :] += mt_source
 
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                     noiseval += self.grism_background
 
                 if input_type in ['pointSource', 'galaxies']:
@@ -946,27 +1026,48 @@ class Catalog_seed():
                 else:
                     indseg = self.seg_from_photutils(mt_source[-1, :, :], index, noiseval)
                     moving_segmap.segmap += indseg
+
+            # Check the elapsed time for creating each object
+            elapsed_time = time.time() - start_time
+            times.append(elapsed_time)
+            if obj_counter > 3 and not time_reported:
+                avg_time = np.mean(times)
+                total_time = len(indexes) * avg_time
+                print(("Expected time to process {} sources: {:.2f} seconds "
+                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                time_reported = True
+            obj_counter += 1
         return mt_integration, moving_segmap.segmap
 
-    def on_detector(self,xloc, yloc, stampdim, finaldim):
+    def on_detector(self, xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
         and final image dimensions, determine whether the stamp
         image will overlap at all with the final image, or
         completely miss it.
 
-        Arguments:
-        ----------
-        xloc -- list of x-coordinate locations of source
-        yloc -- list of y-coordinate locations of source
-        stampdim -- tuple of x,y dimension lengths of stamp image
-        finaldim -- tuple of x,y dimension lengths of final image
+        Parameters
+        ---------
 
-        Returns:
-        --------
-        state of stamp image:
-        "on" -- stamp image fully or partially overlaps the final
-             image for at least one xloc, yloc pair
-        "off" -- stamp image never overlaps with final image
+        xloc : list
+            X-coordinate locations of source
+
+        yloc : list
+            Y-coordinate locations of source
+
+        stampdim : tuple
+            (x,y) dimension lengths of stamp image
+
+        finaldim : tuple
+            (x,y) dimension lengths of final image
+
+        Returns
+        -------
+
+        status : str
+            state of stamp image:
+            "on" -- stamp image fully or partially overlaps the final
+                 image for at least one xloc, yloc pair
+            "off" -- stamp image never overlaps with final image
         """
         status = 'on'
         stampx, stampy = stampdim
@@ -976,7 +1077,7 @@ class Catalog_seed():
         stampmaxy = np.max(yloc + (stampy / 2))
         finalx, finaly = finaldim
         if ((stampminx > finalx) or (stampmaxx < 0) or
-            (stampminy > finaly) or (stampmaxy < 0)):
+           (stampminy > finaly) or (stampmaxy < 0)):
             status = 'off'
         return status
 
@@ -1193,7 +1294,7 @@ class Catalog_seed():
 
     def addedSignals(self):
         # Generate a signal rate image from input sources
-        if self.params['Output']['grism_source_image'] == False:
+        if (self.params['Output']['grism_source_image'] == False) and (not self.params['Inst']['mode'] in ["pom"]):
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
@@ -1461,7 +1562,7 @@ class Catalog_seed():
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
         # Expand the limits if a grism direct image is being made
-        if self.params['Output']['grism_source_image'] == True:
+        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
             extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -1490,6 +1591,9 @@ class Catalog_seed():
         # conversion to hang.
         indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(lines, filename)
+
         start_time = time.time()
         times = []
         time_reported = False
@@ -1513,7 +1617,7 @@ class Catalog_seed():
                                                                               pixelflag, 4096)
 
                 # Get the input magnitude of the point source
-                mag = float(values['magnitude'])
+                mag = float(values[mag_column])
 
                 if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
                     # set up an entry for the output table
@@ -1812,7 +1916,7 @@ class Catalog_seed():
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            condition=('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            condition = ('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
             if condition:
                 msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
                 msys = msys.lower()
@@ -1821,6 +1925,59 @@ class Catalog_seed():
             raise IOError("WARNING: Unable to open the source list file {}".format(filename))
 
         return gtab, pflag, msys
+
+    def select_magnitude_column(self, catalog, catalog_file_name):
+        """Select the appropriate column to use for source magnitudes from the input source catalog. If there
+        is a specific column name constructed as <instrument>_<filter>_magnitude to use for source magnitudes
+        (e.g. nircam_f200w_magnitude) then use that. (NOTE: for FGS we search for a column name of
+        'fgs_magnitude'). If not, check for a generic 'magnitude' column. If neither are present, raise an
+        error.
+
+        Parameters
+        ----------
+
+        catalog : astropy.table.Table
+            Source catalog
+
+        catalog_file_name : str
+            Name of the catalog file. Used only when raising errors.
+
+        Returns
+        -------
+
+        specific_mag_col : str
+            The name of the catalog column to use for source magnitudes
+        """
+        # Determine the filter name to look for
+        if self.params['Inst']['instrument'].lower() in ['nircam', 'niriss']:
+            if self.params['Readout']['pupil'][0].upper() == 'F':
+                usefilt = 'pupil'
+            else:
+                usefilt = 'filter'
+            filter_name = self.params['Readout'][usefilt].lower()
+            # Construct the column header to look for
+            specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(),
+                                                        filter_name)
+
+        elif self.params['Inst']['instrument'].lower() == 'fgs':
+            specific_mag_col = "fgs_magnitude"
+
+        # Search catalog column names.
+        if specific_mag_col in catalog.colnames:
+            print("Using {} column in {} for magnitudes".format(specific_mag_col,
+                                                                os.path.split(catalog_file_name)[1]))
+            return specific_mag_col
+
+        elif 'magnitude' in catalog.colnames:
+            print(("WARNING: Catalog {} does not have a magnitude column called {}, "
+                   "but does have a generic 'magnitude' column. Continuing simulation using that."
+                   .format(os.path.split(catalog_file_name)[1], specific_mag_col)))
+            return "magnitude"
+        else:
+            raise ValueError(("WARNING: Catalog {} has no magnitude column specifically for {} {}, "
+                              "nor a generic 'magnitude' column. Unable to proceed."
+                              .format(os.path.split(catalog_file_name)[1], self.params['Inst']['instrument'],
+                                      filter_name.upper())))
 
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
@@ -1987,13 +2144,12 @@ class Catalog_seed():
                 msys = msys.lower()
 
         except:
-            print("WARNING: Unable to open the galaxy source list file {}".format(filename))
-            sys.exit()
+            raise IOError("WARNING: Unable to open the galaxy source list file {}".format(filename))
 
         return gtab, pflag, rpflag, msys
 
 
-    def filterGalaxyList(self, galaxylist, pixelflag, radiusflag, magsystem):
+    def filterGalaxyList(self, galaxylist, pixelflag, radiusflag, magsystem, catfile):
         # given a list of galaxies (location, size, orientation, magnitude)
         # keep only those which will fall fully or partially on the output array
 
@@ -2026,7 +2182,7 @@ class Catalog_seed():
         nx = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
 
         #Expand the limits if a grism direct image is being made
-        if self.params['Output']['grism_source_image'] == True:
+        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
             extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -2058,6 +2214,9 @@ class Catalog_seed():
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
         indexes, galaxylist = self.remove_outside_fov_sources(indexes, galaxylist, pixelflag, 4096)
+
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(galaxylist, catfile)
 
         # Loop over galaxy sources
         for index, source in zip(indexes, galaxylist):
@@ -2091,7 +2250,7 @@ class Catalog_seed():
 
                 # Now look at the input magnitude of the point source
                 # append the mag and pixel position to the list of ra, dec
-                mag = float(source['magnitude'])
+                mag = float(source[mag_column])
                 entry.append(mag)
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
@@ -2209,7 +2368,7 @@ class Catalog_seed():
 
         # Extract and save only the entries which will land (fully or partially) on the
         # aperture of the output
-        galaxylist = self.filterGalaxyList(glist, pixflag, radflag, magsys)
+        galaxylist = self.filterGalaxyList(glist, pixflag, radflag, magsys, file)
 
         # galaxylist is a table with columns:
         # 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'radius', 'ellipticity', 'pos_angle', 'sersic_index', 'magnitude', 'countrate_e/s', 'counts_per_frame_e'
@@ -2223,7 +2382,7 @@ class Catalog_seed():
         # expand if a grism source image is being made
         xfact = 1
         yfact = 1
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             # xfact = self.grism_direct_factor
             # yfact = self.grism_direct_factor
             # elif
@@ -2243,7 +2402,7 @@ class Catalog_seed():
         # Adjust the coordinate system of the galaxy list if working with a grism direct image output
         deltax = 0
         deltay = 0
-        if self.params['Output']['grism_source_image']:
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
             deltax = np.int((dims[1] - origxd) / 2)
             deltay = np.int((dims[0] - origyd) / 2)
 
@@ -2387,6 +2546,9 @@ class Catalog_seed():
 
         print("After extended sources, max index is {}".format(self.maxindex))
 
+        # Determine the name of the column to use for source magnitudes
+        mag_column = self.select_magnitude_column(lines, filename)
+
         #Loop over input lines in the source list
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
@@ -2396,7 +2558,7 @@ class Catalog_seed():
                                                                               pixelflag, 4096)
                 # Get the input magnitude
                 try:
-                    mag = float(values['magnitude'])
+                    mag = float(values[mag_column])
                 except ValueError:
                     mag = None
 
@@ -2427,7 +2589,7 @@ class Catalog_seed():
                 maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
                 # Expand the limits if a grism direct image is being made
-                if self.params['Output']['grism_source_image'] == True:
+                if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
                     extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
                     miny -= extrapixy
                     maxy += extrapixy
