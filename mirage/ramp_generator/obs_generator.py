@@ -47,7 +47,7 @@ from ..utils import set_telescope_pointing_separated as stp
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         "niriss": ["imaging", "ami"],
+         "niriss": ["imaging", "ami", "pom"],
          "fgs": ["imaging"]}
 
 
@@ -2014,13 +2014,13 @@ class Observation():
 
         Parameters
         ----------
-        starttime : float
-            Starting time of exposure (mjd)
+        starttime : astropy.time.Time
+            Starting time of exposure
 
         grouptime : float
             Exposure time of a single group (seconds)
 
-        ramptime : floag
+        ramptime : float
             Exposure tiem of the entire exposure (seconds)
 
         numint : int
@@ -2043,7 +2043,7 @@ class Observation():
         # Create the table with a first row populated by garbage
         grouptable = self.create_group_entry(999, 999, 0, 0, 0, 'void', 0, 0, 0, 0, 'void', 1., 1.)
 
-        # Fixed for all exposures
+        # Quantities that are fixed for all exposures
         compcode = 0
         comptext = 'Normal Completion'
         numgap = 0
@@ -2058,22 +2058,33 @@ class Observation():
             groups = np.arange(1, numgroup+1)
             groupends = intstarts[integ] + (np.arange(1, numgroup+1)*groupdelta)
             endday = (groupends - baseday).jd
+
+            # If the integration has a single group, force endday to be an array
+            if isinstance(endday, float):
+                endday = np.array([endday])
             enddayint = [np.int(s) for s in endday]
 
-            # now to get end_milliseconds, we need milliseconds from the beginning
+            # Now to get end_milliseconds, we need milliseconds from the beginning
             # of the day
             inday = TimeDelta(endday - enddayint, format='jd')
             endmilli = inday.sec * 1000.
 
-            # submilliseconds - just use a random number
+            # Submilliseconds - just use a random number
             endsubmilli = np.random.randint(0, 1000, len(endmilli))
 
-            # group end time. need to remove : and - and make lowercase t
+            # Group end time. need to remove : and - and make lowercase t
             groupending = groupends.isot
 
-            # approximate these as just the group end time in mjd
+            # Approximate these as just the group end time in mjd
             barycentric = groupends.mjd
             heliocentric = groupends.mjd
+
+            # For the case of an integration with a single group, force quantities to be
+            # arrays so that everything is consistent
+            if isinstance(groupending, str):
+                groupending = np.array([groupending])
+                barycentric = np.array([barycentric])
+                heliocentric = np.array([heliocentric])
 
             for grp, day, milli, submilli, grpstr, bary, helio in zip(groups, endday, endmilli,
                                                                       endsubmilli, groupending,
@@ -2413,13 +2424,13 @@ class Observation():
             outModel.zeroframe = np.zeros((numint, ys, xs))
 
         # EXPTYPE OPTIONS
-        # exptypes = ['NRC_IMAGE', 'NRC_GRISM', 'NRC_TACQ', 'NRC_CORON',
+        # exptypes = ['NRC_IMAGE', 'NRC_WFSS', 'NRC_TACQ', 'NRC_CORON',
         #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
         # nrc_tacq and nrc_coron are not currently implemented.
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE"},
+                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
+                   "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE"},
                    "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
@@ -2691,7 +2702,7 @@ class Observation():
             groupextnum = 3
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_GRISM", "ts_wfss": "NRC_TSGRISM"},
+                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
                    "niriss": {"imaging": "NIS_IMAGE"},
                    "fgs": {"imaging": "FGS_IMAGE"}}
 
