@@ -199,10 +199,10 @@ def test_setting_inputs():
                              num_psfs=1, fov_pixels=1, oversample=2, save=False)
     grid4 = inst4.create_files()
 
-    # # Pass the name "shortwave" to both filter and detector - This case takes 6min alone to run - excluding for time
-    # inst5 = CreatePSFLibrary(instrument="NIRCam", filters="shortwave", detectors="shortwave",
-    #                          num_psfs=1, fov_pixels=1, oversample=2, save=False)
-    # grid5 = inst5.create_files()
+    # Pass the name "shortwave" to both filter and detector
+    inst5 = CreatePSFLibrary(instrument="NIRCam", filters="shortwave", detectors="shortwave",
+                             num_psfs=1, fov_pixels=1, oversample=2, save=False)
+    grid5 = inst5.create_files()
 
     # Length is the number of filters, Shape of those objects follows (det, j, i, y, x)
     assert len(grid1) == 1
@@ -213,8 +213,8 @@ def test_setting_inputs():
     assert grid3[0][0].data.shape == (1, 1, 1, 2, 2)
     assert len(grid4) == 16
     assert grid4[0][0].data.shape == (2, 1, 1, 2, 2)
-    # assert len(grid5) == 13
-    # assert grid5[0][0].data.shape == (8, 1, 1, 2, 2)
+    assert len(grid5) == 13
+    assert grid5[0][0].data.shape == (8, 1, 1, 2, 2)
 
     # Check that passing strings and lists produces the same result
     assert np.array_equal(grid1[0][0].data, grid3[0][0].data)
