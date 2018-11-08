@@ -83,14 +83,14 @@ def test_complete_input_generation():
 
 
     # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
+    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
     # for instrument in ['NIRISS']:
     # for instrument in ['misc']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
     # for instrument in ['FGS']:
-    # for instrument in ['NIRCam']:
+    for instrument in ['NIRCam']:
 
         print('='*100)
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
@@ -101,7 +101,7 @@ def test_complete_input_generation():
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
-            # apt_file_seeds = ['NIRCamTest']
+            apt_file_seeds = ['NIRCamTest']
             # apt_file_seeds = ['1069']
             # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
@@ -149,9 +149,10 @@ def test_complete_input_generation():
             print('Processing program {}'.format(apt_file_xml))
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
                                           catalogs=catalogs, observation_list_file=observation_list_file,
-                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR)
+                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
+                                          offline=True)
 
-            yam.reffile_setup(offline=True)
+            # yam.reffile_setup(offline=True)
             yam.create_inputs()
 
             yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
@@ -159,5 +160,5 @@ def test_complete_input_generation():
             assert len(valid_instrument_list) == len(yfiles)
 
 # for debugging
-# if __name__ == '__main__':
-#     test_complete_input_generation()
+if __name__ == '__main__':
+    test_complete_input_generation()

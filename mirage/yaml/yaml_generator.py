@@ -101,7 +101,7 @@ ENV_VAR = 'MIRAGE_DATA'
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
                  use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
-                 output_dir='./', simdata_output_dir='./', parameter_defaults=None):
+                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -166,7 +166,7 @@ class SimInput:
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose,
                                                      parameter_defaults=parameter_defaults)
 
-        self.reffile_setup()
+        self.reffile_setup(offline=offline)
 
     def add_catalogs(self):
         """
