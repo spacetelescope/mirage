@@ -24,7 +24,7 @@ env:
     global:
         - MAIN_CMD='python setup.py'
         - CONDA_CHANNELS='http://ssb.stsci.edu/astroconda'
-        - CONDA_DEPENDENCIES='pytest=3.6 sphinx pandoc IPython'
+        - CONDA_DEPENDENCIES='pytest=3.6 sphinx pandoc IPython yaml'
         - PIP_DEPENDENCIES=''
         - PYTHON_VERSION=3.6
         - NUMPY_VERSION=stable
@@ -63,6 +63,7 @@ matrix:
 install:
     - git clone git://github.com/astropy/ci-helpers.git
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
+    - git clone https://github.com/npirzkal/NIRCAM_Gsim.git
 
 script:
     - $MAIN_CMD $SETUP_CMD
