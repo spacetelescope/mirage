@@ -131,8 +131,8 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            if 'OTE08-1142' not in apt_file_seed:
-                continue
+            # if 'OTE08-1142' not in apt_file_seed:
+            #     continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
             for file in obs_yaml_files:
@@ -148,12 +148,14 @@ def test_complete_input_generation():
                 apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
-
-            print('Processing program {}'.format(apt_file_xml))
-            yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                          catalogs=catalogs, observation_list_file=observation_list_file,
-                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
-                                          offline=True)
+            try:
+                print('Processing program {}'.format(apt_file_xml))
+                yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
+                                              catalogs=catalogs, observation_list_file=observation_list_file,
+                                              verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
+                                              offline=True)
+            except RuntimeError as e:
+                print('Skipping {} because of error\n{}'.format(apt_file_xml, e))
 
             # yam.reffile_setup(offline=True)
             yam.create_inputs()

@@ -329,7 +329,6 @@ class AptInput:
         print('Wrote exposure table to {}'.format(detectors_file))
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
-        1/0
         self.ra_dec_update()
 
         # Output to a csv file.
