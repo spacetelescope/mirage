@@ -338,6 +338,7 @@ class SimInput:
         # detector_labels = self.info['detector']
         # for det in detector_labels:
         for instrument, det in zip([s.lower() for s in self.info['Instrument']], self.info['detector']):
+            instrument = instrument.lower()
             darks.append(self.get_dark(instrument, det))
             lindarks.append(self.get_lindark(instrument, det))
             superbias.append(self.get_reffile(self.superbias_list[instrument], det))
@@ -1140,13 +1141,12 @@ class SimInput:
                     self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
                     self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
 
-                    self.astrometric_list[det] = glob(os.path.join(self.reference_file_dir[instrument], 'distortion/*distortion*.asdf'))[0]
+                    self.astrometric_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'distortion/*distortion*.asdf'))[0]
                     # suspecting that the FGS wcs reference file has a problem
                     # self.astrometric_list[instrument][det] = 'none'
 
                     self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'pam/*area*.fits'))[0]
                     self.lindark_list[instrument][det] = [None]
-
 
     def set_config(self, file, prop):
         """

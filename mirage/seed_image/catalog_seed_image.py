@@ -2039,7 +2039,7 @@ class Catalog_seed():
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
         else:
-            print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
+            # print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
