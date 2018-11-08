@@ -1126,22 +1126,31 @@ class SimInput:
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
                                                '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
+                        self.astrometric_list[instrument][det] = glob(
+                            os.path.join(self.reference_file_dir[instrument],
+                                         'distortion/*distortion_0004.asdf'))[0]
 
                     elif det == 'G2':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
                                                '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
+                        self.astrometric_list[instrument][det] = glob(
+                            os.path.join(self.reference_file_dir[instrument],
+                                         'distortion/*distortion_0003.asdf'))[0]
 
                     elif det == 'NIS':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
                                                '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+                        self.astrometric_list[instrument][det] = glob(
+                            os.path.join(self.reference_file_dir[instrument],
+                                         'distortion/*distortion*.asdf'))[0]
                     self.superbias_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'superbias/*superbias*.fits'))[0]
                     self.linearity_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'linearity/*linearity*.fits'))[0]
                     self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
                     self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
 
-                    self.astrometric_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'distortion/*distortion*.asdf'))[0]
+
                     # suspecting that the FGS wcs reference file has a problem
                     # self.astrometric_list[instrument][det] = 'none'
 
