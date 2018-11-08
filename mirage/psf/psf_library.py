@@ -180,9 +180,8 @@ class CreatePSFLibrary:
                                    "falls within the detector band.")
 
     def _set_detectors(self, filter):
-        """Get the list of detectors to include in the PSF library files"""
+        """Set the list of detectors to include in the PSF library files"""
 
-        # Set detector list
         if self.detector_input == "all":
             if self.instr != "NIRCam":
                 detector_list = self.webb.detector_list
@@ -211,9 +210,8 @@ class CreatePSFLibrary:
         return detector_list
 
     def _set_filters(self):
-        """Get the list of filters to create PSF library files for"""
+        """Set the list of filters to create PSF library files for"""
 
-        # Set filter list
         if self.filter_input == "all":
             filter_list = self.webb.filter_list
         elif self.filter_input == "shortwave":
@@ -249,6 +247,7 @@ class CreatePSFLibrary:
 
         # Set the center values
         if num_psfs == 1:
+            # (1023.5, 1023.5) is the center, but we want an integer location- so default is (1024,1024)
             ij_list = [(0, 0)]
             loc_list = list(psf_location[::-1])  # list of x,y location
             location_list = [psf_location[::-1]]  # tuple of (x,y)
@@ -267,8 +266,8 @@ class CreatePSFLibrary:
 
         Returns
         -------
-        This saves out the library files (if requested) and then returns a list of all the
-        hdulist objects created (a 5D array of [SCA, j, i, y, x], 1 per filter requested).
+        Returns a list of all the hdulist objects created (a 5D array of [SCA, j, i, y, x],
+        1 per filter) and saves out the library files if requested.
 
         """
 
@@ -402,10 +401,8 @@ class CreatePSFLibrary:
             # Add header labels
             header.insert("INSTRUME", ('', ''))
             header.insert("INSTRUME", ('COMMENT', '/ PSF Library Information'))
-
             header.insert("NORMALIZ", ('', ''))
             header.insert("NORMALIZ", ('COMMENT', '/ WebbPSF Creation Information'))
-
             header.insert("DATAVERS", ('COMMENT', '/ File Description'), after=True)
             header.insert("DATAVERS", ('', ''), after=True)
 
@@ -415,13 +412,10 @@ class CreatePSFLibrary:
             # Write file out
             if self.save:
 
-                # Set file information
                 if self.fileloc is None:
                     self.fileloc = os.path.expandvars('$MIRAGE_DATA/{}/'
                                                       'test_webbpsf_library'.format(self.instr.lower()))
-
                 if self.filename is None:
-                    # E.g. filename: nircam_f090w_fovp1000_samp5_npsf16.fits
                     name = "{}_{}_fovp{}_samp{}_npsf{}.fits".format(self.instr.lower(), filt.lower(),
                                                                     self.fov_pixels, self.oversample,
                                                                     self.num_psfs)
@@ -433,7 +427,6 @@ class CreatePSFLibrary:
 
                 hdu.writeto(filepath, overwrite=self.overwrite)
 
-            # Create something to return
             final_list.append(hdu)
 
         return final_list
