@@ -18,7 +18,7 @@ import shutil
 from lxml import etree
 import pytest
 
-from mirage.yaml import write_observationlist, yaml_generator
+from mirage.yaml import generate_observationlist, yaml_generator
 
 # for debugging
 # from mirage.apt import read_apt_xml, apt_inputs
@@ -72,10 +72,10 @@ def RunAllAPTTemplates(instrument):
 
     # Write observationlist.yaml
     observationlist_file = os.path.join(out_dir, instrument + '_observationlist.yaml')
-    # write_observationlist.write_yaml(xml_file, pointing_file, observationlist_file,
+    # write_observationlist.get_observation_dict(xml_file, pointing_file, observationlist_file,
     #                                  ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
-    apt_xml_dict = write_observationlist.write_yaml(xml_file, observationlist_file, None,
-                                     ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
+    apt_xml_dict = generate_observationlist.get_observation_dict(xml_file, observationlist_file, None,
+                                                                 ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
 
     # Create a series of data simulator input yaml files
     yam = yaml_generator.SimInput()
@@ -83,7 +83,7 @@ def RunAllAPTTemplates(instrument):
     yam.pointing_file = pointing_file
     yam.output_dir = out_dir
     yam.simdata_output_dir = out_dir
-    yam.observation_table = observationlist_file
+    yam.observation_list_file = observationlist_file
     yam.use_JWST_pipeline = False
     yam.use_linearized_darks = True
     yam.datatype = 'linear'

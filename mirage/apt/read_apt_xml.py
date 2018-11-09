@@ -10,56 +10,10 @@ from lxml import etree
 from astropy.io import ascii
 import numpy as np
 
+from ..utils.utils import append_dictionary
+
 APT_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 PACKAGE_DIR = os.path.dirname(APT_DIR)
-
-
-def append_dictionary(base_dictionary, added_dictionary, braid=False):
-    """Append the content of added_dictionary key-by-key to the base_dictionary.
-
-    This assumes that the keys refer to lists.
-
-    Parameters
-    ----------
-    base_dictionary : dict
-    added_dictionary : dict
-    braid : bool
-        If true, the elements of added_dictionary are added in alternating sequence.
-        This is used to synchronize parallel observations with the pointing file.
-
-    Returns
-    -------
-    new_dictionary : dict
-        Dictionary where every key holds a list of lists
-
-    """
-    new_dictionary = copy.deepcopy(base_dictionary)
-
-    # extract an arbitrary key name
-    first_key = [key for i, key in enumerate(base_dictionary.keys()) if i == 0][0]
-
-    # Insert keys from added_dictionary that are not yet present in base_dictionary
-    for key in added_dictionary.keys():
-        if key not in base_dictionary.keys():
-            new_dictionary[key] = ['None'] * len(base_dictionary[first_key])
-
-    # Append the items
-    for key in new_dictionary.keys():
-        if key not in added_dictionary.keys():
-            continue
-        # print('{} {}'.format(key, new_dictionary[key]))
-        if len(new_dictionary[key]) == 0:
-            new_dictionary[key] = added_dictionary[key]
-        else:
-            if braid:
-                # solution from https://stackoverflow.com/questions/3678869/pythonic-way-to-combine-two-lists-in-an-alternating-fashion
-                new_dictionary[key] = [sub[i] for i in range(len(added_dictionary[key])) for sub in
-                                       [new_dictionary[key], added_dictionary[key]]]
-            else:
-                new_dictionary[key] = new_dictionary[key] + added_dictionary[key]
-
-    return new_dictionary
-
 
 class ReadAPTXML():
     """Class to open and parse XML files from APT. Can read templates for
@@ -235,7 +189,13 @@ class ReadAPTXML():
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
             CoordinatedParallelSet = None
             if coordparallel == 'true':
-                CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
+                try:
+                    CoordinatedParallelSet = obs.find(self.apt + 'CoordinatedParallelSet').text
+                except AttributeError:
+                    raise RuntimeError('Program does not specify parallels correctly.')
+                    # if verbose:
+                    #     print('No CoordinatedParallelSet found. Set to default.')
+
 
             try:
                 obs_label = obs.find(self.apt + 'Label').text
@@ -274,8 +234,12 @@ class ReadAPTXML():
             if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
                 if coordparallel == 'true':
-                    parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary, proposal_parameter_dictionary, verbose=verbose)
-                    exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
+                    parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
+                    if parallel_template_name in ['MiriImaging']:
+                        pass
+                    else:
+                        parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary, proposal_parameter_dictionary, verbose=verbose)
+                        exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
 
             # If template is WFSC Commissioning
             elif template_name in ['WfscCommissioning']:
@@ -310,7 +274,9 @@ class ReadAPTXML():
 
             # set default number of dithers to one, for downstream processing
             for i, n_dither in enumerate(exposures_dictionary['number_of_dithers']):
-                if int(n_dither) == 0:
+                if (template_name == 'NircamEngineeringImaging') and (n_dither == '2PLUS'):
+                    exposures_dictionary['number_of_dithers'][i] = '2'
+                elif int(n_dither) == 0:
                     exposures_dictionary['number_of_dithers'][i] = '1'
 
             # add the exposure dictionary to the main dictionary
@@ -347,7 +313,6 @@ class ReadAPTXML():
         if verbose:
             print('Finished reading APT xml file.')
             print('+'*100)
-
         return self.APTObservationParams
 
 
@@ -409,12 +374,19 @@ class ReadAPTXML():
             parallel_instrument = True
             if template_name == 'FgsExternalCalibration':
                 instrument = 'FGS'
+            elif template_name == 'MiriImaging':
+                instrument = 'MIRI'
+            elif template_name == 'NirissImaging':
+                instrument = 'NIRISS'
             prime_instrument = obs.find(self.apt + 'Instrument').text
             print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
         else:
             instrument = obs.find(self.apt + 'Instrument').text
             parallel_instrument = False
             prime_instrument = instrument
+
+        # if instrument.lower() in 'miri nirspec':
+        #     return {}
 
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
         ns = "{{{}/Template/{}}}".format(self.apt.replace('{','').replace('}',''), template_name)
@@ -451,15 +423,19 @@ class ReadAPTXML():
 
             if dither_key_name in observation_dict.keys():
                 number_of_dithers = observation_dict[dither_key_name]
+                if observation_dict['SubpixelDitherType'] in ['3-POINT-WITH-MIRI-F770W']:
+                    number_of_dithers = str(np.int(number_of_dithers) * 3)
             else:
                 print('Element {} not found, use default value.'.format(dither_key_name))
+
+
 
             # Find filter parameters for all filter configurations within obs
             filter_configs = template.findall('.//' + ns + 'FilterConfig')
             # loop over filter configurations
             for filter_config_index, filter_config in enumerate(filter_configs):
                 filter_config_dict = {}
-                print('Filter config index {}'.format(filter_config_index))
+                # print('Filter config index {}'.format(filter_config_index))
                 for element in filter_config:
                     key = element.tag.split(ns)[1]
                     value = element.text
@@ -524,6 +500,14 @@ class ReadAPTXML():
                     DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
                     number_of_dithers = int(DitherPatternType[0])
 
+                # Determine if there is an aperture override
+                override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+                FiducialPointOverride = False
+                if override is not None:
+                    FiducialPointOverride = True
+                #
+                # observation_dict['FiducialPointOverride'] = str(FiducialPointOverride)
+
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
                         ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
@@ -556,6 +540,8 @@ class ReadAPTXML():
                                 value = parallel_instrument
                             elif key == 'number_of_dithers':
                                 value = str(number_of_dithers)
+                            elif key == 'FiducialPointOverride':
+                                value = str(FiducialPointOverride)
                             else:
                                 value = str(None)
 
