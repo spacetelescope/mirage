@@ -21,6 +21,7 @@ tab.save()
 
 """
 
+import copy
 import os
 
 from astropy.io import ascii
@@ -37,6 +38,12 @@ class PointSourceCatalog():
         ----------
         something
         """
+        # Make sure we are working with numpy arrays
+        ra = np.array(ra)
+        dec = np.array(dec)
+        x = np.array(x)
+        y = np.array(y)
+
         if len(ra) != len(dec):
             raise ValueError(("WARNING: inconsistent length between RA and Dec inputs."))
         if len(x) != len(y):
@@ -59,6 +66,48 @@ class PointSourceCatalog():
         if len(x) > 0:
             self.location_units = 'position_pixels'
 
+    def add_catalog(self, catalog_to_add, magnitude_fill_value=99.):
+        """Add a catalog to the current caatlog instance"""
+        # The the source positions in the two catalogs have different units, then the catalogs
+        # can't be combined.
+        if self.location_units != catalog_to_add.location_units:
+            raise ValueError("WARNING: Sources in the catalogs do not have matching units (RA/Dec or x/y)")
+
+        # Check the magnitude system from each and make sure they match
+        current_mag_labels = list(self.magnitudes.keys())
+        new_mag_labels = list(catalog_to_add.magnitudes.keys())
+        mag_sys = self.magnitudes[current_mag_labels[0]][0]
+        if mag_sys != catalog_to_add.magnitudes[new_mag_labels[0]][0]:
+            print("WARNING: Magnitude systems of the two catalogs do not match. Cannot combine.")
+
+        # Get the length of the two catalogs
+        current_length = len(self._ra)
+        new_length = len(catalog_to_add._ra)
+
+        # Combine location columns
+        self._ra = np.append(self._ra, catalog_to_add._ra)
+        self._dec = np.append(self._dec, catalog_to_add._dec)
+
+        # Now we need to compare magnitude columns. Columns common to both catalogs can be
+        # combined. Columns not common will have to have fill values added so that everything
+        # is the same length
+        orig_current_mag_labels = copy.deepcopy(current_mag_labels)
+        current_mag_labels.extend(new_mag_labels)
+        mag_label_set = set(current_mag_labels)
+        for label in mag_label_set:
+            if ((label in orig_current_mag_labels) and (label not in new_mag_labels)):
+                fill = [magnitude_fill_value] * new_length
+                self.magnitudes[label][1] = np.append(self.magnitudes[label][1], fill)
+            if ((label not in orig_current_mag_labels) and (label in new_mag_labels)):
+                fill = [magnitude_fill_value] * current_length
+                self.magnitudes[label] = [mag_sys, np.append(fill, catalog_to_add.magnitudes[label][1])]
+            if ((label in orig_current_mag_labels) and (label in new_mag_labels)):
+                self.magnitudes[label][1] = np.append(self.magnitudes[label][1],
+                                                      catalog_to_add.magnitudes[label][1])
+
+        # Update the catalog table if it already exists, so that it is consistent
+        self.create_table()
+
     def add_magnitude_column(self, magnitude_list, magnitude_system='abmag', instrument='', filter_name=''):
         """Add a list of magnitudes to the catalog
 
@@ -66,6 +115,9 @@ class PointSourceCatalog():
         ----------
         some_stuff
         """
+        # Force magnitude list to be a numpy array
+        magnitude_list = np.array(magnitude_list)
+
         # Make sure instrument and filter are allowed values
         instrument = instrument.lower()
         filter_name = filter_name.lower()
@@ -95,7 +147,10 @@ class PointSourceCatalog():
                                   "Current catalog is using {}, while the new entry is {}."
                                   .format(current_mag_sys, magnitude_system)))
         else:
-            self.magnitudes[header] = (magnitude_system, magnitude_list)
+            self.magnitudes[header] = [magnitude_system, magnitude_list]
+
+        # Update the catalog table
+        self.create_table()
 
     def filter_check(self, inst_name, filt_name):
         """Make sure the requested instrument/filter pair is valid
@@ -358,6 +413,11 @@ def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_un
     input_table.add_columns([ra_vel_col, dec_vel_col], indexes=[3, 3])
     input_table.meta['comments'].append(velocity_units)
     return input_table
+
+def combine_catalogs(catalog1, catalog2):
+    """Combine two catalogs into one
+    input two catalog objects
+    """
 
 
 def create_basic_table(ra_values, dec_values, magnitudes, location_units):
