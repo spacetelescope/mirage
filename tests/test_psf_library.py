@@ -9,34 +9,36 @@ import webbpsf
 from mirage.psf.psf_library import CreatePSFLibrary
 
 
-# @pytest.mark.skip()
 def test_all_filters_and_detectors():
     """Check that setting filters and detectors to all works"""
 
     # Case 1: Setting filters="all" and "detectors="all"
-    inst1 = CreatePSFLibrary(instrument="FGS", filters="all", detectors="all", num_psfs=1, save=False)
+    inst1 = CreatePSFLibrary(instrument="FGS", filters="all", detectors="all",
+                             num_psfs=1, save=False)
     grid1 = inst1.create_files()
-    inst2 = CreatePSFLibrary(instrument="FGS", filters="FGS", detectors=["FGS1", "FGS2"], num_psfs=1, save=False)
+    inst2 = CreatePSFLibrary(instrument="FGS", filters="FGS", detectors=["FGS1", "FGS2"],
+                             num_psfs=1, save=False)
     grid2 = inst2.create_files()
 
-    # Check they are the same
+    # Check outputs are the same
     assert np.array_equal(grid1[0][0].data, grid2[0][0].data)
 
     # Case 2: NIRCam should be able to pull all the appropriate detectors based on the filter type (SW vs LW)
     longfilt = "F250M"
     shortfilt = "F140M"
-    inst1 = CreatePSFLibrary(instrument="NIRCam", filters=[shortfilt, longfilt], detectors="all",
-                             num_psfs=1, add_distortion=False, fov_pixels=1, oversample=2, save=False)
-    grid1, grid2 = inst1.create_files()
+    inst3 = CreatePSFLibrary(instrument="NIRCam", filters=[shortfilt, longfilt],
+                             detectors="all", num_psfs=1, add_distortion=False,
+                             fov_pixels=1, oversample=2, save=False)
+    grid1, grid2 = inst3.create_files()
 
-    # Check that only and all the SW detectors are in this file
+    # Check that only and all the SW detectors are in the first file
     det_list = []
     for i in range(len(grid1[0].data)):
         det_list.append(grid1[0].header["DETNAME{}".format(i)])
     assert len(grid1[0].data) == len(CreatePSFLibrary.nrca_short_detectors)
     assert set(det_list) == set(CreatePSFLibrary.nrca_short_detectors)
 
-    # Check that only and all the LW detectors are in this file
+    # Check that only and all the LW detectors are in the second file
     det_list = []
     for i in range(len(grid2[0].data)):
         det_list.append(grid2[0].header["DETNAME{}".format(i)])
@@ -44,9 +46,16 @@ def test_all_filters_and_detectors():
     assert set(det_list) == set(CreatePSFLibrary.nrca_long_detectors)
 
 
-# @pytest.mark.skip()
 def test_compare_to_calc_psf():
-    """Check that the output PSF matches calc_psf"""
+    """
+    Check that the output grid has the expected PSFs in the right grid locations by comparing
+    to calc_psf
+
+    This case also uses an even length array, so we'll need to subtract 0.5 from the detector
+    position because grid header has been shifted during calc_psf to account for it being an
+    even length array and this shift shouldn't happen 2x (ie again in calc_psf call below)
+    """
+
     oversample = 2
     fov_pixels = 10
 
@@ -59,13 +68,13 @@ def test_compare_to_calc_psf():
     psfnum = 1
     loc = grid[0][0].header["DET_YX{}".format(psfnum)]  # (y,x) location
     pos = grid[0][0].header["DET_JI{}".format(psfnum)]  # (j,i) position
-    locy = int(loc.split()[0][1:-1])
-    locx = int(loc.split()[1][:-1])
+    locy = int(float(loc.split()[0][1:-1]) - 0.5)
+    locx = int(float(loc.split()[1][:-1]) - 0.5)
     posj = int(pos.split()[0][1:-1])
     posi = int(pos.split()[1][:-1])
     gridpsf = grid[0][0].data[0, posj, posi, :, :]
 
-    # Using header data, create the expected same PSF via calc_psf + convolution
+    # Using grid header data, create the expected same PSF via calc_psf + convolution
     fgs = webbpsf.FGS()
     fgs.detector = "FGS1"
     fgs.filter = "FGS"
@@ -75,64 +84,65 @@ def test_compare_to_calc_psf():
     convpsf = astropy.convolution.convolve(calcpsf, kernel)
 
     # Compare to make sure they are in fact the same PSF
-    assert gridpsf.shape == calcpsf.shape
     assert np.array_equal(gridpsf, convpsf)
 
 
-# @pytest.mark.skip()
 def test_nircam_errors():
-    """Check that there are checks for incorrect value setting - particularly with NIRCam"""
+    """Check that there are errors for incorrect value setting - particularly with NIRCam"""
+
     longfilt = "F250M"
     shortfilt = "F140M"
     longdet = "NRCB5"
     shortdet = "NRCA3"
 
     # Shouldn't error - applying SW to SW and LW to LW
-    inst1 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet, add_distortion=False,
-                             num_psfs=1, fov_pixels=1, save=False)  # no error
+    inst1 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet,
+                             add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # no error
     inst1.create_files()
-    inst2 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=shortdet, add_distortion=False,
-                             num_psfs=1, fov_pixels=1, save=False)  # no error
+    inst2 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=shortdet,
+                             add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # no error
     inst2.create_files()
 
-    # Should error - Bad filter/detector combination (SW filt to LW det)
+    # Should error - Bad filter/detector combination (LW filt to SW det)
     with pytest.raises(ValueError) as excinfo:
-        inst3 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=shortdet, add_distortion=False,
-                                 num_psfs=1, fov_pixels=1, save=False)  # error
+        inst3 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=shortdet,
+                                 add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # error
         inst3.create_files()
     assert "ValueError" in str(excinfo)
 
     # Should error - Bad filter/detector combination (SW filt to LW det)
     with pytest.raises(ValueError) as excinfo:
-        inst4 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=longdet, add_distortion=False,
-                                 num_psfs=1, fov_pixels=1, save=False)  # error
+        inst4 = CreatePSFLibrary(instrument="NIRCam", filters=shortfilt, detectors=longdet,
+                                 add_distortion=False, num_psfs=1, fov_pixels=1, save=False)  # error
         inst4.create_files()
     assert "ValueError" in str(excinfo)
 
     # Should error - Bad num_psfs entry (must be a square number)
     with pytest.raises(ValueError) as excinfo:
-        inst5 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet, add_distortion=False,
-                                 num_psfs=3, fov_pixels=1, save=False)  # error
+        inst5 = CreatePSFLibrary(instrument="NIRCam", filters=longfilt, detectors=longdet,
+                                 add_distortion=False, num_psfs=3, fov_pixels=1, save=False)  # error
         inst5.create_files()
     assert "ValueError" in str(excinfo)
 
 
-# @pytest.mark.skip()
-def test_onepsf():
+def test_one_psf():
     """Check that setting num_psfs = 1 produces the PSF in the expected location"""
+
     oversample = 2
     fov_pixels = 101
 
     # Create 2 cases with different locations: the default center and a set location
-    inst1 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS", num_psfs=1, add_distortion=True,
-                             oversample=oversample, fov_pixels=fov_pixels, save=False)
+    inst1 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS",
+                             num_psfs=1, add_distortion=True, oversample=oversample,
+                             fov_pixels=fov_pixels, save=False)
     grid1 = inst1.create_files()
-    inst2 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS", num_psfs=1, add_distortion=True,
-                             oversample=oversample, fov_pixels=fov_pixels, psf_location=(0, 10), save=False)
+    inst2 = CreatePSFLibrary(instrument="NIRISS", filters="F090W", detectors="NIS",
+                             num_psfs=1, add_distortion=True, oversample=oversample,
+                             fov_pixels=fov_pixels, psf_location=(0, 10), save=False)
     grid2 = inst2.create_files()
 
-    assert grid1[0][0].header["DET_YX0"] == "(1024, 1024)"  # the default is the center of the NIS aperture
-    assert grid2[0][0].header["DET_YX0"] == "(0, 10)"  # (y,x)
+    assert grid1[0][0].header["DET_YX0"] == "(1023.0, 1023.0)"  # the default is the integer center of the NIS aperture
+    assert grid2[0][0].header["DET_YX0"] == "(0.0, 10.0)"  # (y,x)
 
     # Compare to the WebbPSF calc_psf output to make sure it's placing the PSF in the right location
     nis = webbpsf.NIRISS()
@@ -145,7 +155,6 @@ def test_onepsf():
     assert np.array_equal(convpsf, grid2[0][0].data[0, 0, 0, :, :])
 
 
-# @pytest.mark.skip()
 def test_saving(tmpdir):
     """Test saving files works properly"""
 
@@ -163,8 +172,10 @@ def test_saving(tmpdir):
         assert infile[0].header == grid[0][0].header
         assert np.array_equal(infile[0].data, grid[0][0].data)
 
+    # Remove temp directory
+    tmpdir.remove()
 
-# @pytest.mark.skip()
+
 def test_setting_inputs():
     """Test that no errors are raised when filters and detectors can be set different ways"""
 
@@ -189,9 +200,9 @@ def test_setting_inputs():
     grid4 = inst4.create_files()
 
     # Pass the name "shortwave" to both filter and detector
-    # inst5 = CreatePSFLibrary(instrument="NIRCam", filters="shortwave", detectors="shortwave",
-    #                          num_psfs=1, fov_pixels=1, oversample=2, save=False)
-    # grid5 = inst5.create_files()  # This case takes 6min alone to run - excluding for time
+    inst5 = CreatePSFLibrary(instrument="NIRCam", filters="shortwave", detectors="shortwave",
+                             num_psfs=1, fov_pixels=1, oversample=2, save=False)
+    grid5 = inst5.create_files()
 
     # Length is the number of filters, Shape of those objects follows (det, j, i, y, x)
     assert len(grid1) == 1
@@ -202,8 +213,8 @@ def test_setting_inputs():
     assert grid3[0][0].data.shape == (1, 1, 1, 2, 2)
     assert len(grid4) == 16
     assert grid4[0][0].data.shape == (2, 1, 1, 2, 2)
-    # assert len(grid5) == 13
-    # assert grid5[0][0].data.shape == (8, 1, 1, 2, 2)
+    assert len(grid5) == 13
+    assert grid5[0][0].data.shape == (8, 1, 1, 2, 2)
 
     # Check that passing strings and lists produces the same result
     assert np.array_equal(grid1[0][0].data, grid3[0][0].data)
