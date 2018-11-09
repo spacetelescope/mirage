@@ -93,7 +93,7 @@ class CreatePSFLibrary:
 
         filename : str
             The name to save your current file under if "save" keyword is set to True.
-            Default of None will save it in the form: "{intr}_{filt}_fovp{}_samp{}_npsf{}.fits"
+            Default of None will save it in the form: "{instr}_{filt}_fovp{}_samp{}_npsf{}.fits"
 
         overwrite : bool
             True/False boolean to overwrite the output file if it already exists. Default
