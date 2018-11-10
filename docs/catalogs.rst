@@ -41,6 +41,7 @@ The locations of sources can be specified in RA, Dec or in (x,y) pixel locations
      Note that RA and Dec values can be given in decimal degrees, or in more conventional string formats::
 
 	    03:32:21.273  -27:50:23.983
+	    03h32m21.273s -27d50m23.983s
 
 Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system by specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**.
 

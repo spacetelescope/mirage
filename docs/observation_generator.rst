@@ -82,7 +82,7 @@ At this point, the observation contains linearized, partially calibrated (superb
 In order to return to a raw state, the linearization step of the pipeline is run in reverse on the data. The previously subtracted superbias and reference pixel signal is then added back in to the exposure.
 
 Save Observation
-================
+----------------
 
 With the construction of the observation exposure complete, the exposure is then saved in the requested format.
 
