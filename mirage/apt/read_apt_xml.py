@@ -1225,3 +1225,24 @@ class ReadAPTXML():
             raise RuntimeError('Mismatch in the number of parallel observations.')
 
         return parallel_exposures_dictionary
+
+
+def get_guider_number(xml_file, observation_number):
+    """"Parse the guider number for a particular FGSExternalCalibration observation.
+    """
+    observation_number = int(observation_number)
+    apt_namespace = '{http://www.stsci.edu/JWST/APT}'
+    fgs_namespace = '{http://www.stsci.edu/JWST/APT/Template/FgsExternalCalibration}'
+
+    with open(xml_file) as f:
+        tree = etree.parse(f)
+
+    observation_data = tree.find(apt_namespace + 'DataRequests')
+    observation_list = observation_data.findall('.//' + apt_namespace + 'Observation')
+    for obs in observation_list:
+        if int(obs.findtext(apt_namespace + 'Number')) == observation_number:
+            detector = obs.findtext('.//' + fgs_namespace + 'Detector')
+            number = detector[-1]
+            return number
+
+    raise RuntimeError('Could not find guider number in observation {} in {}'.format(observation_number, xml_file))

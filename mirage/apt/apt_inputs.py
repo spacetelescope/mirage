@@ -387,13 +387,11 @@ class AptInput:
                 detectors = ['NRS']
 
             elif instrument == 'fgs':
-                if 'FGS1' in input_dictionary['aperture'][index]:
-                    detectors = ['G1']
-                elif 'FGS2' in input_dictionary['aperture'][index]:
-                    detectors = ['G2']
+                guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                detectors = ['G{}'.format(guider_number)]
+
             elif instrument== 'miri':
                 detectors = ['MIR']
-
 
             n_detectors = len(detectors)
             for key in input_dictionary:
