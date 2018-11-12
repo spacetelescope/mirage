@@ -318,6 +318,8 @@ class AptInput:
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
+        self.check_aperture_override()
+
         # print(self.exposure_tab['Instrument'])
         if verbose:
             for key in self.exposure_tab.keys():
@@ -337,6 +339,39 @@ class AptInput:
             self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
+
+
+    def check_aperture_override(self):
+        instruments = self.exposure_tab['Instrument']
+        apertures = self.exposure_tab['aperture']
+
+        aperture_key = {'nircam': 'NRC',
+                        'fgs': 'FGS',
+                        'niriss': 'NIS',
+                        'nirspec': 'NRS',
+                        'miri': 'MIR'}
+        fixed_apertures = []
+        for i, (instrument, aperture) in enumerate(zip(instruments, apertures)):
+            inst_match_ap = aperture.startswith(aperture_key[instrument.lower()])
+            if not inst_match_ap:
+                print('Aperture {} is not for instrument {}'.format(aperture, instrument))
+
+                # Handle the one case we understand, for now
+                if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
+                    obs_num = self.exposure_tab['obs_num'][i]
+                    guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                    guider_aperture = 'FGS{}_FULL'.format(guider_number)
+                    fixed_apertures.append(guider_aperture)
+                else:
+                    raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
+            else:
+                fixed_apertures.append(aperture)
+
+        # if len(self.exposure_tab['aperture']) != len(fixed_apertures):
+
+        else:
+            self.exposure_tab['aperture'] = fixed_apertures
+
 
     def expand_for_detectors(self, input_dictionary):
         """Expand dictionary to have one entry per detector, rather than the
