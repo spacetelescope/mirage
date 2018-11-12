@@ -8,9 +8,9 @@ Authors
 Use
 ---
     ::
-        from mirage.yaml import write_observationlist
-        write_observationlist.write_yaml(xml_file, pointing_file,
-            yaml_file, ps_cat_sw, ps_cat_lw)
+        from mirage.yaml import generate_observationlist
+        generate_observationlist.get_observation_dict(xml_file, yaml_file, catalogs,
+            parameter_defaults=None, verbose=False):
 
 TODO
 ----

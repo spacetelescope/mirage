@@ -1,80 +1,92 @@
 # ! /usr/bin/env python
 
 '''
-Function to produce yaml files that can be used as input for
+Class to produce yaml files that can be used as input for
 the ramp simulator
 
-Inputs:
+Use
+---
+    To generate an observationlist.yaml file and generate all .yamls at once
+    ::
+        yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
+                                      catalogs=catalogs, verbose=True, output_dir=out_dir,
+                                      simdata_output_dir=out_dir)
+        yam.create_inputs()
 
-xml file - Name of xml file exported from APT.
-pointing file - Name of associated pointing file exported from APT.
-
-Optional inputs:
-
-output_dir - Directory into which the output yaml files are written
-
-simdata_output_dir - Directory to place in the output_directory field of the yaml files.
-                     This is the directory where the simulated ramps will be saved.
-
-table_file - Ascii table containing observation info. This is the
-             output from apt_inputs.py Use this if you are
-             not providing xml and pointing files from APT.
-
-datatype - Specifies the type of output data to save. Can be "raw", in which
-           case the raw (uncalibrated) file is saved, "linear", where the
-           linearized file is saved and ready to be run through the jump
-           detection and ramp-fitting steps of the pipeline, or
-           "linear, raw", where both versions are saved.
-
-use_nonstsci_names - set to True to override the use of the standard
-                     STScI naming convention for output files
-
-subarray_def_file - Ascii file containing NIRCam subarray definitions
-
-readpatt_def_file - Ascii file containing NIRCam readout pattern definitions
-
-point_source - point source catalog file. Can be a single file, or a list of
-               catalogs. If it is a list, each filename is expected to contain
-               the filter name for which it is to be used. Catalogs and filters
-               will then be matched up in the output yaml files.
-
-galaxyListFile - galaxy (sersic) source catalog file. Can be a single name, or
-                 a list of names. Behavior is identical to point_source above.
-
-extended - extended source catalog file. Behavior is identical to point_source
-            above.
-
-convolveExtended - Set to True to convolve extended sources with NIRCam PSF
-
-movingTarg - Moving (point source) target catalog (sources moving through fov) names.
-             Behavior is the same as point_sources above.
-
-movingTargSersic - Moving galaxy (sersic) target catalog (sources moving through fov)
-                   names. Behavior is the same as point_sources above.
-
-movingTargExtended - Moving extended source target catalog (sources moving through fov)
-                     names. Behavior is the same as point_sources above.
-
-movingTargToTrack - Catalog of non-sidereal targets for non-sidereal tracking observations.
-                    Behavior is the same as point_sources above.
-
-bkgdrate - Uniform background rate (e-/s) to add to observation.
-
-epoch_list - Ascii table file containing epoch start times and telescope roll angles
-             to use for each observation.
+    NOTE there is currently no way to generate yamls from an existing observationlist.yaml
 
 
-Dependencies:
-argparse, astropy, numpy, glob, copy
+Inputs
+------
+    xml file - Name of xml file exported from APT.
+    pointing file - Name of associated pointing file exported from APT.
 
-apt_inputs.py - Functions for reading and parsing xml and pointing files from APT.
+    Optional inputs:
 
-HISTORY:
+    output_dir - Directory into which the output yaml files are written
 
-July 2017 - V0: Initial version. Bryan Hilbert
-Feb 2018 - V1: Updates to accomodate multiple filter pairs per
-               observation. Lauren Chambers
-August 2018 - V2: Replaced input SIAF CSV file with pysiaf dependence. Bryan Hilbert
+    simdata_output_dir - Directory to place in the output_directory field of the yaml files.
+                         This is the directory where the simulated ramps will be saved.
+
+    table_file - Ascii table containing observation info. This is the
+                 output from apt_inputs.py Use this if you are
+                 not providing xml and pointing files from APT.
+
+    datatype - Specifies the type of output data to save. Can be "raw", in which
+               case the raw (uncalibrated) file is saved, "linear", where the
+               linearized file is saved and ready to be run through the jump
+               detection and ramp-fitting steps of the pipeline, or
+               "linear, raw", where both versions are saved.
+
+    use_nonstsci_names - set to True to override the use of the standard
+                         STScI naming convention for output files
+
+    subarray_def_file - Ascii file containing NIRCam subarray definitions
+
+    readpatt_def_file - Ascii file containing NIRCam readout pattern definitions
+
+    point_source - point source catalog file. Can be a single file, or a list of
+                   catalogs. If it is a list, each filename is expected to contain
+                   the filter name for which it is to be used. Catalogs and filters
+                   will then be matched up in the output yaml files.
+
+    galaxyListFile - galaxy (sersic) source catalog file. Can be a single name, or
+                     a list of names. Behavior is identical to point_source above.
+
+    extended - extended source catalog file. Behavior is identical to point_source
+                above.
+
+    convolveExtended - Set to True to convolve extended sources with NIRCam PSF
+
+    movingTarg - Moving (point source) target catalog (sources moving through fov) names.
+                 Behavior is the same as point_sources above.
+
+    movingTargSersic - Moving galaxy (sersic) target catalog (sources moving through fov)
+                       names. Behavior is the same as point_sources above.
+
+    movingTargExtended - Moving extended source target catalog (sources moving through fov)
+                         names. Behavior is the same as point_sources above.
+
+    movingTargToTrack - Catalog of non-sidereal targets for non-sidereal tracking observations.
+                        Behavior is the same as point_sources above.
+
+    bkgdrate - Uniform background rate (e-/s) to add to observation.
+
+    epoch_list - Ascii table file containing epoch start times and telescope roll angles
+                 to use for each observation.
+
+
+Dependencies
+------------
+    argparse, astropy, numpy, glob, copy
+    apt_inputs.py - Functions for reading and parsing xml and pointing files from APT.
+
+History
+-------
+    July 2017 - V0: Initial version. Bryan Hilbert
+    Feb 2018 - V1: Updates to accomodate multiple filter pairs per
+                   observation. Lauren Chambers
+    August 2018 - V2: Replaced input SIAF CSV file with pysiaf dependence. Bryan Hilbert
 
 '''
 
