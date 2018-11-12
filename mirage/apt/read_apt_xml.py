@@ -682,9 +682,6 @@ class ReadAPTXML():
         mod = template.find(ns + 'Module').text
         num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
 
-        # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
-
         # Find filter parameters for all filter configurations within obs
         filter_configs = template.findall('.//' + ns + 'FilterConfig')
 
@@ -775,9 +772,6 @@ class ReadAPTXML():
         mod = template.find(ns + 'Module').text
         # num_WFCgroups = int(template.find(ns + 'ExpectedWfcGroups').text)
 
-        # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
-
         # Find filter parameters for all filter configurations within obs
         ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
 
@@ -850,12 +844,11 @@ class ReadAPTXML():
 
         # Find the module and derive the subarrays
         mod = template.find(ns + 'Module').text
+        mods = [mod] * 12
         if mod == 'A':
-            mods = ['SUB96DHSPILA'] + ['DHSPILA'] * 6
-            subarrs = ['NRCA3_DHSPIL_SUB96'] + ['NRCA3_DHSPIL'] * 6
+            subarrs = ['SUB96DHSPILA'] + ['FULL'] * 6
         if mod == 'B':
-            mods = ['SUB96DHSPILB'] + ['DHSPILB'] * 6
-            subarrs = ['NRCB4_DHSPIL_SUB96'] + ['NRCB4_DHSPIL'] * 6
+            subarrs = ['SUB96DHSPILB'] + ['FULL'] * 6
 
         # Find the exposure parameters for the In Focus, DHS, and Defocus modes
         readouts = [r.text for r in obs.findall('.//' + ns + 'ReadoutPattern')]
@@ -929,10 +922,6 @@ class ReadAPTXML():
 
         # Find the module and derive the subarrays
         mod = template.find(ns + 'Module').text
-        if mod == 'A':
-            mod = 'A3'
-        elif mod == 'B':
-            mod = 'B4'
 
         # Determine the sensing type, and list the pupils and filters
         # in the appropriate order
@@ -975,7 +964,7 @@ class ReadAPTXML():
             n_configs += 1
             n_dithers += [1] * n_configs
 
-            subarrs += ['SUB8FP1{}'.format(mod[0])]
+            subarrs += ['SUB8FP1{}'.format(mod)]
             mods += [mod]
 
             sw_pupils += ['CLEAR']
@@ -1004,7 +993,7 @@ class ReadAPTXML():
 
             n_dithers += [2] * n_configs_fp
 
-            subarrs += ['FP1'] * n_configs_fp
+            subarrs += ['FULL'] * n_configs_fp
             mods += [mod] * n_configs_fp
 
             sw_pupils += ['WLM8', 'WLP8', 'WLP8', 'WLM8', 'CLEAR', 'WLM8', 'WLP8'][:n_configs_fp]
@@ -1093,9 +1082,6 @@ class ReadAPTXML():
         # sdithtype = template.find(ns + 'SubpixelPositions').text
         explist = template.find(ns + 'ExposureList')
         expseqs = explist.findall(ns + 'ExposureSequences')
-
-        # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, i_obs)
 
         # if BOTH was specified for the grism,
         # then we need to repeat the sequence of
@@ -1204,35 +1190,6 @@ class ReadAPTXML():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
         return exposures_dictionary
-
-    def check_for_aperture_override(self, obs, mod, subarr, i_obs):
-        '''Determine if there is an aperture override'''
-
-        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
-        if override is not None:
-            mod = override.text
-            if 'FULL' not in mod:
-                subarray_list_file = os.path.join(PACKAGE_DIR, 'config',
-                                                  'NIRCam_subarray_definitions.list')
-                config = ascii.read(subarray_list_file)
-                try:
-                    i_sub = list(config['AperName']).index(mod)
-                except ValueError:
-                    i_sub = [mod in name for name in np.array(config['AperName'])]
-                    i_sub = np.where(i_sub)[0]
-                    if len(i_sub) > 1 or len(i_sub) == 0:
-                        raise ValueError('Unable to match FiducialPointOverride {} to valid aperture in observation {}.'.format(mod, i_obs))
-
-                subarr = config[i_sub]['Name']
-                if type(subarr) != np.str_: # Don't know why, but astropy tables aren't behaving
-                    subarr = subarr[0]
-
-                print('Aperture override: subarray {}'.format(subarr))
-
-            return mod, subarr
-
-        else:
-            return mod, subarr
 
     def read_parallel_exposures(self, obs, exposures_dictionary, proposal_parameter_dictionary, verbose=False):
         """Read the exposures of the parallel instrument.

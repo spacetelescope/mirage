@@ -475,28 +475,19 @@ class SimInput:
             if module != 'None':
                 if module in ['A', 'B']:
                     n_det = 5
-                    module = ' ' + module
+                    inst_mod = 'NIRCam module ' + module
                 if module == 'ALL':
                     n_det = 10
-                    module = 's A and B'
-                if 'A3' in module:
-                    n_det = 1
-                    module = ' A3'
-                if 'B4' in module:
-                    n_det = 1
-                    module = ' B4'
-                if module == 'SUB96DHSPILA':
-                    n_det = 1
-                    module = ' A3'
+                    inst_mod = 'NIRCam modules A and B'
             else:
                 # number of detectors
                 n_det = 1
-                module = ' NIS'
+                inst_mod = self.info['Instrument'][i_mod]
 
             i_mod += n_tiles * n_det
 
-            print(('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'
-                   .format(obs, n_visits, n_tiles, n_det, module)))
+            print(('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in {}'
+                   .format(obs, n_visits, n_tiles, n_det, inst_mod)))
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 

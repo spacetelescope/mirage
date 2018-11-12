@@ -363,36 +363,29 @@ class AptInput:
                 # NIRCam case: Expand for detectors. Create one entry in each list for each
                 # detector, rather than a single entry for 'ALL' or 'BSALL'
 
-                # Determine module of the observation
-                module = input_dictionary['Module'][index]
-                if module == 'ALL':
-                    detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-                elif module == 'A':
-                    detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
-                elif module == 'B':
-                    detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
-                elif 'A3' in module:
-                    detectors = ['A3']
-                elif 'B4' in module:
-                    detectors = ['B4']
-                elif 'DHSPIL' in module:
-                    if module[-1] == 'A':
-                        detectors = ['A3']
-                    elif module[-1] == 'B':
-                        detectors = ['B4']
+                # Determine module and subarray of the observation
+                sub = input_dictionary['Subarray'][index]
+                if 'DHSPIL' not in sub and 'FP1' not in sub:
+                    module = input_dictionary['Module'][index]
+                    if module == 'ALL':
+                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+                    elif module == 'A':
+                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
+                    elif module == 'B':
+                        detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
                     else:
-                        ValueError('Unknown module {}'.format(module))
+                        raise ValueError('Unknown module {}'.format(module))
                 else:
-                    raise ValueError('Unknown module {}'.format(module))
+                    # Wait to handle cases where there are subarrays, and so things should not be
+                    # expanded for all detectors.
+                    detectors = ['placeholder']
 
             elif instrument == 'niriss':
                 detectors = ['NIS']
+
             elif instrument == 'nirspec':
                 detectors = ['NRS']
-                # if 'NRS1' in input_dictionary['aperture'][index]:
-                #     detectors = ['NRS1']
-                # elif 'NRS2' in input_dictionary['aperture'][index]:
-                #     detectors = ['NRS2']
+
             elif instrument == 'fgs':
                 if 'FGS1' in input_dictionary['aperture'][index]:
                     detectors = ['G1']
@@ -407,34 +400,30 @@ class AptInput:
                 observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
             observation_dictionary['detector'].extend(detectors)
 
-        #correct NIRCam aperture names
+        # Correct NIRCam aperture names for commissioning subarrays
         for index, instrument in enumerate(observation_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
-                detector = 'NRC' + observation_dictionary['detector'][index]
+                detector = observation_dictionary['detector'][index]
                 sub = observation_dictionary['Subarray'][index]
 
                 # this should probably better be handled by using the subarray_definitions file upstream
-                if sub == 'SUB96DHSPILA':
-                    aperture_name = 'NRCA3_DHSPIL_SUB96'
-                elif sub == 'SUB96DHSPILB':
-                    aperture_name = 'NRCB4_DHSPIL_SUB96'
-                elif sub == 'SUB96DHSPILB':
-                    aperture_name = 'NRCB4_DHSPIL_SUB96'
-                elif ('NRCB4_DHSPIL' in sub) or ('NRCA3_DHSPIL' in sub):# in ['NRCB4_DHSPIL_SUB96', 'NRCA3_DHSPIL_SUB96']:
-                    aperture_name = sub
-                elif sub == 'SUB8FP1A':
-                    aperture_name = 'NRCA3_FP1_SUB8'
-                elif sub == 'SUB64FP1A':
-                    aperture_name = 'NRCA3_FP1_SUB64'
-                elif sub == 'SUB8FP1B':
-                    aperture_name = 'NRCB4_FP1_SUB8'
-                elif sub == 'SUB64FP1B':
-                    aperture_name = 'NRCB4_FP1_SUB64'
-
+                if 'DHSPIL' in sub:
+                    subarray, module = sub.split('DHSPIL')
+                    subarray_size = subarray[3:]
+                    detector = 'A3' if module == 'A' else 'B4'
+                    aperture_name = 'NRC{}_DHSPIL_SUB{}'.format(detector, subarray_size)
+                elif 'FP1' in sub:
+                    subarray, module = sub.split('FP1')
+                    subarray_size = subarray[3:]
+                    detector = 'A3' if module == 'A' else 'B4'
+                    aperture_name = 'NRC{}_FP1_SUB{}'.format(detector, subarray_size)
                 else:
-                    aperture_name = detector + '_' + sub
+                    aperture_name = 'NRC' + detector + '_' + sub
+
                 observation_dictionary['aperture'][index] = aperture_name
+                observation_dictionary['detector'][index] = detector
+
 
 
         return observation_dictionary
