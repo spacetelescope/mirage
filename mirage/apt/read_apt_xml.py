@@ -165,6 +165,8 @@ class ReadAPTXML():
                                    'NirspecImaging', 'NirspecInternalLamp',  # NIRSpec
                                    'MiriMRS',  # MIRI
                                    'FgsExternalCalibration',  # FGS
+                                   'NircamDark', 'NirissDark', # Darks
+                                   'NircamTimeSeries',
                                    ]
             if template_name not in known_APT_templates:
                 # If not, turn back now.

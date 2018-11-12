@@ -131,8 +131,8 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            # if 'OTE08-1142' not in apt_file_seed:
-            # if 'OTE12-1147' not in apt_file_seed:
+            # if '1068_official' not in apt_file_seed:
+            # # if 'OTE12-1147' not in apt_file_seed:
             #     continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
