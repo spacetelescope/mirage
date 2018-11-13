@@ -23,7 +23,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   gain: $MIRAGE_DATA/nircam/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
+  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_from_pysiaf_distortion.asdf  #Astrometric distortion file (asdf)
   distortion_coeffs: $MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
   ipc: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.

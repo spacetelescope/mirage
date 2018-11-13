@@ -23,7 +23,7 @@ from mirage.yaml import generate_observationlist, yaml_generator
 # from mirage.utils import siaf_interface
 # import importlib
 # importlib.reload( yaml_generator )
-# importlib.reload(generate_observationlist)
+# importlib.reload( generate_observationlist )
 # importlib.reload( read_apt_xml )
 # importlib.reload( apt_inputs )
 # importlib.reload( siaf_interface )
@@ -131,8 +131,8 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            # if '1068_official' not in apt_file_seed:
-            # # if 'OTE12-1147' not in apt_file_seed:
+            # if '1068_manual' not in apt_file_seed:
+            # # # if 'OTE12-1147' not in apt_file_seed:
             #     continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
