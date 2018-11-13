@@ -209,18 +209,6 @@ class ReadAPTXML():
             visit_numbers = [np.int(element.items()[0][1]) for element in obs if
                              element.tag.split(self.apt)[1] == 'Visit']
 
-            # Determine pointing offset?
-            offset = obs.find('.//' + self.apt + 'Offset')
-            try:
-                offset_x = offset.get('Xvalue')
-                offset_y = offset.get('Yvalue')
-            except AttributeError:
-                offset_x, offset_y = 0, 0
-            if (offset_x != 0) or (offset_y != 0):
-                print('* * * OFFSET OF ({}, {}) IN OBS {} NOT APPLIED (should be accounted for in pointing file)***'.format(offset_x,
-                                                                                  offset_y,
-                                                                                  observation_number))
-
             prop_params = [pi_name, prop_id, prop_title, prop_category,
                            science_category, coordparallel, observation_number, obs_label]
 
@@ -417,11 +405,7 @@ class ReadAPTXML():
 
             # Determine if there is an aperture override
             override = obs.find('.//' + self.apt + 'FiducialPointOverride')
-            FiducialPointOverride = False
-            if override is not None:
-                FiducialPointOverride = True
-
-            observation_dict['FiducialPointOverride'] = str(FiducialPointOverride)
+            FiducialPointOverride = True if override is not None else False
 
             if dither_key_name in observation_dict.keys():
                 number_of_dithers = observation_dict[dither_key_name]
@@ -479,6 +463,8 @@ class ReadAPTXML():
                         value = str(number_of_dithers)
                     elif key == 'FiducialPointOverride':
                         value = str(FiducialPointOverride)
+                    elif key == 'APTTemplate':
+                        value = template_name
                     else:
                         value = str(None)
 
@@ -506,9 +492,7 @@ class ReadAPTXML():
 
                 # Determine if there is an aperture override
                 override = obs.find('.//' + self.apt + 'FiducialPointOverride')
-                FiducialPointOverride = False
-                if override is not None:
-                    FiducialPointOverride = True
+                FiducialPointOverride = True if override is not None else False
                 #
                 # observation_dict['FiducialPointOverride'] = str(FiducialPointOverride)
 
@@ -546,6 +530,8 @@ class ReadAPTXML():
                                 value = str(number_of_dithers)
                             elif key == 'FiducialPointOverride':
                                 value = str(FiducialPointOverride)
+                            elif key == 'APTTemplate':
+                                value = template_name
                             else:
                                 value = str(None)
 
@@ -688,7 +674,6 @@ class ReadAPTXML():
         #typeflag = template_name
         typeflag = 'imaging'
         grismval = 'N/A'
-        short_pupil = 'CLEAR'
         subarr = 'FULL'
         pdithtype = 'NONE'
         pdither = '1'

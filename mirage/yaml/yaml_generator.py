@@ -1,80 +1,92 @@
 # ! /usr/bin/env python
 
 '''
-Function to produce yaml files that can be used as input for
+Class to produce yaml files that can be used as input for
 the ramp simulator
 
-Inputs:
+Use
+---
+    To generate an observationlist.yaml file and generate all .yamls at once
+    ::
+        yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
+                                      catalogs=catalogs, verbose=True, output_dir=out_dir,
+                                      simdata_output_dir=out_dir)
+        yam.create_inputs()
 
-xml file - Name of xml file exported from APT.
-pointing file - Name of associated pointing file exported from APT.
-
-Optional inputs:
-
-output_dir - Directory into which the output yaml files are written
-
-simdata_output_dir - Directory to place in the output_directory field of the yaml files.
-                     This is the directory where the simulated ramps will be saved.
-
-table_file - Ascii table containing observation info. This is the
-             output from apt_inputs.py Use this if you are
-             not providing xml and pointing files from APT.
-
-datatype - Specifies the type of output data to save. Can be "raw", in which
-           case the raw (uncalibrated) file is saved, "linear", where the
-           linearized file is saved and ready to be run through the jump
-           detection and ramp-fitting steps of the pipeline, or
-           "linear, raw", where both versions are saved.
-
-use_nonstsci_names - set to True to override the use of the standard
-                     STScI naming convention for output files
-
-subarray_def_file - Ascii file containing NIRCam subarray definitions
-
-readpatt_def_file - Ascii file containing NIRCam readout pattern definitions
-
-point_source - point source catalog file. Can be a single file, or a list of
-               catalogs. If it is a list, each filename is expected to contain
-               the filter name for which it is to be used. Catalogs and filters
-               will then be matched up in the output yaml files.
-
-galaxyListFile - galaxy (sersic) source catalog file. Can be a single name, or
-                 a list of names. Behavior is identical to point_source above.
-
-extended - extended source catalog file. Behavior is identical to point_source
-            above.
-
-convolveExtended - Set to True to convolve extended sources with NIRCam PSF
-
-movingTarg - Moving (point source) target catalog (sources moving through fov) names.
-             Behavior is the same as point_sources above.
-
-movingTargSersic - Moving galaxy (sersic) target catalog (sources moving through fov)
-                   names. Behavior is the same as point_sources above.
-
-movingTargExtended - Moving extended source target catalog (sources moving through fov)
-                     names. Behavior is the same as point_sources above.
-
-movingTargToTrack - Catalog of non-sidereal targets for non-sidereal tracking observations.
-                    Behavior is the same as point_sources above.
-
-bkgdrate - Uniform background rate (e-/s) to add to observation.
-
-epoch_list - Ascii table file containing epoch start times and telescope roll angles
-             to use for each observation.
+    NOTE there is currently no way to generate yamls from an existing observationlist.yaml
 
 
-Dependencies:
-argparse, astropy, numpy, glob, copy
+Inputs
+------
+    xml file - Name of xml file exported from APT.
+    pointing file - Name of associated pointing file exported from APT.
 
-apt_inputs.py - Functions for reading and parsing xml and pointing files from APT.
+    Optional inputs:
 
-HISTORY:
+    output_dir - Directory into which the output yaml files are written
 
-July 2017 - V0: Initial version. Bryan Hilbert
-Feb 2018 - V1: Updates to accomodate multiple filter pairs per
-               observation. Lauren Chambers
-August 2018 - V2: Replaced input SIAF CSV file with pysiaf dependence. Bryan Hilbert
+    simdata_output_dir - Directory to place in the output_directory field of the yaml files.
+                         This is the directory where the simulated ramps will be saved.
+
+    table_file - Ascii table containing observation info. This is the
+                 output from apt_inputs.py Use this if you are
+                 not providing xml and pointing files from APT.
+
+    datatype - Specifies the type of output data to save. Can be "raw", in which
+               case the raw (uncalibrated) file is saved, "linear", where the
+               linearized file is saved and ready to be run through the jump
+               detection and ramp-fitting steps of the pipeline, or
+               "linear, raw", where both versions are saved.
+
+    use_nonstsci_names - set to True to override the use of the standard
+                         STScI naming convention for output files
+
+    subarray_def_file - Ascii file containing NIRCam subarray definitions
+
+    readpatt_def_file - Ascii file containing NIRCam readout pattern definitions
+
+    point_source - point source catalog file. Can be a single file, or a list of
+                   catalogs. If it is a list, each filename is expected to contain
+                   the filter name for which it is to be used. Catalogs and filters
+                   will then be matched up in the output yaml files.
+
+    galaxyListFile - galaxy (sersic) source catalog file. Can be a single name, or
+                     a list of names. Behavior is identical to point_source above.
+
+    extended - extended source catalog file. Behavior is identical to point_source
+                above.
+
+    convolveExtended - Set to True to convolve extended sources with NIRCam PSF
+
+    movingTarg - Moving (point source) target catalog (sources moving through fov) names.
+                 Behavior is the same as point_sources above.
+
+    movingTargSersic - Moving galaxy (sersic) target catalog (sources moving through fov)
+                       names. Behavior is the same as point_sources above.
+
+    movingTargExtended - Moving extended source target catalog (sources moving through fov)
+                         names. Behavior is the same as point_sources above.
+
+    movingTargToTrack - Catalog of non-sidereal targets for non-sidereal tracking observations.
+                        Behavior is the same as point_sources above.
+
+    bkgdrate - Uniform background rate (e-/s) to add to observation.
+
+    epoch_list - Ascii table file containing epoch start times and telescope roll angles
+                 to use for each observation.
+
+
+Dependencies
+------------
+    argparse, astropy, numpy, glob, copy
+    apt_inputs.py - Functions for reading and parsing xml and pointing files from APT.
+
+History
+-------
+    July 2017 - V0: Initial version. Bryan Hilbert
+    Feb 2018 - V1: Updates to accomodate multiple filter pairs per
+                   observation. Lauren Chambers
+    August 2018 - V2: Replaced input SIAF CSV file with pysiaf dependence. Bryan Hilbert
 
 '''
 
@@ -488,7 +500,7 @@ class SimInput:
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
-    def create_output_name(self, input_obj):
+    def create_output_name(self, input_obj, index=0):
         """Put together the JWST formatted fits file name based on observation parameters
 
         Parameters
@@ -501,13 +513,13 @@ class SimInput:
         base : str
             JWST formatted filename base (excluding pipeline step suffix and ".fits")
         """
-        proposal_id = '{0:05d}'.format(int(input_obj['ProposalID']))
-        observation = input_obj['obs_num']
-        visit_number = input_obj['visit_num']
-        visit_group = input_obj['visit_group']
-        parallel_sequence_id = input_obj['sequence_id']
-        activity_id = input_obj['act_id']
-        exposure = input_obj['exposure']
+        proposal_id = '{0:05d}'.format(int(input_obj['ProposalID'][index]))
+        observation = input_obj['obs_num'][index]
+        visit_number = input_obj['visit_num'][index]
+        visit_group = input_obj['visit_group'][index]
+        parallel_sequence_id = input_obj['sequence_id'][index]
+        activity_id = input_obj['act_id'][index]
+        exposure = input_obj['exposure'][index]
 
         base = 'jw{}{}{}_{}{}{}_{}_'.format(proposal_id, observation, visit_number,
                                             visit_group, parallel_sequence_id, activity_id,
@@ -665,23 +677,40 @@ class SimInput:
         Create output yaml file names to go with all of the
         entries in the dictionary
         """
-        onames = []
-        fnames = []
-        for i in range(len(self.info['Module'])):
-            act = str(self.info['act_id'][i]).zfill(2)
-            if self.info['Instrument'][i].lower() == 'niriss':
-                det = 'NIS'
-            elif self.info['Instrument'][i].lower() == 'fgs':
-                det = 'FGS'
-            else:
-                det = self.info['detector'][i]
-            mode = self.info['Mode'][i]
-            dither = str(self.info['dither'][i]).zfill(2)
-            onames.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}.yaml'
-                                                                        .format(act, det, mode, dither))))
-            fnames.append('Act{}_{}_{}_Dither{}_uncal.fits'.format(act, det, mode, dither))
-        self.info['yamlfile'] = onames
-        self.info['outputfits'] = fnames
+        yaml_names = []
+        fits_names = []
+
+        if self.use_nonstsci_names:
+            for i in range(len(self.info['Module'])):
+                act = str(self.info['act_id'][i]).zfill(2)
+                if self.info['Instrument'][i].lower() == 'niriss':
+                    det = 'NIS'
+                elif self.info['Instrument'][i].lower() == 'fgs':
+                    det = 'FGS'
+                else:
+                    det = self.info['detector'][i]
+                mode = self.info['Mode'][i]
+                dither = str(self.info['dither'][i]).zfill(2)
+
+                yaml_names.append(os.path.abspath(os.path.join(self.output_dir, 'Act{}_{}_{}_Dither{}.yaml'
+                                                                            .format(act, det, mode, dither))))
+                fits_names.append('Act{}_{}_{}_Dither{}_uncal.fits'.format(act, det, mode, dither))
+
+        else:
+            for i in range(len(self.info['Module'])):
+                if self.info['Instrument'][i].upper() == 'NIRCAM':
+                    fulldetector = 'nrc{}'.format(self.info['detector'][i].lower())
+                else:
+                    fulldetector = self.info['detector'][i].lower()
+                outfilebase = self.create_output_name(self.info, index=i)
+                outfile = "{}{}{}".format(outfilebase, fulldetector, '_uncal.fits')
+                yamlout = "{}{}{}".format(outfilebase, fulldetector, '.yaml')
+
+                yaml_names.append(yamlout)
+                fits_names.append(outfile)
+
+        self.info['yamlfile'] = yaml_names
+        self.info['outputfits'] = fits_names
 
     def set_global_definitions(self):
         """Store the subarray defnitions of all supported instruments."""
@@ -1230,19 +1259,8 @@ class SimInput:
                 pupilkey = 'LongPupil'
                 catkey = 'lw'
 
-        if self.use_nonstsci_names:
-            outtf = False
-            outfile = input['outputfits']
-            yamlout = input['yamlfile']
-        else:
-            if instrument.upper() == 'NIRCAM':
-                fulldetector = 'nrc{}'.format(input['detector'].lower())
-            else:
-                fulldetector = input['detector'].lower()
-            outtf = True
-            outfilebase = self.create_output_name(input)
-            outfile = "{}{}{}".format(outfilebase, fulldetector, '_uncal.fits')
-            yamlout = "{}{}{}".format(outfilebase, fulldetector, '.yaml')
+        outfile = input['outputfits']
+        yamlout = input['yamlfile']
 
         yamlout = os.path.join(self.output_dir, yamlout)
         with open(yamlout, 'w') as f:

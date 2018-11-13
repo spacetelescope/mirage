@@ -8,9 +8,9 @@ Authors
 Use
 ---
     ::
-        from mirage.yaml import write_observationlist
-        write_observationlist.write_yaml(xml_file, pointing_file,
-            yaml_file, ps_cat_sw, ps_cat_lw)
+        from mirage.yaml import generate_observationlist
+        generate_observationlist.get_observation_dict(xml_file, yaml_file, catalogs,
+            parameter_defaults=None, verbose=False):
 
 TODO
 ----
@@ -229,6 +229,11 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     unique_observation_ids = np.unique(xml_dict['ObservationID']).tolist()
     number_of_observations = len(unique_observation_ids)
     number_of_exposures = len(xml_dict['ObservationID'])
+
+    # Check that the appropriate catalogs have been included
+    for inst in used_instruments:
+        if inst.lower() not in catalogs.keys():
+            raise KeyError('Missing a catalog entry for {} in the catalog dictionary.'.format(inst))
 
     entry_numbers = []
 
