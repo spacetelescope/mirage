@@ -748,7 +748,7 @@ class Observation():
                    .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
 
-        # Get SIAF-realted information and subarray bounds
+        # Get SIAF-related information and subarray bounds
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
@@ -2214,7 +2214,7 @@ class Observation():
             # gainim[zs] = 1.0
 
     def read_parameter_file(self):
-        """Read in the yaml parameter file (main input to Mirage"""
+        """Read in the yaml parameter file (main input to Mirage)."""
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)

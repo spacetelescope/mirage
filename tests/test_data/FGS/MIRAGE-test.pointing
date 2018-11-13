@@ -1,0 +1,14 @@
+# APT Output Product
+# 
+# APT Version: Version 26.0.5  JWST PRD: PRDOPSSOC-H-015 
+# Date: Thu Oct 18 19:47:42 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 999 (MIRAGE-test.aptx)
+
+========================================
+* FGS TEST for MARIAGE (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 FGS1_FULL                 7 FGS1-TAR  +90.97204  -67.35822   +0.000   +0.000   +0.000   +0.000 +207.190 -697.500   +0.000   -0.000 TARGET     SCIENCE       62     62  0.000 (base)
+
+

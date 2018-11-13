@@ -1602,47 +1602,45 @@ class Catalog_seed():
         time_reported = False
         # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
-            try:
-                # Warn user of how long this calcuation might take...
-                if len(times) < 100:
-                    elapsed_time = time.time() - start_time
-                    times.append(elapsed_time)
-                    start_time = time.time()
-                elif len(times) == 100 and time_reported is False:
-                    avg_time = np.mean(times)
-                    total_time = len(indexes) * avg_time
-                    print(("Expected time to process {} sources: {:.2f} seconds "
-                           "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
-                    time_reported = True
+            # Warn user of how long this calcuation might take...
+            if len(times) < 100:
+                elapsed_time = time.time() - start_time
+                times.append(elapsed_time)
+                start_time = time.time()
+            elif len(times) == 100 and time_reported is False:
+                avg_time = np.mean(times)
+                total_time = len(indexes) * avg_time
+                print(("Expected time to process {} sources: {:.2f} seconds "
+                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                time_reported = True
 
-                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
-                                                                              values['y_or_Dec'],
-                                                                              pixelflag, 4096)
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                          values['y_or_Dec'],
+                                                                          pixelflag, 4096)
 
-                # Get the input magnitude of the point source
-                mag = float(values[mag_column])
+            # Get the input magnitude of the point source
+            mag = float(values[mag_column])
 
-                if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
-                    # set up an entry for the output table
-                    entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
+            if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
+                # set up an entry for the output table
+                entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
-                    # Calculate the countrate for the source
-                    countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
-                                                      photflam=self.photflam)
-                    framecounts = countrate * self.frametime
+                # Calculate the countrate for the source
+                countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
+                                                  photflam=self.photflam)
+                framecounts = countrate * self.frametime
 
-                    # add the countrate and the counts per frame to pointSourceList
-                    # since they will be used in future calculations
-                    entry.append(countrate)
-                    entry.append(framecounts)
+                # add the countrate and the counts per frame to pointSourceList
+                # since they will be used in future calculations
+                entry.append(countrate)
+                entry.append(framecounts)
 
-                    # add the good point source, including location and counts, to the pointSourceList
-                    pointSourceList.add_row(entry)
+                # add the good point source, including location and counts, to the pointSourceList
+                pointSourceList.add_row(entry)
 
-                    # write out positions, distances, and counts to the output file
-                    pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts))
-            except:
-                pass
+                # write out positions, distances, and counts to the output file
+                pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts))
+
         self.n_pointsources = len(pointSourceList)
         print("Number of point sources found within the requested aperture: {}".format(self.n_pointsources))
         # close the output file
@@ -2041,6 +2039,7 @@ class Catalog_seed():
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
         else:
+            # print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
@@ -3036,6 +3035,7 @@ class Catalog_seed():
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])
 
+        print('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']

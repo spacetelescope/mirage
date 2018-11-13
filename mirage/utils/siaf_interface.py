@@ -17,7 +17,7 @@ Use
         from mirage.utils import siaf_interface
 
 """
-
+import os
 import numpy as np
 
 import pysiaf
@@ -27,39 +27,50 @@ from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
 
-def get_siaf_information(instrument, aperture, ra, dec, telescope_roll):
-    """Use pysiaf to get aperture information
+def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_arcsec=None, v3_arcsec=None, verbose=False):
+    """Use pysiaf to get aperture information.
 
     Parameters
     ----------
     instrument : str
         Instrument name.
 
-    aperture : str
+    aperture_name : str
         Aperture name (e.g. "NRCA1_FULL")
     """
     # Temporary fix to access good NIRCam distortion coefficients which
     # which are not yet in the PRD
     if instrument.lower() == 'nircam':
-        import os
-        print("NOTE: Using pre-delivery SIAF data")
-        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, instrument)
-        siaf = pysiaf.Siaf(instrument, basepath=pre_delivery_dir)[aperture]
+        print("NOTE: Using pre-delivery SIAF data for {}".format(aperture_name))
+        siaf_instrument = 'NIRCam'
+        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
+        siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)[aperture_name]
     else:
-        siaf = pysiaf.Siaf(instrument)[aperture]
+        siaf_instrument = instrument
+        siaf = pysiaf.Siaf(siaf_instrument)[aperture_name]
+
+    if v2_arcsec is None:
+        v2_arcsec = siaf.V2Ref
+    if v3_arcsec is None:
+        v3_arcsec = siaf.V3Ref
 
     local_roll = set_telescope_pointing.compute_local_roll(telescope_roll,
-                                                           ra, dec, siaf.V2Ref,
-                                                           siaf.V3Ref)
+                                                           ra, dec, v2_arcsec, v3_arcsec)
+
     # Create attitude_matrix
-    att_matrix = rotations.attitude(siaf.V2Ref, siaf.V3Ref, ra, dec, local_roll)
+    att_matrix = rotations.attitude(v2_arcsec, v3_arcsec, ra, dec, local_roll)
 
     # Get full frame size
     fullframesize = siaf.XDetSize
 
     # Subarray boundaries in full frame coordinates
-    xcorner, ycorner = sci_subarray_corners(instrument, aperture)
-    subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
+    try:
+        xcorner, ycorner = sci_subarray_corners(siaf_instrument, aperture_name)
+        subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
+    except (RuntimeError, TypeError) as e: # e.g. NIRSpec NRS_FULL_MSA aperture
+        if verbose:
+            print('get_siaf_information raised error:\n{}\nIgnoring it.'.format(e))
+        subarray_boundaries = [0, 0, 0, 0]
     return siaf, local_roll, att_matrix, fullframesize, subarray_boundaries
 
 

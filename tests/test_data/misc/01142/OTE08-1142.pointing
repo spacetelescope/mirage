@@ -1,0 +1,26 @@
+# APT Output Product
+# 
+# APT Version: Version 25.4.0.1 
+# Date: Wed Dec 13 14:54:57 GMT 2017
+
+JWST Pointing Report for JWST Approved Proposal 1142 (Unsaved)
+
+========================================
+* NIRcam Confirmation COARSE (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA3_FULL                9 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +51.934 -527.803   -0.000   -0.000 TARGET     SCIENCE      102    102  0.000 (base)
+
+========================================
+* FGS Confirmation (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA3_FULL                9 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +51.934 -527.803   -0.000   -0.000 TARGET     SCIENCE       93     93  0.000 (base)
+
+========================================
+* NIRcam Confirmation TRACK (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA3_FULL                9 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +51.934 -527.803   -0.000   -0.000 TARGET     SCIENCE      102    102  0.000 (base)
+
+

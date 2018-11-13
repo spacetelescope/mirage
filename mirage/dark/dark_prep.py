@@ -714,6 +714,7 @@ class DarkPrep():
             # In order to linearize the dark, the JWST pipeline must
             # be present, and self.dark will have to be translated back
             # into a RampModel instance
+            # print('Working on {}'.format(self.dark))
             self.linDark = self.linearize_dark(self.dark)
             print("Linearized dark shape: {}".format(self.linDark.data.shape))
 

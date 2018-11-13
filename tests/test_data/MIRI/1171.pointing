@@ -1,0 +1,99 @@
+# APT Output Product
+# 
+# APT Version: Version 26.0.5  JWST PRD: PRDOPSSOC-H-015 
+# Date: Fri Oct 12 01:35:45 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1171 (1171_OTE-34_MIRI-FGS-alignment.aptx)
+
+========================================
+* MIRIM_distortion_calibration_F770W_MRS_MEDIUM (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942  -50.000  -55.000   -0.991   -0.684 -452.663 -374.427  -50.991  -55.684 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +653.622 +338.104   -0.976   -0.706 -452.663 -374.427 +652.644 +337.400 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942  -50.000  -55.000   +0.905   +0.578 -454.559 -373.164  -49.095  -54.422 DITHER     SCIENCE        0      0  2.278           
+  1    1   1    2 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +653.622 +338.104   +0.892   +0.598 -454.559 -373.164 +654.511 +338.704 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942  -50.000  -55.000   -0.907   -0.582 -452.748 -374.324  -50.907  -55.582 DITHER     SCIENCE        0      0  2.151           
+  1    1   1    3 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +653.622 +338.104   -0.894   -0.602 -452.748 -374.324 +652.726 +337.504 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942  -50.000  -55.000   +0.989   +0.679 -454.643 -373.063  -49.011  -54.320 DITHER     SCIENCE        0      0  2.277           
+  1    1   1    4 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +653.622 +338.104   +0.974   +0.701 -454.643 -373.063 +654.593 +338.807 DITHER     PARALLEL       0      0                  
+
+========================================
+* MIRIM_vignetting_check_F770W_MRS_SHORT (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL2A          1 LMC-MIRI  +80.48876  -69.49942  -80.000  -85.000   -0.828   -1.388 -422.808 -405.479  -80.828  -86.388 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +449.038 +291.918   -0.832   -1.385 -422.808 -405.479 +448.206 +290.534 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL2A          1 LMC-MIRI  +80.48876  -69.49942  -80.000  -85.000   +0.798   +1.797 -424.434 -402.294  -79.202  -83.203 DITHER     SCIENCE        0      0  3.576           
+  1    1   1    2 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +449.038 +291.918   +0.804   +1.794 -424.434 -402.294 +449.842 +293.713 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL2A          1 LMC-MIRI  +80.48876  -69.49942  -80.000  -85.000   -0.750   -1.235 -422.886 -405.327  -80.750  -86.235 DITHER     SCIENCE        0      0  3.405           
+  1    1   1    3 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +449.038 +291.918   -0.754   -1.233 -422.886 -405.327 +448.284 +290.686 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL2A          1 LMC-MIRI  +80.48876  -69.49942  -80.000  -85.000   +0.875   +1.948 -424.511 -402.143  -79.125  -83.052 DITHER     SCIENCE        0      0  3.574           
+  1    1   1    4 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +449.038 +291.918   +0.881   +1.945 -424.511 -402.143 +449.919 +293.864 DITHER     PARALLEL       0      0                  
+
+========================================
+* MIRI_FGS1_alignment_F770W_MRS_SHORT (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL3A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   -2.092   -2.409 -122.280 -537.207 -382.093 -218.408 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +327.930 +169.901   -2.039   -2.454 -122.280 -537.207 +325.892 +167.447 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL3A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   +1.480   +1.071 -125.852 -533.726 -378.521 -214.928 DITHER     SCIENCE        0      0  4.987           
+  1    1   1    2 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +327.930 +169.901   +1.456   +1.103 -125.852 -533.726 +329.387 +171.004 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL3A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   -1.997   -2.197 -122.374 -536.994 -381.998 -218.196 DITHER     SCIENCE        0      0  4.772           
+  1    1   1    3 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +327.930 +169.901   -1.949   -2.240 -122.374 -536.994 +325.982 +167.662 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL3A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   +1.572   +1.279 -125.944 -533.518 -378.429 -214.720 DITHER     SCIENCE        0      0  4.982           
+  1    1   1    4 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +327.930 +169.901   +1.544   +1.313 -125.944 -533.518 +329.475 +171.215 DITHER     PARALLEL       0      0                  
+
+========================================
+* MIRI_FGS1_alignment_F560W_MRS_MEDIUM (Obs 4)
+** Visit 4:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   -1.967   -2.870 -121.161 -538.357 -381.968 -218.869 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   -1.904   -2.912 -121.161 -538.357 +324.799 +166.273 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   +2.086   +2.659 -125.213 -532.828 -377.915 -213.340 DITHER     SCIENCE        0      0  6.855           
+  1    1   1    2 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   +2.027   +2.704 -125.213 -532.828 +328.730 +171.889 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   -1.874   -2.524 -121.254 -538.011 -381.875 -218.523 DITHER     SCIENCE        0      0  6.522           
+  1    1   1    3 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   -1.818   -2.564 -121.254 -538.011 +324.884 +166.621 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   +2.173   +2.995 -125.301 -532.492 -377.828 -213.004 DITHER     SCIENCE        0      0  6.844           
+  1    1   1    4 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   +2.107   +3.042 -125.301 -532.492 +328.810 +172.227 DITHER     PARALLEL       0      0                  
+
+========================================
+* MIRI_FGS2_alignment_F770W_MRS_SHORT (Obs 5)
+** Visit 5:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   -0.991   -0.684 -202.663 -535.426 -300.992 -216.684 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.623 +161.999   -0.994   -0.681 -202.663 -535.426 +227.630 +161.319 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   +0.905   +0.578 -204.558 -534.163 -299.096 -215.421 DITHER     SCIENCE        0      0  2.278           
+  1    1   1    2 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.623 +161.999   +0.907   +0.575 -204.558 -534.163 +229.530 +162.575 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   -0.907   -0.582 -202.747 -535.324 -300.907 -216.581 DITHER     SCIENCE        0      0  2.151           
+  1    1   1    3 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.623 +161.999   -0.908   -0.579 -202.747 -535.324 +227.715 +161.421 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL1A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   +0.989   +0.679 -204.643 -534.062 -299.012 -215.320 DITHER     SCIENCE        0      0  2.277           
+  1    1   1    4 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.623 +161.999   +0.991   +0.676 -204.643 -534.062 +229.614 +162.676 DITHER     PARALLEL       0      0                  
+
+========================================
+* MIRI_FGS2_alignment_F560W_MRS_LONG (Obs 6)
+** Visit 6:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   -1.967   -2.870 -201.161 -538.357 -301.968 -218.869 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.094 +161.256   -1.977   -2.863 -201.161 -538.357 +226.118 +158.393 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   +2.086   +2.659 -205.213 -532.828 -297.915 -213.340 DITHER     SCIENCE        0      0  6.855           
+  1    1   1    2 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.094 +161.256   +2.094   +2.652 -205.213 -532.828 +230.189 +163.908 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   -1.874   -2.524 -201.254 -538.011 -301.875 -218.523 DITHER     SCIENCE        0      0  6.522           
+  1    1   1    3 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.094 +161.256   -1.882   -2.517 -201.254 -538.011 +226.212 +158.739 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -300.000 -216.000   +2.173   +2.995 -205.301 -532.492 -297.828 -213.004 DITHER     SCIENCE        0      0  6.844           
+  1    1   1    4 FGS2_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +228.094 +161.256   +2.183   +2.988 -205.301 -532.492 +230.278 +164.244 DITHER     PARALLEL       0      0                  
+
+========================================
+* Confirmation_MIRI_FGS1_alignment_F560W_MRS_MEDIUM (Obs 7)
+** Visit 7:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   -1.967   -2.870 -121.161 -538.357 -381.968 -218.869 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   -1.904   -2.912 -121.161 -538.357 +324.799 +166.273 TARGET     PARALLEL       0      0                  
+  1    1   1    2 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   +2.086   +2.659 -125.213 -532.828 -377.915 -213.340 DITHER     SCIENCE        0      0  6.855           
+  1    1   1    2 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   +2.027   +2.704 -125.213 -532.828 +328.730 +171.889 DITHER     PARALLEL       0      0                  
+  1    1   1    3 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   -1.874   -2.524 -121.254 -538.011 -381.875 -218.523 DITHER     SCIENCE        0      0  6.522           
+  1    1   1    3 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   -1.818   -2.564 -121.254 -538.011 +324.884 +166.621 DITHER     PARALLEL       0      0                  
+  1    1   1    4 MIRIFU_CHANNEL4A          1 LMC-MIRI  +80.48876  -69.49942 -380.000 -216.000   +2.173   +2.995 -125.301 -532.492 -377.828 -213.004 DITHER     SCIENCE        0      0  6.844           
+  1    1   1    4 FGS1_FULL                 1 LMC-MIRI  +80.48876  -69.49942 +326.702 +169.184   +2.107   +3.042 -125.301 -532.492 +328.810 +172.227 DITHER     PARALLEL       0      0                  
+
+
