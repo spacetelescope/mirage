@@ -11,6 +11,73 @@ import numpy as np
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
 
 
+get_pointing_info -> returns dictioary
+def ptsrc_for_proposal(pointing_dictionary, catalog_splitting_threshold=1., email=''):
+    """Given a pointing dictionary from an APT file, generate source catalogs
+    that cover all of the coordinates specifired.
+
+    Parameters
+    ----------
+    pointing_dictionary : dict
+        Output from miarge.apt.apt_inputs.ra_dec_update()
+
+    catalog_splitting_threshold : float
+        Maximum distance in degrees between two pointings where a single catalog will contain
+        both pointings
+
+    Returns
+    -------
+    something
+    """
+    threshold = catalog_splitting_threshold * u.deg
+    ra_apertures = pointing_dictionary['ra_ref'] * u.deg
+    dec_apertures = pointing_dictionary['dec_ref'] * u.deg
+    ra_target = pointing_dictionary['ra'] * u.deg
+    dec_target = pointing_dictionary['dec'] * u.deg
+    mapped = np.array([False] * len(ra_target))
+    index = np.arange(len(ra_target))
+
+    for indx, target_ra, target_dec in zip(index, ra_target, dec_target):
+        if mapped[indx] is False:
+            dithers = ra_target == target_ra & dec_target == target_dec
+            min_ra = np.min(ra_apertures[dithers])
+            max_ra = np.max(ra_apertures[dithers])
+            min_dec = np.min(dec_apertures[dithers])
+            max_dec = np.max(dec_apertures[dithers])
+
+            nearby_targets = separation(target_ra, target_dec to ra_target, dec_target) < catalog_splitting_threshold &
+                            mapped is False
+            for close_target in nearby_targets:
+                dithers = ra_target == ra_target[close_target] & dec_target == dec_target[close_target]
+                min_ra = np.min([ra_apertures[dithers]].append(min_ra))
+                max_ra = np.max([ra_apertures[dithers]].append(max_ra))
+                min_dec = np.min([dec_apertures[dithers]].append(min_dec))
+                max_dec = np.max([dec_apertures[dithers]].append(max_dec))
+            mapped[nearby_targets] = True
+
+            # Pad min and max RA and Dec values since so far we have values only at the reference
+            # location. Add at least half a (LW) detector width * sqrt(2).
+            pad = 0.062 * 1024 * 1.5
+            min_ra -= pad
+            max_ra += pad
+            min_dec -= pad
+            max_dec += pad
+            mean_ra = (max_ra + min_ra) / 2.
+            mean_dec = (max_dec + min_dec) / 2.
+            delta_ra = max_ra - min_ra
+            delta_dec = max_dec - min_dec
+            full_width = np.max([delta_ra, delta_dec])
+
+            # Create catalog
+            cat = twoMASS_plus_background(mean_ra, mean_dec, full_width, email=email)
+            cat_filename = '???????'
+            cat_dir = '???????'
+            cat.save(os.path.join(cat_dir, cat_filename))
+
+
+
+
+
 def get_2MASS_ptsrc_catalog(ra, dec, box_width):
     """Query the 2MASS All-Sky Point Source Catalog in a square region around the RA and Dec
     provided. Box width must be in units of arcseconds
@@ -46,7 +113,9 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email=''):
     Besancon model so that we don't end up with a double population of bright stars
     """
     two_mass = get_2MASS_ptsrc_catalog(ra, dec, box_width)
-    and then...
+    background = besancon(ra, dec, box_width, coords='ra_dec', email=email)
+    two_mass.add_catalog(background)
+    return two_mass
 
 
 def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(10, 29)):
@@ -184,10 +253,10 @@ def galactic_bulge(box_width, email=''):
     cat : obj
         mirage.catalogs.create_catalog.PointSourceCatalog
     """
-    Look up Besancon limitations. Model breaks down somewhere close to the
-    galactic core.
-    representative_galactic_longitude = 0.?  # deg
-    representative_galactic_latitude = 5.0 ? # deg
+    #Look up Besancon limitations. Model breaks down somewhere close to the
+    #galactic core.
+    representative_galactic_longitude = 0.  # ? deg
+    representative_galactic_latitude = 5.0  # ? deg
 
     cat = besancon(representative_galactic_longitude, representative_galactic_latitude,
                    box_width, coords='galactic', email=email)
