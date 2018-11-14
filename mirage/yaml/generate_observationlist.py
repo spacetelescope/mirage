@@ -365,7 +365,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                             ]
                         if 'CLEAR' in filter_wheel_value:
                             filter_value = pupil_wheel_value
-                        elif 'CLEAR' in pupil_wheel_value:
+                        elif ('CLEAR' in pupil_wheel_value) or ('NRM' in pupil_wheel_value):
                             filter_value = filter_wheel_value
                     else:
                         filter_value = xml_dict['Filter'][index]

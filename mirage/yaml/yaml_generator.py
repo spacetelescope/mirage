@@ -106,6 +106,7 @@ import pysiaf
 from ..apt import apt_inputs
 from ..utils.utils import calc_frame_time
 from .generate_observationlist import get_observation_dict
+from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 
 ENV_VAR = 'MIRAGE_DATA'
 
@@ -993,7 +994,6 @@ class SimInput:
         if self.table_file is not None:
             self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
 
-        # 1/0
         # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
         # self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
@@ -1241,7 +1241,23 @@ class SimInput:
         """
         instrument = input['Instrument']
         # select the right filter
-        if input['detector'] in ['NIS', 'FGS']:
+        if input['detector'] in ['NIS']:
+            # if input['APTTemplate'] == 'NirissExternalCalibration': 'NirissImaging':
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            # set the FilterWheel and PupilWheel for NIRISS
+            if input['APTTemplate'] != 'NirissExternalCalibration':
+                filter_name = input['Filter']
+                if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                    input[pupilkey] = filter_name
+                    input[filtkey] = 'CLEAR'
+                elif filter_name in NIRISS_FILTER_WHEEL_ELEMENTS:
+                    input[pupilkey] = 'CLEARP'
+                    input[filtkey] = filter_name
+                else:
+                    raise RuntimeError('Filter {} not valid'.format(filter_name))
+            catkey = ''
+        elif input['detector'] in ['FGS']:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             catkey = ''
