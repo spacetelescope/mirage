@@ -721,8 +721,6 @@ class AptInput:
 
         for i in range(len(self.exposure_tab['Module'])):
             siaf_instrument = self.exposure_tab["Instrument"][i]
-            if siaf_instrument == 'NIRSPEC':
-                siaf_instrument = 'NIRSpec'
 
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
