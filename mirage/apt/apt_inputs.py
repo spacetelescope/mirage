@@ -336,7 +336,7 @@ class AptInput:
             if inst == 'NIRCAM':
                 instrument_name = 'NIRCam'
             if inst == 'NIRSPEC':
-                instrument_name = 'NIRSPec'
+                instrument_name = 'NIRSpec'
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
