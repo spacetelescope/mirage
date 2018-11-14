@@ -750,7 +750,7 @@ class AptInput:
             parser = argparse.ArgumentParser(usage=usage, description='Simulate JWST ramp')
         parser.add_argument("input_xml", help='XML file from APT describing the observations.')
         parser.add_argument("pointing_file", help='Pointing file from APT describing observations.')
-        parser.add_argument("--output_csv", help="Name of output CSV file containing list of observations.",
+        parser.add_argument("--output_csv", help="Name of output file containing list of observations.",
                             default=None)
         parser.add_argument("--observation_list_file", help=('Ascii file containing a list of '
                                                              'observations, times, and roll angles, '

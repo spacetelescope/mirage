@@ -1341,14 +1341,14 @@ class Catalog_seed():
         # Read in the list of point sources to add
         # Adjust point source locations using astrometric distortion
         # Translate magnitudes to counts in a single frame
-        if self.runStep['pointsource'] == True:
+        if self.runStep['pointsource'] is True:
             pslist = self.getPointSourceList(self.params['simSignals']['pointsource'])
 
             # translate the point source list into an image
             psfimage, ptsrc_segmap = self.makePointSourceImage(pslist)
 
             # save the point source image for examination by user
-            if self.params['Output']['save_intermediates'] == True:
+            if self.params['Output']['save_intermediates'] is True:
                 psfImageName = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(psfimage)
                 h1 = fits.ImageHDU(ptsrc_segmap)
@@ -1367,7 +1367,7 @@ class Catalog_seed():
         # Simulated galaxies
         # Read in the list of galaxy positions/magnitudes to simulate
         # and create a countrate image of those galaxies.
-        if self.runStep['galaxies'] == True:
+        if self.runStep['galaxies'] is True:
             galaxyCRImage, galaxy_segmap = self.makeGalaxyImage(self.params['simSignals']['galaxyListFile'], self.centerpsf)
 
             # Multiply by the pixel area map
@@ -1377,7 +1377,7 @@ class Catalog_seed():
             segmentation_map += galaxy_segmap
 
             # save the galaxy image for examination by the user
-            if self.params['Output']['save_intermediates'] == True:
+            if self.params['Output']['save_intermediates'] is True:
                 galImageName = self.basename + '_galaxyRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(galaxyCRImage)
                 h1 = fits.ImageHDU(galaxy_segmap)
@@ -1390,7 +1390,7 @@ class Catalog_seed():
             signalimage = signalimage + galaxyCRImage
 
         # read in extended signal image and add the image to the overall image
-        if self.runStep['extendedsource'] == True:
+        if self.runStep['extendedsource'] is True:
             extlist, extstamps = self.getExtendedSourceList(self.params['simSignals']['extended'])
 
             # translate the extended source list into an image
@@ -1419,7 +1419,7 @@ class Catalog_seed():
             signalimage = signalimage + extimage
 
         # ZODIACAL LIGHT
-        if self.runStep['zodiacal'] == True:
+        if self.runStep['zodiacal'] is True:
             #zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
             zodiangle = self.params['Telescope']['rotation']
             zodiacalimage, zodiacalheader = self.getImage(self.params['simSignals']['zodiacal'], arrayshape, True, zodiangle, arrayshape/2)
@@ -3029,9 +3029,10 @@ class Catalog_seed():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        self.siaf = siaf_interface.get_instance(siaf_inst)
+        instrument_siaf = siaf_interface.get_instance(siaf_inst)
+        self.siaf = instrument_siaf[self.params['Readout']['array_name']]
         self.local_roll, self.attitude_matrix, self.ffsize, \
-            self.subarray_bounds = siaf_interface.get_siaf_information(self.siaf,
+            self.subarray_bounds = siaf_interface.get_siaf_information(instrument_siaf,
                                                                        self.params['Readout']['array_name'],
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])

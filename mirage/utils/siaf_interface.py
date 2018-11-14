@@ -64,6 +64,26 @@ def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, 
     aperture_name : str
         Aperture name (e.g. "NRCA1_FULL")
 
+    ra : float
+        RA value of pointing in degrees
+
+    dec : float
+        Dec value of pointing in degrees
+
+    telescope_roll : float
+        Position angle of the telescope in degrees
+
+    v2_arcsec : float
+        The V2 value in arcseconds of the reference location for the
+        instrument aperture
+
+    v3_arcsecc : float
+        The V3 value in arcseconds of the reference location for the
+        instrument aperture
+
+    verbose : bool
+        Print extra information to the screen
+
     Returns
     -------
     local_roll : float
