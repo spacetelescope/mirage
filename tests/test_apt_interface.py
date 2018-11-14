@@ -27,7 +27,7 @@ from mirage.yaml import generate_observationlist, yaml_generator
 # importlib.reload( read_apt_xml )
 # importlib.reload( apt_inputs )
 # importlib.reload( siaf_interface )
-
+# from mirage.yaml import generate_observationlist, yaml_generator
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
@@ -97,7 +97,7 @@ def test_complete_input_generation():
         if instrument == 'NIRISS':
             apt_file_seeds = ['1088', '1087', 'm31_field_test_observation']
             # apt_file_seeds = ['1088']
-            # apt_file_seeds = ['1087_minimal']
+            apt_file_seeds = ['1087_minimal']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
@@ -131,8 +131,8 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            # if '1068_manual' not in apt_file_seed:
-            # # # if 'OTE12-1147' not in apt_file_seed:
+            # if '1071' not in apt_file_seed:
+            # # # # if 'OTE12-1147' not in apt_file_seed:
             #     continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
@@ -166,5 +166,5 @@ def test_complete_input_generation():
             assert len(valid_instrument_list) == len(yfiles)
 
 # for debugging
-# if __name__ == '__main__':
-#     test_complete_input_generation()
+if __name__ == '__main__':
+    test_complete_input_generation()

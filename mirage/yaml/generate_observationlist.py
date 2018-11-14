@@ -356,9 +356,21 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                         text += ["        {}: {}\n".format(key, default_values[key])]
 
                 elif instrument.lower() in ['niriss', 'fgs', 'nirspec', 'miri']:
+                    if (instrument.lower() == 'niriss') and (xml_dict['APTTemplate'][index] in ['NirissExternalCalibration']):
+                        filter_wheel_value = xml_dict['FilterWheel'][index]
+                        pupil_wheel_value = xml_dict['PupilWheel'][index]
+                        text += [
+                            "    FilterWheel: {}\n".format(filter_wheel_value),
+                            "    PupilWheel: {}\n".format(pupil_wheel_value),
+                            ]
+                        if 'CLEAR' in filter_wheel_value:
+                            filter_value = pupil_wheel_value
+                        elif 'CLEAR' in pupil_wheel_value:
+                            filter_value = filter_wheel_value
+                    else:
+                        filter_value = xml_dict['Filter'][index]
                     text += [
-                        "    Filter: {}\n".format(xml_dict['FilterWheel'][index]),
-                        "    Pupil: {}\n".format(xml_dict['PupilWheel'][index]),
+                        "    Filter: {}\n".format(filter_value),
                         "    PointSourceCatalog: {}\n".format(catalogs[instrument.lower()][observation_index]),
                         "    BackgroundRate: {}\n".format(default_values['BackgroundRate']),
                         ]
