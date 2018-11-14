@@ -52,6 +52,7 @@ import yaml
 
 from . import read_apt_xml
 from ..utils import siaf_interface
+from ..utils import constants
 
 
 class AptInput:
@@ -342,34 +343,27 @@ class AptInput:
 
 
     def check_aperture_override(self):
-        instruments = self.exposure_tab['Instrument']
-        apertures = self.exposure_tab['aperture']
+        if bool(self.exposure_tab['FiducialPointOverride']) == True:
+            instruments = self.exposure_tab['Instrument']
+            apertures = self.exposure_tab['aperture']
 
-        aperture_key = {'nircam': 'NRC',
-                        'fgs': 'FGS',
-                        'niriss': 'NIS',
-                        'nirspec': 'NRS',
-                        'miri': 'MIR'}
-        fixed_apertures = []
-        for i, (instrument, aperture) in enumerate(zip(instruments, apertures)):
-            inst_match_ap = aperture.startswith(aperture_key[instrument.lower()])
-            if not inst_match_ap:
-                print('Aperture {} is not for instrument {}'.format(aperture, instrument))
+            aperture_key = constants.instrument_abbreviations
 
-                # Handle the one case we understand, for now
-                if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
-                    obs_num = self.exposure_tab['obs_num'][i]
-                    guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
-                    guider_aperture = 'FGS{}_FULL'.format(guider_number)
-                    fixed_apertures.append(guider_aperture)
+            fixed_apertures = []
+            for i, (instrument, aperture) in enumerate(zip(instruments, apertures)):
+                inst_match_ap = aperture.startswith(aperture_key[instrument.lower()])
+                if not inst_match_ap:
+                    # Handle the one case we understand, for now
+                    if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
+                        obs_num = self.exposure_tab['obs_num'][i]
+                        guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                        guider_aperture = 'FGS{}_FULL'.format(guider_number)
+                        fixed_apertures.append(guider_aperture)
+                    else:
+                        raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
                 else:
-                    raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
-            else:
-                fixed_apertures.append(aperture)
+                    fixed_apertures.append(aperture)
 
-        # if len(self.exposure_tab['aperture']) != len(fixed_apertures):
-
-        else:
             self.exposure_tab['aperture'] = fixed_apertures
 
 

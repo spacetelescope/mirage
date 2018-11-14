@@ -305,9 +305,6 @@ class SimInput:
             apt.observation_list_file = self.observation_list_file
             apt.apt_xml_dict = self.apt_xml_dict
 
-            if 'True' in self.apt_xml_dict['FiducialPointOverride']:
-                raise RuntimeError('FiducialPointOverride detected. mirage is not yet capable of handling this correctly.')
-
             apt.output_dir = self.output_dir
             apt.create_input_table()
 
