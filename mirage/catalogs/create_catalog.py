@@ -101,8 +101,11 @@ def query_gaia(ra, dec, box_width, frame='icrs'):
     Returns
     -------
 
-    cat : catalog_generator:PointSourceCatalog object
-        Catalog containing Gaia sources
+    gaia_cat : astropy.table.Table
+        Catalog composed of MaskedColumns containing Gaia sources
+
+    magnitude_column_names : list
+        List of column header names corresponding to columns containing source magnitude
     """
     if isinstance(ra, float):
         ra_units = u.deg
@@ -140,7 +143,23 @@ def query_2MASS_ptsrc_catalog(ra, dec, box_width):
 
     Parameters
     ----------
-    something
+    ra : float or str
+        Right ascention of the center of the catalog. Can be decimal degrees or HMS string
+
+    dec : float or str
+        Declination of the center of the catalog. Can be decimal degrees of DMS string
+
+    box_width : float
+        Width of the box in arcseconds containing the catalog.
+
+    Returns
+    -------
+
+    query_table : astropy.table.Table
+        Catalog composed of MaskedColumns containing 2MASS sources
+
+    magnitude_column_names : list
+        List of column header names corresponding to columns containing source magnitude
     """
     # Don't artificially limit how many sources are returned
     Irsa.ROW_LIMIT = -1
@@ -175,8 +194,14 @@ def mirage_ptsrc_catalog_from_table(table, instrument, mag_colnames):
     Parameters
     ----------
 
+    table : astropy.table.Table
+        Source catalog from (e.g.) Gaia or 2MASS query
+
     instrument : str
         Unique identifier for where data came from (e.g. '2MASS', 'WISE', 'nircam_f200w')
+
+    mag_colnames : list
+        List of strings corresponding to the columns in 'table' that contain magnitude values
     """
     cat = PointSourceCatalog(ra=table['ra'].data.data, dec=table['dec'].data.data)
 
