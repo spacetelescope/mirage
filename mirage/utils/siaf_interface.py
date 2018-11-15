@@ -6,6 +6,7 @@ Authors
 -------
 
     - Johannes Sahlmann
+    - Bryan Hilbert
 
 Use
 ---
@@ -27,27 +28,79 @@ from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
 
-def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_arcsec=None, v3_arcsec=None, verbose=False):
-    """Use pysiaf to get aperture information.
+def get_instance(instrument):
+    """Return an instance of a pysiaf.Siaf object for the given instrument
 
     Parameters
     ----------
     instrument : str
-        Instrument name.
+        Name of instrument
+
+    Returns
+    -------
+    siaf : pysiaf.Siaf
+        Siaf object for the requested instrument
+    """
+    if instrument.lower() == 'nircam':
+        print("NOTE: Using pre-delivery SIAF data for {}".format(instrument))
+        siaf_instrument = 'NIRCam'
+        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
+        siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)
+    else:
+        siaf_instrument = instrument
+        siaf = pysiaf.Siaf(siaf_instrument)
+    return siaf
+
+
+def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, v2_arcsec=None,
+                         v3_arcsec=None, verbose=False):
+    """Use pysiaf to get aperture information.
+
+    Parameters
+    ----------
+    siaf_instance : pysiaf.Siaf
+        Instance of SIAF for a single instrument
 
     aperture_name : str
         Aperture name (e.g. "NRCA1_FULL")
+
+    ra : float
+        RA value of pointing in degrees
+
+    dec : float
+        Dec value of pointing in degrees
+
+    telescope_roll : float
+        Position angle of the telescope in degrees
+
+    v2_arcsec : float
+        The V2 value in arcseconds of the reference location for the
+        instrument aperture
+
+    v3_arcsecc : float
+        The V3 value in arcseconds of the reference location for the
+        instrument aperture
+
+    verbose : bool
+        Print extra information to the screen
+
+    Returns
+    -------
+    local_roll : float
+        Local roll angle at the reference location of the aperture
+
+    att_matrix : matrix
+        Attitude matrix used to relate RA, Dec, local roll angle to V2, V3
+
+    fullframesize : int
+        Number of columns in the  given aperture
+
+    subarray_boundaries : list
+        List of full-frame coordinates corresponding to the minimum and maximum
+        values of x and y in the given aperture
     """
-    # Temporary fix to access good NIRCam distortion coefficients which
-    # which are not yet in the PRD
-    if instrument.lower() == 'nircam':
-        print("NOTE: Using pre-delivery SIAF data for {}".format(aperture_name))
-        siaf_instrument = 'NIRCam'
-        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
-        siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)[aperture_name]
-    else:
-        siaf_instrument = instrument
-        siaf = pysiaf.Siaf(siaf_instrument)[aperture_name]
+    # Select the correct aperture
+    siaf = siaf_instance[aperture_name]
 
     if v2_arcsec is None:
         v2_arcsec = siaf.V2Ref
@@ -65,16 +118,16 @@ def get_siaf_information(instrument, aperture_name, ra, dec, telescope_roll, v2_
 
     # Subarray boundaries in full frame coordinates
     try:
-        xcorner, ycorner = sci_subarray_corners(siaf_instrument, aperture_name)
+        xcorner, ycorner = sci_subarray_corners(siaf_instance.instrument, aperture_name, siaf=siaf_instance)
         subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
-    except (RuntimeError, TypeError) as e: # e.g. NIRSpec NRS_FULL_MSA aperture
+    except (RuntimeError, TypeError) as e:  # e.g. NIRSpec NRS_FULL_MSA aperture
         if verbose:
             print('get_siaf_information raised error:\n{}\nIgnoring it.'.format(e))
         subarray_boundaries = [0, 0, 0, 0]
-    return siaf, local_roll, att_matrix, fullframesize, subarray_boundaries
+    return local_roll, att_matrix, fullframesize, subarray_boundaries
 
 
-def sci_subarray_corners(instrument, aperture_name, verbose=False):
+def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     """Return the two opposing aperture corners in the SIAF Science frame of the full-frame SCA.
 
     This function serves as interface between the SIAF information accessible via the pysiaf package
@@ -86,6 +139,8 @@ def sci_subarray_corners(instrument, aperture_name, verbose=False):
         JWST instrument name with correct capitalization
     aperture_name : str
         SIAF aperture name
+    siaf : pysiaf.Siaf
+        SIAF instance for a single instrument
     verbose : bool
         Verbose output on/off
 
@@ -96,7 +151,8 @@ def sci_subarray_corners(instrument, aperture_name, verbose=False):
 
     """
     # get SIAF
-    siaf = pysiaf.Siaf(instrument)
+    if siaf is None:
+        siaf = pysiaf.Siaf(instrument)
 
     # get master aperture names
     siaf_detector_layout = iando.read.read_siaf_detector_layout()

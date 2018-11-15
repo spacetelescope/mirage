@@ -671,8 +671,10 @@ class DarkPrep():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        self.siaf, junk0, junk1, self.ffsize, \
-            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+        instrument_siaf = siaf_interface.get_instance(siaf_inst)
+        self.siaf = instrument_siaf[self.params['Readout']['array_name']]
+        junk0, junk1, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(instrument_siaf,
                                                                        self.params['Readout']['array_name'],
                                                                        0.0, 0.0,
                                                                        self.params['Telescope']['rotation'])
