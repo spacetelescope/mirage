@@ -361,6 +361,7 @@ class SimInput:
             astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
             ipc.append(self.get_reffile(self.ipc_list[instrument], det))
             pam.append(self.get_reffile(self.pam_list[instrument], det))
+
         self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
@@ -1097,8 +1098,11 @@ class SimInput:
 
             if offline:
                 # no access to central store. Set all files to none.
-                default_value = 'none'
                 for list_name in list_names:
+                    if list_name in 'dark lindark'.split():
+                        default_value = ['None']
+                    else:
+                        default_value = 'None'
                     for det in self.det_list[instrument]:
                         getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
 
@@ -1508,8 +1512,6 @@ class SimInput:
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
 
-        # if instrument.lower()=='niriss':
-        #     1/0
         return yamlout
 
     def add_options(self, parser=None, usage=None):
