@@ -2,18 +2,26 @@
 
 """
 Tools for generating Mirage-compatible catalogs from surveys
+
+Note that once you have mirage-formatted catalogs, there is an "add_catalog" function
+in catalog_generator.py that can combine catalogs
+
 """
 
+from astropy.coordinates import SkyCoord
 import astropy.units as u
+from astroquery.gaia import Gaia
 from astroquery.irsa import Irsa
 import numpy as np
 
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
 
 
-get_pointing_info -> returns dictioary
 def ptsrc_for_proposal(pointing_dictionary, catalog_splitting_threshold=1., email=''):
-    """Given a pointing dictionary from an APT file, generate source catalogs
+    """
+    NOT YET FUNCTIONAL
+
+    Given a pointing dictionary from an APT file, generate source catalogs
     that cover all of the coordinates specifired.
 
     Parameters
@@ -75,10 +83,58 @@ def ptsrc_for_proposal(pointing_dictionary, catalog_splitting_threshold=1., emai
             cat.save(os.path.join(cat_dir, cat_filename))
 
 
+def query_gaia(ra, dec, box_width, frame='icrs'):
+    """Query the Gaia archive in a square region around the RA and Dec provided.
+
+    Parameters
+    ----------
+
+    ra : float or str
+        Right ascention of the center of the catalog. Can be decimal degrees or HMS string
+
+    dec : float or str
+        Declination of the center of the catalog. Can be decimal degrees of DMS string
+
+    box_width : float
+        Width of the box in arcseconds containing the catalog.
+
+    Returns
+    -------
+
+    cat : catalog_generator:PointSourceCatalog object
+        Catalog containing Gaia sources
+    """
+    if isinstance(ra, float):
+        ra_units = u.deg
+    elif isinstance(ra, str):
+        ra_units = u.hourangle
+    else:
+        raise ValueError(("WARNING: RA must be a decimal degrees or a string (e.g. '12h23m34.5s', "
+                          "'12:23:34.5'"))
+    if isinstance(dec, float):
+        dec_units = u.deg
+    elif isinstance(dec, str):
+        dec_units = u.hourangle
+    else:
+        raise ValueError(("WARNING: Dec must be a decimal degrees or a string (e.g. '12d23m34.5s', "
+                          "'12:23:34.5'"))
+
+    coord = SkyCoord(ra=ra, dec=dec, unit=(ra_units, dec_units), frame=frame)
+    width = u.Quantity(box_width, u.arcsec)
+    height = u.Quantity(box_width, u.arcsec)
+    gaia_cat = Gaia.query_object_async(coordinate=coord, width=width, height=height)
+
+    magnitude_column_names = ['phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag']
+    # Place the results into a Mirage-formatted catalog
+    #cat = PointSourceCatalog(ra=gaia_cat['ra'].data.data, dec=gaia_cat['dec'].data.data)
+    #for key in ['phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag']:
+    #    filter_name = key.split('_')[1]
+    #    cat.add_magnitude_column(gaia_cat[key].data.data, instrument='Gaia', filter_name=filter_name)
+
+    return gaia_cat, magnitude_column_names
 
 
-
-def get_2MASS_ptsrc_catalog(ra, dec, box_width):
+def query_2MASS_ptsrc_catalog(ra, dec, box_width):
     """Query the 2MASS All-Sky Point Source Catalog in a square region around the RA and Dec
     provided. Box width must be in units of arcseconds
 
@@ -87,7 +143,7 @@ def get_2MASS_ptsrc_catalog(ra, dec, box_width):
     something
     """
     # Don't artificially limit how many sources are returned
-    Irsa.ROW_LIMIT = 1000000  # -1?
+    Irsa.ROW_LIMIT = -1
 
     ra_dec_string = "{}  {}".format(ra, dec)
     query_table = Irsa.query_region(ra_dec_string, catalog='fp_psc', spatial='Box',
@@ -95,16 +151,46 @@ def get_2MASS_ptsrc_catalog(ra, dec, box_width):
 
     # Exclude any entries with missing RA or Dec values
     radec_mask = filter_bad_ra_dec(query_table)
-    cat = PointSourceCatalog(ra=query_table['ra'].data.data.data[radec_mask],
-                             dec=query_table['dec'].data.data.data[radec_mask])
+    query_table = query_table[radec_mask]
 
+    # Column names of interest
+    magnitude_column_names = ['j_m', 'h_m', 'k_m']
+    #cat = PointSourceCatalog(ra=query_table['ra'].data.data.data[radec_mask],
+    #                         dec=query_table['dec'].data.data.data[radec_mask])
+    #
     # Add the J, H, and K magnitudes as they may be useful for magnitude conversions later
     # Add the values that have had fill_values applied. The fill_value is 1e20.
-    for key in ['j_m', 'h_m', 'k_m']:
-        data = query_table[key].filled().data
-        cat.add_magnitude_column(data, instrument='2MASS', filter_name=key)
+    #for key in ['j_m', 'h_m', 'k_m']:
+    #    data = query_table[key].filled().data
+    #    cat.add_magnitude_column(data, instrument='2MASS', filter_name=key)
 
+    return query_table, magnitude_column_names
+
+
+def mirage_ptsrc_catalog_from_table(table, instrument, mag_colnames):
+    """Create a mirage-formatted point source catalog from an input
+    table (e.g. from one of the query functions), along with the magnitude
+    column names of interest
+
+    Parameters
+    ----------
+
+    instrument : str
+        Unique identifier for where data came from (e.g. '2MASS', 'WISE', 'nircam_f200w')
+    """
+    cat = PointSourceCatalog(ra=table['ra'].data.data, dec=table['dec'].data.data)
+
+    for magcol in mag_colnames:
+        data = table[key].filled().data
+        cat.add_magnitude_column(data, instrument=instrument, filter_name=key)
     return cat
+
+
+def get_2MASS_ptsrc_catalog(ra, dec, box_width):
+    """Wrapper around 2MASS query and creation of mirage-formatted catalog"""
+    twomass_cat, twomass_mag_cols = query_2MASS_ptsrc_catalog(ra, dec, box_width)
+    twomass_mirage = mirage_ptsrc_catalog_from_table(twomass_cat, '2MASS', twomass_mag_cols)
+    return twomass_mirage
 
 
 def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email=''):
@@ -116,6 +202,13 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email=''):
     background = besancon(ra, dec, box_width, coords='ra_dec', email=email)
     two_mass.add_catalog(background)
     return two_mass
+
+
+def get_gaia_ptsrc_catalog(ra, dec, box_width):
+    """Wrapper around Gaia query and creation of mirage-formatted catalog"""
+    gaia_cat, gaia_mag_cols = query_2MASS_ptsrc_catalog(ra, dec, box_width)
+    gaia_mirage = mirage_ptsrc_catalog_from_table(gaia_cat, 'gaia', gaia_mag_cols)
+    return gaia_mirage
 
 
 def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(10, 29)):
@@ -273,10 +366,16 @@ def filter_bad_ra_dec(table_data):
     Parameters
     ----------
     something
+
+    Returns
+    -------
+
+    position_mask : numpy.ndarray
+        1D boolean array. True for good sources, False for bad.
     """
-    ra_data = table_data['ra'].data.data
+    #ra_data = table_data['ra'].data.data
     ra_mask = ~table_data['ra'].data.mask
-    dec_data = table_data['dec'].data.data
+    #dec_data = table_data['dec'].data.data
     dec_mask = ~table_data['dec'].data.mask
     position_mask = ra_mask & dec_mask
     return position_mask

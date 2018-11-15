@@ -67,7 +67,7 @@ class PointSourceCatalog():
             self.location_units = 'position_pixels'
 
     def add_catalog(self, catalog_to_add, magnitude_fill_value=99.):
-        """Add a catalog to the current caatlog instance"""
+        """Add a catalog to the current catalog instance"""
         # The the source positions in the two catalogs have different units, then the catalogs
         # can't be combined.
         if self.location_units != catalog_to_add.location_units:
