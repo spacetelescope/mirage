@@ -51,8 +51,7 @@ from pysiaf import rotations
 import yaml
 
 from . import read_apt_xml
-from ..utils import siaf_interface
-from ..utils import constants
+from ..utils import siaf_interface, constants
 
 
 class AptInput:
@@ -343,7 +342,7 @@ class AptInput:
 
 
     def check_aperture_override(self):
-        if bool(self.exposure_tab['FiducialPointOverride']) == True:
+        if bool(self.exposure_tab['FiducialPointOverride']) is True:
             instruments = self.exposure_tab['Instrument']
             apertures = self.exposure_tab['aperture']
 
@@ -364,6 +363,9 @@ class AptInput:
                 else:
                     fixed_apertures.append(aperture)
 
+            # Add new dictionary entry to document the FiducialPointOverride
+            self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
+            # Rewrite the existing aperture entry to match the primary instrument
             self.exposure_tab['aperture'] = fixed_apertures
 
 
