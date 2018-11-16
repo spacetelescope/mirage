@@ -669,8 +669,6 @@ class DarkPrep():
 
         # Get the subarray boundaries from pysiaf
         siaf_inst = self.params['Inst']['instrument']
-        if siaf_inst.lower() == 'nircam':
-            siaf_inst = 'NIRCam'
         instrument_siaf = siaf_interface.get_instance(siaf_inst)
         self.siaf = instrument_siaf[self.params['Readout']['array_name']]
         junk0, junk1, self.ffsize, \

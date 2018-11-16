@@ -35,7 +35,7 @@ from .utils import read_fits
 
 
 class ImgSim():
-    def __init__(self):
+    def __init__(self, paramfile=None, override_dark=None):
         self.env_var = 'MIRAGE_DATA'
         datadir = os.environ.get(self.env_var)
         if datadir is None:
@@ -45,8 +45,8 @@ class ImgSim():
                               "input files needed for the simulation."
                               "These files must be downloaded separately"
                               "from the Mirage package.".format(self.env_var)))
-        self.paramfile = None
-        self.override_dark = None
+        self.paramfile = paramfile
+        self.override_dark = override_dark
 
     def create(self):
         # Create seed image

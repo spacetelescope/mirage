@@ -181,7 +181,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
         x_sci, y_sci = siaf[aperture._parent_apertures].det_to_sci(x_det, y_det)
         aperture = siaf[aperture._parent_apertures]
 
-    if instrument == 'NIRCam':
+    if instrument.lower() == 'nircam':
         if aperture.DetSciParity == 1:
             corner_index = np.array([1, 3])
         elif aperture.DetSciParity == -1:
@@ -189,7 +189,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
             corner_index = np.array([0, 2])
         x_corner = x_sci[corner_index]
         y_corner = y_sci[corner_index]
-    elif instrument == 'NIRISS':
+    elif instrument.lower() == 'niriss':
         x_corner_index = np.array([0, 2])
         y_corner_index = np.array([0, 2])
         if aperture_name == 'NIS_CEN_OSS':
@@ -200,7 +200,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
         if aperture_name in ['NIS_SUBSTRIP96', 'NIS_SUBSTRIP256']:
             x_corner = [1, 2048]
             y_corner = [1, 2048]
-    elif instrument == 'FGS':
+    elif instrument.lower() == 'fgs':
         x_corner_index = np.array([0, 2])
         y_corner_index = np.array([0, 2])
         if aperture_name == 'FGS1_FULL_OSS':
