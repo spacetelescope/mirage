@@ -82,8 +82,8 @@ def test_complete_input_generation():
     temporary_directory()
 
 
-    # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
+    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
+    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
     # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
     # for instrument in ['NIRISS']:
     # for instrument in ['misc']:
