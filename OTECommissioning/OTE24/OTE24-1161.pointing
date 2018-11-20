@@ -1,0 +1,99 @@
+# APT Output Product
+# 
+# APT Version: Version 25.4.0.1 
+# Date: Tue Dec 19 15:42:17 GMT 2017
+
+JWST Pointing Report for JWST Approved Proposal 1161 (Unsaved)
+
+========================================
+* NIRCam HF time series 1 (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* Realtime visit 1 (state 3 to 4) (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA3_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +81.349 -498.228   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+========================================
+* NIRCam HF time series 2 (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* NIRCam HF time series 3 (Obs 4)
+** Visit 4:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* Realtime visit 2 (frequency 1) (Obs 5)
+** Visit 5:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA1_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +91.172 -498.073   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+========================================
+* NIRCam HF time series 4 (Obs 6)
+** Visit 6:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* Realtime visit 3 (frequency 2) (Obs 7)
+** Visit 7:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA1_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +91.172 -498.073   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+========================================
+* NIRCam HF time series 5 (Obs 8)
+** Visit 8:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* Realtime visit 4 (frequency 3) (Obs 9)
+** Visit 9:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA1_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +91.172 -498.073   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+========================================
+* NIRCam HF time series 6 (Obs 10)
+** Visit 10:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* Realtime visit 5 (frequency 4) (Obs 11)
+** Visit 11:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA1_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +91.172 -498.073   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+========================================
+* NIRCam HF time series 7 (Obs 12)
+** Visit 12:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  0    0   0    0 NRCA3_FP1_SUB64           5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     T_ACQ          0      0        (base)
+  1    1   1    1 NRCA3_FP1_SUB8            5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +69.542 -515.658   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000           
+
+========================================
+* Realtime visit 5 (frequency 5) (Obs 13)
+** Visit 13:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA1_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +91.172 -498.073   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+========================================
+* Realtime visit 6 (set frequency) (Obs 14)
+** Visit 14:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCA1_SUB160              5 BD+65-12 +273.08917  +65.60481   +0.000   +0.000   +0.000   +0.000  +91.172 -498.073   -0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+

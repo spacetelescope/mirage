@@ -9,7 +9,7 @@
 #################
 build/*
 dist/*
-mirages.egg-info/*
+mirage.egg-info/*
 
 # Lists and images #
 ######################
@@ -20,6 +20,7 @@ mirages.egg-info/*
 *.yaml~
 *.csv
 *.txt~
+*.pointing
 
 # exceptions
 !tests/test_data/*/*.list
@@ -27,16 +28,15 @@ mirages.egg-info/*
 
 # Other #
 #########
-.ipynb_checkpoints/*
-examples/.ipynb_checkpoints/*
+**/.ipynb_checkpoints/*
 *.aptbackup
 *.aptx
 *.docx
 .idea/*
+*.xlsx
 
 # Files #
 #########
-OTECommissioning/*
 dev_scripts/*
 *config.json
 
@@ -44,3 +44,7 @@ dev_scripts/*
 docs/_build
 docs/_static
 docs/_templates
+
+# Commissioning-specific #
+##########################
+OTECommissioning/**/*.jpg
