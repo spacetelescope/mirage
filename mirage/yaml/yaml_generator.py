@@ -106,6 +106,7 @@ import pysiaf
 from ..apt import apt_inputs
 from ..utils.utils import calc_frame_time
 from .generate_observationlist import get_observation_dict
+from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 
 ENV_VAR = 'MIRAGE_DATA'
 
@@ -357,6 +358,7 @@ class SimInput:
             astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
             ipc.append(self.get_reffile(self.ipc_list[instrument], det))
             pam.append(self.get_reffile(self.pam_list[instrument], det))
+
         self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
@@ -981,7 +983,6 @@ class SimInput:
         if self.table_file is not None:
             self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
 
-        # 1/0
         # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
         # self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
@@ -1085,8 +1086,11 @@ class SimInput:
 
             if offline:
                 # no access to central store. Set all files to none.
-                default_value = 'none'
                 for list_name in list_names:
+                    if list_name in 'dark lindark'.split():
+                        default_value = ['None']
+                    else:
+                        default_value = 'None'
                     for det in self.det_list[instrument]:
                         getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
 
@@ -1229,7 +1233,23 @@ class SimInput:
         """
         instrument = input['Instrument']
         # select the right filter
-        if input['detector'] in ['NIS', 'FGS']:
+        if input['detector'] in ['NIS']:
+            # if input['APTTemplate'] == 'NirissExternalCalibration': 'NirissImaging':
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            # set the FilterWheel and PupilWheel for NIRISS
+            if input['APTTemplate'] != 'NirissExternalCalibration':
+                filter_name = input['Filter']
+                if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                    input[pupilkey] = filter_name
+                    input[filtkey] = 'CLEAR'
+                elif filter_name in NIRISS_FILTER_WHEEL_ELEMENTS:
+                    input[pupilkey] = 'CLEARP'
+                    input[filtkey] = filter_name
+                else:
+                    raise RuntimeError('Filter {} not valid'.format(filter_name))
+            catkey = ''
+        elif input['detector'] in ['FGS']:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             catkey = ''
@@ -1480,8 +1500,6 @@ class SimInput:
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
 
-        # if instrument.lower()=='niriss':
-        #     1/0
         return yamlout
 
     def add_options(self, parser=None, usage=None):

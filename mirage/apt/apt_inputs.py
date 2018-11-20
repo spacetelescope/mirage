@@ -282,7 +282,6 @@ class AptInput:
         #     readxml_obj = read_apt_xml.ReadAPTXML()
         #     tab = readxml_obj.read_xml(self.input_xml)
 
-
         # This affects on NIRCam exposures (right?)
         # If the number of dithers is set to '3TIGHT'
         # (currently only used in NIRCam)
@@ -303,7 +302,9 @@ class AptInput:
 
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
-            'Inconsistent table size from XML file ({}) and pointing file ({}). Something was not processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']), len(pointing_dictionary['obs_num']))
+            ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
+             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID'])),
+             len(pointing_dictionary['obs_num']))
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
@@ -329,6 +330,16 @@ class AptInput:
 
         ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
         print('Wrote exposure table to {}'.format(detectors_file))
+
+        # Create a pysiaf.Siaf instance for each instrument in the proposal
+        self.siaf = {}
+        for inst in np.unique(observation_dictionary['Instrument']):
+            instrument_name = inst
+            if inst == 'NIRCAM':
+                instrument_name = 'NIRCam'
+            if inst == 'NIRSPEC':
+                instrument_name = 'NIRSpec'
+            self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
         self.ra_dec_update()
@@ -425,7 +436,7 @@ class AptInput:
                 guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                 detectors = ['G{}'.format(guider_number)]
 
-            elif instrument== 'miri':
+            elif instrument == 'miri':
                 detectors = ['MIR']
 
             n_detectors = len(detectors)
@@ -456,8 +467,6 @@ class AptInput:
 
                 observation_dictionary['aperture'][index] = aperture_name
                 observation_dictionary['detector'][index] = detector
-
-
 
         return observation_dictionary
 
@@ -557,7 +566,7 @@ class AptInput:
         with open(file) as f:
             for line in f:
 
-                #skip comments and new lines
+                # skip comments and new lines
                 if (line[0] == '#') or (line in ['\n']) or ('=====' in line):
                     continue
                 # extract proposal ID
@@ -566,12 +575,11 @@ class AptInput:
                     try:
                         propid = np.int(propid_header)
                     except ValueError:
-                        #adopt value passed to function
+                        # adopt value passed to function
                         pass
                     if verbose:
                         print('Extracted proposal ID {}'.format(propid))
                     continue
-
 
                 elif (len(line) > 1):
                     elements = line.split()
@@ -727,7 +735,6 @@ class AptInput:
 
         for i in range(len(self.exposure_tab['Module'])):
             siaf_instrument = self.exposure_tab["Instrument"][i]
-
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
@@ -741,10 +748,12 @@ class AptInput:
 
             telescope_roll = pav3
 
-            aperture, local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                siaf_interface.get_siaf_information(
-                siaf_instrument, aperture_name, pointing_ra, pointing_dec, telescope_roll,
-                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+            aperture = self.siaf[siaf_instrument][aperture_name]
+
+            local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
+                                                    pointing_ra, pointing_dec, telescope_roll,
+                                                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
 
             # calculate RA, Dec of reference location for the detector
             ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
@@ -759,8 +768,11 @@ class AptInput:
             parser = argparse.ArgumentParser(usage=usage, description='Simulate JWST ramp')
         parser.add_argument("input_xml", help='XML file from APT describing the observations.')
         parser.add_argument("pointing_file", help='Pointing file from APT describing observations.')
-        parser.add_argument("--output_csv", help="Name of output CSV file containing list of observations.", default=None)
-        parser.add_argument("--observation_list_file", help='Ascii file containing a list of observations, times, and roll angles, catalogs', default=None)
+        parser.add_argument("--output_csv", help="Name of output file containing list of observations.",
+                            default=None)
+        parser.add_argument("--observation_list_file", help=('Ascii file containing a list of '
+                                                             'observations, times, and roll angles, '
+                                                             'catalogs'), default=None)
         return parser
 
 

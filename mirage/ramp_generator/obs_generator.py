@@ -752,8 +752,10 @@ class Observation():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
-            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+        instrument_siaf = siaf_interface.get_instance(siaf_inst)
+        self.siaf = instrument_siaf[self.params['Readout']['array_name']]
+        self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(instrument_siaf,
                                                                        self.params['Readout']['array_name'],
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])

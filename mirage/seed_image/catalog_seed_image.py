@@ -168,43 +168,43 @@ class Catalog_seed():
         if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
             ('FULL' not in self.params['Readout']['array_name'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
-         
+
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
-       
+
         if self.params['Inst']['mode'] in ["pom"]:
             self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
-         
+
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
-         
+
     def extract_full_from_pom(self,seedimage,seed_segmap):
-        """ Given the seed image and segmentation images for the NIRISS POM field of view, 
-        extract the central 2048x2048 pixel area where the detector sits.  The routine is only 
-        called when the mode is "pom".  The mode is set to "imaging" in these routine, as after 
-        the routine is called the subsequent results are the same as when the mode is set to 
+        """ Given the seed image and segmentation images for the NIRISS POM field of view,
+        extract the central 2048x2048 pixel area where the detector sits.  The routine is only
+        called when the mode is "pom".  The mode is set to "imaging" in these routine, as after
+        the routine is called the subsequent results are the same as when the mode is set to
         "imaging" in the parameter file.
-        
+
         Parameters:
         -----------
-        
+
         seedimage : numpy.ndarray (float)   dimension 2322x2322 pixels
         seed_segmap : numpy.ndarray (int)    dimension 2322x2322 pixels
-        
+
         Returns:
         ---------
-        
+
         newseedimage : numpy.ndarray (float)  dimension 2048x2048
         newseed_segmap : numpy.ndarray (int)   dimension 2048x2048
-        
+
         """
-        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
+        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the
         # ramp simulation.  Set the mode back to "imaging".
         newseedimage = np.copy(seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
         newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-        self.params['Inst']['mode'] = "imaging" 
+        self.params['Inst']['mode'] = "imaging"
         return newseedimage, newseed_segmap
-         
+
     def add_detector_to_zeropoints(self, detector):
         """Manually add detector dependence to the zeropoint table for
         NIRCam and NIRISS simualtions. This is being done as a placeholder
@@ -568,7 +568,7 @@ class Catalog_seed():
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
-                  
+
         if self.params['Inst']['mode'] in ["pom"]:
             # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
             self.output_dims = [2322,2322]
@@ -1341,14 +1341,14 @@ class Catalog_seed():
         # Read in the list of point sources to add
         # Adjust point source locations using astrometric distortion
         # Translate magnitudes to counts in a single frame
-        if self.runStep['pointsource'] == True:
+        if self.runStep['pointsource'] is True:
             pslist = self.getPointSourceList(self.params['simSignals']['pointsource'])
 
             # translate the point source list into an image
             psfimage, ptsrc_segmap = self.makePointSourceImage(pslist)
 
             # save the point source image for examination by user
-            if self.params['Output']['save_intermediates'] == True:
+            if self.params['Output']['save_intermediates'] is True:
                 psfImageName = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(psfimage)
                 h1 = fits.ImageHDU(ptsrc_segmap)
@@ -1367,7 +1367,7 @@ class Catalog_seed():
         # Simulated galaxies
         # Read in the list of galaxy positions/magnitudes to simulate
         # and create a countrate image of those galaxies.
-        if self.runStep['galaxies'] == True:
+        if self.runStep['galaxies'] is True:
             galaxyCRImage, galaxy_segmap = self.makeGalaxyImage(self.params['simSignals']['galaxyListFile'], self.centerpsf)
 
             # Multiply by the pixel area map
@@ -1377,7 +1377,7 @@ class Catalog_seed():
             segmentation_map += galaxy_segmap
 
             # save the galaxy image for examination by the user
-            if self.params['Output']['save_intermediates'] == True:
+            if self.params['Output']['save_intermediates'] is True:
                 galImageName = self.basename + '_galaxyRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(galaxyCRImage)
                 h1 = fits.ImageHDU(galaxy_segmap)
@@ -1390,7 +1390,7 @@ class Catalog_seed():
             signalimage = signalimage + galaxyCRImage
 
         # read in extended signal image and add the image to the overall image
-        if self.runStep['extendedsource'] == True:
+        if self.runStep['extendedsource'] is True:
             extlist, extstamps = self.getExtendedSourceList(self.params['simSignals']['extended'])
 
             # translate the extended source list into an image
@@ -1419,7 +1419,7 @@ class Catalog_seed():
             signalimage = signalimage + extimage
 
         # ZODIACAL LIGHT
-        if self.runStep['zodiacal'] == True:
+        if self.runStep['zodiacal'] is True:
             #zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
             zodiangle = self.params['Telescope']['rotation']
             zodiacalimage, zodiacalheader = self.getImage(self.params['simSignals']['zodiacal'], arrayshape, True, zodiangle, arrayshape/2)
@@ -3029,8 +3029,10 @@ class Catalog_seed():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
-            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+        instrument_siaf = siaf_interface.get_instance(siaf_inst)
+        self.siaf = instrument_siaf[self.params['Readout']['array_name']]
+        self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(instrument_siaf,
                                                                        self.params['Readout']['array_name'],
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])
