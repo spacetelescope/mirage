@@ -20,7 +20,6 @@ mirage.egg-info/*
 *.yaml~
 *.csv
 *.txt~
-*.pointing
 
 # exceptions
 !tests/test_data/*/*.list
