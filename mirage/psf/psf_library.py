@@ -15,103 +15,6 @@ from astropy.io import fits
 
 
 class CreatePSFLibrary:
-    """
-    Class Description:
-    -----------------
-    Class to create a PSF library in the following format:
-        For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
-        (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
-        is the 2D PSF.
-
-    This class must be run separately for each instrument.
-
-    Special Case for NIRCam:
-    For NIRCam, you can set detectors and filters both to "shortwave" or both to
-    "longwave" to run all the shortwave/longwave filters/detectors.
-    Or if you want to run all of the filters and detectors, setting both to "all"
-    will separate the short and long wave filter/detectors and run them in the
-    correct pairings.
-    If you choose to specify specific filters and detectors, they must all be either
-    shortwave or longwave. Mismatched lists of short and long wave filters and
-    detectors will result in an error.
-
-    Parameters:
-    -----------
-    instrument: str
-        The name of the instrument you want to run. Can be any capitalization. Can
-        only run 1 instrument at a time. Right now this is only set up for NIRCam,
-        NIRISS, and FGS (they are 2048x2048)
-
-    filters: str or list, optional
-        Which filter(s) you want to create a library for.
-
-        Can be a string of 1 filter name, a list of filter names (as strings), or
-        the default "all" will run through all the filters in the filter_list
-        attribute of webbpsf.INSTR(). Spelling/capitalization must match what
-        webbpsf expects. See also special case for NIRCam. Default is "all"
-
-    detectors: str or list, optional
-        Which detector(s) you want to create a library for.
-
-        Can be a string of 1 detector name, a list of detector names (as strings), or
-        the default "all" will run through all the detectors in the detector_list
-        attribute of webbpsf.INSTR(). Spelling/capitalization must match what
-        webbpsf expects. See also special case for NIRCam. Default is "all"
-
-    fov_pixels: int, optional
-        The field of view in undersampled detector pixels used by WebbPSF when
-        creating the PSFs. Default is 101 pixels.
-
-    oversample: int, optional
-        The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
-
-    num_psfs: int, optional
-        The total number of fiducial PSFs to be created and saved in the files. This
-        number must be a square number. Default is 16.
-        E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
-
-    opd_type: str, optional
-        The type of OPD map you would like to use to create the PSFs. Options are
-        "predicted" or "requirements" where the predicted map is of the expected
-        WFE and the requirements map is slightly more conservative (has slightly
-        larger WFE). Default is "requirements"
-
-    opd_number: int, optional
-        The realization of the OPD map pulled from the OPD file. Options are an
-        integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
-        the telescope included in the OPD map file. Default is 0.
-
-    pupil_opd: webbpsf.opds.OTE_Linear_Model_WSS, optional
-        The OPD map to use to generate all PSFs, in the form of a
-        OTE_Linear_Model_WSS object. If provided, overrides the ``opd_type`` and
-        ``opd_number`` options.
-
-    save: bool, optional
-        True/False boolean if you want to save your file
-
-    fileloc: str, optional
-        Where to save your file if "save" keyword is set to True. Default of None
-        will save in the current directory
-
-    filename: str, optional
-        The name to save your current file under if "save" keyword is set to True.
-        Default of None will save it as "INSTRNAME_FILTERNAME.fits"
-
-    overwrite: bool, optional
-        True/False boolean to overwrite the output file if it already exists.
-
-
-    Use:
-    ----
-    c = CreatePSFLibrary(instrument, filters, detectors, fov_pixels, oversample,
-                         num_psfs, save, fileloc, filename, overwrite)
-    c.create_files()
-
-    nis = CreatePSFLibrary("NIRISS") # will run all filters/detectors
-    nis.create_files()
-
-    """
-
     # Class variables for NIRCam short vs long wave information:
     nrca_short_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W2', 'F150W',
                           'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
@@ -128,6 +31,102 @@ class CreatePSFLibrary:
                  oversample=5, num_psfs=16, opd_type="requirements", opd_number=0,
                  save=True, fileloc=None, filename=None, overwrite=True,
                  pupil_opd=None, header_addons=None):
+        """
+        Class Description:
+        -----------------
+        Class to create a PSF library in the following format:
+            For a given instrument, 1 file per filter in the form [SCA, j, i, y, x] where
+            (j,i) is the PSF position on the detector grid (integer positions) and (y,x)
+            is the 2D PSF.
+
+        This class must be run separately for each instrument.
+
+        Special Case for NIRCam:
+        For NIRCam, you can set detectors and filters both to "shortwave" or both to
+        "longwave" to run all the shortwave/longwave filters/detectors.
+        Or if you want to run all of the filters and detectors, setting both to "all"
+        will separate the short and long wave filter/detectors and run them in the
+        correct pairings.
+        If you choose to specify specific filters and detectors, they must all be either
+        shortwave or longwave. Mismatched lists of short and long wave filters and
+        detectors will result in an error.
+
+        Parameters:
+        -----------
+        instrument: str
+            The name of the instrument you want to run. Can be any capitalization. Can
+            only run 1 instrument at a time. Right now this is only set up for NIRCam,
+            NIRISS, and FGS (they are 2048x2048)
+
+        filters: str or list, optional
+            Which filter(s) you want to create a library for.
+
+            Can be a string of 1 filter name, a list of filter names (as strings), or
+            the default "all" will run through all the filters in the filter_list
+            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
+            webbpsf expects. See also special case for NIRCam. Default is "all"
+
+        detectors: str or list, optional
+            Which detector(s) you want to create a library for.
+
+            Can be a string of 1 detector name, a list of detector names (as strings), or
+            the default "all" will run through all the detectors in the detector_list
+            attribute of webbpsf.INSTR(). Spelling/capitalization must match what
+            webbpsf expects. See also special case for NIRCam. Default is "all"
+
+        fov_pixels: int, optional
+            The field of view in undersampled detector pixels used by WebbPSF when
+            creating the PSFs. Default is 101 pixels.
+
+        oversample: int, optional
+            The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
+
+        num_psfs: int, optional
+            The total number of fiducial PSFs to be created and saved in the files. This
+            number must be a square number. Default is 16.
+            E.g. num_psfs = 16 will have the class create a 4x4 grid of fiducial PSFs.
+
+        opd_type: str, optional
+            The type of OPD map you would like to use to create the PSFs. Options are
+            "predicted" or "requirements" where the predicted map is of the expected
+            WFE and the requirements map is slightly more conservative (has slightly
+            larger WFE). Default is "requirements"
+
+        opd_number: int, optional
+            The realization of the OPD map pulled from the OPD file. Options are an
+            integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
+            the telescope included in the OPD map file. Default is 0.
+
+        pupil_opd: webbpsf.opds.OTE_Linear_Model_WSS, optional
+            The OPD map to use to generate all PSFs, in the form of a
+            OTE_Linear_Model_WSS object. If provided, overrides the ``opd_type`` and
+            ``opd_number`` options.
+
+        save: bool, optional
+            True/False boolean if you want to save your file
+
+        fileloc: str, optional
+            Where to save your file if "save" keyword is set to True. Default of None
+            will save in the current directory
+
+        filename: str, optional
+            The name to save your current file under if "save" keyword is set to True.
+            Default of None will save it as "INSTRNAME_FILTERNAME.fits"
+
+        overwrite: bool, optional
+            True/False boolean to overwrite the output file if it already exists.
+
+
+        Use:
+        ----
+        c = CreatePSFLibrary(instrument, filters, detectors, fov_pixels, oversample,
+                             num_psfs, save, fileloc, filename, overwrite)
+        c.create_files()
+
+        nis = CreatePSFLibrary("NIRISS") # will run all filters/detectors
+        nis.create_files()
+
+        """
 
         # Pull correct capitalization of instrument name
         webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
@@ -171,28 +170,17 @@ class CreatePSFLibrary:
         self.pupil_opd = pupil_opd
         self.header_addons = header_addons
 
-    def _set_filters(self):
-        """ Get the list of filters to create PSF library files for """
 
-        # Set filter list to loop over
-        if self.filter_input == "all":
-            filter_list = self.webb.filter_list
-        elif self.filter_input == "shortwave":
-            filter_list = CreatePSFLibrary.nrca_short_filters
-        elif self.filter_input == "longwave":
-            filter_list = CreatePSFLibrary.nrca_long_filters
-        elif type(self.filter_input) is str:
-            filter_list = self.filter_input.split()
-        elif type(self.filter_input) is list:
-            filter_list = self.filter_input
+    @staticmethod
+    def _raise_value_error(msg_type, det, filt):
+        """Raise a specific ValueError based on mis-matched short/long wave detectors/filters"""
 
-        # If the user hand chose a filter list, check it's a valid list for the chosen instrument
-        if self.filter_input not in ["all", "shortwave", "longwave"]:
-            for filt in filter_list:
-                if filt not in self.webb.filter_list:
-                    raise ValueError("Instrument {} doesn't have a filter called {}.".format(self.instr, filt))
+        if "short filter" in msg_type.lower():
+            message = "You are trying to apply a shortwave filter ({}) to a longwave detector ({}). ".format(filt, det)
+        if "long filter" in msg_type.lower():
+            message = "You are trying to apply a longwave filter ({}) to a shortwave detector ({}). ".format(filt, det)
 
-        return filter_list
+        raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
 
     def _set_detectors(self):
         """ Get the list of detectors to include in the PSF library files """
@@ -217,16 +205,28 @@ class CreatePSFLibrary:
 
         return detector_list
 
-    @staticmethod
-    def _raise_value_error(msg_type, det, filt):
-        """Raise a specific ValueError based on mis-matched short/long wave detectors/filters"""
+    def _set_filters(self):
+        """ Get the list of filters to create PSF library files for """
 
-        if "short filter" in msg_type.lower():
-            message = "You are trying to apply a shortwave filter ({}) to a longwave detector ({}). ".format(filt, det)
-        if "long filter" in msg_type.lower():
-            message = "You are trying to apply a longwave filter ({}) to a shortwave detector ({}). ".format(filt, det)
+        # Set filter list to loop over
+        if self.filter_input == "all":
+            filter_list = self.webb.filter_list
+        elif self.filter_input == "shortwave":
+            filter_list = CreatePSFLibrary.nrca_short_filters
+        elif self.filter_input == "longwave":
+            filter_list = CreatePSFLibrary.nrca_long_filters
+        elif type(self.filter_input) is str:
+            filter_list = self.filter_input.split()
+        elif type(self.filter_input) is list:
+            filter_list = self.filter_input
 
-        raise ValueError(message + "Please change these entries so the filter falls within the detector band.")
+        # If the user hand chose a filter list, check it's a valid list for the chosen instrument
+        if self.filter_input not in ["all", "shortwave", "longwave"]:
+            for filt in filter_list:
+                if filt not in self.webb.filter_list:
+                    raise ValueError("Instrument {} doesn't have a filter called {}.".format(self.instr, filt))
+
+        return filter_list
 
     def _set_opd(self):
         """Define the telescope's OPD, either grabbing the requested
