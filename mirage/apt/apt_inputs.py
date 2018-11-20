@@ -363,10 +363,14 @@ class AptInput:
                 else:
                     fixed_apertures.append(aperture)
 
-            # Add new dictionary entry to document the FiducialPointOverride
+            # Add new dictionary entry to document the FiducialPointOverride (pointing aperture)
             self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
-            # Rewrite the existing aperture entry to match the primary instrument
+            # Rewrite the existing imaging aperture entry to match the primary instrument
             self.exposure_tab['aperture'] = fixed_apertures
+        else:
+            # Add new dictionary entry to document that the imaging aperture is the
+            # same as the pointing aperture
+            self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
 
 
     def expand_for_detectors(self, input_dictionary):
