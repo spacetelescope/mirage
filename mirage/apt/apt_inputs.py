@@ -303,8 +303,8 @@ class AptInput:
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
-             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID'])),
-             len(pointing_dictionary['obs_num']))
+             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']),
+             len(pointing_dictionary['obs_num'])))
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
@@ -334,11 +334,7 @@ class AptInput:
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
         for inst in np.unique(observation_dictionary['Instrument']):
-            instrument_name = inst
-            if inst == 'NIRCAM':
-                instrument_name = 'NIRCam'
-            if inst == 'NIRSPEC':
-                instrument_name = 'NIRSpec'
+            instrument_name = inst.lower()
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
@@ -734,7 +730,7 @@ class AptInput:
         aperture_dec = []
 
         for i in range(len(self.exposure_tab['Module'])):
-            siaf_instrument = self.exposure_tab["Instrument"][i]
+            siaf_instrument = self.exposure_tab["Instrument"][i].lower()
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
