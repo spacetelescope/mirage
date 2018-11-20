@@ -127,12 +127,11 @@ class CreatePSFLibrary:
     def __init__(self, instrument, filters="all", detectors="all", fov_pixels=101,
                  oversample=5, num_psfs=16, opd_type="requirements", opd_number=0,
                  save=True, fileloc=None, filename=None, overwrite=True,
-                 pupil_opd=None):
+                 pupil_opd=None, header_addons=None):
 
         # Pull correct capitalization of instrument name
         webbpsf_name_dict = {"NIRCAM": "NIRCam", "NIRSPEC": "NIRSpec", "NIRISS": "NIRISS",
                              "MIRI": "MIRI", "FGS": "FGS"}
-
         self.instr = webbpsf_name_dict[instrument.upper()]
 
         # Create instance of instrument in WebbPSF (same as webbpsf.instr)
@@ -170,6 +169,7 @@ class CreatePSFLibrary:
         self.fileloc = fileloc
         self.filename = filename
         self.pupil_opd = pupil_opd
+        self.header_addons = header_addons
 
     def _set_filters(self):
         """ Get the list of filters to create PSF library files for """
@@ -407,6 +407,11 @@ class CreatePSFLibrary:
             header["VERSION"] = (psf[0].header["VERSION"], "WebbPSF software version")
             header["DATAVERS"] = (psf[0].header["DATAVERS"], "WebbPSF reference data files version ")
 
+            # Include any header add-ons from the user, if applicable
+            if self.header_addons is not None:
+                # Append new keywords on to the existing header
+                header += self.header_addons
+
             # Add descriptor for how the file was made
             header["COMMENT"] = "For a given instrument, 1 file per filter in the form [SCA, j, i, y, x]"
             header["COMMENT"] = "where (j,i) is the PSF position on the detector grid (integer "
@@ -421,8 +426,17 @@ class CreatePSFLibrary:
             header.insert("NORMALIZ", ('', ''))
             header.insert("NORMALIZ", ('COMMENT', '/ WebbPSF Creation Information'))
 
-            header.insert("DATAVERS", ('COMMENT', '/ File Description'), after=True)
-            header.insert("DATAVERS", ('', ''), after=True)
+            if self.header_addons is None:
+                header.insert("DATAVERS", ('COMMENT', '/ File Description'), after=True)
+                header.insert("DATAVERS", ('', ''), after=True)
+            else:
+                header.insert("DATAVERS", ('COMMENT', '/ User-Supplied Information'), after=True)
+                header.insert("DATAVERS", ('', ''), after=True)
+
+                last_added_keyword = list(self.header_addons.keys())[-1]
+                header.insert(last_added_keyword, ('COMMENT', '/ File Description'), after=True)
+                header.insert(last_added_keyword, ('', ''), after=True)
+
 
             # Combine the header and data
             hdu = fits.HDUList([fits.PrimaryHDU(psf_arr, header=header)])

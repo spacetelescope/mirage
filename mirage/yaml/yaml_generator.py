@@ -860,11 +860,13 @@ class SimInput:
 
         Parameters:
         -----------
-        psf_paths : list or None
+        psf_paths : list, str, or None
             Either a list of the paths to the PSF library(ies), with a
             length equal to the number of activities in the APT program,
-            or None. If the former, each path will be written
-            chronologically into the yaml file. If the latter, the
+            a string containing the path to one PSF library,
+            or None. If a list, each path will be written
+            chronologically into each yaml file. If a string, that path
+            will be written into every yaml file. If None, the
             default PSF library path will be used for all yamls.
 
         Returns:
@@ -879,28 +881,36 @@ class SimInput:
             act_id_indices.append(act_ids.index(act_id))
         n_activities = len(act_ids)
 
+        # If no path explicitly provided, use the default path.
         if self.psf_paths is None:
             default_path = os.path.join(self.datadir, self.instrument, 'webbpsf_library')
             print('No PSF path provided. Using {} as PSF path for all yamls.'.format(default_path))
             paths_out = default_path * len(self.info['act_id'])
             return paths_out
 
-        elif not isinstance(self.psf_paths, list):
-            raise TypeError('Invalid PSF paths parameter provided. Please '
-                             'provide the psf_paths in the form of a list, not'
-                             '{}'.format(type(self.psf_paths)))
+        elif isinstance(self.psf_paths, str):
+            print('Using provided PSF path.')
+            paths_out = [self.psf_paths] * len(act_id_indices)
+            return paths_out
 
-        elif len(self.psf_paths) != n_activities:
+        elif isinstance(self.psf_paths, list) and self.psf_paths != n_activities:
             raise ValueError('Invalid PSF paths parameter provided. Please '
                              'provide the psf_paths in the form of a list of '
                              'strings with a length equal to the number of '
                              'activities in the APT program ({}), not equal to {}.'
                              .format(n_activities, len(self.psf_paths)))
 
-        else:
+        elif isinstance(self.psf_paths, list):
             print('Using provided PSF paths.')
             paths_out = [sorted(self.psf_paths)[i] for i in act_id_indices]
             return paths_out
+
+        elif not isinstance(self.psf_paths, list) or not isinstance(self.psf_paths, str):
+            raise TypeError('Invalid PSF paths parameter provided. Please '
+                            'provide the psf_paths in the form of a list or string, not'
+                            '{}'.format(type(self.psf_paths)))
+
+
 
     def get_reffile(self, refs, detector):
         """
