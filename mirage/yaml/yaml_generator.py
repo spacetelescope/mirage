@@ -458,7 +458,7 @@ class SimInput:
             file_dict['crosstalk_file'] = self.global_crosstalk_files[self.info['Instrument'][i].lower()]
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[self.info['Instrument'][i].lower()]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[self.info['Instrument'][i].lower()]
-            file_dict['psfpath'] = self.global_psfpath[self.info['Instrument'][i].lower()]
+            # file_dict['psfpath'] = self.global_psfpath[self.info['Instrument'][i].lower()]
 
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
@@ -1025,8 +1025,6 @@ class SimInput:
             Name of instrument
         """
 
-        # self.instrument = instrument.lower()
-
         # Prepare to find files listed as 'config'
         # and set up PSF path
 
@@ -1246,14 +1244,16 @@ class SimInput:
 
         # If no path explicitly provided, use the default path.
         if self.psf_paths is None:
-            default_path = os.path.join(self.datadir, self.instrument, 'webbpsf_library')
-            print('No PSF path provided. Using {} as PSF path for all yamls.'.format(default_path))
-            paths_out = default_path * len(self.info['act_id'])
+            print('No PSF path provided. Using default path as PSF path for all yamls.')
+            paths_out = []
+            for instrument in self.info['Instrument']:
+                default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
+                paths_out.append(default_path)
             return paths_out
 
         elif isinstance(self.psf_paths, str):
             print('Using provided PSF path.')
-            paths_out = [self.psf_paths] * len(act_id_indices)
+            paths_out = [self.psf_paths] * len(self.info['act_id'])
             return paths_out
 
         elif isinstance(self.psf_paths, list) and self.psf_paths != n_activities:
