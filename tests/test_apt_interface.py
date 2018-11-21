@@ -29,6 +29,7 @@ from mirage.yaml import generate_observationlist, yaml_generator
 # importlib.reload( siaf_interface )
 # from mirage.yaml import generate_observationlist, yaml_generator
 
+
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
