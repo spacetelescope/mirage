@@ -90,10 +90,23 @@ except ImportError:
         subprocess.check_call(['git', 'clone',
                                'https://github.com/spacetelescope/jwst.git'])
         sys.path.insert(1, 'jwst')
-        # import jwst
     except subprocess.CalledProcessError as e:
         print(e)
         exit(1)
+
+
+# get github version of webbpsf
+try:
+    import webbpsf
+except ImportError:
+    try:
+        subprocess.check_call(['git', 'clone',
+                               'https://github.com/spacetelescope/webbpsf.git'])
+        sys.path.insert(1, 'webbpsf')
+    except subprocess.CalledProcessError as e:
+        print(e)
+        exit(1)
+
 
 
 setup(
