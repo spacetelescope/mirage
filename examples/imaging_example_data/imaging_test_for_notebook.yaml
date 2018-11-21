@@ -11,6 +11,7 @@ Readout:
   array_name: NRCB5_FULL    #Name of array (FULL, SUB160, SUB64P, etc)
   filter: F250M       #Filter of simulated data (F090W, F322W2, etc)
   pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
+  namp: 4        #Number of amplifiers used to read out array. Only used for NIRCam/NRCA5_GRISMXX_<filter> array_names
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
   dark: None   #Dark current integration used as the base
@@ -22,7 +23,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   gain: $MIRAGE_DATA/nircam/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
+  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_from_pysiaf_distortion.asdf  #Astrometric distortion file (asdf)
   distortion_coeffs: $MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
   ipc: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.

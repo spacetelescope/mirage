@@ -35,9 +35,7 @@ from .utils import read_fits
 
 
 class ImgSim():
-    def __init__(self):
-        # Set the MIRAGE_DATA environment variable if it is not
-        # set already. This is for users at STScI.
+    def __init__(self, paramfile=None, override_dark=None):
         self.env_var = 'MIRAGE_DATA'
         datadir = os.environ.get(self.env_var)
         if datadir is None:
@@ -47,8 +45,8 @@ class ImgSim():
                               "input files needed for the simulation."
                               "These files must be downloaded separately"
                               "from the Mirage package.".format(self.env_var)))
-        self.paramfile = None
-        self.override_dark = None
+        self.paramfile = paramfile
+        self.override_dark = override_dark
 
     def create(self):
         # Create seed image
@@ -62,6 +60,7 @@ class ImgSim():
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
+            print('Perform dark preparation:')
             d = dark_prep.DarkPrep()
             d.paramfile = self.paramfile
             d.prepare()
@@ -76,6 +75,12 @@ class ImgSim():
         obs.seedheader = cat.seedinfo
         obs.paramfile = self.paramfile
         obs.create()
+
+        # Make useful information class attributes
+        self.seedimage = cat.seedimage
+        self.seed_segmap = cat.seed_segmap
+        self.seedinfo = cat.seedinfo
+        self.linDark = obs.linDark
 
     def read_dark_product(self, file):
         # Read in dark product that was produced

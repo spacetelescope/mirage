@@ -8,7 +8,7 @@ from astropy.io import fits
 import numpy as np
 #from photutils.utils import ShepardIDWInterpolator as idw
 from photutils import FittableImageModel
-from scipy.interpolate import interp2d
+from scipy.interpolate import interp2d, RectBivariateSpline
 
 
 class PSFCollection:
@@ -243,7 +243,8 @@ class PSFCollection:
             xlist = []
             for xpix in range(psf_xdim):
                 pixeldata = self.library[:, :, ypix, xpix]
-                interp2d_fncn = interp2d(xs, ys, pixeldata, kind='linear')
+                # interp2d_fncn = interp2d(xs, ys, pixeldata, kind='linear')
+                interp2d_fncn = RectBivariateSpline(xs, ys, pixeldata, kx=1, ky=1)
                 xlist.append(interp2d_fncn)
             interp_functions.append(xlist)
         return interp_functions

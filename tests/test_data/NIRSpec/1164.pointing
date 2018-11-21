@@ -1,0 +1,93 @@
+# APT Output Product
+# 
+# APT Version: Version 26.0.5  JWST PRD: PRDOPSSOC-H-015 
+# Date: Thu Oct 11 15:46:12 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1164 (1164_OTE-27_NIRSpec_FGS_alignment_mosaicdither.aptx)
+
+========================================
+* NIRSpec_FGS1_alignment (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   +0.066   -0.130 +321.702 -473.359  -72.694   -3.970 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   +0.033   +0.142 +321.702 -473.359 -119.378 +221.588 TARGET     PARALLEL       0      0                  
+  1    1   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   +0.066   -0.130 +321.702 -473.359  -72.694   -3.970 FILTER     SCIENCE        0      0  0.000           
+  1    1   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   +0.033   +0.142 +321.702 -473.359 -119.378 +221.588 FILTER     PARALLEL       0      0                  
+  1    1   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   +0.066   -0.130 +321.702 -473.359  -72.694   -3.970 FILTER     SCIENCE        0      0  0.000           
+  1    1   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   +0.033   +0.142 +321.702 -473.359 -119.378 +221.588 FILTER     PARALLEL       0      0                  
+  1    3   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   -0.066   +0.130 +321.775 -473.642  -72.827   -3.710 TILE       SCIENCE        0      0  0.292           
+  1    3   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   -0.033   -0.142 +321.775 -473.642 -119.444 +221.304 TILE       PARALLEL       0      0                  
+  1    3   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   -0.066   +0.130 +321.775 -473.642  -72.827   -3.710 FILTER     SCIENCE        0      0  0.000           
+  1    3   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   -0.033   -0.142 +321.775 -473.642 -119.444 +221.304 FILTER     PARALLEL       0      0                  
+  1    3   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   -0.066   +0.130 +321.775 -473.642  -72.827   -3.710 FILTER     SCIENCE        0      0  0.000           
+  1    3   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   -0.033   -0.142 +321.775 -473.642 -119.444 +221.304 FILTER     PARALLEL       0      0                  
+
+========================================
+* NIRSpec_FGS1_alignment (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -70.500   -3.980   +0.066   -0.130 +323.302 -471.756  -70.434   -4.110 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -121.045 +223.013   +0.033   +0.142 +323.302 -471.756 -121.012 +223.156 TARGET     PARALLEL       0      0                  
+  1    1   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -70.500   -3.980   +0.066   -0.130 +323.302 -471.756  -70.434   -4.110 FILTER     SCIENCE        0      0  0.000           
+  1    1   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -121.045 +223.013   +0.033   +0.142 +323.302 -471.756 -121.012 +223.156 FILTER     PARALLEL       0      0                  
+  1    1   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -70.500   -3.980   +0.066   -0.130 +323.302 -471.756  -70.434   -4.110 FILTER     SCIENCE        0      0  0.000           
+  1    1   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -121.045 +223.013   +0.033   +0.142 +323.302 -471.756 -121.012 +223.156 FILTER     PARALLEL       0      0                  
+  1    3   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -70.500   -3.980   -0.066   +0.130 +323.375 -472.039  -70.567   -3.850 TILE       SCIENCE        0      0  0.292           
+  1    3   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -121.045 +223.013   -0.033   -0.142 +323.375 -472.039 -121.079 +222.871 TILE       PARALLEL       0      0                  
+  1    3   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -70.500   -3.980   -0.066   +0.130 +323.375 -472.039  -70.567   -3.850 FILTER     SCIENCE        0      0  0.000           
+  1    3   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -121.045 +223.013   -0.033   -0.142 +323.375 -472.039 -121.079 +222.871 FILTER     PARALLEL       0      0                  
+  1    3   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -70.500   -3.980   -0.066   +0.130 +323.375 -472.039  -70.567   -3.850 FILTER     SCIENCE        0      0  0.000           
+  1    3   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -121.045 +223.013   -0.033   -0.142 +323.375 -472.039 -121.079 +222.871 FILTER     PARALLEL       0      0                  
+
+========================================
+* Vignetting_check_NIRSpec_FGS1_alignment (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -102.760  +26.160   +0.066   -0.130 +319.118 -515.706 -102.694  +26.030 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -115.903 +179.165   +0.033   +0.142 +319.118 -515.706 -115.869 +179.307 TARGET     PARALLEL       0      0                  
+  1    1   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -102.760  +26.160   +0.066   -0.130 +319.118 -515.706 -102.694  +26.030 FILTER     SCIENCE        0      0  0.000           
+  1    1   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -115.903 +179.165   +0.033   +0.142 +319.118 -515.706 -115.869 +179.307 FILTER     PARALLEL       0      0                  
+  1    1   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -102.760  +26.160   +0.066   -0.130 +319.118 -515.706 -102.694  +26.030 FILTER     SCIENCE        0      0  0.000           
+  1    1   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -115.903 +179.165   +0.033   +0.142 +319.118 -515.706 -115.869 +179.307 FILTER     PARALLEL       0      0                  
+  1    3   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -102.760  +26.160   -0.066   +0.130 +319.191 -515.989 -102.827  +26.290 TILE       SCIENCE        0      0  0.292           
+  1    3   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -115.903 +179.165   -0.033   -0.142 +319.191 -515.989 -115.936 +179.023 TILE       PARALLEL       0      0                  
+  1    3   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -102.760  +26.160   -0.066   +0.130 +319.191 -515.989 -102.827  +26.290 FILTER     SCIENCE        0      0  0.000           
+  1    3   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -115.903 +179.165   -0.033   -0.142 +319.191 -515.989 -115.936 +179.023 FILTER     PARALLEL       0      0                  
+  1    3   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -102.760  +26.160   -0.066   +0.130 +319.191 -515.989 -102.827  +26.290 FILTER     SCIENCE        0      0  0.000           
+  1    3   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -115.903 +179.165   -0.033   -0.142 +319.191 -515.989 -115.936 +179.023 FILTER     PARALLEL       0      0                  
+
+========================================
+* NIRSpec_FGS2_alignment (Obs 4)
+** Visit 4:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -150.000   +0.000   +0.066   -0.130 +266.404 -527.423 -149.934   -0.130 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS2_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -241.444 +170.738   +0.037   +0.141 +266.404 -527.423 -241.408 +170.880 TARGET     PARALLEL       0      0                  
+  1    1   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -150.000   +0.000   +0.066   -0.130 +266.404 -527.423 -149.934   -0.130 FILTER     SCIENCE        0      0  0.000           
+  1    1   2    1 FGS2_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -241.444 +170.738   +0.037   +0.141 +266.404 -527.423 -241.408 +170.880 FILTER     PARALLEL       0      0                  
+  1    1   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -150.000   +0.000   +0.066   -0.130 +266.404 -527.423 -149.934   -0.130 FILTER     SCIENCE        0      0  0.000           
+  1    1   3    1 FGS2_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -241.444 +170.738   +0.037   +0.141 +266.404 -527.423 -241.408 +170.880 FILTER     PARALLEL       0      0                  
+  1    3   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -150.000   +0.000   -0.066   +0.130 +266.477 -527.706 -150.067   +0.130 TILE       SCIENCE        0      0  0.292           
+  1    3   1    1 FGS2_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -241.444 +170.738   -0.037   -0.141 +266.477 -527.706 -241.482 +170.597 TILE       PARALLEL       0      0                  
+  1    3   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -150.000   +0.000   -0.066   +0.130 +266.477 -527.706 -150.067   +0.130 FILTER     SCIENCE        0      0  0.000           
+  1    3   2    1 FGS2_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -241.444 +170.738   -0.037   -0.141 +266.477 -527.706 -241.482 +170.597 FILTER     PARALLEL       0      0                  
+  1    3   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942 -150.000   +0.000   -0.066   +0.130 +266.477 -527.706 -150.067   +0.130 FILTER     SCIENCE        0      0  0.000           
+  1    3   3    1 FGS2_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -241.444 +170.738   -0.037   -0.141 +266.477 -527.706 -241.482 +170.597 FILTER     PARALLEL       0      0                  
+
+========================================
+* Confirmation_NIRSpec_FGS1_alignment (Obs 6)
+** Visit 6:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   +0.066   -0.130 +321.702 -473.359  -72.694   -3.970 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   +0.033   +0.142 +321.702 -473.359 -119.378 +221.588 TARGET     PARALLEL       0      0                  
+  1    1   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   +0.066   -0.130 +321.702 -473.359  -72.694   -3.970 FILTER     SCIENCE        0      0  0.000           
+  1    1   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   +0.033   +0.142 +321.702 -473.359 -119.378 +221.588 FILTER     PARALLEL       0      0                  
+  1    1   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   +0.066   -0.130 +321.702 -473.359  -72.694   -3.970 FILTER     SCIENCE        0      0  0.000           
+  1    1   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   +0.033   +0.142 +321.702 -473.359 -119.378 +221.588 FILTER     PARALLEL       0      0                  
+  1    3   1    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   -0.066   +0.130 +321.775 -473.642  -72.827   -3.710 TILE       SCIENCE        0      0  0.292           
+  1    3   1    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   -0.033   -0.142 +321.775 -473.642 -119.444 +221.304 TILE       PARALLEL       0      0                  
+  1    3   2    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   -0.066   +0.130 +321.775 -473.642  -72.827   -3.710 FILTER     SCIENCE        0      0  0.000           
+  1    3   2    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   -0.033   -0.142 +321.775 -473.642 -119.444 +221.304 FILTER     PARALLEL       0      0                  
+  1    3   3    1 NRS_FULL_MSA              2 LMC-NIRS  +80.48876  -69.49942  -72.760   -3.840   -0.066   +0.130 +321.775 -473.642  -72.827   -3.710 FILTER     SCIENCE        0      0  0.000           
+  1    3   3    1 FGS1_FULL                 2 LMC-NIRS  +80.48876  -69.49942 -119.411 +221.446   -0.033   -0.142 +321.775 -473.642 -119.444 +221.304 FILTER     PARALLEL       0      0                  
+
+

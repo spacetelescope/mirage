@@ -30,34 +30,35 @@ env:
         - NUMPY_VERSION=stable
         - ASTROPY_VERSION=stable
         - EVENT_TYPE='push pull_request'
+        - MIRAGE_DATA='non_existing_path'
 
     matrix:
         - SETUP_CMD='install'
         - SETUP_CMD='test'
 
-matrix:
-
-    # Don't wait for allowed failures
-    fast_finish: true
-
-    include:
-        # build sphinx documentation with warnings
-        - os: linux
-          env: SETUP_CMD='build_sphinx'
-               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
-               PIP_DEPENDENCIES='sphinx_rtd_theme stsci_rtd_theme sphinx-automodapi'
-
-        # PEP8 check with flake8 (only once, i.e. "os: linux")
-        - os: linux
-          env: MAIN_CMD='flake8 --count'
-               SETUP_CMD='mirage'
-               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
-
-    allow_failures:
-        # PEP8 will fail for numerous reasons. Ignore it.
-        - env: MAIN_CMD='flake8 --count'
-               SETUP_CMD='mirage'
-               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+#matrix:
+#
+#    # Don't wait for allowed failures
+#    fast_finish: true
+#
+#    include:
+#        # build sphinx documentation with warnings
+#        - os: linux
+#          env: SETUP_CMD='build_sphinx'
+#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+#               PIP_DEPENDENCIES='sphinx_rtd_theme stsci_rtd_theme sphinx-automodapi'
+#
+#        # PEP8 check with flake8 (only once, i.e. "os: linux")
+#        - os: linux
+#          env: MAIN_CMD='flake8 --count'
+#               SETUP_CMD='mirage'
+#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+#
+#    allow_failures:
+#        # PEP8 will fail for numerous reasons. Ignore it.
+#        - env: MAIN_CMD='flake8 --count'
+#               SETUP_CMD='mirage'
+#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
 
 install:
     - git clone git://github.com/astropy/ci-helpers.git

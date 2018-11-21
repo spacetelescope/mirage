@@ -1,0 +1,78 @@
+# APT Output Product
+# 
+# APT Version: Version 26.1.1  JWST PRD: PRDOPSSOC-J-019 
+# Date: Fri Nov 09 21:59:47 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1071 (1071.aptx)
+
+========================================
+* FGS-1, GS#1 (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-1, GS#2 (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-1, GS#3 (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-1, GS#4 (Obs 4)
+** Visit 4:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-1, GS#5 (Obs 5)
+** Visit 5:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-2, GS#1 (Obs 6)
+** Visit 6:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-2, GS#2 (Obs 7)
+** Visit 7:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-2, GS#3 (Obs 8)
+** Visit 8:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-2, GS#4 (Obs 9)
+** Visit 9:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+========================================
+* FGS-2, GS#5 (Obs 10)
+** Visit 10:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               1 LMC-ASTR  +80.66667  -69.53333   +0.000   +0.000   +0.000   +0.000   -0.517 -492.666   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NIS_CEN                   1 LMC-ASTR  +80.66667  -69.53333 -287.531 +207.704   +0.000   +0.000   -0.517 -492.666 -287.531 +207.704 TARGET     PARALLEL       0      0                 
+
+
