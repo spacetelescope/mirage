@@ -20,7 +20,7 @@ import pkg_resources
 from asdf import AsdfFile
 import scipy.signal as s1
 import numpy as np
-from photutils import detect_sources
+from photutils.segmentation import detect_sources
 from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
