@@ -164,6 +164,7 @@ class SimInput:
         self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
         self.psf_paths = None
+        self.expand_catalog_for_segments = False
 
         # Expand the MIRAGE_DATA environment variable
         self.expand_env_var()
@@ -1502,6 +1503,8 @@ class SimInput:
                      .format(np.random.randint(1, 2**32-2))))
             f.write('  photonyield: True                         #Apply photon yield in simulation\n')
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
+            f.write('  expand_catalog_for_segments: {}                     # Expand catalog for 18 segments and use distinct PSFs\n'
+                    .format(self.expand_catalog_for_segments))
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
