@@ -27,7 +27,7 @@ class CreatePSFLibrary:
 
     def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, psf_location=(1023, 1023),
                  add_distortion=True, fov_pixels=101, oversample=5, opd_type="requirements", opd_number=0,
-                 save=True, fileloc=None, filename=None, overwrite=True, pupil_opd=None, header_addons=None
+                 save=True, fileloc=None, filename=None, overwrite=True, ote=None, header_addons=None,
                  **kwargs):
         """
         Description
@@ -102,7 +102,7 @@ class CreatePSFLibrary:
             The name to save your current file under if "save" keyword is set to True.
             Default of None will save it in the form: "{instr}_{filt}_fovp{}_samp{}_npsf{}.fits"
 
-        pupil_opd: webbpsf.opds.OTE_Linear_Model_WSS, optional
+        ote: webbpsf.opds.OTE_Linear_Model_WSS, optional
             The OPD map to use to generate all PSFs, in the form of a
             OTE_Linear_Model_WSS object. If provided, overrides the ``opd_type`` and
             ``opd_number`` options.
@@ -175,7 +175,7 @@ class CreatePSFLibrary:
         self.oversample = oversample
         self.opd_type = opd_type
         self.opd_number = opd_number
-        self.pupil_opd = pupil_opd
+        self.ote = ote
         self._kwargs = kwargs
 
         # Set saving attributes
@@ -281,11 +281,11 @@ class CreatePSFLibrary:
     def _set_opd(self):
         """Define the telescope's OPD, either grabbing the requested
         FITS file (requirements or predicted) or loading an OPD as a
-        FITS object from an OTE_Linear_Model_WSS instance.
+        OTE_Linear_Model_WSS instance.
 
         For now, sets one OPD for all files being created.
         """
-        if self.pupil_opd is None:
+        if self.ote is None:
             # Set OPD Map (pull most recent version with self.webb.opd_list call) - always predicted then requirements
             if self.opd_type.lower() == "requirements":
                 opd = self.webb.opd_list[1]
@@ -295,19 +295,17 @@ class CreatePSFLibrary:
             self.opd_name = opd
             self.opd_realization = self.opd_number
 
-            return (opd, self.opd_number)
+            self.webb.pupilopd = (opd, self.opd_number)
 
-        elif not isinstance(self.pupil_opd, webbpsf.opds.OTE_Linear_Model_WSS):
+        elif not isinstance(self.ote, webbpsf.opds.OTE_Linear_Model_WSS):
             raise TypeError('Must provide pupil OPD as an OTE_Linear_Model_WSS object,'
-                            'not {}'.format(type(self.pupil_opd)))
+                            'not {}'.format(type(self.ote)))
 
         else:
-            opd_hdu = self.pupil_opd.as_fits()
+            self.webb.pupil = self.ote  # Also defines self.webb.pupilopd
 
             self.opd_name = "Modified OPD"
             self.opd_realization = "N/A"
-
-            return opd_hdu
 
     def create_files(self):
         """
@@ -323,7 +321,7 @@ class CreatePSFLibrary:
         """
 
         # Set the pupil OPD based on the input
-        self.webb.pupilopd = self._set_opd()
+        self._set_opd()
 
         # Set extension to read based on distortion choice
         if self.add_distortion:
