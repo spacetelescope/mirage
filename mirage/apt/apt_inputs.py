@@ -300,7 +300,20 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
+        print(self.apt_xml_dict['ProposalID'])
+        print(len(self.apt_xml_dict['ProposalID']))
+        print(pointing_dictionary['obs_num'])
+        print(len(pointing_dictionary['obs_num']))
+        print(len(self.apt_xml_dict['ProposalID']))
+        print(len(pointing_dictionary['obs_num']))
+
         # Check that the .xml and .pointing files agree
+        print(self.apt_xml_dict['ProposalID'])
+        print(pointing_dictionary['obs_num'])
+        print(len(self.apt_xml_dict['ProposalID']))
+        print(len(pointing_dictionary['obs_num']))
+
+
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
              'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID'])),
@@ -649,10 +662,12 @@ class AptInput:
                             type_str.append(elements[18])
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
-                            if elements[18] == 'PARALLEL':
-                                ddist.append(None)
-                            else:
-                                ddist.append(np.float(elements[21]))
+                            #if elements[18] == 'PARALLEL':
+                            #    ddist.append(None)
+                            #else:
+                                #print('line is: {}'.format(elements))
+                                #print(ddist)
+                                #ddist.append(np.float(elements[21]))
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.
