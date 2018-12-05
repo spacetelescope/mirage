@@ -28,7 +28,6 @@ import relic.release
 version = relic.release.get_info()
 relic.release.write_template(version, 'mirage')
 
-
 # allows you to build sphinx docs from the package
 # main directory with "python setup.py build_sphinx"
 
