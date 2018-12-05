@@ -37,7 +37,6 @@ env:
         - SETUP_CMD='test'
 
 matrix:
-
     # Don't wait for allowed failures
     fast_finish: true
 
