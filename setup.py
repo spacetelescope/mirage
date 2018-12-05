@@ -94,6 +94,18 @@ except ImportError:
         print(e)
         exit(1)
 
+# make sure NIRCAM_Gsim is available
+try:
+    import NIRCAM_Gsim
+except ImportError:
+    try:
+        subprocess.check_call(['git', 'clone',
+                               'https://github.com/npirzkal/NIRCAM_Gsim.git'])
+        sys.path.insert(1, 'NIRCAM_Gsim')
+        # import jwst
+    except subprocess.CalledProcessError as e:
+        print(e)
+        exit(1)
 
 setup(
     name='mirage',
@@ -133,7 +145,8 @@ setup(
         'asdf>=1.2.0',
         'scipy>=0.17',
         'photutils>=0.4.0',
-        'pysiaf>=0.1.11'
+        'pysiaf>=0.1.11',
+        'yaml'
     ],
     include_package_data=True,
     cmdclass={
