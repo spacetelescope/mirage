@@ -190,6 +190,7 @@ class ReadAPTXML():
 
             # Get coordinated parallel
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
+            print('COORDPARALLEL IS: {}'.format(coordparallel))
             CoordinatedParallelSet = None
             if coordparallel == 'true':
                 try:
@@ -504,6 +505,34 @@ class ReadAPTXML():
                         value = 'imaging'
 
                     exposures_dictionary[key].append(value)
+
+            ##########################################################
+            # If NIRCam is prime with NIRISS WFSS parallel, then a DITHER_DIRECT
+            # field will be added to the xml, describing whether the direct images
+            # on either side of the grism exposure should be ditered. In a rare case
+            # of the prime instrument having to conform to what the parallel instrument
+            # is doing, this means that the NIRCam exposures taken at the same time as
+            # the NIRISS direct images will also be dithered or not to match NIRISS. In
+            # this special mode, NIRISS direct images are taken before and after each
+            # grism exposure. Therefore for the NIRCam prime exposures, you can collect
+            # them into groups of 3, and the dither_direct value will affect the first
+            # and third exposures in each group. If dither_direct is false then all dithering,
+            # primary and subpixel, are skipped. If dither_direct is true, then primary
+            # and subpixel dithers are both done. It is guaranteed (by APT) in this case that
+            # then number of exposures is a multiple of 3.
+            print('PARALLEL IS {}:'.format(parallel))
+            try:
+                dither_direct = observation_dict['DitherNirissWfssDirectImages']
+                print('DITHER_DIRECT IS {}'.format(dither_direct))
+                if dither_direct == 'NO_DITHERING':
+                    print(('NIRISS WFSS parallel and NO_DITHERING set for direct imgages. Adjusting'
+                           'number_of_dithers to 1 for the matching NIRCam exposures.'))
+                    num_dithers = exposures_dictionary['number_of_dithers']
+                    for counter in range(0, len(num_dithers), 3):
+                        num_dithers[counter: counter+3] = [1, num_dithers[counter+1], 1]
+            except:
+                pass
+            ############################################################
 
         else:
             for element in template:
@@ -1297,39 +1326,43 @@ class ReadAPTXML():
             prime_instrument = obs.find(self.apt + 'Instrument').text
             print('IN READ_NIRISS_WFSS_TEMPLATE')
             print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
+            pdither_grism = prime_template.find(prime_ns + 'PrimaryDithers').text
+            pdither_type_grism = prime_template.find(prime_ns + 'PrimaryDitherType').text
             dither_direct = prime_template.find(prime_ns + 'DitherNirissWfssDirectImages').text
             sdither_type_grism = prime_template.find(prime_ns + 'CoordinatedParallelSubpixelPositions').text
-            sdither_grism = sdither_type_grism[0]
+            try:
+                int_test = int(sdither_type_grism[0])
+                sdither_grism = sdither_type_grism[0]
+            except ValueError:
+                sdither_grism = prime_template.find(prime_ns + 'SubpixelPositions').text
         else:
             parallel_instrument = False
             prime_instrument = instrument
             dither_direct = 'NO_DITHERING'
             sdither_type_grism = '1'
             sdither_grism = '1'
+            # Dither size can be SMALL, MEDIUM, LARGE. Only look for this if NIRISS is prime
+            pdither_type_grism = template.find(ns + 'DitherSize').text
 
-        # Can be various types
-        # WFSS stand-alone observation or WFSS as parallel, to NIRCam imaging: Integer: number
-        # of primary dithers WFSS as prime, with NIRCam imaging as parallel: str
-        # (e.g. '2-POINT-LARGE-NIRCam')
-        dvalue = template.find(ns + 'PrimaryDithers').text
-        try:
-            dvalue_int = np.int(dvalue)
-            pdither_grism = dvalue
-        except ValueError:
-            # When NIRISS is prime with NIRCam parallel, the PrimaryDithers field can be
-            # (e.g. '2-POINT-LARGE-NIRCAM'), where the first character is always the number
-            # of dither positions. Not sure how to save both this name as well as the DitherSize
-            # value. I don't think there are header keywords for both, with PATTTYPE being the
-            # only keyword for dither pattern names.
-            pdither_grism = dvalue[0]
-            # pdither_type = dvalue
-
-        # Dither size can be SMALL, MEDIUM, LARGE
-        pdither_type_grism = template.find(ns + 'DitherSize').text
-
+            # Can be various types
+            # WFSS stand-alone observation or WFSS as parallel, to NIRCam imaging: Integer: number
+            # of primary dithers WFSS as prime, with NIRCam imaging as parallel: str
+            # (e.g. '2-POINT-LARGE-NIRCam')
+            dvalue = template.find(ns + 'PrimaryDithers').text
+            try:
+                dvalue_int = np.int(dvalue)
+                pdither_grism = dvalue
+            except ValueError:
+                # When NIRISS is prime with NIRCam parallel, the PrimaryDithers field can be
+                # (e.g. '2-POINT-LARGE-NIRCAM'), where the first character is always the number
+                # of dither positions. Not sure how to save both this name as well as the DitherSize
+                # value. I don't think there are header keywords for both, with PATTTYPE being the
+                # only keyword for dither pattern names.
+                pdither_grism = dvalue[0]
+                # pdither_type = dvalue
 
         print('Primary dither info:', pdither_grism, pdither_type_grism)
-
+        print('Subpixel dither info:', sdither_grism, sdither_type_grism)
 
         explist = template.find(ns + 'ExposureList')
         expseqs = explist.findall(ns + 'ExposureSequences')

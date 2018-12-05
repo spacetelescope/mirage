@@ -143,6 +143,9 @@ def expand_for_dithers(indict, verbose=True):
         if expand_parallel_dithers:
             dither_table = table[i:i + 2]
 
+            print('expand_parallel_dithers:')
+            print(dither_table, number_of_dithers)
+
             if (number_of_dithers > 1):
                 #replicate parallel observation n times
                 dither_table = vstack([dither_table]*number_of_dithers)
@@ -155,6 +158,10 @@ def expand_for_dithers(indict, verbose=True):
                 expanded_table = vstack((expanded_table, dither_table))
 
         elif expand_prime_dithers_only:
+
+            print('expand_prime_dithers_only:')
+            print(dither_table, number_of_dithers)
+
             # add row multiplied by number of dithers
             dither_table = vstack([table[i]]*number_of_dithers)
             if expanded_table is None:
