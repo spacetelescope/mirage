@@ -388,9 +388,10 @@ class SimInput:
         grism_source_image = ['False'] * len(self.info['Mode'])
         grism_input_only = ['False'] * len(self.info['Mode'])
         for i in range(len(self.info['Mode'])):
-            if self.info['Mode'][i] == 'WFSS':
-                grism_source_image[i] = 'True'
-                grism_input_only[i] = 'True'
+            if self.info['Mode'][i].lower() == 'wfss':
+                if self.info['detector'][i][-1] == '5':
+                    grism_source_image[i] = 'True'
+                    grism_input_only[i] = 'True'
                 # SW detectors shouldn't be wfss
                 if self.info['detector'][i][-1] != '5':
                     self.info['Mode'][i] = 'imaging'

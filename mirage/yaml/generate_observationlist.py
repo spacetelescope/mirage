@@ -158,9 +158,11 @@ def expand_for_dithers(indict, verbose=True):
                 expanded_table = vstack((expanded_table, dither_table))
 
         elif expand_prime_dithers_only:
-
-            print('expand_prime_dithers_only:')
-            print(dither_table, number_of_dithers)
+            try:
+                print('expand_prime_dithers_only:')
+                print(dither_table, number_of_dithers)
+            except:
+                pass
 
             # add row multiplied by number of dithers
             dither_table = vstack([table[i]]*number_of_dithers)
