@@ -300,24 +300,11 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
-        print(self.apt_xml_dict['ProposalID'])
-        print(len(self.apt_xml_dict['ProposalID']))
-        print(pointing_dictionary['obs_num'])
-        print(len(pointing_dictionary['obs_num']))
-        print(len(self.apt_xml_dict['ProposalID']))
-        print(len(pointing_dictionary['obs_num']))
-
         # Check that the .xml and .pointing files agree
-        print(self.apt_xml_dict['ProposalID'])
-        print(pointing_dictionary['obs_num'])
-        print(len(self.apt_xml_dict['ProposalID']))
-        print(len(pointing_dictionary['obs_num']))
-
-
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
-             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID'])),
-             len(pointing_dictionary['obs_num']))
+             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']),
+                                                         len(pointing_dictionary['obs_num'])))
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
@@ -332,7 +319,6 @@ class AptInput:
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
-        # print(self.exposure_tab['Instrument'])
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))

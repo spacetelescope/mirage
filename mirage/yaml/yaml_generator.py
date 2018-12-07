@@ -176,8 +176,8 @@ class SimInput:
 
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose,
-                                                     parameter_defaults=parameter_defaults)
+            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
+                                                     verbose=self.verbose, parameter_defaults=parameter_defaults)
 
         self.reffile_setup(offline=offline)
 
@@ -313,7 +313,6 @@ class SimInput:
             apt.create_input_table()
 
             self.info = apt.exposure_tab
-            # pprint.pprint(self.info)
 
             # Add start time info to each element
             self.make_start_times()
@@ -413,9 +412,9 @@ class SimInput:
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
-        if 0: #for debugging
-            for key in self.info.keys():
-                print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
+        #if 0: #for debugging
+        #    for key in self.info.keys():
+        #        print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
         # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
@@ -477,34 +476,54 @@ class SimInput:
             all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs and m[10:13] in visit_list]
             total_files = len(all_obs_files)
 
-            check_file = np.where(np.array(self.info['yamlfile']) == all_obs_files[0])[0][0]
-            inst = self.info['Instrument'][check_file]
-            module = self.info['Module'][check_file]
+            obs_indexes = np.where(np.array(self.info['ObservationID']) == np.int(obs))[0]
+            obs_entries = np.array(self.info['ParallelInstrument'])[obs_indexes]
+            coord_par = self.info['CoordinatedParallel'][obs_indexes[0]]
+            if coord_par:
+                par_indexes = np.where(obs_entries)[0]
+                if len(par_indexes) > 0:
+                    parallel_instrument = self.info['Instrument'][obs_indexes[par_indexes[0]]]
+                else:
+                    parallel_instrument = 'NONE'
+            else:
+                parallel_instrument = 'NONE'
 
-            if inst == 'NIRCAM':
+            # Note that changing the == below to 'is' results in an error
+            pri_indexes = np.where(obs_entries == False)[0]
+            prime_instrument = self.info['Instrument'][obs_indexes[pri_indexes[0]]]
+
+            if prime_instrument.upper() == 'NIRCAM':
+                module = self.info['Module'][obs_indexes[pri_indexes[0]]]
+            elif parallel_instrument.upper() == 'NIRCAM':
+                module = self.info['Module'][obs_indexes[par_indexes[0]]]
+
+            if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
                 if module in ['A', 'B']:
                     n_det = 5
-                    module = ' ' + module
                 if module == 'ALL':
                     n_det = 10
                     module = 'A and B'
                 if 'A3' in module:
                     n_det = 1
-                    module = ' A3'
+                    module = 'A3'
                 if 'B4' in module:
                     n_det = 1
-                    module = ' B4'
+                    module = 'B4'
                 if module == 'SUB96DHSPILA':
                     n_det = 1
-                    module = ' A3'
+                    module = 'A3'
+            if coord_par == 'true':
+                instrument_string = '    Prime: {}, Parallel: {}'.format(prime_instrument, parallel_instrument)
+            else:
+                instrument_string = '    Prime: {}'.format(prime_instrument)
 
             print('Observation {}:'.format(obs))
-            print('    {}'.format(inst))
+            print(instrument_string)
             print('    {} visit(s)'.format(n_visits))
             print('    {} exposure(s)'.format(n_exposures))
             print('    {} file(s)'.format(total_files))
-            if inst == 'NIRCAM':
-                print('    {} detector(s) in module {}'.format(n_det, module))
+            if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
+                print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
 
         print('\n{} exposures total.'.format(total_exposures))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
@@ -882,8 +901,6 @@ class SimInput:
                     # We don't want aperture as a list
                     aperture = aperture[0]
 
-                # print(aperture)
-
                 amp = subarray_def['num_amps'][match][0]
                 namp.append(amp)
 
@@ -893,7 +910,6 @@ class SimInput:
                     date_obs.append(base_date)
                     time_obs.append(base_time)
                     expstart.append(base.mjd)
-                    # print(actid, visit, obsname, base_date, base_time)
                     continue
 
                 epoch_date = self.info['epoch_start_date'][i]

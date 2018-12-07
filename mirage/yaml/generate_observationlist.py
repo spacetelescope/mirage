@@ -68,55 +68,20 @@ def expand_for_dithers(indict, verbose=True):
     for key in indict:
         expanded[key] = []
 
-    # Loop over entries in dict and duplicate by the
-    # number of dither positions
-    # keys = indict.keys()
-    # if np.all(np.unique(indict['Instrument']) == 'NIRCAM'):
-    # # if not np.all(np.array(indict['PrimaryDithers']).astype(int) == 1):
-    #     # NIRCam exposures
-    #     for i in range(len(indict['PrimaryDithers'])):
-    #         arr = np.array([item[i] for item in indict.values()])
-    #         entry = dict(zip(keys, arr))
-    #
-    #         # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
-    #         subpix = entry['SubpixelPositions']
-    #         if subpix in ['0', 'NONE']:
-    #             subpix = [[1]]
-    #         if subpix == '4-Point':
-    #             subpix = [[4]]
-    #         if subpix == '9-Point':
-    #             subpix = [[9]]
-    #
-    #         primary = entry['PrimaryDithers']
-    #         if primary == '0':
-    #             primary = [1]
-    #         reps = np.int(subpix[0][0]) * np.int(primary[0])
-    #         for key in keys:
-    #             for j in range(reps):
-    #                 expanded[key].append(indict[key][i])
-
-
     # use astropy table operations to expand dithers while maintaining parallels in sync
     # implementation assumes that only one instrument is used in parallel
     table = Table(indict)
     table['row'] = np.arange(len(table))
     expanded_table = None #copy.deepcopy(table)
 
-    # if verbose:
-    #     table['ObservationID', 'Instrument', 'CoordinatedParallel', 'ParallelInstrument', 'number_of_dithers'].pprint()
-
-
     # complication here is to handle cases with unsupported instruments (MIRI, NIRSpec) in parallel
     for i, row in enumerate(table['row']):
         number_of_dithers = np.int(table['number_of_dithers'][i])
         expand_prime_dithers_only = False
         expand_parallel_dithers = False
-        # 1/0
 
         # skip over parallel observations because they are already accounted for
         if table['ParallelInstrument'][i]:
-            print('skipping row {}'.format(i))
-            print(table[i]['Instrument'])
             continue
 
         try:
@@ -135,16 +100,8 @@ def expand_for_dithers(indict, verbose=True):
         if expand_prime_dithers_only and expand_parallel_dithers:
             raise RuntimeError('Possible conflict found when expanding for dithers.')
 
-        print('table row: {}.'.format(i))
-        print(table[i]['Instrument'])
-        print('expand_prime_dithers_only: {}, expand_parallel_dithers: {}'.format(expand_prime_dithers_only, expand_parallel_dithers))
-
-
         if expand_parallel_dithers:
             dither_table = table[i:i + 2]
-
-            print('expand_parallel_dithers:')
-            print(dither_table, number_of_dithers)
 
             if (number_of_dithers > 1):
                 #replicate parallel observation n times
@@ -158,14 +115,9 @@ def expand_for_dithers(indict, verbose=True):
                 expanded_table = vstack((expanded_table, dither_table))
 
         elif expand_prime_dithers_only:
-            try:
-                print('expand_prime_dithers_only:')
-                print(dither_table, number_of_dithers)
-            except:
-                pass
-
             # add row multiplied by number of dithers
             dither_table = vstack([table[i]]*number_of_dithers)
+
             if expanded_table is None:
                 expanded_table = dither_table
             else:
@@ -192,7 +144,6 @@ def expand_for_dithers(indict, verbose=True):
     if verbose:
         for obs_id in np.unique(expanded_table['ObservationID']):
             print('Expanded table for Observation {} has {} entries'.format(obs_id, len(np.where(expanded_table['ObservationID']==obs_id)[0])))
-
     return expanded
 
 
@@ -231,22 +182,16 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
     xml_dict = readxml_obj.read_xml(xml_file, verbose=verbose)
 
-    print('Primary dithers output from read_xml: {}'.format(xml_dict['PrimaryDithers']))
-    print('Number of dithers output from read_xml: {}'.format(xml_dict['number_of_dithers']))
-
-    print('IN generate_observationlist: ', xml_dict['Instrument'])
-    print(np.unique(xml_dict['Instrument']))
-
     # if verbose:
-    print('Summary of observation dictionary:')
-    for key in xml_dict.keys():
-        print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
+    #print('Summary of observation dictionary:')
+    #for key in xml_dict.keys():
+    #    print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
 
     # create an expanded dictionary that contains lists of parameters expanded for dithers
-    xml_dict = expand_for_dithers(xml_dict)
-    print('Summary of observation dictionary after expanding for dithers:')
-    for key in xml_dict.keys():
-        print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
+    xml_dict = expand_for_dithers(xml_dict, verbose=verbose)
+    #print('Summary of observation dictionary after expanding for dithers:')
+    #for key in xml_dict.keys():
+    #    print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
 
     return_dict = None
 
@@ -254,26 +199,16 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     used_instruments = np.unique(xml_dict['Instrument'])
     unique_observation_ids = np.unique(xml_dict['ObservationID']).tolist()
 
-    print('LIST OF USED INSTRUMENTS:', used_instruments)
-
     # Only require the number of catalogs equal to the number of observations
     # for each instrument. Keep in mind that multiple instruments can be involved in
-    # a given observation due to parallels (right?) But in the case of serial observations
+    # a given observation due to parallels. But in the case of serial observations
     # with different instruments, we don't want to over-count observations and
     # require more catalogs than are really necessary
-    print('TEST TEST: make sure required number of catalogs is correct')
     number_of_obs = {}
     for instrument_name in used_instruments:
-        print('CHECKING FOR ', instrument_name.lower())
-        print(type(xml_dict['Instrument']))
         inst_observations = np.array(np.array(xml_dict['Instrument']) == instrument_name)
-        print(inst_observations)
-        print(np.array(xml_dict['ObservationID'])[inst_observations])
         unique_inst_obs = np.unique(np.array(xml_dict['ObservationID'])[inst_observations])
-        print(unique_inst_obs, len(unique_inst_obs))
         number_of_obs[instrument_name.lower()] = len(unique_inst_obs)
-    print('TEST TEST')
-
 
     number_of_observations = len(unique_observation_ids)
     number_of_exposures = len(xml_dict['ObservationID'])
@@ -302,12 +237,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                     if isinstance(catalog_files, str):
                         catalog_file_list = [catalog_files] * number_of_observations
                         catalogs[key][module_key] = catalog_file_list
-
-                    #if len(catalogs[key][module_key]) != number_of_observations:
-                    print('TEST HERE TOO, original line commented out above')
-                    print(key, number_of_obs)
-                    print(len(catalogs[key][module_key]))
-                    print(number_of_obs[key])
                     if len(catalogs[key][module_key]) != number_of_obs[key]:
                         raise RuntimeError('Please specify one catalog per observation for {}'.format(key.lower()))
 
@@ -317,8 +246,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                 catalog_file_list = [catalog_files] * number_of_observations
                 catalogs[key] = catalog_file_list
 
-            #if len(catalogs[key]) != number_of_observations:
-            print('TEST FOR OTHER INST CATALOG LENGTHS (orig line is commented out above')
             if len(catalogs[key]) != number_of_obs[key]:
                 raise RuntimeError(
                     'Please specify one catalog per observation for {}'.format(key.lower()))
@@ -342,10 +269,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     default_values['MovingTargetExtended'] = 'None'
     default_values['MovingTargetConvolveExtended'] = 'True'
     default_values['MovingTargetToTrack'] = 'None'
-    default_values['BackgroundRate_sw'] = '0.5'
-    default_values['BackgroundRate_lw'] = '1.2'
+    default_values['BackgroundRate_sw'] = 'low'
+    default_values['BackgroundRate_lw'] = 'low'
     default_values['BackgroundRate'] = '0.5'
-
 
     default_parameter_name_list = [key for key, item in default_values.items() if key not in 'Date PAV3 BackgroundRate BackgroundRate_sw BackgroundRate_lw'.split()]
 
@@ -355,17 +281,11 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
             if key in default_values.keys():
                 default_values[key] = parameter_defaults[key]
 
-
     # assemble string that will constitute the yaml content
     text_out = ["# Observation list created by generate_observationlist.py\n\n"]
 
     text = ['']
     entry_number = 0  # running number for every entry in the observation list
-
-
-    print(xml_dict['ObservationID'])
-    print(xml_dict['Instrument'])
-
 
     # Create an instrument-specific counter to be used with input catalogs
     all_instruments = np.unique(xml_dict['Instrument'])
@@ -381,9 +301,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
             "  Name: '{}'\n".format(xml_dict['ObservationName'][first_index])
             ]
         observation_rows = np.where(np.array(xml_dict['ObservationID']) == observation_number)[0]
-        print(observation_rows, type(observation_rows))
         instruments_in_observation = np.unique(np.array(xml_dict['Instrument'])[observation_rows])
-        print('Observation {}, instruments used: {}'.format(observation_index, instruments_in_observation))
         for index in observation_rows:
             number_of_dithers = np.int(xml_dict['number_of_dithers'][index])
             instrument = xml_dict['Instrument'][index]
@@ -404,14 +322,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                     sw_filt = xml_dict['ShortFilter'][index]
                     lw_filt = xml_dict['LongFilter'][index]
 
-                    #text += [
-                    #    "    FilterConfig:\n",
-                    #    "      SW:\n",
-                    #    "        Filter: {}\n".format(sw_filt),
-                    #    "        PointSourceCatalog: {}\n".format(catalogs[instrument.lower()]['sw'][observation_index]),
-                    #    "        BackgroundRate: {}\n".format(default_values['BackgroundRate_sw']),
-                    #    ]
-
                     text += [
                         "    FilterConfig:\n",
                         "      SW:\n",
@@ -422,14 +332,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
                     for key in default_parameter_name_list:
                         text += ["        {}: {}\n".format(key, default_values[key])]
-                    #text += [
-                    #    "      LW:\n",
-                    #    "        Filter: {}\n".format(lw_filt),
-                    #    "        PointSourceCatalog: {}\n".format(
-                    #        catalogs[instrument.lower()]['lw'][observation_index]),
-                    #    "        BackgroundRate: {}\n".format(
-                    #        default_values['BackgroundRate_lw']),
-                    #    ]
 
                     text += [
                         "      LW:\n",
@@ -457,11 +359,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                             filter_value = filter_wheel_value
                     else:
                         filter_value = xml_dict['Filter'][index]
-                    #text += [
-                    #    "    Filter: {}\n".format(filter_value),
-                    #    "    PointSourceCatalog: {}\n".format(catalogs[instrument.lower()][observation_index]),
-                    #    "    BackgroundRate: {}\n".format(default_values['BackgroundRate']),
-                    #    ]
 
                     text += [
                         "    Filter: {}\n".format(filter_value),
@@ -476,16 +373,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                 entry_number += 1
 
         # Update the catalog counters for the instruments used in this observation
-        print("TESTING CATALOG COUNTER UPDATES")
         for inst_name in instruments_in_observation:
             counter[inst_name] += 1
-        print('updated counters are: {}'.format(counter))
-
-    print('BUT WHAT ABOUT THE CASE WHERE THERE ARE MULTIPLE FILTER CONFIGS *WITHIN* AN OBSERVATION??')
-    print('HOW DO WE GET DIFFERENT CATALOGS IN THERE? FORCE THE USER TO MANUALLY EDIT THE OBSERVATION LIST FILE?')
-    print('STRONLY SUGGEST THAT USERS MAKE CATALOGS WITH MAGNITUDE COLUMNS TO COVER ALL THE FILTERS IN THE OBSERVATION')
-    print('WHAT ABOUT CASE WHERE SAME CATALOG IS TO BE USED FOR ALL OBS? USER SHOULD ONLY HAVE TO PROVIDE IT ONCE,')
-    print('RATHER THAN A LONG LIST OF THE SAME CATALOG NAME OVER AND OVER.')
 
     text_out += text
 
