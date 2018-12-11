@@ -210,6 +210,12 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
         unique_inst_obs = np.unique(np.array(xml_dict['ObservationID'])[inst_observations])
         number_of_obs[instrument_name.lower()] = len(unique_inst_obs)
 
+    # Strip out catalogs for any instruments that aren't used
+    input_catalogs = copy.deepcopy(catalogs)
+    for key in input_catalogs:
+        if key.upper() not in used_instruments:
+            del catalogs[key]
+
     number_of_observations = len(unique_observation_ids)
     number_of_exposures = len(xml_dict['ObservationID'])
 
@@ -235,7 +241,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                 for module_key in catalogs[key].keys():
                     catalog_files = catalogs[key][module_key]
                     if isinstance(catalog_files, str):
-                        catalog_file_list = [catalog_files] * number_of_observations
+                        catalog_file_list = [catalog_files] * number_of_obs[key]
                         catalogs[key][module_key] = catalog_file_list
                     if len(catalogs[key][module_key]) != number_of_obs[key]:
                         raise RuntimeError('Please specify one catalog per observation for {}'.format(key.lower()))
@@ -243,8 +249,12 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
         else:
             catalog_files = catalogs[key]
             if isinstance(catalog_files, str):
-                catalog_file_list = [catalog_files] * number_of_observations
+                catalog_file_list = [catalog_files] * number_of_obs[key]
                 catalogs[key] = catalog_file_list
+
+                print('used instruments', used_instruments)
+            print(key, catalogs)
+            print('NUMBER OF OBS:', number_of_obs)
 
             if len(catalogs[key]) != number_of_obs[key]:
                 raise RuntimeError(

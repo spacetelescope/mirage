@@ -476,7 +476,8 @@ class SimInput:
             all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs and m[10:13] in visit_list]
             total_files = len(all_obs_files)
 
-            obs_indexes = np.where(np.array(self.info['ObservationID']) == np.int(obs))[0]
+            obs_id_int = np.array([np.int(ele) for ele in self.info['ObservationID']])
+            obs_indexes = np.where(obs_id_int == np.int(obs))[0]
             obs_entries = np.array(self.info['ParallelInstrument'])[obs_indexes]
             coord_par = self.info['CoordinatedParallel'][obs_indexes[0]]
             if coord_par:

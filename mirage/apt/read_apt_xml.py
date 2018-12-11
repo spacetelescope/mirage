@@ -8,6 +8,7 @@ from collections import OrderedDict
 
 from lxml import etree
 from astropy.io import ascii
+from astropy.table import Table, Column
 import numpy as np
 
 from ..utils.utils import append_dictionary
@@ -576,6 +577,7 @@ class ReadAPTXML():
             instrument = obs.find(self.apt + 'Instrument').text
             parallel_instrument = False
             prime_instrument = instrument
+            prime_template_name = template_name
 
         # if instrument.lower() in 'miri nirspec':
         #     return {}
@@ -592,7 +594,7 @@ class ReadAPTXML():
             dither_key_name = 'ImageDithers'
 
         # number of dithers defaults to 1
-        number_of_dithers = 1
+        number_of_dithers = '1'
 
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
@@ -692,7 +694,7 @@ class ReadAPTXML():
                                'number_of_dithers to 1 for the matching NIRCam exposures.'))
                     num_dithers = exposures_dictionary['number_of_dithers']
                     for counter in range(0, len(num_dithers), 3):
-                        num_dithers[counter: counter+3] = [1, num_dithers[counter+1], 1]
+                        num_dithers[counter: counter+3] = ['1', num_dithers[counter+1], '1']
             except:
                 pass
             ############################################################
@@ -927,14 +929,14 @@ class ReadAPTXML():
             subpix_dither_grism = subpix_dither_type_grism[0]
         else:
             subpix_dither_grism = '1'
-        grism_number_of_dithers = int(primary_dither_grism) * int(subpix_dither_grism)
+        grism_number_of_dithers = str(int(primary_dither_grism) * int(subpix_dither_grism))
 
         # Direct and out of field images are never dithered
         primary_dither_direct = '1'
         primary_dither_type_direct = '1'
         subpix_dither_direct = '1'
         subpix_dither_type_direct = '1'
-        direct_number_of_dithers = 1
+        direct_number_of_dithers = '1'
 
         # Which grism(s) are to be used
         grismval = template.find(ns + 'Grism').text
@@ -1170,20 +1172,20 @@ class ReadAPTXML():
             prime_instrument = obs.find(self.apt + 'Instrument').text
             if verbose:
                 print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
-            pdither_grism = int(prime_template.find(prime_ns + 'PrimaryDithers').text)
+            pdither_grism = prime_template.find(prime_ns + 'PrimaryDithers').text
             pdither_type_grism = prime_template.find(prime_ns + 'PrimaryDitherType').text
             dither_direct = prime_template.find(prime_ns + 'DitherNirissWfssDirectImages').text
             sdither_type_grism = prime_template.find(prime_ns + 'CoordinatedParallelSubpixelPositions').text
             try:
-                sdither_grism = int(sdither_type_grism[0])
+                sdither_grism = str(np.int(sdither_type_grism[0]))
             except ValueError:
-                sdither_grism = int(prime_template.find(prime_ns + 'SubpixelPositions').text)
+                sdither_grism = prime_template.find(prime_ns + 'SubpixelPositions').text
         else:
             parallel_instrument = False
             prime_instrument = instrument
             dither_direct = 'NO_DITHERING'
             sdither_type_grism = '1'
-            sdither_grism = 1
+            sdither_grism = '1'
             # Dither size can be SMALL, MEDIUM, LARGE. Only look for this if NIRISS is prime
             pdither_type_grism = template.find(ns + 'DitherSize').text
 
@@ -1194,14 +1196,14 @@ class ReadAPTXML():
             # (e.g. '2-POINT-LARGE-NIRCam')
             dvalue = template.find(ns + 'PrimaryDithers').text
             try:
-                pdither_grism = np.int(dvalue)
+                pdither_grism = str(np.int(dvalue))
             except ValueError:
                 # When NIRISS is prime with NIRCam parallel, the PrimaryDithers field can be
                 # (e.g. '2-POINT-LARGE-NIRCAM'), where the first character is always the number
                 # of dither positions. Not sure how to save both this name as well as the DitherSize
                 # value. I don't think there are header keywords for both, with PATTTYPE being the
                 # only keyword for dither pattern names.
-                pdither_grism = np.int(dvalue[0])
+                pdither_grism = str(np.int(dvalue[0]))
 
         # Check if this observation has parallels
         coordinated_parallel = obs.find(self.apt + 'CoordinatedParallel').text
@@ -1239,9 +1241,9 @@ class ReadAPTXML():
                 directexp = expseq.find(ns + 'DiExposure')
                 typeflag = 'imaging'
                 if dither_direct == 'NO_DITHERING':
-                    pdither = 1  # direct image has no dithers
+                    pdither = '1'  # direct image has no dithers
                     pdither_type = '1'  # direct image has no dithers
-                    sdither = 1
+                    sdither = '1'
                     sdither_type = '1'
                 else:
                     pdither = pdither_grism
@@ -1292,7 +1294,9 @@ class ReadAPTXML():
                     exp_seq_dict['Integrations'] = [ints, grism_ints, ints]
                     exp_seq_dict['ShortPupil'] = [pupil, grism_pupil, pupil]
                     exp_seq_dict['Grism'] = [direct_grismvalue, grism, direct_grismvalue]
-                    exp_seq_dict['number_of_dithers'] = [pdither*sdither, int(pdither_grism)*int(sdither_grism), pdither*sdither]
+                    exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
+                                                         str(int(pdither_grism)*int(sdither_grism)),
+                                                         str(int(pdither)*int(sdither))]
                     exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
                 else:
                     if grism_number == 0:
@@ -1306,12 +1310,13 @@ class ReadAPTXML():
                         exp_seq_dict['Integrations'] = [ints, grism_ints]
                         exp_seq_dict['ShortPupil'] = [pupil, grism_pupil]
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism]
-                        exp_seq_dict['number_of_dithers'] = [pdither*sdither, int(pdither_grism)*int(sdither_grism)]
+                        exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
+                                                             str(int(pdither_grism)*int(sdither_grism))]
                         exp_seq_dict['PupilWheel'] = [pupil, grism_pupil]
                     elif grism_number == 1:
                         exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]
                         exp_seq_dict['PrimaryDitherType'] = [pdither_type, pdither_type_grism, pdither_type]
-                        exp_seq_dict['PrimaryDithers'] = [pdither+1, pdither_grism, pdither]
+                        exp_seq_dict['PrimaryDithers'] = [str(int(pdither)+1), pdither_grism, pdither]
                         exp_seq_dict['SubpixelPositions'] = [sdither, sdither_grism, sdither]
                         exp_seq_dict['SubpixelDitherType'] = [sdither_type, sdither_type_grism, sdither_type]
                         exp_seq_dict['ReadoutPattern'] = [rpatt, grism_rpatt, rpatt]
@@ -1319,7 +1324,9 @@ class ReadAPTXML():
                         exp_seq_dict['Integrations'] = [ints, grism_ints, ints]
                         exp_seq_dict['ShortPupil'] = [pupil, grism_pupil, pupil]
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism, direct_grismvalue]
-                        exp_seq_dict['number_of_dithers'] = [(pdither*sdither)*2, int(pdither_grism)*int(sdither_grism), pdither*sdither]
+                        exp_seq_dict['number_of_dithers'] = [str((int(pdither)*int(sdither))*2),
+                                                             str(int(pdither_grism)*int(sdither_grism)),
+                                                             str(int(pdither)*int(sdither))]
                         exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
                 #######################################################################
                 # Update exposure dictionary to return
@@ -1466,7 +1473,7 @@ class ReadAPTXML():
 
         # Loop through observations, get parameters
         for i_obs, obs in enumerate(observation_list):
-            observation_number = np.int(obs.find(self.apt + 'Number').text)
+            observation_number = obs.find(self.apt + 'Number').text
 
             # Create empty list that will be populated with a tuple of parameters
             # for every observation
@@ -1505,9 +1512,11 @@ class ReadAPTXML():
 
             if verbose:
                 print('+'*100)
-                print('Observation `{}` labelled `{}` uses template `{}`'.format(observation_number, label, template_name))
+                print('Observation `{}` labelled `{}` uses template `{}`'.format(observation_number, label,
+                                                                                 template_name))
                 number_of_entries = len(self.APTObservationParams['Instrument'])
-                print('APTObservationParams Dictionary holds {} entries before reading template'.format(number_of_entries))
+                print('APTObservationParams Dictionary holds {} entries before reading template'
+                      .format(number_of_entries))
                 if coordparallel:
                     print('Coordinated parallel observation')
 
@@ -1557,26 +1566,35 @@ class ReadAPTXML():
 
             # If template is WFSC Commissioning
             elif template_name in ['WfscCommissioning']:
-                exposures_dictionary, num_WFCgroups = self.read_commissioning_template(template, template_name, obs, prop_params)
+                exposures_dictionary, num_WFCgroups = self.read_commissioning_template(template,
+                                                                                       template_name, obs,
+                                                                                       prop_params)
 
             # If template is WFSC Global Alignment
             elif template_name in ['WfscGlobalAlignment']:
-                exposures_dictionary, n_exp = self.read_globalalignment_template(template, template_name, obs, prop_params)
+                exposures_dictionary, n_exp = self.read_globalalignment_template(template, template_name, obs,
+                                                                                 prop_params)
 
             # If template is WFSC Coarse Phasing
             elif template_name in ['WfscCoarsePhasing']:
-                exposures_dictionary, n_tiles_phasing = self.read_coarsephasing_template(template, template_name, obs, prop_params)
+                exposures_dictionary, n_tiles_phasing = self.read_coarsephasing_template(template,
+                                                                                         template_name, obs,
+                                                                                         prop_params)
 
             # If template is WFSC Fine Phasing
             elif template_name in ['WfscFinePhasing']:
-                exposures_dictionary, n_tiles_phasing = self.read_finephasing_template(template, template_name, obs, prop_params)
+                exposures_dictionary, n_tiles_phasing = self.read_finephasing_template(template,
+                                                                                       template_name, obs,
+                                                                                       prop_params)
 
             # If template is WFSS
             elif template_name == 'NircamWfss':
-                exposures_dictionary = self.read_nircam_wfss_template(template, template_name, obs, proposal_parameter_dictionary)
+                exposures_dictionary = self.read_nircam_wfss_template(template, template_name, obs,
+                                                                      proposal_parameter_dictionary)
 
             elif template_name == 'NirissWfss':
-                exposures_dictionary = self.read_niriss_wfss_template(template, template_name, obs, proposal_parameter_dictionary,
+                exposures_dictionary = self.read_niriss_wfss_template(template, template_name, obs,
+                                                                      proposal_parameter_dictionary,
                                                                       verbose=verbose)
                 if coordparallel == 'true':
                     parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
@@ -1610,7 +1628,6 @@ class ReadAPTXML():
             # add the exposure dictionary to the main dictionary
             self.APTObservationParams = append_dictionary(self.APTObservationParams,
                                                           exposures_dictionary)
-
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
             # Now we need to look for mosaic details, if any
@@ -1642,6 +1659,25 @@ class ReadAPTXML():
         if verbose:
             print('Finished reading APT xml file.')
             print('+'*100)
+
+        # Temporary for creating truth tables to use in tests
+        #bool_cols = ['ParallelInstrument']
+        #int_cols = ['Groups', 'Integrations']
+        #final_table = Table()
+        #for key in self.APTObservationParams.keys():
+        #    if key in bool_cols:
+        #        data_type = bool
+        #    elif key in int_cols:
+        #        data_type = str
+        #    else:
+        #        data_type = str
+        #    new_col = Column(data=self.APTObservationParams[key], name=key, dtype=data_type)
+        #    final_table.add_column(new_col)
+        #tmpoutdir = '/Users/hilbert/python_repos/mirage/tests/test_data'
+        #filebase = os.path.split(infile)[1]
+        #tmpoutfile = '{}{}'.format(filebase.split('.xml')[0], '.txt')
+        #ascii.write(final_table, os.path.join(tmpoutdir, tmpoutfile), overwrite=True)
+
         return self.APTObservationParams
 
     def separate_pupil_and_filter(self, filter_string):
