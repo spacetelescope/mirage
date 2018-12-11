@@ -251,11 +251,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
             if isinstance(catalog_files, str):
                 catalog_file_list = [catalog_files] * number_of_obs[key]
                 catalogs[key] = catalog_file_list
-
-                print('used instruments', used_instruments)
-            print(key, catalogs)
-            print('NUMBER OF OBS:', number_of_obs)
-
             if len(catalogs[key]) != number_of_obs[key]:
                 raise RuntimeError(
                     'Please specify one catalog per observation for {}'.format(key.lower()))

@@ -135,12 +135,12 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            # if '1071' not in apt_file_seed:
-            # # # # if 'OTE12-1147' not in apt_file_seed:
-            #     continue
-            print('REMOVE THIS ONCE NIRISS IMAGING IS WORKING')
+
+            # For the moment, skip tests that contain NirissImaging observations
+            # or that take too long for Travis
             skip_for_now = ['DeepField', 'NCam010', '1071']
-            if ('DeepField' in apt_file_seed) or ('NCam010' in apt_file_seed) or ('1071' in apt_file_seed):
+            skip_bool = any([True if prop in apt_file_seed else False for prop in skip_for_now])
+            if skip_bool:
                 continue
 
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
@@ -158,8 +158,6 @@ def test_complete_input_generation():
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             print('Processing program {}'.format(apt_file_xml))
-
-            print('XXXXXXXXX CATALOGS:', catalogs)
 
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
                                           catalogs=catalogs, observation_list_file=observation_list_file,
@@ -255,5 +253,5 @@ def test_xml_reader():
 
 # for debugging
 if __name__ == '__main__':
-    #test_complete_input_generation()
-    test_xml_reader()
+    test_complete_input_generation()
+    #test_xml_reader()
