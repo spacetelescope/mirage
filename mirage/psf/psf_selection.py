@@ -1,4 +1,15 @@
 #! /usr/bin/env python
+"""Open a PSF library file and interpolate to a field-dependent location.
+
+Authors
+-------
+ - Bryan Hilbert
+ - Lauren Chambers
+
+Use
+---\
+
+"""
 
 from ast import literal_eval
 from glob import glob
@@ -8,7 +19,9 @@ from astropy.io import fits
 import numpy as np
 #from photutils.utils import ShepardIDWInterpolator as idw
 from photutils import FittableImageModel
+import pysiaf
 from scipy.interpolate import interp2d, RectBivariateSpline
+import webbpsf
 
 
 class PSFCollection:
@@ -16,7 +29,7 @@ class PSFCollection:
     single filter. Through interpolation, the PSF at any location on
     the detector can be created."""
 
-    def __init__(self, instrument, detector, filtername, library_path):
+    def __init__(self, instrument, detector, filtername, library_path, expand_for_segments):
         """Upon instantiation of the class, read in the PSF library
         contained in the given fits file. Also pull out relevant
         information such as the oversampling factor and the locations
@@ -33,39 +46,49 @@ class PSFCollection:
         --------
         None
         """
-        library_file = self.get_library_file(instrument, filtername, library_path)
 
-        try:
-            with fits.open(library_file) as hdu:
-                self.library_info = hdu[0].header
-                det_index = self.select_detector(detector, library_file)
-                self.library = hdu[0].data[det_index, :, :, :, :]
-        except OSError:
-            print("OSError: Unable to open {}.".format(library_file))
-        except IndexError:
-            print(("IndexError: File {} has no data in extension 0."
-                   .format(library_file)))
+        # Open the library file (or files)
+        library_list = self.get_library_list(instrument, filtername, library_path, expand_for_segments)
+
+        # Load the library into a list
+        self.library_list = []
+        for file in library_list:
+            try:
+                with fits.open(file) as hdu:
+                    header = hdu[0].header
+                    det_index = self.select_detector(header, detector, file)
+                    library_dict = {'header': header,
+                                    'data': hdu[0].data[det_index, :, :, :, :]}
+                self.library_list.append(library_dict)
+            except OSError:
+                print("OSError: Unable to open {}.".format(file))
+            except IndexError:
+                print(("IndexError: File {} has no data in extension 0."
+                       .format(file)))
 
         # Get some basic information about the library
-        self.psf_y_dim, self.psf_x_dim = self.library.shape[-2:]
-        self.psf_x_dim /= self.library_info['OVERSAMP']
-        self.psf_y_dim /= self.library_info['OVERSAMP']
-        self.num_psfs = self.library_info['NUM_PSFS']
+        library = self.library_list[0]
+        self.psf_y_dim, self.psf_x_dim = library['data'].shape[-2:]
+        self.psf_x_dim /= library['header']['OVERSAMP']
+        self.psf_y_dim /= library['header']['OVERSAMP']
+        self.num_psfs = library['header']['NUM_PSFS']
         self.x_det = []
         self.y_det = []
         self.x_index = []
         self.y_index = []
         for num in range(self.num_psfs):
-            yval, xval = literal_eval(self.library_info['DET_YX' + str(num)])
+            yval, xval = literal_eval(library['header']['DET_YX' + str(num)])
             self.x_det.append(xval)
             self.y_det.append(yval)
-            yi, xi = literal_eval(self.library_info['DET_JI' + str(num)])
+            yi, xi = literal_eval(library['header']['DET_JI' + str(num)])
             self.x_index.append(xi)
             self.y_index.append(yi)
+
+        # Get the locations on the detector for each PSF in the library
         if self.num_psfs > 1:
-            self.interpolator = self.create_interpolator()
+            self.interpolator_list = self.create_interpolator()
         else:
-            self.interpolator = None
+            self.interpolator_list = [None] * len(self.library_list)
 
     def create_interpolator(self, interp_type='interp2d'):
         """Create an interpolator function for the detector-dependent
@@ -90,17 +113,21 @@ class PSFCollection:
         # x_psf = np.arange(psfxdim)
         # y_psf = np.arange(psfydim)
 
-        # Create interpolator for each pixel
-        if interp_type.lower() == 'interp2d':
-            interpolator = self.make_interp2d_functions(self.x_det,
-                                                        self.y_det,
-                                                        self.library)
-        elif interp_type.lower() == 'idw':
-            interpolator = None
-        else:
-            raise ValueError(("interp_type of {} not supported."
-                              .format(interp_type)))
-        return interpolator
+        interpolator_list = []
+        for library in self.library_list:
+            # Create interpolator for each pixel
+            if interp_type.lower() == 'interp2d':
+                interpolator = self.make_interp2d_functions(self.x_det,
+                                                            self.y_det,
+                                                            library['data'])
+            elif interp_type.lower() == 'idw':
+                interpolator = None
+            else:
+                raise ValueError(("interp_type of {} not supported."
+                                  .format(interp_type)))
+            interpolator_list.append(interpolator)
+
+        return interpolator_list
 
     def evaluate_interp2d(self, splines, xout, yout):
         """Evaluate the splines produced in make_interp2d_functions for each
@@ -173,7 +200,7 @@ class PSFCollection:
         result = (x_nearest, y_nearest, distances[match_index])
         return result
 
-    def get_library_file(self, instrument, filt, library_path):
+    def get_library_list(self, instrument, filt, library_path, expand_for_segments):
         """Given an instrument and filter name along with the path of
         the PSF library, find the appropriate library file to load.
 
@@ -190,22 +217,32 @@ class PSFCollection:
 
         Returns:
         --------
-        lib_file : str
-            Name of the PSF library file for the instrument and filtername
+        lib_file : list
+            Name of the PSF library file(s) for the instrument and filtername
         """
-        lib_file = glob(os.path.join(library_path, instrument.lower() + '_' +
-                                     filt.lower() + '*.fits'))
+        # Find the matching file (or files, if expanding for 18 segments)
+        if not expand_for_segments:
+            lib_list = glob(os.path.join(library_path, instrument.lower() + '_' +
+                                         filt.lower() + '*.fits'))
 
-        # If no matching files are found, or more than 1 matching file is
+        elif expand_for_segments:
+            lib_list = glob(os.path.join(library_path, instrument.lower() + '_' +
+                                         filt.lower() + '*seg*.fits'))
+            lib_list = sorted(lib_list)
+
+        # If no matching files are found, or more than 1/18 matching file/s is/are
         # found, raise an error.
-        if len(lib_file) == 0:
+        if len(lib_list) == 0:
             raise FileNotFoundError("No files matching {}, {} found in {}."
                                     .format(instrument, filt, library_path))
-        elif len(lib_file) > 1:
+        elif len(lib_list) > 1 and not expand_for_segments:
             raise ValueError("Multiple files matching {}, {} found in {}."
                              .format(instrument, filt, library_path))
+        elif len(lib_list) != 18 and  expand_for_segments:
+            raise ValueError("Did not find 18 segment files matching {}, {} found in {}. Instead found {}."
+                             .format(instrument, filt, library_path, len(lib_list)))
 
-        return lib_file[0]
+        return lib_list
 
     def make_interp2d_functions(self, xpos, ypos, psfdata):
         """Create a list of lists containing splines for each pixel in the PSF
@@ -242,7 +279,7 @@ class PSFCollection:
         for ypix in range(psf_ydim):
             xlist = []
             for xpix in range(psf_xdim):
-                pixeldata = self.library[:, :, ypix, xpix]
+                pixeldata = psfdata[:, :, ypix, xpix]
                 # interp2d_fncn = interp2d(xs, ys, pixeldata, kind='linear')
                 interp2d_fncn = RectBivariateSpline(xs, ys, pixeldata, kx=1, ky=1)
                 xlist.append(interp2d_fncn)
@@ -282,7 +319,7 @@ class PSFCollection:
                                   y_0=(eval_yshape - 1) / 2 + deltay)
         return eval_psf
 
-    def populate_epsfmodel(self, psf_data):
+    def populate_epsfmodel(self, psf_data, header):
         """Create an instance of EPSFModel and populate the data
         from the given fits file. Also populate information
         about the oversampling rate.
@@ -302,12 +339,13 @@ class PSFCollection:
 
         # Create instance. Assume the PSF is centered
         # in the array
-        oversample = self.library_info['OVERSAMP']
+        oversample = header['OVERSAMP']
         psf = FittableImageModel(psf_data, oversampling=oversample)
         # psf = EPSFModel(psf_data, oversampling=oversample)
         return psf
 
-    def position_interpolation(self, x, y, method="spline", idw_number_nearest=4, idw_alpha=-2):
+    def position_interpolation(self, x, y, method="spline", idw_number_nearest=4,
+                               idw_alpha=-2, segment_number=None):
         """Interpolate the PSF library to construct the PSF at a
         a given location on the detector. Note that the coordinate system used
         in this case has (0.0, 0.0) centered in the lower left pixel. (0.5, 0.5)
@@ -339,29 +377,41 @@ class PSFCollection:
         out : FittableImageModel
             Instance of FittableImageModel containing the interpolated PSF
         """
-        # Get the locations on the detector for each PSF
-        # in the library
+
+        # If needed, restrict the library to the data for the desired segment.
+        if segment_number is None:
+            library = self.library_list[0]['data']
+            header = self.library_list[0]['header']
+            interpolator = self.interpolator_list[0]
+        else:
+            library = self.library_list[segment_number - 1]['data']
+            header = self.library_list[segment_number - 1]['header']
+            assert int(header['SEGID']) == int(segment_number), \
+                "Uh-oh. The segment ID of the library does not match the requested " \
+                "segment. The library_list was not assembled correctly."
+            interpolator = self.interpolator_list[segment_number - 1] # Really, this is always none....
+
         if self.num_psfs == 1:
-            interp_psf = self.library[0, 0, :, :]
+            interp_psf = library[0, 0, :, :]
         else:
             if method == "spline":
-                interp_psf = self.evaluate_interp2d(self.interpolator, x, y)
+                interp_psf = self.evaluate_interp2d(interpolator, x, y)
             elif method == "idw":
                 nearest_x, nearest_y, nearest_dist = self.find_nearest_neighbors(x, y, idw_number_nearest)
                 if len(nearest_dist) > 1:
-                    psfs_to_avg = self.library[nearest_x, nearest_y, :, :]
+                    psfs_to_avg = library[nearest_x, nearest_y, :, :]
                     interp_psf = self.weighted_avg(psfs_to_avg, nearest_dist,
                                                    idw_alpha)
                 elif len(nearest_dist) == 1:
-                    interp_psf = self.library[nearest_x, nearest_y, :, :]
+                    interp_psf = library[nearest_x, nearest_y, :, :]
             else:
                 raise ValueError(("{} interpolation method not supported."
                                 .format(method)))
 
         # Return resulting PSF in instance of FittableImageModel (or EPSFModel)
-        return self.populate_epsfmodel(interp_psf)
+        return self.populate_epsfmodel(interp_psf, header)
 
-    def select_detector(self, det_name, input_file):
+    def select_detector(self, header, det_name, input_file):
         """Given a PSF library, select only the PSFs associated with a
         given detector.
 
@@ -377,12 +427,12 @@ class PSFCollection:
         Returns:
         --------
         match : int
-            Index number indicating which slice of self.library corresponds
+            Index number indicating which slice of the library file corresponds
             to the given detector
         """
         det_list = []
-        for i in range(self.library_info['NAXIS5']):
-            det_list.append(self.library_info['DETNAME' + str(i)])
+        for i in range(header['NAXIS5']):
+            det_list.append(header['DETNAME' + str(i)])
 
         if det_name in det_list:
             match = np.where(np.array(det_list) == det_name)[0][0]
@@ -418,3 +468,69 @@ class PSFCollection:
         weights = distances**alpha
         output = np.average(psfs, axis=0, weights=weights)
         return output
+
+    def get_segment_offset(self, segment_number, detector):
+        """Convert vectors coordinates in the local segment control
+        coordinate system to NIRCam detector X and Y coordinates,
+        at least proportionally, in order to calculate the location of
+
+        Parameters
+        ----------
+        segment : int
+            Segment ID, i.e 3
+
+        Returns
+        -------
+        x_displacement
+            The shift of the segment PSF in NIRCam SW x pixels
+        y_displacement
+            The shift of the segment PSF in NIRCam SW y pixels
+        """
+        # Verify that the segment number in the header matches the index
+        assert int(self.library_list[segment_number - 1]['header']['SEGID']) == int(segment_number),\
+            "Uh-oh. The segment ID of the library does not match the requested " \
+            "segment. The library_list was not assembled correctly."
+
+        xtilt = self.library_list[segment_number - 1]['header']['XTILT']
+        ytilt = self.library_list[segment_number - 1]['header']['YTILT']
+        segment = self.library_list[segment_number - 1]['header']['SEGNAME'][:2]
+
+        # These conversion factors were empirically calculated by measuring the
+        # relation between tilt and the pixel displacement
+        tilt_to_pixel_slope = 13.4
+        tilt_to_pixel_intercept = 0
+
+        # segment = webbpsf.constants.SEGNAMES_WSS_ORDER[segment_number - 1][:2]
+
+        control_xaxis_rotations = {
+            'A1': 180, 'A2': 120, 'A3': 60, 'A4': 0, 'A5': -60,
+            'A6': -120, 'B1': 0, 'C1': 60, 'B2': -60, 'C2': 0,
+            'B3': -120, 'C3': -60, 'B4': -180, 'C4': -120,
+            'B5': -240, 'C5': -180, 'B6': -300, 'C6': -240
+        }
+
+        x_rot = control_xaxis_rotations[segment]  # degrees
+        x_rot_rad = x_rot * np.pi / 180  # radians
+
+        # Note that y is defined as the x component and x is defined as the y component.
+        # This is because "xtilt" moves the PSF in the y direction, and vice versa.
+        tilt_onto_y = (xtilt * np.cos(x_rot_rad)) - (ytilt * np.sin(x_rot_rad))
+        tilt_onto_x = (xtilt * np.sin(x_rot_rad)) + (ytilt * np.cos(x_rot_rad))
+
+        # TODO: IS THE SLOPE DIFFERENT FOR LW DETECTORS????
+        x_displacement = -(tilt_onto_x * tilt_to_pixel_slope)  # pixels
+        y_displacement = -(tilt_onto_y * tilt_to_pixel_slope)  # pixels
+
+        # Get the appropriate pixel scale from pysiaf
+        siaf = pysiaf.Siaf('nircam')
+        aperture = siaf['NRC{}_FULL'.format(detector[-2:])]
+        nircam_x_pixel_scale = aperture.XSciScale  # arcsec/pixel
+        nircam_y_pixel_scale = aperture.YSciScale  # arcsec/pixel
+
+        # Convert the pixel displacement into angle
+        x_arcsec = x_displacement * nircam_x_pixel_scale  # arcsec
+        y_arcsec = y_displacement * nircam_y_pixel_scale  # arcsec
+
+        return x_arcsec, y_arcsec
+
+        # return x_displacement, y_displacement

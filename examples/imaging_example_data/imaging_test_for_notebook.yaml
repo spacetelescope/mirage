@@ -74,6 +74,7 @@ simSignals:
   poissonseed: 2012872553                  #Random number generator seed for Poisson simulation)
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
+  expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
 
 Telescope:
   ra: 53.1                     #RA of simulated pointing
