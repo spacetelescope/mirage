@@ -491,6 +491,8 @@ class ReadAPTXML():
                     sub_dithers = np.int(observation_dict['SubpixelDitherType'][0])
                     number_of_dithers = str(np.int(number_of_dithers) * sub_dithers)
                 elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING']:
+                    if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
+                        number_of_dithers = observation_dict[dither_key_name][0]
                     number_of_dithers = str(np.int(number_of_dithers) * np.int(observation_dict['SubpixelPositions']))
             elif parallel and prime_instrument == 'NIRISS' and prime_template_name == 'NirissWfss':
                 observation_dict['PrimaryDithers'] = prime_template.find(prime_ns + dither_key_name).text
