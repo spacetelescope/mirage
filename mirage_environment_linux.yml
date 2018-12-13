@@ -108,8 +108,8 @@ dependencies:
   - lxml=4.2.5=py36hefd8a0e_0
   - markupsafe=1.0=py36h14c3975_1
   - matplotlib=3.0.0=py36h5429711_0
-  - mkl=2019.0=118
-  - mkl_fft=1.0.6=py36h7dd41cf_0
+  - mkl=2018.0.3=1
+  - mkl_fft=1.0.4=py36h4414c95_1
   - mkl_random=1.0.1=py36h4414c95_1
   - more-itertools=4.3.0=py36_0
   - mpmath=1.0.0=py36_2
@@ -206,7 +206,7 @@ dependencies:
     - msgpack==0.5.6
     - openpyxl==2.5.8
     - poppy==0.7.0
-    - pysiaf==0.2.4
+    - pysiaf==0.2.5
     - relic==1.1.2
     - webbpsf==0.7.0
 
