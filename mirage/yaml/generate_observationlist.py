@@ -67,34 +67,6 @@ def expand_for_dithers(indict, verbose=True):
     for key in indict:
         expanded[key] = []
 
-    # Loop over entries in dict and duplicate by the
-    # number of dither positions
-    # keys = indict.keys()
-    # if np.all(np.unique(indict['Instrument']) == 'NIRCAM'):
-    # # if not np.all(np.array(indict['PrimaryDithers']).astype(int) == 1):
-    #     # NIRCam exposures
-    #     for i in range(len(indict['PrimaryDithers'])):
-    #         arr = np.array([item[i] for item in indict.values()])
-    #         entry = dict(zip(keys, arr))
-    #
-    #         # In WFSS, SubpixelPositions will be either '4-Point' or '9-Point'
-    #         subpix = entry['SubpixelPositions']
-    #         if subpix in ['0', 'NONE']:
-    #             subpix = [[1]]
-    #         if subpix == '4-Point':
-    #             subpix = [[4]]
-    #         if subpix == '9-Point':
-    #             subpix = [[9]]
-    #
-    #         primary = entry['PrimaryDithers']
-    #         if primary == '0':
-    #             primary = [1]
-    #         reps = np.int(subpix[0][0]) * np.int(primary[0])
-    #         for key in keys:
-    #             for j in range(reps):
-    #                 expanded[key].append(indict[key][i])
-
-
     # use astropy table operations to expand dithers while maintaining parallels in sync
     # implementation assumes that only one instrument is used in parallel
     table = Table(indict)
@@ -103,7 +75,6 @@ def expand_for_dithers(indict, verbose=True):
 
     # if verbose:
     #     table['ObservationID', 'Instrument', 'CoordinatedParallel', 'ParallelInstrument', 'number_of_dithers'].pprint()
-
 
     # complication here is to handle cases with unsupported instruments (MIRI, NIRSpec) in parallel
     for i, row in enumerate(table['row']):

@@ -303,8 +303,8 @@ class AptInput:
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
-             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID'])),
-             len(pointing_dictionary['obs_num']))
+             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']),
+             len(pointing_dictionary['obs_num'])))
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)

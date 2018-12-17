@@ -161,7 +161,7 @@ class ReadAPTXML():
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
                                    'NircamEngineeringImaging', 'WfscGlobalAlignment',
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
-                                   'NirissExternalCalibration',  # NIRISS
+                                   'NirissExternalCalibration', 'NirissAmi',  # NIRISS
                                    'NirspecImaging', 'NirspecInternalLamp',  # NIRSpec
                                    'MiriMRS',  # MIRI
                                    'FgsExternalCalibration',  # FGS
@@ -221,7 +221,7 @@ class ReadAPTXML():
                                              'ObservationName': obs_label,
                                              }
 
-            if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
+            if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration', 'NirissAmi']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs, proposal_parameter_dictionary, verbose=verbose)
                 if coordparallel == 'true':
                     parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
@@ -387,8 +387,10 @@ class ReadAPTXML():
             dither_key_name = 'PrimaryDithers'
         elif prime_instrument in ['NIRISS', 'MIRI', 'NIRSPEC']:
             dither_key_name = 'ImageDithers'
+
         # number of dithers defaults to 1
         number_of_dithers = 1
+        number_of_subpixel_positions = 1
 
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
@@ -473,17 +475,21 @@ class ReadAPTXML():
 
                     exposures_dictionary[key].append(value)
 
-        else:
+        else: # instruments other than nircam
             for element in template:
                 element_tag_stripped = element.tag.split(ns)[1]
                 # if verbose:
-                #     print('{} {}'.format(element_tag_stripped, element.text))
+                # print('{} {}'.format(element_tag_stripped, element.text))
                 # loop through exposures and collect exposure parameters
                 if element_tag_stripped == 'DitherPatternType':
                     DitherPatternType = element.text
                 elif element_tag_stripped == 'ImageDithers':
                     # ImageDithers = element.text
                     number_of_dithers = element.text
+                elif element_tag_stripped == 'SubpixelPositions':
+                    if element.text != 'NONE':
+                        number_of_subpixel_positions = np.int(element.text)
+                        # print('\nnumber_of_subpixel_positions {}\n'.format(number_of_subpixel_positions))
                 elif element_tag_stripped == 'PrimaryDithers':
                     number_of_dithers = element.text
                 elif element_tag_stripped == 'Dithers':
@@ -504,8 +510,8 @@ class ReadAPTXML():
                     for exposure in element.findall(ns + 'Exposure'):
                         exposure_dict = {}
                         exposure_dict['DitherPatternType'] = DitherPatternType
-                        if number_of_dithers is None:
-                            number_of_dithers = 1
+                        if (number_of_dithers is None) | (number_of_dithers == 'NONE'):
+                            number_of_dithers = 1 * number_of_subpixel_positions
                         exposure_dict[dither_key_name] = np.int(number_of_dithers)
                         for exposure_parameter in exposure:
                             parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
@@ -518,10 +524,8 @@ class ReadAPTXML():
                         for key in self.APTObservationParams_keys:
                             if key in exposure_dict.keys():
                                 value = exposure_dict[key]
-                                # print(key)
                             elif key in proposal_parameter_dictionary.keys():
                                 value = proposal_parameter_dictionary[key]
-                                # print(key)
                             elif key == 'Instrument':
                                 value = instrument
                             elif key == 'ParallelInstrument':
@@ -538,8 +542,11 @@ class ReadAPTXML():
                             if (key in ['PrimaryDithers', 'ImageDithers']) and ((value is None) or (value == 'None')):
                                 value = '1'
 
-                            if (key == 'Mode'):# and (template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
-                                value = 'imaging'
+                            if (key == 'Mode'):
+                                if template_name not in ['NirissAmi']:
+                                    value = 'imaging'
+                                else:
+                                    value = 'ami'
 
                             exposures_dictionary[key].append(value)
 
@@ -553,6 +560,7 @@ class ReadAPTXML():
                                 else:
                                     exposures_dictionary[key].append(str(exposure_dict[key]))
 
+
         for key in exposures_dictionary.keys():
             if type(exposures_dictionary[key]) is not list:
                 exposures_dictionary[key] = list(exposures_dictionary[key])
@@ -561,7 +569,9 @@ class ReadAPTXML():
         for key, item in exposures_dictionary.items():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
+
         return exposures_dictionary
+
 
     def read_imaging_template(self, template, template_name, obs, prop_params):
         """Read NIRCam imaging template.

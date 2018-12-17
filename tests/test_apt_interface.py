@@ -95,7 +95,7 @@ def test_complete_input_generation():
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
-            apt_file_seeds = ['1087_minimal', '1088', '1087', 'm31_field_test_observation']
+            apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
             # apt_file_seeds = ['1087']
             # apt_file_seeds = ['1087_minimal']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
@@ -153,7 +153,6 @@ def test_complete_input_generation():
                                           catalogs=catalogs, observation_list_file=observation_list_file,
                                           verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
                                           offline=True)
-
             try:
                 yam.create_inputs()
             except RuntimeError as e:
