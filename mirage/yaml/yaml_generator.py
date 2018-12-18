@@ -104,7 +104,7 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
-from ..utils.utils import calc_frame_time
+from ..utils.utils import calc_frame_time, ensure_dir_exists
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 
@@ -171,6 +171,7 @@ class SimInput:
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
         self.set_global_definitions()
+        self.path_defs()
 
         if (input_xml is not None) and (catalogs is not None):
 
@@ -982,6 +983,9 @@ class SimInput:
         self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
         if self.table_file is not None:
             self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
+
+        ensure_dir_exists(self.output_dir)
+        ensure_dir_exists(self.simdata_output_dir)
 
         # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')

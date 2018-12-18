@@ -89,7 +89,6 @@ class ReadAPTXML():
             If the .xml file includes a fiducial pointing override with an
             unknown subarray specification
         """
-
         # Open XML file, get element tree of the APT proposal
         with open(infile) as f:
             tree = etree.parse(f)
@@ -145,7 +144,7 @@ class ReadAPTXML():
         observation_data = tree.find(self.apt + 'DataRequests')
         observation_list = observation_data.findall('.//' + self.apt + 'Observation')
 
-        # Loop through observatiobs, get parameters
+        # Loop through observations, get parameters
         for i_obs, obs in enumerate(observation_list):
             observation_number = np.int(obs.find(self.apt + 'Number').text)
 
@@ -280,7 +279,7 @@ class ReadAPTXML():
 
             # count only tiles that are included
             tile_state = np.array([mosaic_tiles[i].find('.//' + self.apt + 'TileState').text for i in range(len(mosaic_tiles))])
-            n_tiles = np.sum(tile_state=='Tile Included')
+            n_tiles = np.sum(np.array(tile_state=='Tile Included'))
 
             label = obs_label
 
@@ -493,8 +492,6 @@ class ReadAPTXML():
                 # Determine if there is an aperture override
                 override = obs.find('.//' + self.apt + 'FiducialPointOverride')
                 FiducialPointOverride = True if override is not None else False
-                #
-                # observation_dict['FiducialPointOverride'] = str(FiducialPointOverride)
 
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower()=='niriss') and (element_tag_stripped == 'ExposureList')) | \
@@ -535,7 +532,7 @@ class ReadAPTXML():
                             else:
                                 value = str(None)
 
-                            if (key in ['PrimaryDithers', 'ImageDithers']) and ((value is None) or (value == 'None')):
+                            if (key in ['PrimaryDithers', 'ImageDithers']) and (str(value) == 'None'):
                                 value = '1'
 
                             if (key == 'Mode'):# and (template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
@@ -1048,7 +1045,7 @@ class ReadAPTXML():
                     exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                     self.obs_tuple_list.append(tup_to_add)
 
-                # make sure all list items in the returned dictionary have the same length
+        # make sure all list items in the returned dictionary have the same length
         for key, item in exposures_dictionary.items():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
@@ -1133,6 +1130,8 @@ class ReadAPTXML():
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
+
+                # -------------------------------------------------------------
 
                 directexp = expseq.find(ns + 'DiExposure')
                 #typeflag = template_name
