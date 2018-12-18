@@ -1413,9 +1413,8 @@ class Catalog_seed():
 
                     # Create a point source image, using the specific point
                     # source list and PSF for the given segment
-                    seg_psfimage, ptsrc_segmap = self.makePointSourceImage(pslist,
-                                                                       segment_number=i_segment,
-                                                                               segmap=ptsrc_segmap)
+                    seg_psfimage, ptsrc_segmap = self.makePointSourceImage(pslist, segment_number=i_segment,
+                                                                           ptsrc_segmap=ptsrc_segmap)
 
                     seg_psfImageName = self.basename + '_pointSourceRateImage_seg{:02d}.fits'.format(i_segment)
                     h0 = fits.PrimaryHDU(seg_psfimage)
@@ -1843,7 +1842,7 @@ class Catalog_seed():
 
         return filtered_indexes, filtered_sources
 
-    def makePointSourceImage(self, pointSources, segment_number=None, seg=None):
+    def makePointSourceImage(self, pointSources, segment_number=None, ptsrc_segmap=None):
         dims = np.array(self.nominal_dims)
 
         # Offset that needs to be applied to the x, y positions of the
@@ -1862,12 +1861,12 @@ class Catalog_seed():
         # Create the empty image
         psfimage = np.zeros((dims[0], dims[1]))
 
-        if seg is None:
+        if ptsrc_segmap is None:
             # Create empty segmentation map
-            seg = segmap.SegMap()
-            seg.xdim = newdimsx
-            seg.ydim = newdimsy
-            seg.initialize_map()
+            ptsrc_segmap = segmap.SegMap()
+            ptsrc_segmap.xdim = newdimsx
+            ptsrc_segmap.ydim = newdimsy
+            ptsrc_segmap.initialize_map()
 
         # Loop over the entries in the point source list
         for entry in pointSources:
@@ -1908,30 +1907,30 @@ class Catalog_seed():
             (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, psf_xdim, psf_ydim,
                                                                    newdimsx, newdimsy)
 
-            try:
-                ypts, xpts = np.mgrid[j1:j2, i1:i2]
+            # try:
+            ypts, xpts = np.mgrid[j1:j2, i1:i2].astype(int)
 
-                # FOR USE WITH OLD PSF LIBRARY
-                # scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
+            # FOR USE WITH OLD PSF LIBRARY
+            # scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
 
-                # FOR USE WITH NEW PSF LIBRARY
-                scaled_psf = psf_integer_interp.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos, y_0=ypos)
-                psfimage[ypts, xpts] += scaled_psf
+            # FOR USE WITH NEW PSF LIBRARY
+            scaled_psf = psf_integer_interp.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos, y_0=ypos)
+            psfimage[ypts, xpts] += scaled_psf
 
-                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
-                    noiseval += self.grism_background
-                seg.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
-            except:
-                # In here we catch sources that are off the edge
-                # of the detector. These may not necessarily be caugh t in
-                # getpointsourcelist because if the PSF is not centered
-                # in the webbpsf stamp, then the area to be pulled from
-                # the stamp may shift off of the detector.
-                pass
+            # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
+            noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
+            if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                noiseval += self.grism_background
+            ptsrc_segmap.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+            # except:
+            #     # In here we catch sources that are off the edge
+            #     # of the detector. These may not necessarily be caugh t in
+            #     # getpointsourcelist because if the PSF is not centered
+            #     # in the webbpsf stamp, then the area to be pulled from
+            #     # the stamp may shift off of the detector.
+            #     pass
 
-        return psfimage, seg
+        return psfimage, ptsrc_segmap
 
     def cropped_coords(self, x_det, y_det, psfxdim, psfydim, aperturexdim, apertureydim):
         """
@@ -2022,12 +2021,12 @@ class Catalog_seed():
         # This is used only for segmap now that epsf is
         # implemented.
         if l2 > psfydim:
-            l2 = psfydim
-            j2 = j1 + (l2 - l1)
+            l2 = int(psfydim)
+            j2 = int(j1 + (l2 - l1))
 
         if k2 > psfxdim:
-            k2 = psfxdim
-            i2 = i1 + (k2 - k1)
+            k2 = int(psfxdim)
+            i2 = int(i1 + (k2 - k1))
 
         # At this point coordinates are in the final output array coordinate system, so there
         # should be no negative values, nor values larger than the output array size
