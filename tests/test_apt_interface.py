@@ -131,12 +131,9 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            # if '1071' not in apt_file_seed:
-            if '1068_official' in apt_file_seed: # exlude until support for NircamTimeSeries is included
+            if 'DeepField' in apt_file_seed:
                 continue
-            # elif '1068_manual' not in apt_file_seed:
-            #     continue
-
+                
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
             for file in obs_yaml_files:
                 os.remove(file)
