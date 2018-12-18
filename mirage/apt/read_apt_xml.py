@@ -279,7 +279,7 @@ class ReadAPTXML():
 
             # count only tiles that are included
             tile_state = np.array([mosaic_tiles[i].find('.//' + self.apt + 'TileState').text for i in range(len(mosaic_tiles))])
-            n_tiles = np.sum(np.array(tile_state=='Tile Included'))
+            n_tiles = np.sum(np.array(tile_state)=='Tile Included')
 
             label = obs_label
 
