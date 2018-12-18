@@ -1404,7 +1404,7 @@ class Catalog_seed():
                 psfimage = np.zeros((dims[0], dims[1]))
 
                 for i_segment in np.arange(1, 19):
-                    print('Calculating point source lists for segment {}'.format(i_segment))
+                    print('\nCalculating point source lists for segment {}'.format(i_segment))
                     # Get the RA/Dec offset that matches the given segment
                     offset_vector = self.psf_library.get_segment_offset(i_segment, self.detector)
 
@@ -1416,10 +1416,11 @@ class Catalog_seed():
                     seg_psfimage, ptsrc_segmap = self.makePointSourceImage(pslist, segment_number=i_segment,
                                                                            ptsrc_segmap=ptsrc_segmap)
 
-                    seg_psfImageName = self.basename + '_pointSourceRateImage_seg{:02d}.fits'.format(i_segment)
-                    h0 = fits.PrimaryHDU(seg_psfimage)
-                    h0.writeto(seg_psfImageName, overwrite=True)
-                    print("    Segment {} point source image and segmap saved as {}".format(i_segment, seg_psfImageName))
+                    if self.params['Output']['save_intermediates'] is True:
+                        seg_psfImageName = self.basename + '_pointSourceRateImage_seg{:02d}.fits'.format(i_segment)
+                        h0 = fits.PrimaryHDU(seg_psfimage)
+                        h0.writeto(seg_psfImageName, overwrite=True)
+                        print("    Segment {} point source image and segmap saved as {}".format(i_segment, seg_psfImageName))
 
                     psfimage += seg_psfimage
 
@@ -1845,12 +1846,12 @@ class Catalog_seed():
     def makePointSourceImage(self, pointSources, segment_number=None, ptsrc_segmap=None):
         dims = np.array(self.nominal_dims)
 
-        # Offset that needs to be applied to the x, y positions of the
-        # source list to account for case where we make a
-        # seed image that is extra-large, to be used as a grism
-        # direct image
-        deltax = 0
-        deltay = 0
+        # # Offset that needs to be applied to the x, y positions of the
+        # # source list to account for case where we make a
+        # # seed image that is extra-large, to be used as a grism
+        # # direct image
+        # deltax = 0
+        # deltay = 0
 
         newdimsx = np.int(dims[1] * self.coord_adjust['x'])
         newdimsy = np.int(dims[0] * self.coord_adjust['y'])
