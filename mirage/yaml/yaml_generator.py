@@ -113,7 +113,8 @@ ENV_VAR = 'MIRAGE_DATA'
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
                  use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
-                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False):
+                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False,
+                 create_source_catalogs={'ptsrc': None, 'extragalactic': None}):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -130,6 +131,11 @@ class SimInput:
         parameter_defaults : dict
             Default values of parameters like roll angle (PAV3) to pass on to observation list
             generator
+
+        create_source_catalogs : dict
+            Contains two keys:
+                'ptsrc', which can have values of [None, ??] We know RA, Dec, so real obj are no prob. for besancon we need info
+                'extragalactic', which can gave values of [None, Standard]
 
         """
         self.info = {}
@@ -162,6 +168,7 @@ class SimInput:
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
+        self.create_source_catalogs = create_source_catalogs
 
         # Expand the MIRAGE_DATA environment variable
         self.expand_env_var()
@@ -319,6 +326,14 @@ class SimInput:
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
+
+            # If requested, generate source catalogs
+            print("If requested, create source catalogs from APT file here.")
+            if self.create_source_catalogs['ptsrc'] is not None:
+                print('We need to create some kind of ptsrc catalog.')
+            if self.create_source_catalogs['extragalactic'] is not None:
+                galaxy_catalog = create_catalog.for_proposal(self.exposure_tab, instrument, filter_list, email='')
+
 
             # Add source catalogs
             # self.add_catalogs()

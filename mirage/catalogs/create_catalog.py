@@ -22,7 +22,7 @@ from collections import OrderedDict
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
 
 
-def ptsrc_for_proposal(pointing_dictionary, catalog_splitting_threshold=1., email=''):
+def for_proposal(pointing_dictionary, catalog_splitting_threshold=1., instrument, filter_list, email=''):
     """
     NOT YET FUNCTIONAL
 
@@ -81,8 +81,20 @@ def ptsrc_for_proposal(pointing_dictionary, catalog_splitting_threshold=1., emai
             delta_dec = max_dec - min_dec
             full_width = np.max([delta_ra, delta_dec])
 
-            # Create catalog
-            cat = get_all_catalogs(mean_ra, mean_dec, full_width, email=email)
+            # Create catalog(s)
+            if point_source:
+                ptsrc_cat = get_all_catalogs(mean_ra, mean_dec, full_width, instrument=instrument, filters=filter_list,
+                                             email=email)
+            else:
+                ptsrc_cat = None
+
+            if extragalactic:
+                galaxy_cat = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument, filter_list,
+                                               boxflag=False, brightlimit=14.0, seed=None)
+            else:
+                galaxy_cat = None
+
+            Now_save_the_catalogs_and_return_filenames
 #            cat_filename = '???????'
 #            cat_dir = '???????'
 #            cat.save(os.path.join(cat_dir, cat_filename))
@@ -1376,7 +1388,7 @@ def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max):
 
 
 def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
-                      boxflag='True', brightlimit=14.0, seed=None):
+                      boxflag=True, brightlimit=14.0, seed=None):
     """
     Given a sky position (ra0,dec0), and a V3 rotation angle (v3rotangle) this
     routine makes a fake galaxy background for a square region of sky or a circle

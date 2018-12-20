@@ -68,7 +68,7 @@ class PointSourceCatalog():
 
     def add_catalog(self, catalog_to_add, magnitude_fill_value=99.):
         """Add a catalog to the current catalog instance"""
-        # The the source positions in the two catalogs have different units, then the catalogs
+        # If the the source positions in the two catalogs have different units, then the catalogs
         # can't be combined.
         if self.location_units != catalog_to_add.location_units:
             raise ValueError("WARNING: Sources in the catalogs do not have matching units (RA/Dec or x/y)")
@@ -322,6 +322,16 @@ class ExtendedCatalog(PointSourceCatalog):
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
 
+    @property
+    def filenames(self):
+        """Return Dec values from catalog"""
+        return self.table['filename'].data
+
+    @property
+    def position_angle(self):
+        """Return Dec values from catalog"""
+        return self.table['pos_angle'].data
+
 
 class MovingPointSourceCatalog(PointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
@@ -348,6 +358,21 @@ class MovingPointSourceCatalog(PointSourceCatalog):
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
+
+    @property
+    def dec_velocity(self):
+        """Return Dec values from catalog"""
+        return self.dec_velocity
+
+    @property
+    def ra_velocity(self):
+        """Return Dec values from catalog"""
+        return self.ra_velocity
+
+    @property
+    def velocity_units(self):
+        """Return Dec values from catalog"""
+        return self.velocity_units
 
 
 class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
@@ -440,11 +465,6 @@ def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_un
     input_table.add_columns([ra_vel_col, dec_vel_col], indexes=[3, 3])
     input_table.meta['comments'].append(velocity_units)
     return input_table
-
-def combine_catalogs(catalog1, catalog2):
-    """Combine two catalogs into one
-    input two catalog objects
-    """
 
 
 def create_basic_table(ra_values, dec_values, magnitudes, location_units):
