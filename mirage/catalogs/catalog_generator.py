@@ -127,7 +127,10 @@ class PointSourceCatalog():
         if instrument == '' or filter_name == '':
             header = 'magnitude'
         else:
-            header = '{}_{}_magnitude'.format(instrument, filter_name)
+            if 'guider' in instrument.lower():
+                header = '{}_magnitude'.format(instrument)
+            else:
+                header = '{}_{}_magnitude'.format(instrument, filter_name)
 
         # Get a list of magnitude_system for the existing catalog. No mixing of
         # magnitude systems is currently allowed.
