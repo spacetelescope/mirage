@@ -17,7 +17,7 @@ from astroquery.irsa import Irsa
 from astropy.table import Table
 import numpy as np
 from collections import OrderedDict
-import distortion
+#import distortion
 
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
 
@@ -201,8 +201,8 @@ def mirage_ptsrc_catalog_from_table(table, instrument, mag_colnames, magnitude_s
     cat = PointSourceCatalog(ra=table['ra'].data.data, dec=table['dec'].data.data)
 
     for magcol in mag_colnames:
-        data = table[key].filled().data
-        cat.add_magnitude_column(data, instrument=instrument, filter_name=key,
+        data = table[magcol].filled().data
+        cat.add_magnitude_column(data, instrument=instrument, filter_name=magcol,
                                  magnitude_system=magnitude_system)
     return cat
 
@@ -220,7 +220,7 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email=''):
     Besancon model so that we don't end up with a double population of bright stars
     """
     two_mass, twomass_cat = get_2MASS_ptsrc_catalog(ra, dec, box_width)
-    background = besancon(ra, dec, box_width, coords='ra_dec', email=email)
+    background, background_cat = besancon(ra, dec, box_width, coords='ra_dec', email=email)
     two_mass.add_catalog(background)
     return two_mass
 
@@ -297,8 +297,8 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
                                           filter_name=newfilters[loop], magnitude_system='vegamag')
     observed_jwst = combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise,
                                             gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters)
-    print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_cat.ra()),
-                                                                                  len(observed_jwst.ra())))
+    print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_cat.ra),
+                                                                                  len(observed_jwst.ra)))
     source_list = combine_catalogs(observed_jwst, besancon_cat)
     return source_list, filter_names
 
@@ -337,7 +337,7 @@ def transform_besancon(besancon_cat, besancon_model, instrument, filter_names):
                      should not happen with the regular inputs.
     """
     standard_magnitudes, standard_values, standard_filters, standard_labels = read_standard_magnitudes()
-    nstars = len(besancon_cat.ra())
+    nstars = len(besancon_cat.ra)
     nfilters = len(filter_names)
     out_magnitudes = np.zeros((nstars, nfilters), dtype=np.float32)
     inds = crossmatch_filter_names(filter_names, standard_filters)
@@ -985,10 +985,10 @@ def combine_catalogs(observed_jwst, besancon_jwst):
     if observed_jwst.location_units != besancon_jwst.location_units:
         print('Coordinate mismatch in catalogs to combine.  Will return None.')
         return None
-    ra1 = observed_jwst.ra()
-    dec1 = observed_jwst.dec()
-    ra2 = besancon_jwst.ra()
-    dec2 = besancon_jwst.dec()
+    ra1 = observed_jwst.ra
+    dec1 = observed_jwst.dec
+    ra2 = besancon_jwst.ra
+    dec2 = besancon_jwst.dec
     raout = np.concatenate((ra1, ra2))
     decout = np.concatenate((dec1, dec2))
     outcat = PointSourceCatalog(ra=raout, dec=decout)
@@ -1221,7 +1221,7 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     cat.add_magnitude_column(h_mags, instrument='Besancon', filter_name='h', magnitude_system='vegamag')
     cat.add_magnitude_column(k_mags, instrument='Besancon', filter_name='k', magnitude_system='vegamag')
     cat.add_magnitude_column(l_mags, instrument='Besancon', filter_name='l', magnitude_system='vegamag')
-    nstars = len(cat.ra())
+    nstars = len(cat.ra)
     print('The Besancon model contains %d stars.' % (nstars))
     return cat, model
 
@@ -1447,7 +1447,6 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
         seedvalue = int(950397468.*np.random.random())
     else:
         if not isinstance(seed, int):
-        #if type(seed) != type(10):
             seedvalue = int(abs(seed))
         else:
             seedvalue = seed
@@ -1488,9 +1487,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
                   'niriss_f480m_magnitude': 30, 'guider1_magnitude': 11,
                   'guider2_magnitude': 11}
     path = os.environ.get('MIRAGE_DATA')
-    if not path[-1] == '/':
-        path = path + '/'
-    catalog_values = np.loadtxt(path + 'niriss/catalogs/' + 'goodss_3dhst.v4.1.jwst_galfit.cat', comments='#')
+    catalog_values = np.loadtxt(os.path.join(path, 'niriss/catalogs/', 'goodss_3dhst.v4.1.jwst_galfit.cat'),
+                                comments='#')
     outinds = np.zeros((nfilters), dtype=np.int16)
     try:
         loop = 0

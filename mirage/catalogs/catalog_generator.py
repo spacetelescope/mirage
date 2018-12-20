@@ -181,6 +181,7 @@ class PointSourceCatalog():
         if inst_name not in ['nircam', 'niriss', 'fgs']:
             raise ValueError("WARNING: {} is not a valid instrument.".format(inst_name))
 
+    @property
     def dec(self):
         """Return Dec values from catalog"""
         if self.location_units == 'position_RA_Dec':
@@ -200,6 +201,7 @@ class PointSourceCatalog():
         except KeyError:
             print("WARNING: No {} magnitude column present.".format(key))
 
+    @property
     def ra(self):
         """Return RA values from catalog"""
         if self.location_units == 'position_RA_Dec':
@@ -207,6 +209,7 @@ class PointSourceCatalog():
         else:
             return []
 
+    @property
     def x(self):
         """Return x values from catalog"""
         if self.location_units == 'position_pixels':
@@ -214,6 +217,7 @@ class PointSourceCatalog():
         else:
             return []
 
+    @property
     def y(self):
         """Return y values from catalog"""
         if self.location_units == 'position_pixels':
@@ -271,6 +275,26 @@ class GalaxyCatalog(PointSourceCatalog):
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
+
+    @property
+    def ellipticity(self):
+        """Return Dec values from catalog"""
+        return self.table['ellipticity'].data
+
+    @property
+    def position_angle(self):
+        """Return Dec values from catalog"""
+        return self.table['pos_angle'].data
+
+    @property
+    def radius(self):
+        """Return Dec values from catalog"""
+        return self.table['radius'].data
+
+    @property
+    def sersic_index(self):
+        """Return Dec values from catalog"""
+        return self.table['sersic_index'].data
 
 
 class ExtendedCatalog(PointSourceCatalog):
