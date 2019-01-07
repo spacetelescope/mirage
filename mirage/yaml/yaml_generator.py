@@ -300,7 +300,8 @@ class SimInput:
                                       '_with_yaml_parameters.csv')
 
             # Read XML file and make observation table
-            apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file)
+            apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file,
+                                      output_dir=self.output_dir)
             # apt.input_xml = self.input_xml
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
@@ -388,11 +389,11 @@ class SimInput:
         grism_input_only = ['False'] * len(self.info['Mode'])
         for i in range(len(self.info['Mode'])):
             if self.info['Mode'][i].lower() == 'wfss':
-                if self.info['detector'] == 'NIS' or self.info['detector'][i][-1] == '5':
+                if self.info['detector'][i] == 'NIS' or self.info['detector'][i][-1] == '5':
                     grism_source_image[i] = 'True'
                     grism_input_only[i] = 'True'
                 # SW detectors shouldn't be wfss
-                if self.info['instrument'] == 'NIRCAM' and self.info['detector'][i][-1] != '5':
+                if self.info['Instrument'][i] == 'NIRCAM' and self.info['detector'][i][-1] != '5':
                     self.info['Mode'][i] = 'imaging'
         self.info['grism_source_image'] = grism_source_image
         self.info['grism_input_only'] = grism_input_only

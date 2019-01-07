@@ -66,13 +66,13 @@ class AptInput:
         pointing_file (str): Description
     """
 
-    def __init__(self, input_xml=None, pointing_file=None):
-
+    def __init__(self, input_xml=None, pointing_file=None, output_dir=None, output_csv=None,
+                 observation_list_file=None):
         self.input_xml = input_xml
         self.pointing_file = pointing_file
-
-        self.output_csv = None
-        self.observation_list_file = None
+        self.output_dir = output_dir
+        self.output_csv = output_csv
+        self.observation_list_file = observation_list_file
 
     def add_epochs(self, intab):
         """NOT CURRENTLY USED"""
@@ -323,19 +323,14 @@ class AptInput:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
-        detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
-
-        ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
-        print('Wrote exposure table to {}'.format(detectors_file))
+        #detectors_file = os.path.join(self.output_dir,
+        #                              '{}_expanded_for_detectors.csv'.format(infile.split('.')[0]))
+        #ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
+        #print('Wrote exposure table to {}'.format(detectors_file))
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
-        for inst in np.unique(observation_dictionary['Instrument']):
-            instrument_name = inst
-            if inst == 'NIRCAM':
-                instrument_name = 'NIRCam'
-            if inst == 'NIRSPEC':
-                instrument_name = 'NIRSpec'
+        for instrument_name in np.unique(observation_dictionary['Instrument']):
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
@@ -713,10 +708,6 @@ class AptInput:
 
         for i in range(len(self.exposure_tab['Module'])):
             siaf_instrument = self.exposure_tab["Instrument"][i]
-            if siaf_instrument == 'NIRSPEC':
-                siaf_instrument = 'NIRSpec'
-            if siaf_instrument == 'NIRCAM':
-                siaf_instrument = 'NIRCam'
 
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
