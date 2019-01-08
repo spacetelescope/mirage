@@ -32,9 +32,9 @@ from mirage.yaml import generate_observationlist, yaml_generator
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
-# @pytest.fixture(scope="module")
+@pytest.fixture()
 def temporary_directory(test_dir=TEMPORARY_DIR):
-    """Create a test directory for permission management.
+    """Create a test directory.
 
     Parameters
     ----------
@@ -52,12 +52,14 @@ def temporary_directory(test_dir=TEMPORARY_DIR):
     else:
         os.mkdir(test_dir)
 
+    yield test_dir
 
-def test_observation_list_generation_minimal():
+    print("teardown tests/temp_data directory")
+    if os.path.isdir(test_dir):
+        shutil.rmtree(test_dir)
 
-    # generate output directory
-    temporary_directory()
 
+def test_observation_list_generation_minimal(temporary_directory):
     instrument = 'NIRISS'
 
     catalogs = {}
@@ -68,101 +70,78 @@ def test_observation_list_generation_minimal():
         catalogs[instrument.lower()] = source_list_file_name
 
     # Write observationlist.yaml
-    observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
+    observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(instrument.lower()))
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
     generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs=catalogs)
 
     assert os.path.isfile(observation_list_file)
 
+# Assemble list of programs to test
+complete_input_generation_parameters = [('NIRISS', '1087_minimal', 'niriss_point_sources.list'),
+                                        ('NIRISS', '1088', 'niriss_point_sources.list'),
+                                        ('NIRISS', '1087', 'niriss_point_sources.list'),
+                                        ('NIRISS', 'm31_field_test_observation', 'niriss_point_sources.list'),
+                                        ('NIRCam', '1069', 'seed_im_from_catalog_test_ptsrc_catalog.list'),
+                                        ('NIRCam', '1144-OTE-10', 'seed_im_from_catalog_test_ptsrc_catalog.list'),
+                                        ('NIRCam', 'NIRCamTest', 'seed_im_from_catalog_test_ptsrc_catalog.list'),
+                                        ('NIRSpec', '1164', 'niriss_point_sources.list'),
+                                        ('MIRI', '1171', 'niriss_point_sources.list'),
+                                        ('FGS', 'MIRAGE-test', 'niriss_point_sources.list')]
+# Add miscellaneous programs
+apt_xml_files = glob.glob(os.path.join(TEST_DATA_DIR, 'misc', '*/*.xml'))
+for file in apt_xml_files:
+    apt_dir = os.path.join(TEST_DATA_DIR, 'misc')
+    seed = file.split(apt_dir)[1]
+    complete_input_generation_parameters.append(('misc', seed, 'niriss_point_sources.list'))
 
-def test_complete_input_generation():
+@pytest.mark.parametrize('instrument, apt_file_seed, source_list_file_name', complete_input_generation_parameters)
+def test_complete_input_generation(temporary_directory, instrument, apt_file_seed, source_list_file_name):
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
 
-    # generate output directory
-    temporary_directory()
+    # Determine source list filename
+    apt_dir = os.path.join(TEST_DATA_DIR, instrument)
+    source_list_file_name = os.path.join(apt_dir, source_list_file_name)
 
+    # Populate the catalogs
+    catalogs = {}
+    for instrument_name in 'fgs nircam niriss miri nirspec'.split():
+        if instrument_name.lower() == 'nircam':
+            catalogs[instrument_name.lower()] = {}
+            catalogs[instrument_name.lower()]['sw'] = source_list_file_name
+            catalogs[instrument_name.lower()]['lw'] = source_list_file_name
+        else:
+            catalogs[instrument_name.lower()] = source_list_file_name
 
-    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
-    # for instrument in ['NIRISS']:
-    # for instrument in ['misc']:
-    # for instrument in ['NIRSpec']:
-    # for instrument in ['MIRI']:
-    # for instrument in ['FGS']:
-    # for instrument in ['NIRCam']:
+    print('\n\n' + '=' * 100 + '\n')
+    if 'DeepField' in apt_file_seed: # exlude until support for NircamTimeSeries is included
+        return
 
+    # # Remove any existing yaml files
+    # obs_yaml_files = glob.glob(os.path.join(temporary_directory, 'jw*.yaml'))
+    # for file in obs_yaml_files:
+    #     os.remove(file)
 
-        apt_dir = os.path.join(TEST_DATA_DIR, instrument)
-        if instrument == 'NIRISS':
-            apt_file_seeds = ['1087_minimal', '1088', '1087', 'm31_field_test_observation']
-            # apt_file_seeds = ['1087']
-            # apt_file_seeds = ['1087_minimal']
-            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
-        elif instrument == 'NIRCam':
-            apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
-            # apt_file_seeds = ['NIRCamTest']
-            # apt_file_seeds = ['1069']
-            # apt_file_seeds = ['1144-OTE-10']
-            source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
-        elif instrument == 'NIRSpec':
-            apt_file_seeds = ['1164']
-            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
-        elif instrument == 'MIRI':
-            apt_file_seeds = ['1171']
-            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
-        elif instrument == 'FGS':
-            apt_file_seeds = ['MIRAGE-test']
-            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
+    if '.xml' in apt_file_seed:
+        apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
+        apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
+        observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
 
-        elif instrument == 'misc':
-            apt_xml_files = glob.glob(os.path.join(apt_dir, '*/*.xml'))
-            apt_file_seeds = [f.split(apt_dir)[1] for f in apt_xml_files]
-            source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
+    else:
+        observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(apt_file_seed))
+        apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
+        apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
-        catalogs = {}
-        for instrument_name in 'fgs nircam niriss miri nirspec'.split():
-            if instrument_name.lower() == 'nircam':
-                catalogs[instrument_name.lower()] = {}
-                catalogs[instrument_name.lower()]['sw'] = source_list_file_name
-                catalogs[instrument_name.lower()]['lw'] = source_list_file_name
-            else:
-                catalogs[instrument_name.lower()] = source_list_file_name
+    print('Processing program {}'.format(apt_file_xml))
+    yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
+                                  catalogs=catalogs, observation_list_file=observation_list_file,
+                                  verbose=True, output_dir=temporary_directory, simdata_output_dir=temporary_directory,
+                                  offline=True)
 
-        for i, apt_file_seed in enumerate(apt_file_seeds):
-            print('\n\n' + '=' * 100 + '\n')
-            if 'DeepField' in apt_file_seed:
-                continue
-                
-            obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
-            for file in obs_yaml_files:
-                os.remove(file)
+    yam.create_inputs()
 
-            if '.xml' in apt_file_seed:
-                apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
-                apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
-                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
-
-            else:
-                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed))
-                apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-                apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
-
-            print('Processing program {}'.format(apt_file_xml))
-            yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                          catalogs=catalogs, observation_list_file=observation_list_file,
-                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
-                                          offline=True)
-
-            try:
-                yam.create_inputs()
-            except RuntimeError as e:
-                print('\nERROR detected. Skipping {} because of error\n{}\n\n'.format(apt_file_xml, e))
-                continue
-
-            yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
-            valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
-            assert len(valid_instrument_list) == len(yfiles)
+    yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
+    valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
+    assert len(valid_instrument_list) == len(yfiles)
 
 # for debugging
 if __name__ == '__main__':
