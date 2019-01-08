@@ -8,16 +8,17 @@ in catalog_generator.py that can combine catalogs
 
 """
 
-from astropy.coordinates import SkyCoord
-import os
+from collections import OrderedDict
 import math
+import numpy as np
+import os
+
+from astropy.coordinates import SkyCoord
+from astropy.table import Table
 import astropy.units as u
 from astroquery.gaia import Gaia
 from astroquery.irsa import Irsa
-from astropy.table import Table
-import numpy as np
-from collections import OrderedDict
-#import distortion
+from pysiaf.utils.projection import deproject_from_tangent_plane
 
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
 
@@ -1536,7 +1537,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     raout = delx * 0.
     decout = dely * 0.
     for loop in range(len(delx)):
-        raout[loop], decout[loop] = distortion.Pix2RADec_TAN(delx[loop], dely[loop], ra0, dec0)
+        raout[loop], decout[loop] = deproject_from_tangent_plane(delx[loop], dely[loop], ra0, dec0)
     rot1 = 360.*np.random.random(nout)-180.
     rout = np.copy(catalog_values[outputinds, sersicinds[0]])
     drout = np.copy(catalog_values[outputinds, sersicerrorinds[0]])
