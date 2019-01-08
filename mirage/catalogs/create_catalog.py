@@ -84,14 +84,19 @@ def for_proposal(pointing_dictionary, catalog_splitting_threshold=1., instrument
 
             # Create catalog(s)
             if point_source:
-                ptsrc_cat = get_all_catalogs(mean_ra, mean_dec, full_width, instrument=instrument, filters=filter_list,
-                                             email=email)
+                ptsrc_cat, ptsrc_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
+                                                            instrument=instrument, filters=filter_list,
+                                                            email=email)
+                save_ptsrc_as_catalog()
             else:
                 ptsrc_cat = None
 
             if extragalactic:
-                galaxy_cat = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument, filter_list,
-                                               boxflag=False, brightlimit=14.0, seed=None)
+                galaxy_cat, galaxy_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
+                                                            filter_list, boxflag=False, brightlimit=14.0,
+                                                            seed=None)
+                save_galaxy_cat_as_catalog()
+                print_seed(?)
             else:
                 galaxy_cat = None
 
