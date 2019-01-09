@@ -168,43 +168,43 @@ class Catalog_seed():
         if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
             ('FULL' not in self.params['Readout']['array_name'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
-         
+
         # Save the combined static + moving targets ramp
         self.saveSeedImage()
-       
+
         if self.params['Inst']['mode'] in ["pom"]:
             self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
-         
+
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
-         
+
     def extract_full_from_pom(self,seedimage,seed_segmap):
-        """ Given the seed image and segmentation images for the NIRISS POM field of view, 
-        extract the central 2048x2048 pixel area where the detector sits.  The routine is only 
-        called when the mode is "pom".  The mode is set to "imaging" in these routine, as after 
-        the routine is called the subsequent results are the same as when the mode is set to 
+        """ Given the seed image and segmentation images for the NIRISS POM field of view,
+        extract the central 2048x2048 pixel area where the detector sits.  The routine is only
+        called when the mode is "pom".  The mode is set to "imaging" in these routine, as after
+        the routine is called the subsequent results are the same as when the mode is set to
         "imaging" in the parameter file.
-        
+
         Parameters:
         -----------
-        
+
         seedimage : numpy.ndarray (float)   dimension 2322x2322 pixels
         seed_segmap : numpy.ndarray (int)    dimension 2322x2322 pixels
-        
+
         Returns:
         ---------
-        
+
         newseedimage : numpy.ndarray (float)  dimension 2048x2048
         newseed_segmap : numpy.ndarray (int)   dimension 2048x2048
-        
+
         """
-        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the 
+        # For the NIRISS POM mode, extact the central 2048x2048 pixels for the
         # ramp simulation.  Set the mode back to "imaging".
         newseedimage = np.copy(seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
         newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-        self.params['Inst']['mode'] = "imaging" 
+        self.params['Inst']['mode'] = "imaging"
         return newseedimage, newseed_segmap
-         
+
     def add_detector_to_zeropoints(self, detector):
         """Manually add detector dependence to the zeropoint table for
         NIRCam and NIRISS simualtions. This is being done as a placeholder
@@ -568,7 +568,7 @@ class Catalog_seed():
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
-                  
+
         if self.params['Inst']['mode'] in ["pom"]:
             # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
             self.output_dims = [2322,2322]
@@ -1983,34 +1983,25 @@ class Catalog_seed():
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
         # values hh:mm:ss
-        if alpha1 < 0.:
-            alpha1 = alpha1 + 360.
+        if ((alpha1 < 0) or (alpha1 >= 360.)):
+            alpha1 = alpha1 % 360
         if delta1 < 0.:
             sign = "-"
             d1 = abs(delta1)
         else:
-            sign = " + "
+            sign = "+"
             d1 = delta1
         decd = int(d1)
         value = 60. * (d1 - float(decd))
         decm = int(value)
         decs = 60. * (value - decm)
-        a1 = alpha1/15.0
+        a1 = alpha1 / 15.0
         radeg = int(a1)
         value = 60. * (a1 - radeg)
         ramin = int(value)
         rasec = 60. * (value - ramin)
         alpha2 = "%2.2d:%2.2d:%7.4f" % (radeg, ramin, rasec)
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
-        alpha2 = alpha2.replace(" ", "0")
-        delta2 = delta2.replace(" ", "0")
-        # The following fixes a format issue; it is not clear why the signa
-        # can have spaces around it in view of the above format string, but
-        # that is what happens.
-        alpha2 = alpha2.replace("0+0",'+')
-        delta2 = alpha2.replace("0+0",'+')
-        alpha2 = alpha2.replace("0-0",'-')
-        delta2 = alpha2.replace("0-0",'-')
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
