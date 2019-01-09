@@ -106,7 +106,6 @@ import pysiaf
 from ..apt import apt_inputs
 from ..utils.utils import calc_frame_time
 from .generate_observationlist import get_observation_dict
-from ..catalogs import create_catalog
 
 ENV_VAR = 'MIRAGE_DATA'
 
