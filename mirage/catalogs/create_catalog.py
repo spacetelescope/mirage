@@ -264,18 +264,26 @@ def get_2MASS_ptsrc_catalog(ra, dec, box_width):
     return twomass_mirage, twomass_cat
 
 
-def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email=''):
+def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', seeds=[None, None]):
     """Convenience function to create a catalog from 2MASS and add a population of
     fainter stars. In this case, cut down the magnitude limits for the call to the
     Besancon model so that we don't end up with a double population of bright stars
+
+    Parameters
+    ----------
+
+        seeds : list
+        Seeds to use in the random number generator when choosing RA and
+        Dec values for Besancon sources.
     """
     two_mass, twomass_cat = get_2MASS_ptsrc_catalog(ra, dec, box_width)
-    background, background_cat = besancon(ra, dec, box_width, coords='ra_dec', email=email)
+    background, background_cat = besancon(ra, dec, box_width, coords='ra_dec', email=email, seeds=seeds)
     two_mass.add_catalog(background)
     return two_mass
 
 
-def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrument='NIRISS', filters=[]):
+def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrument='NIRISS', filters=[],
+                     besancon_seeds=[None, None]):
     """
     This is a driver function to query the GAIA/2MASS/WISE catalogues
     plus the Besancon model and combine these into a single JWST source list.
@@ -311,6 +319,9 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
         filters:      (list of strings)
                       Either an empty list (which gives all filters) or a list
                       of filter names (i.e. F090W) to be calculated.
+        besancon_seeds : list
+            Seeds to use in the random number generator when choosing RA and
+            Dec values for Besancon sources.
 
     Return values:
 
@@ -334,7 +345,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
     wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width)
     besancon_cat, besancon_model = besancon(outra, outdec, box_width,
-                                            email=email, kmag_limits=kmag_limits)
+                                            email=email, kmag_limits=kmag_limits, seeds=besancon_seeds)
     besancon_jwst = transform_besancon(besancon_cat, besancon_model, instrument, filter_names)
     if len(filter_names) != len(filters):
         newfilters = []
@@ -828,6 +839,10 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat):
     print(len(gaia_wise_crossref['ra']))
     print(len(wise_cat['ra']))
 
+    print(gaia_cat[0:10])
+    print(gaia_wise_crossref)
+    print(wise_cat)
+
     for loop in range(len(gaia_wise_crossref['ra'])):
         for n1 in range(len(gaia_cat['ra'])):
             if gaia_cat['designation'][n1] == gaia_wise_crossref['designation'][loop]:
@@ -1142,7 +1157,7 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
 
 
-def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)):
+def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29), seeds=[None, None]):
     """
     This routine calls a server to get a Besancon star count model over a given
     small sky area at a defined position.  For documentation of the Besancon
@@ -1190,6 +1205,10 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
                       that for the JWST instruments the 2MASS sources will
                       saturate in full frame imaging in many cases.
                       (tuple)
+
+        seeds         A 2-element list containing seeds to use in the random
+                      number generator for the RA and Dec values for the
+                      Besancon sources.
 
     Return values:
 
@@ -1248,7 +1267,7 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     max_ra = ra + half_width
     min_dec = dec - half_width
     max_dec = dec + half_width
-    ra_values, dec_values = generate_ra_dec(len(k_mags), min_ra, max_ra, min_dec, max_dec)
+    ra_values, dec_values = generate_ra_dec(len(k_mags), min_ra, max_ra, min_dec, max_dec, seeds=seeds)
 
     # Create the catalog object
     cat = PointSourceCatalog(ra=ra_values, dec=dec_values)
@@ -1264,13 +1283,17 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     return cat, model
 
 
-def galactic_plane(box_width, email=''):
+def galactic_plane(box_width, email='', seeds=[None, None]):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function
 
     Parameters
     ----------
     box_width : float
+
+    seeds : list
+        Seeds to use in the random number generator when choosing RA and
+        Dec values for Besancon sources.
 
     Returns
     -------
@@ -1299,7 +1322,7 @@ def galactic_plane(box_width, email=''):
     representative_galactic_latitude = 0.0  # deg
 
     cat, model = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                          box_width, coords='galactic', email=email)
+                          box_width, coords='galactic', email=email, seeds=seeds)
     return cat, model
 
 
@@ -1326,13 +1349,17 @@ def out_of_plane(box_width, email=''):
     return cat
 
 
-def galactic_bulge(box_width, email=''):
+def galactic_bulge(box_width, email='', seeds=[None, None]):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
 
     Parameters
     ----------
     box_width : float
+
+    seeds : list
+        Seeds to use in the random number generator when choosing RA and
+        Dec values for Besancon sources.
 
     Returns
     -------
@@ -1346,7 +1373,7 @@ def galactic_bulge(box_width, email=''):
     representative_galactic_latitude = 5.0  # ? deg
 
     cat, model = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                          box_width, coords='galactic', email=email)
+                          box_width, coords='galactic', email=email, seeds=seeds)
     return cat, model
 
 #def from_luminosity_function(self, luminosity_function):
@@ -1375,7 +1402,7 @@ def filter_bad_ra_dec(table_data):
     return position_mask
 
 
-def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max):
+def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max, seeds=[None, None]):
     """
     Generate a list of random RA, Dec values in a square region.  Note that
     this assumes a small sky area so that the change in the sky area per
@@ -1407,8 +1434,12 @@ def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max):
 
     """
     delta_ra = ra_max - ra_min
+    if seeds[0] is not None:
+        np.random.seed(seeds[0])
     ra_list = np.random.random(number_of_stars) * delta_ra + ra_min
     delta_dec = dec_max - dec_min
+    if seeds[1] is not None:
+        np.random.seed(seeds[1])
     dec_list = np.random.random(number_of_stars) * delta_dec + dec_min
     return ra_list, dec_list
 

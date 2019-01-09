@@ -132,11 +132,47 @@ def test_get_all_catalogs():
     ins = 'NIRCAM'
     filters = ['F150W', 'F356W', 'F444W', 'F480M']
     cat, headers = create_catalog.get_all_catalogs(ra, dec, width, kmag_limits=(10, 29),
-                                                   email='hilbert@stsci.edu', instrument=ins, filters=filters)
+                                                   email='hilbert@stsci.edu', instrument=ins, filters=filters,
+                                                   besancon_seeds=[1234, 1235])
     print(type(cat))
     #comparison_file = os.path.join(TEST_DATA_DIR, 'get_all_catalogs.cat')
     #comparison_data = ascii.read(comparison_file)
 
+    # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
+    # fail without there being a problem with Mirage.
+    assert all(cat.table == comparison_data)
+
     #for colname in comparison_data.colnames:
     #    assert colname in headers
     #assert len(cat[headers[0]]) == len(comparison_data[headers[0]])
+
+
+def test_gaia_query():
+    """Test the GAIA query and transformation into a Mirage-format catalog"""
+    ra = 80.4
+    dec = -69.8
+    box_width = 200.
+    cat, query, gaia_2mass_cross, gaia_wise_cross = create_catalog.get_gaia_ptsrc_catalog(ra, dec, box_width)
+    assert len(cat.table) == 1153
+    assert cat.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'gaia_phot_g_mean_mag_magnitude',
+                                  'gaia_phot_bp_mean_mag_magnitude', 'gaia_phot_rp_mean_mag_magnitude']
+
+
+def test_random_ra_dec_values():
+    """Test the random RA, Dec value generator used when getting Besancon
+    sources"""
+    num_stars = 10
+    ra_min = 1.0
+    ra_max = 1.1
+    dec_min = 40.
+    dec_max = 40.1
+    ra1, dec1 = create_catalog.generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max,
+                                               seeds=[37465, 927436])
+    ra2, dec2 = create_catalog.generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max,
+                                               seeds=[37465, 927436])
+    assert ra1 == ra2
+    assert dec1 == dec2
+    assert np.min(ra1) >= ra_min
+    assert np.max(ra1) <= ra_max
+    assert np.min(dec1) >= dec_min
+    assert np.max(dec1) <= dec_max
