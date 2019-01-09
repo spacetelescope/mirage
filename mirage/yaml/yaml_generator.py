@@ -106,6 +106,7 @@ import pysiaf
 from ..apt import apt_inputs
 from ..utils.utils import calc_frame_time
 from .generate_observationlist import get_observation_dict
+from ..catalogs import create_catalog
 
 ENV_VAR = 'MIRAGE_DATA'
 
@@ -113,8 +114,7 @@ ENV_VAR = 'MIRAGE_DATA'
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
                  use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
-                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False,
-                 create_source_catalogs={'ptsrc': None, 'extragalactic': None}):
+                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -131,12 +131,6 @@ class SimInput:
         parameter_defaults : dict
             Default values of parameters like roll angle (PAV3) to pass on to observation list
             generator
-
-        create_source_catalogs : dict
-            Contains two keys:
-                'ptsrc', which can have values of [None, ??] We know RA, Dec, so real obj are no prob. for besancon we need info
-                'extragalactic', which can gave values of [None, Standard]
-
         """
         self.info = {}
         self.input_xml = input_xml
@@ -168,7 +162,6 @@ class SimInput:
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
-        self.create_source_catalogs = create_source_catalogs
 
         # Expand the MIRAGE_DATA environment variable
         self.expand_env_var()
@@ -179,7 +172,6 @@ class SimInput:
         self.set_global_definitions()
 
         if (input_xml is not None) and (catalogs is not None):
-
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose,
@@ -326,17 +318,6 @@ class SimInput:
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
-
-            # If requested, generate source catalogs
-            print("If requested, create source catalogs from APT file here.")
-            if self.create_source_catalogs['ptsrc'] is not None:
-                print('We need to create some kind of ptsrc catalog.')
-            if self.create_source_catalogs['extragalactic'] is not None:
-                galaxy_catalog = create_catalog.for_proposal(self.exposure_tab, instrument, filter_list, email='')
-
-
-            # Add source catalogs
-            # self.add_catalogs()
 
         elif self.table_file is not None:
             print('Reading table file: {}'.format(self.table_file))

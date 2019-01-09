@@ -223,7 +223,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
     return_dict = None
 
-
     # array of unique instrument names
     used_instruments = np.unique(xml_dict['Instrument'])
     unique_observation_ids = np.unique(xml_dict['ObservationID']).tolist()
