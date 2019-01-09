@@ -328,6 +328,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
         outra = ra
         outdec = dec
     filter_names = make_filter_names(instrument, filters)
+
     gaia_cat, gaia_mag_cols, gaia_2mass, gaia_2mass_crossref, gaia_wise, \
         gaia_wise_crossref = query_GAIA_ptsrc_catalog(outra, outdec, box_width)
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
@@ -342,6 +343,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
             newfilters.append(values[1])
     else:
         newfilters = filters
+
     for loop in range(len(filters)):
         besancon_cat.add_magnitude_column(np.squeeze(besancon_jwst[:, loop]), instrument=instrument,
                                           filter_name=newfilters[loop], magnitude_system='vegamag')
@@ -530,27 +532,27 @@ def read_standard_magnitudes():
                         'WISE W1', 'WISE W2', 'WISE W3', 'WISE W4', 'GAIA g ',
                         'GAIA gbp', 'GAIA grp',
                         'niriss_f090w_magnitude', 'niriss_f115w_magnitude',
-                        'niriss_f140w_magnitude', 'niriss_f150w_magnitude',
-                        'niriss_f158w_magnitude', 'niriss_f200w_magnitude',
+                        'niriss_f140m_magnitude', 'niriss_f150w_magnitude',
+                        'niriss_f158m_magnitude', 'niriss_f200w_magnitude',
                         'niriss_f277w_magnitude', 'niriss_f356w_magnitude',
-                        'niriss_f380w_magnitude', 'niriss_f430w_magnitude',
-                        'niriss_f444w_magnitude', 'niriss_f480w_magnitude',
+                        'niriss_f380m_magnitude', 'niriss_f430m_magnitude',
+                        'niriss_f444w_magnitude', 'niriss_f480m_magnitude',
                         'guider1_magnitude', 'guider2_magnitude',
                         'nircam_f070w_magnitude', 'nircam_f090w_magnitude',
-                        'nircam_f115w_magnitude', 'nircam_f140w_magnitude',
+                        'nircam_f115w_magnitude', 'nircam_f140m_magnitude',
                         'nircam_f150w_magnitude', 'nircam_f150w2_magnitude',
-                        'nircam_f162w_magnitude', 'nircam_f164w_magnitude',
-                        'nircam_f182w_magnitude', 'nircam_f187w_magnitude',
-                        'nircam_f200w_magnitude', 'nircam_f210w_magnitude',
-                        'nircam_f212w_magnitude', 'nircam_f250w_magnitude',
-                        'nircam_f277w_magnitude', 'nircam_f300w_magnitude',
-                        'nircam_f322w2_magnitude', 'nircam_f323w_magnitude',
-                        'nircam_f335w_magnitude', 'nircam_f356w_magnitude',
-                        'nircam_f360w_magnitude', 'nircam_f405w_magnitude',
-                        'nircam_f410w_magnitude', 'nircam_f430w_magnitude',
-                        'nircam_f444w_magnitude', 'nircam_f460w_magnitude',
-                        'nircam_f466w_magnitude', 'nircam_f470w_magnitude',
-                        'nircam_f480w_magnitude']
+                        'nircam_f162m_magnitude', 'nircam_f164n_magnitude',
+                        'nircam_f182m_magnitude', 'nircam_f187n_magnitude',
+                        'nircam_f200w_magnitude', 'nircam_f210m_magnitude',
+                        'nircam_f212n_magnitude', 'nircam_f250m_magnitude',
+                        'nircam_f277w_magnitude', 'nircam_f300m_magnitude',
+                        'nircam_f322w2_magnitude', 'nircam_f323n_magnitude',
+                        'nircam_f335m_magnitude', 'nircam_f356w_magnitude',
+                        'nircam_f360m_magnitude', 'nircam_f405n_magnitude',
+                        'nircam_f410m_magnitude', 'nircam_f430m_magnitude',
+                        'nircam_f444w_magnitude', 'nircam_f460m_magnitude',
+                        'nircam_f466n_magnitude', 'nircam_f470n_magnitude',
+                        'nircam_f480m_magnitude']
     standard_labels = []
     n1 = 0
     for line in lines:
@@ -809,11 +811,9 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat):
                     list of index values from gaia_cat to wise_cat
 
     """
-    matchwise = []
-    gaiawiseinds = []
-    for loop in range(len(wise_cat['ra'])):
-        matchwise.append(False)
-        gaiawiseinds.append(-1)
+    num_entries = len(wise_cat['ra'])
+    matchwise = [False] * num_entries
+    gaiawiseinds = [-1] * num_entries
     ra1 = np.copy(wise_cat['ra'])
     dec1 = np.copy(wise_cat['dec'])
     ra2 = np.copy(gaia_wise['ra'])
@@ -821,6 +821,13 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat):
     sc1 = SkyCoord(ra=ra1*u.degree, dec=dec1*u.degree)
     sc2 = SkyCoord(ra=ra2*u.degree, dec=dec2*u.degree)
     idx, d2d, d3d = sc2.match_to_catalog_sky(sc1)
+
+    print('COMPARE LENGTHS:')
+    print(len(matchwise))
+    print(len(gaia_cat['ra']))
+    print(len(gaia_wise_crossref['ra']))
+    print(len(wise_cat['ra']))
+
     for loop in range(len(gaia_wise_crossref['ra'])):
         for n1 in range(len(gaia_cat['ra'])):
             if gaia_cat['designation'][n1] == gaia_wise_crossref['designation'][loop]:
@@ -924,36 +931,17 @@ def make_filter_names(instrument, filters):
 
     """
     instrument_names = ['Guider', 'NIRCam', 'NIRISS']
-    guider_filters = ['guider1', 'gauider2']
+    guider_filters = ['guider1', 'guider2']
     guider_filter_names = ['guider1_magnitude', 'guider2_magnitude']
     niriss_filters = ['F090W', 'F115W', 'F140M', 'F150W', 'F158M', 'F200W',
                       'F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
-    niriss_filter_names = ['niriss_f090w_magnitude', 'niriss_f115w_magnitude',
-                           'niriss_f140w_magnitude', 'niriss_f150w_magnitude',
-                           'niriss_f158w_magnitude', 'niriss_f200w_magnitude',
-                           'niriss_f277w_magnitude', 'niriss_f356w_magnitude',
-                           'niriss_f380w_magnitude', 'niriss_f430w_magnitude',
-                           'niriss_f444w_magnitude', 'niriss_f480w_magnitude']
-    nircam_filters = ['F070W', 'F090W', 'F115W', 'F140W', 'F150W', 'F150W2',
-                      'F162W', 'F164W', 'F182W', 'F187W', 'F200W', 'F210W',
-                      'F212W', 'F250W', 'F277W', 'F300W', 'F322W2', 'F323W',
-                      'F335W', 'F356W', 'F360W', 'F405W', 'F410W', 'F430W',
-                      'F444W', 'F460W', 'F466W', 'F470W', 'F480W']
-    nircam_filter_names = ['nircam_f070w_magnitude', 'nircam_f090w_magnitude',
-                           'nircam_f115w_magnitude', 'nircam_f140w_magnitude',
-                           'nircam_f150w_magnitude', 'nircam_f150w2_magnitude',
-                           'nircam_f162w_magnitude', 'nircam_f164w_magnitude',
-                           'nircam_f182w_magnitude', 'nircam_f187w_magnitude',
-                           'nircam_f200w_magnitude', 'nircam_f210w_magnitude',
-                           'nircam_f212w_magnitude', 'nircam_f250w_magnitude',
-                           'nircam_f277w_magnitude', 'nircam_f300w_magnitude',
-                           'nircam_f322w2_magnitude', 'nircam_f323w_magnitude',
-                           'nircam_f335w_magnitude', 'nircam_f356w_magnitude',
-                           'nircam_f360w_magnitude', 'nircam_f405w_magnitude',
-                           'nircam_f410w_magnitude', 'nircam_f430w_magnitude',
-                           'nircam_f444w_magnitude', 'nircam_f460w_magnitude',
-                           'nircam_f466w_magnitude', 'nircam_f470w_magnitude',
-                           'nircam_f480w_magnitude']
+    niriss_filter_names = ['niriss_{}_magnitude'.format(filt.lower()) for filt in niriss_filters]
+    nircam_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F150W2',
+                      'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
+                      'F212N', 'F250M', 'F277W', 'F300M', 'F322W2', 'F323N',
+                      'F335M', 'F356W', 'F360M', 'F405N', 'F410M', 'F430M',
+                      'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
+    nircam_filter_names = ['nircam_{}_magnitude'.format(filt.lower()) for filt in nircam_filters]
     names1 = [guider_filters, nircam_filters, niriss_filters]
     names2 = [guider_filter_names, nircam_filter_names, niriss_filter_names]
     headerstrs = []

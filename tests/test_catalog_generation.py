@@ -37,7 +37,8 @@ def test_ptsrc_catalog_creation():
 
     assert all(ptsrc.ra == ra)
     assert all(ptsrc.dec == dec)
-    assert ptsrc.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'nircam_f090w_magnitude', 'nircam_f200w_magnitude']
+    assert ptsrc.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'nircam_f090w_magnitude',
+                                    'nircam_f200w_magnitude']
 
 
 def test_galaxy_catalog_creation():
@@ -121,3 +122,21 @@ def test_2mass_plus_besaoncon_convenience_function():
     both = create_catalog.twoMASS_plus_background(80.4, -69.8, 120, kmag_limits=(16, 25),
                                                   email='hilbert@stsci.edu')
     assert len(twomass.table) < len(both.table)
+
+
+def test_get_all_catalogs():
+    """Test the wrapper that queries anc combines catalogs from all sources"""
+    ra = 80.4
+    dec = -69.8
+    width = 200.
+    ins = 'NIRCAM'
+    filters = ['F150W', 'F356W', 'F444W', 'F480M']
+    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, kmag_limits=(10, 29),
+                                                   email='hilbert@stsci.edu', instrument=ins, filters=filters)
+    print(type(cat))
+    #comparison_file = os.path.join(TEST_DATA_DIR, 'get_all_catalogs.cat')
+    #comparison_data = ascii.read(comparison_file)
+
+    #for colname in comparison_data.colnames:
+    #    assert colname in headers
+    #assert len(cat[headers[0]]) == len(comparison_data[headers[0]])

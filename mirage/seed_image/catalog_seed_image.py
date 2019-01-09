@@ -2098,10 +2098,10 @@ class Catalog_seed():
         if self.coord_transform is not None:
             loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
-            # Use SIAF to do the calucations if the distortion reffile is not present.
-            # In this case, add 1 to the input pixel values since SIAF works in a 1-indexed
-            # coordinate system.
-            loc_v2s, loc_v3s = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
+            # Use SIAF to do the calculations if the distortion reffile is
+            # not present. In this case, add 1 to the input pixel values
+            # since SIAF works in a 1-indexed coordinate system.
+            loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
 
         ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
 
