@@ -300,6 +300,13 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
+        if len(self.apt_xml_dict['ProposalID']) != len(pointing_dictionary['obs_num']):
+            print(self.apt_xml_dict['PrimaryDitherType'])
+            print(self.apt_xml_dict['PrimaryDithers'])
+            print(self.apt_xml_dict['SubpixelPositions'])
+            print(self.apt_xml_dict['SubpixelDitherType'])
+            print(self.apt_xml_dict['number_of_dithers'])
+
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '

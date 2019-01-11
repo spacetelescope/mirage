@@ -484,10 +484,18 @@ class ReadAPTXML():
             FiducialPointOverride = True if override is not None else False
 
             # Get the number of primary and subpixel dithers
+            print('Dither key name', dither_key_name)
+            print(observation_dict.keys())
             primary_dithers_present = dither_key_name in observation_dict.keys()
             if primary_dithers_present:
+
+                print('primary dithers present')
+
                 #number_of_dithers = observation_dict[dither_key_name]
                 number_of_primary_dithers = observation_dict[dither_key_name]
+
+                print('num primary dithers: {}'.format(number_of_primary_dithers))
+
                 if (template_name == 'NircamEngineeringImaging') and (number_of_primary_dithers == '2PLUS'):
                     # Handle the special case for 2PLUS
                     number_of_primary_dithers = 2
@@ -496,11 +504,19 @@ class ReadAPTXML():
                     #number_of_dithers = str(np.int(number_of_dithers) * sub_dithers)
                     number_of_subpixel_dithers = np.int(observation_dict['SubpixelDitherType'][0])
                 elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING']:
+
+                    print('subpixel type is standard or imaging')
+
+
                     if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
                         #number_of_dithers = observation_dict[dither_key_name][0]
                         number_of_primary_dithers = observation_dict[dither_key_name][0]
                     #number_of_dithers = str(np.int(number_of_dithers) * np.int(observation_dict['SubpixelPositions']))
                     number_of_subpixel_dithers = np.int(observation_dict['SubpixelPositions'])
+
+
+                    print('number of subpixel dithers: {}'.format(observation_dict['SubpixelPositions']))
+
             elif parallel and prime_instrument == 'NIRISS' and prime_template_name == 'NirissWfss':
                 observation_dict['PrimaryDithers'] = prime_template.find(prime_ns + dither_key_name).text
                 observation_dict['DitherSize'] = prime_template.find(prime_ns + 'DitherSize').text
@@ -532,7 +548,10 @@ class ReadAPTXML():
 
             # Combine primary and subpixel dithers
             number_of_dithers = str(np.int(number_of_primary_dithers) * number_of_subpixel_dithers)
-            print('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers, number_of_subpixel_dithers, number_of_dithers))
+            print('Number of {} dithers: {} primary * {} subpixel = {}'.format(instrument,
+                                                                               number_of_primary_dithers,
+                                                                               number_of_subpixel_dithers,
+                                                                               number_of_dithers))
 
             # Find filter parameters for all filter configurations within obs
             filter_configs = template.findall('.//' + ns + 'FilterConfig')
@@ -629,6 +648,12 @@ class ReadAPTXML():
                 override = obs.find('.//' + self.apt + 'FiducialPointOverride')
                 FiducialPointOverride = True if override is not None else False
 
+                # Combine primary and subpixel dithers
+                number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
+                print('Number of {} dithers: {} primary * {} subpixel = {}'.format(instrument,
+                                                                                   number_of_primary_dithers,
+                                                                                   number_of_subpixel_dithers,
+                                                                                   number_of_dithers))
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower() == 'niriss') and (element_tag_stripped == 'ExposureList')) | \
                         ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
@@ -637,11 +662,6 @@ class ReadAPTXML():
                     for exposure in element.findall(ns + 'Exposure'):
                         exposure_dict = {}
 
-                        # Combine primary and subpixel dithers
-                        number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
-                        print('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
-                                                                                        number_of_subpixel_dithers,
-                                                                                        number_of_dithers))
                         # Load dither information into dictionary
                         exposure_dict['DitherPatternType'] = DitherPatternType
                         exposure_dict[dither_key_name] = np.int(number_of_dithers)
@@ -1148,6 +1168,10 @@ class ReadAPTXML():
         module = template.find(ns + 'Module').text
         subarr = template.find(ns + 'Subarray').text
 
+        # Determine if there is an aperture override
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        FiducialPointOverride = True if override is not None else False
+
         # Get primary and subpixel dither values for the grism exposures
         primary_dither_type_grism = template.find(ns + 'PrimaryDitherType').text
         if primary_dither_type_grism.lower() != 'none':
@@ -1254,6 +1278,7 @@ class ReadAPTXML():
                     exp_seq_dict['number_of_dithers'] = [grism_number_of_dithers, direct_number_of_dithers]
                     exp_seq_dict['FilterWheel'] = ['none'] * 2  # used for NIRISS
                     exp_seq_dict['PupilWheel'] = ['none'] * 2  # used for NIRISS
+                    exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * 2
                 else:
                     exp_seq_dict['Mode'] = [grism_typeflag]
                     exp_seq_dict['Module'] = [module]
@@ -1280,6 +1305,7 @@ class ReadAPTXML():
                     exp_seq_dict['number_of_dithers'] = [grism_number_of_dithers]
                     exp_seq_dict['FilterWheel'] = ['none']  # used for NIRISS
                     exp_seq_dict['PupilWheel'] = ['none']  # used for NIRISS
+                    exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride]
 
                 # Add exp_seq_dict to the exposures_dictionary
                 exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
@@ -1316,6 +1342,7 @@ class ReadAPTXML():
             out_of_field_dict['number_of_dithers'] = [direct_number_of_dithers] * 2
             out_of_field_dict['FilterWheel'] = ['none'] * 2  # used for NIRISS
             out_of_field_dict['PupilWheel'] = ['none'] * 2  # used for NIRISS
+            out_of_field_dict['FiducialPointOverride'] = [FiducialPointOverride] * 2
 
             # Add out_of_field_dict to the exposures_dictionary
             exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
@@ -1532,7 +1559,8 @@ class ReadAPTXML():
         expseqs = explist.findall(ns + 'ExposureSequences')
 
         # Determine if there is an aperture override
-        mod, subarr = self.check_for_aperture_override(obs, mod, subarr, proposal_param_dict['ObservationID'])
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        FiducialPointOverride = True if override is not None else False
 
         delta_exp_dict_length = 0
         for expseq in expseqs:
@@ -1602,6 +1630,7 @@ class ReadAPTXML():
                 exp_seq_dict['APTTemplate'] = [template_name] * repeats
                 exp_seq_dict['ObservationName'] = [proposal_param_dict['ObservationName']] * repeats
                 exp_seq_dict['FilterWheel'] = [filter_name] * repeats
+                exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * repeats
 
                 if not both_grisms:
                     exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]

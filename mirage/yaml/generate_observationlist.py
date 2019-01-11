@@ -182,6 +182,15 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
     xml_dict = readxml_obj.read_xml(xml_file, verbose=verbose)
 
+    if os.path.basename(xml_file) == 'OTE-10_1144.xml':
+        print(xml_dict['ObservationID'])
+        print(xml_dict['PrimaryDitherType'])
+        print(xml_dict['PrimaryDithers'])
+        print(xml_dict['SubpixelDitherType'])
+        print(xml_dict['SubpixelPositions'])
+        print(xml_dict['number_of_dithers'])
+        stop
+
     # if verbose:
     #print('Summary of observation dictionary:')
     #for key in xml_dict.keys():
