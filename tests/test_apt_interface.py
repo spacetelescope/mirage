@@ -142,7 +142,7 @@ def test_complete_input_generation():
             skip_bool = any([True if prop in apt_file_seed else False for prop in skip_for_now])
             if skip_bool:
                 continue
-
+                
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
             for file in obs_yaml_files:
                 os.remove(file)
