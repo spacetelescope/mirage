@@ -686,10 +686,6 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     # Now, convert to JWST magnitudes either by transformation (for sources
     # with GAIA G/BP/RP magnitudes) or by interpolation (all other
     # cases).
-    outmags = open('magnitude_table_in.txt','w')
-    for loop in range(nout):
-        print("%10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %10.4f " % (in_magnitudes[loop,0],in_magnitudes[loop,1],in_magnitudes[loop,2],in_magnitudes[loop,3],in_magnitudes[loop,4],in_magnitudes[loop,5],in_magnitudes[loop,6],in_magnitudes[loop,7],in_magnitudes[loop,8],in_magnitudes[loop,9]),file=outmags)
-    outmags.close()
     out_magnitudes = np.zeros((nout, nfilters), dtype=np.float32)
     out_filter_names = make_filter_names(instrument, filter_names)
     inds = crossmatch_filter_names(in_filters, standard_filters)
@@ -708,13 +704,6 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     raout = np.copy(raout[0:nfinal])
     decout = np.copy(raout[0:nfinal])
     out_magnitudes = np.copy(out_magnitudes[0:nfinal, :])
-    outmags = open('magnitude_table_out.txt','w')
-    for loop in range(nfinal):
-        str1 = ''
-        for l1 in range(nfilters):
-            str1 = str1 + '%10.4f ' % (out_magnitudes[loop,l1])
-        print(str1,file=outmags)
-    outmags.close()
     outcat = PointSourceCatalog(ra=raout, dec=decout)
     n1 = 0
     for filter in out_filter_names:
