@@ -335,7 +335,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
     return source_list, filter_names
 
 
-def transform_besancon(besancon_cat, besancon_model, instrument, filter_names):
+def transform_besancon(besancon_cat, besancon_model, filter_names):
     """
     Given the output from a Besancon model, transform to JWST magnitudes by
     making a best match to the standard BOSZ model colours for the VJHKL
@@ -384,6 +384,78 @@ def transform_besancon(besancon_cat, besancon_model, instrument, filter_names):
         newmags = besancon_model['Av'][loop]*standard_values[3, :]+newmags
         out_magnitudes[loop, :] = newmags[inds]
     return out_magnitudes
+
+
+def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(13, 29), email='',
+                     seeds=[None, None], output_file=None):
+    """Create a Mirage-formatted catalog containing sources from a query of the Besancon model
+
+    Parameters
+    ----------
+    ra : float
+        Right ascention (in decimal degrees) of the center of the catalog
+
+    dec : float
+        Declination (in decimal degrees) of the center of the catalog
+
+    box_width : float
+        Width (in arcseconds) of the box on the sky contained in the catalog
+
+    filters : dict
+        Dictionary with keys equal to JWST instrument names, and values
+        that are lists of filter names. Besancon sources will have magnitudes
+        transformed into thiese filters
+
+    coords : str
+        Can be 'ra_dec' if ra and dec are Right Ascention and Declination,
+        or 'galactic' if coords are galactic longitude and latitude
+
+    kmag_limits : tup
+        Minimum and maximum magnitude values to return in the catalog
+
+    email : str
+        Email address needed for the query to the Besancon model
+
+    seeds : list
+        2-element list giving seeds for the random number generator used
+        to create RA and Dec values for model stars.
+
+    output_file : str
+        If not None, save the catalog to a file with this name
+
+    Returns
+    -------
+    transformed_besancon_cat : mirage.catalogs.create_catalog.PointSourceCatalog
+        Catalog containing Besancon model stars with magnitudes in requested
+        JWST filters
+    """
+    # Query the Besancon model and create catalog
+    orig_cat, orig_query = besancon(ra, dec, box_width, coords=coords, kmag_limits=kmag_limits, email=email,
+                                    seeds=seeds)
+
+    # Create list of filter names from filters dictionary
+    all_filters = []
+    for instrument in filters:
+        filt_list = make_filter_names(instrument.lower(), filters[instrument])
+        all_filters.extend(filt_list)
+
+    # Transform Besancon source magnitudes to be in requested filters
+    newmags = transform_besancon(orig_cat, orig_query, all_filters)
+
+    # Combine RA, Dec values in original catalog with updated magnitude lists
+    # into a new catalog
+    transformed_besancon_cat = PointSourceCatalog(ra=orig_cat.table['x_or_RA'].data,
+                                                  dec=orig_cat.table['y_or_Dec'].data)
+
+    for mags, filt in zip(newmags.transpose(), all_filters):
+        instrument, filter_name, _ = filt.split('_')
+        transformed_besancon_cat.add_magnitude_column(mags, instrument=instrument, filter_name=filter_name)
+
+    # Save to output file if requested
+    if output_file is not None:
+        transformed_besancon_cat.save(output_file)
+
+    return transformed_besancon_cat
 
 
 def crossmatch_filter_names(filter_names, standard_filters):
@@ -721,7 +793,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
 
 def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref):
     """
-    Take the GAIA to 2MASS cross references and make sure that there is only 
+    Take the GAIA to 2MASS cross references and make sure that there is only
     one GAIA source cross-matched to a given 2MASS source in the table.
     Input values:
     gaia_cat :   (astropy.table.Table)
@@ -732,7 +804,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref):
                            contains GAIA/2MASS cross-references from the GAIA DR2 archive
     Return values:
     ngaia2masscr :  (numpy array of int)
-                    an array of cross match indexes, giving for each 2MASS source 
+                    an array of cross match indexes, giving for each 2MASS source
                     the index number of the associated GAIA source in the main
                     GAIA table, or a value of -10 where there is no match
     """
