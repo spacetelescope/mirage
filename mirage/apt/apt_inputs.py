@@ -300,6 +300,7 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
+        print('Checking length of pointing dict vs xml dict. RREMOVE BEOFRE MERGING')
         if len(self.apt_xml_dict['ProposalID']) != len(pointing_dictionary['obs_num']):
             print(self.apt_xml_dict['PrimaryDitherType'])
             print(self.apt_xml_dict['PrimaryDithers'])
@@ -315,6 +316,65 @@ class AptInput:
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
+
+
+
+
+
+        if self.pointing_file == '/Users/hilbert/python_repos/mirage/tests/test_data/misc/01148/OTE13-1148.pointing':
+            print('checking dictionary combination in apt_inputs')
+            print(observation_dictionary.keys())
+            print(self.apt_xml_dict.keys())
+            print(pointing_dictionary.keys())
+
+            print(self.apt_xml_dict['ObservationID'])
+            print(observation_dictionary['ObservationID'])
+            print('')
+            print(pointing_dictionary['obs_num'])
+            print(observation_dictionary['obs_num'])
+            print('')
+
+            print(('need to use zfill to add preceding zeros to ObservationID?'
+            'Looks like dictionary is being reordered to increasing ObservationID'
+            'order (even though they are strings????!), but the same is not happening'
+            'for the pointing dictionary.'))
+
+
+
+
+
+            print('dictionary lengths:')
+            print(len(pointing_dictionary['obs_num']))
+            print(len(self.apt_xml_dict['ObservationID']))
+            print(len(observation_dictionary['ObservationID']))
+
+            obs2 = np.where(np.array(pointing_dictionary['obs_num']) == '002')[0]
+            print('obs2 in pointing: {}'.format(obs2))
+            if len(obs2) > 0:
+                for keyname in pointing_dictionary:
+                    print(keyname, pointing_dictionary[keyname][obs2[0]])
+            obs2_xml = np.where(np.array(self.apt_xml_dict['ObservationID']) == '2')[0]
+            print('')
+            print('obs2 in xml: {}'.format(obs2_xml))
+            if len(obs2_xml) > 0:
+                for keyname in self.apt_xml_dict:
+                    print(keyname, self.apt_xml_dict[keyname][obs2_xml[0]])
+            obs2_comb = np.where(np.array(observation_dictionary['obs_num']) == '002')[0]
+            print('')
+            print('obs2 in combined: {}'.format(obs2_comb))
+            if len(obs2_comb) > 0:
+                for keyname in observation_dictionary:
+                    print(keyname, observation_dictionary[keyname][obs2_comb[0]])
+            print('')
+            print('entry {} in xml_dict, for comparison'.format(obs2))
+            for keyname in self.apt_xml_dict:
+                    print(keyname, observation_dictionary[keyname][obs2[0]])
+            stop
+
+
+
+
+
 
         # Add epoch and catalog information
         observation_dictionary = self.add_observation_info(observation_dictionary)
@@ -405,6 +465,14 @@ class AptInput:
         observation_dictionary['detector'] = []
 
         for index, instrument in enumerate(input_dictionary['Instrument']):
+
+            print('in apt_inputs, index and instrument are: {} {}'.format(index, instrument))
+            if instrument.lower() == 'fgs':
+                print(input_dictionary['Instrument'])
+                print(input_dictionary['Instrument'][index])
+                print(self.input_xml)
+
+
             instrument = instrument.lower()
             if instrument == 'nircam':
                 # NIRCam case: Expand for detectors. Create one entry in each list for each
@@ -434,6 +502,14 @@ class AptInput:
                 detectors = ['NRS']
 
             elif instrument == 'fgs':
+
+                print('just before calling get_guider_number, instrument is {}'.format(instrument))
+                print('index is {}'.format(index))
+                print('and obs_num is {}'.format(input_dictionary['obs_num'][index]))
+                print('confirm instrument: {}'.format(input_dictionary['Instrument'][index]))
+                for key in input_dictionary:
+                    print(key, input_dictionary[key][index])
+
                 guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                 detectors = ['G{}'.format(guider_number)]
 
