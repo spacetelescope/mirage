@@ -449,9 +449,6 @@ class ReadAPTXML():
             prime_template = template
             prime_template_name = template_name
 
-        # if instrument.lower() in 'miri nirspec':
-        #     return {}
-
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
         ns = "{{{}/Template/{}}}".format(self.apt.replace('{','').replace('}',''), template_name)
 
@@ -473,9 +470,6 @@ class ReadAPTXML():
             # store Module, Subarray, ... fields
             observation_dict = {}
             for field in template:
-            #     print('{} {}'.format(field.tag, field.text))
-                # if 'Filters ' in key:
-                #     continue
                 key = field.tag.split(ns)[1]
                 value = field.text
                 observation_dict[key] = value
@@ -485,48 +479,19 @@ class ReadAPTXML():
             FiducialPointOverride = True if override is not None else False
 
             # Get the number of primary and subpixel dithers
-            print('Dither key name', dither_key_name)
-            print(observation_dict.keys())
             primary_dithers_present = dither_key_name in observation_dict.keys()
             if primary_dithers_present:
-
-                print('primary dithers present')
-
-                #number_of_dithers = observation_dict[dither_key_name]
                 number_of_primary_dithers = observation_dict[dither_key_name]
-
-                print('num primary dithers: {}'.format(number_of_primary_dithers))
 
                 if (template_name == 'NircamEngineeringImaging') and (number_of_primary_dithers == '2PLUS'):
                     # Handle the special case for 2PLUS
                     number_of_primary_dithers = 2
-                #elif "-WITH-NIRISS" in observation_dict['SubpixelDitherType']:
-                #    #sub_dithers = np.int(observation_dict['SubpixelDitherType'][0])
-                #    #number_of_dithers = str(np.int(number_of_dithers) * sub_dithers)
-                #    print('subpixel dithers from *WITH-NIRISS')
-
-
-                #    number_of_subpixel_dithers = np.int(observation_dict['SubpixelDitherType'][0])
-                #elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING']:
-
-                #    print('subpixel type is standard or imaging')
-
 
                 if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
-                    #number_of_dithers = observation_dict[dither_key_name][0]
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
 
-
-                    print('primary from 2TIGHTGAPS')
-                #number_of_dithers = str(np.int(number_of_dithers) * np.int(observation_dict['SubpixelPositions']))
-                #number_of_subpixel_dithers = np.int(observation_dict['SubpixelPositions'])
-
-
-
-                #print('number of subpixel dithers: {}'.format(observation_dict['SubpixelPositions']))
             else:
-                print('Element {} not found, use default primary dithers value (1).'.format(dither_key_name))
-
+                print('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
 
             # Find the number of subpixel dithers
             if not parallel:
@@ -534,53 +499,27 @@ class ReadAPTXML():
                     # Handle the special case for MIRI
                     number_of_subpixel_dithers = 3
                 elif "-WITH-NIRISS" in observation_dict['SubpixelDitherType']:
-                    #sub_dithers = np.int(observation_dict['SubpixelDitherType'][0])
-                    #number_of_dithers = str(np.int(number_of_dithers) * sub_dithers)
-                    print('subpixel dithers from *WITH-NIRISS')
-
-
                     number_of_subpixel_dithers = np.int(observation_dict['SubpixelDitherType'][0])
                 elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING']:
-
-                    print('subpixel type is standard or imaging')
                     number_of_subpixel_dithers = np.int(observation_dict['SubpixelPositions'])
-                    print('number of subpixel dithers: {}'.format(observation_dict['SubpixelPositions']))
             else:
+                # For parallel instrument we ignore any dither info and set values to 0
                 number_of_primary_dithers = 0
                 number_of_subpixel_dithers = 0
-                print('For parallel instrument we ignore any dither info')
-                print('update table later to contain prime dither info')
-                print('use something along the lines of the lines for the case of the parallel instrument when you have prime nirisswfss')
-                print('but the logic will probably be more complex')
+
+                # The exception is if NIRISS WFSS is prime, in which case the dither pattern
+                # (from NIRISS) can be imposed on only the second of each trio of exposures
+                # (the exposure that is matched up to the NIRISS grism exposure), OR to all
+                # three of each trio of exposures (meaning those matched up to the direct,
+                # grism, and direct NIRISS exposures).
+
+                # This doesn't actually matter at the moment since parallel instrument dither values
+                # in the table are ignored.
                 if prime_instrument == 'NIRISS' and prime_template_name == 'NirissWfss':
                     observation_dict['PrimaryDithers'] = prime_template.find(prime_ns + dither_key_name).text
                     observation_dict['DitherSize'] = prime_template.find(prime_ns + 'DitherSize').text
-                    #number_of_dithers = observation_dict['PrimaryDithers'][0]
                     number_of_primary_dithers = np.int(observation_dict['PrimaryDithers'][0])
                     number_of_subpixel_dithers = 1
-
-
-            # Get the number of primary dithers
-            #primary_dithers_present = dither_key_name in observation_dict.keys()
-            #if primary_dithers_present:
-            #    number_of_primary_dithers = observation_dict[dither_key_name]
-            #    if (template_name == 'NircamEngineeringImaging') and (number_of_primary_dithers == '2PLUS'):
-            #        # Handle the special case for 2PLUS
-            #        number_of_primary_dithers = 2
-
-            #else:
-            #    print('Element {} not found, use default primary dithers value (1).'.format(dither_key_name))
-
-            #if observation_dict['SubpixelDitherType'] in ['3-POINT-WITH-MIRI-F770W']:
-            #    # Handle the special case for MIRI
-            #    number_of_subpixel_dithers = 3
-            #elif observation_dict['SubpixelDitherType'] in ['STANDARD']:
-            #    if primary_dithers_present:
-            #        if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
-            #            # Handle the special case for 2TIGHTGAPS
-            #            number_of_primary_dithers = observation_dict[dither_key_name][0]
-            #
-            #    number_of_subpixel_dithers = np.int(observation_dict['SubpixelPositions'])
 
             # Combine primary and subpixel dithers
             number_of_dithers = str(np.int(number_of_primary_dithers) * number_of_subpixel_dithers)
@@ -1767,6 +1706,7 @@ class ReadAPTXML():
             filter_name = filter_string
         return pupil_name, filter_name
 
+
 def get_guider_number(xml_file, observation_number):
     """"Parse the guider number for a particular FGSExternalCalibration observation.
     """
@@ -1782,8 +1722,6 @@ def get_guider_number(xml_file, observation_number):
     for obs in observation_list:
         if int(obs.findtext(apt_namespace + 'Number')) == observation_number:
             detector = obs.findtext('.//' + fgs_namespace + 'Detector')
-            print(observation_number)
-            print(obs)
             number = detector[-1]
             return number
 

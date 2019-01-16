@@ -85,18 +85,7 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
-
     for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
-    # for instrument in ['NIRISS']:
-    # for instrument in ['misc']:
-    # for instrument in ['NIRSpec']:
-    # for instrument in ['MIRI']:
-    # for instrument in ['FGS']:
-    # for instrument in ['NIRCam']:
-
-
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['1087_minimal', '1088', '1087', 'm31_field_test_observation']
@@ -150,7 +139,8 @@ def test_complete_input_generation():
             if '.xml' in apt_file_seed:
                 apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
                 apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
-                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
+                observation_list_file = os.path.join(TEMPORARY_DIR,
+                                                     '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
 
             else:
                 observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed))
@@ -170,9 +160,28 @@ def test_complete_input_generation():
                 print('\nERROR detected. Skipping {} because of error\n{}\n\n'.format(apt_file_xml, e))
                 continue
 
-            yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
+            yfiles = glob.glob(os.path.join(yam.output_dir, 'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
+
+            if os.path.basename(apt_file_xml) in ['54321_niriss_wfss_prime_nircam_imaging_parallel.xml',
+                                                  '12345_nircam_imaging_prime_niriss_wfss_parallel.xml']:
+                prog = os.path.basename(apt_file_xml).split('_')[0]
+                expected_nircam_files = {'54321': [60, 75], '12345': [40, 90, 40, 20]}
+                expected_niriss_files = {'54321': [12, 15], '12345': [8, 18, 8, 0]}
+                nircam_files_from_list = np.array([True if s.lower() == 'nircam' else False for s in valid_instrument_list])
+                num_nircam_files = np.sum(nircam_files_from_list)
+                num_niriss_files = len(yfiles) - num_nircam_files
+                assert num_nircam_files == np.sum(np.array(expected_nircam_files[prog]))
+                assert num_niriss_files == np.sum(np.array(expected_niriss_files[prog]))
+
+                num_obs = len(expected_nircam_files[prog])
+                for i in range(1, num_obs+1):
+                    obs_num = str(i).zfill(3)
+                    obs_yfiles_nircam = glob.glob(os.path.join(yam.output_dir, 'jw{}{}*nrc*.yaml'.format(prog, obs_num)))
+                    obs_yfiles_niriss = glob.glob(os.path.join(yam.output_dir, 'jw{}{}*nis*.yaml'.format(prog, obs_num)))
+                    assert len(obs_yfiles_nircam) == expected_nircam_files[prog][i-1]
+                    assert len(obs_yfiles_niriss) == expected_niriss_files[prog][i-1]
 
 
 def read_xml(xml_file):
@@ -211,17 +220,15 @@ def test_xml_reader():
         int_to_string_cols = ['ProposalID', 'PrimaryDithers', 'SubpixelPositions', 'ObservationID',
                               'number_of_dithers', 'Groups', 'Integrations', 'TileNumber']
         # Boolean columns to convert to strings in order for the comparison to work
-        bool_to_string_cols = ['ParallelInstrument']
+        bool_to_string_cols = ['ParallelInstrument', 'FiducialPointOverride']
 
         # Convert integer columns to string
         for col in int_to_string_cols:
             data = comparison_dict[col].data
             if col == 'ProposalID':
-                test = str(data[0])
-                leading_zeros = 0
-                if len(test) < 5:
-                    leading_zeros = 5 - len(test)
-                data = ['{}{}'.format('0'*leading_zeros, entry) for entry in data]
+                data = [str(entry).zfill(5) for entry in data]
+            elif col == 'ObservationID':
+                data = [str(entry).zfill(3) for entry in data]
             else:
                 data = [str(entry) for entry in data]
             comparison_dict[col] = data
@@ -241,14 +248,9 @@ def test_xml_reader():
                 if isinstance(data[0], np.int64):
                     data = [str(d) for d in data]
                     comparison_dict[col] = data
-                if isinstance(data[0], int):
-                    assert all(exposure_dict[col] == comparison_dict[col].data), print(col,
-                                                                                       exposure_dict[col],
-                                                                                       comparison_dict[col].data)
-                else:
-                    assert all(exposure_dict[col] == comparison_dict[col].data), print(col,
-                                                                                       exposure_dict[col],
-                                                                                       comparison_dict[col].data)
+                assert all(exposure_dict[col] == comparison_dict[col].data), print(col,
+                                                                                   exposure_dict[col],
+                                                                                   comparison_dict[col].data)
 
 
 # for debugging

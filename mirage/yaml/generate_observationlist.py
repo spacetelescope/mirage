@@ -182,21 +182,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
     xml_dict = readxml_obj.read_xml(xml_file, verbose=verbose)
 
-    print('REMOVE THESE LINES FROM generate_observationlist BEFORE MERGING')
-    #if os.path.basename(xml_file) == 'OTE-10_1144.xml':
-    if os.path.basename(xml_file) == 'OTE13-1148.xml':
-        print('Working on OTE-10_1144.xml. Dither info:')
-        print(xml_dict['ObservationID'])
-        print(xml_dict['PrimaryDitherType'])
-        print(xml_dict['PrimaryDithers'])
-        print(xml_dict['SubpixelDitherType'])
-        print(xml_dict['SubpixelPositions'])
-        print(xml_dict['number_of_dithers'])
-        print(xml_dict['CoordinatedParallel'])
-        print(xml_dict['ParallelInstrument'])
-        print(len(xml_dict['ParallelInstrument']))
-
-
     # if verbose:
     #print('Summary of observation dictionary:')
     #for key in xml_dict.keys():
@@ -207,23 +192,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     #print('Summary of observation dictionary after expanding for dithers:')
     #for key in xml_dict.keys():
     #    print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
-
-    print('ALSO REMOVE THESE LINES FROM generate_observationlist BEFORE MERGING')
-    #if os.path.basename(xml_file) == 'OTE-10_1144.xml':
-    if os.path.basename(xml_file) == 'OTE13-1148.xml':
-        print('Working on OTE-10_1144.xml. Dither info after expand for dithers:')
-        print(xml_dict['ObservationID'])
-        print(xml_dict['PrimaryDitherType'])
-        print(xml_dict['PrimaryDithers'])
-        print(xml_dict['SubpixelDitherType'])
-        print(xml_dict['SubpixelPositions'])
-        print(xml_dict['number_of_dithers'])
-        print(xml_dict['CoordinatedParallel'])
-        print(xml_dict['ParallelInstrument'])
-        print(len(xml_dict['ParallelInstrument']))
-
-
-
     return_dict = None
 
     # array of unique instrument names

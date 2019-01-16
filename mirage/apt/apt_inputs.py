@@ -300,14 +300,6 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
-        print('Checking length of pointing dict vs xml dict. RREMOVE BEOFRE MERGING')
-        if len(self.apt_xml_dict['ProposalID']) != len(pointing_dictionary['obs_num']):
-            print(self.apt_xml_dict['PrimaryDitherType'])
-            print(self.apt_xml_dict['PrimaryDithers'])
-            print(self.apt_xml_dict['SubpixelPositions'])
-            print(self.apt_xml_dict['SubpixelDitherType'])
-            print(self.apt_xml_dict['number_of_dithers'])
-
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
@@ -320,7 +312,7 @@ class AptInput:
 
 
 
-
+        """
         if self.pointing_file == '/Users/hilbert/python_repos/mirage/tests/test_data/misc/01148/OTE13-1148.pointing':
             print('checking dictionary combination in apt_inputs')
             print(observation_dictionary.keys())
@@ -369,8 +361,7 @@ class AptInput:
             print('entry {} in xml_dict, for comparison'.format(obs2))
             for keyname in self.apt_xml_dict:
                     print(keyname, observation_dictionary[keyname][obs2[0]])
-            stop
-
+            """
 
 
 
@@ -412,7 +403,6 @@ class AptInput:
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
 
-
     def check_aperture_override(self):
         if bool(self.exposure_tab['FiducialPointOverride']) is True:
             instruments = self.exposure_tab['Instrument']
@@ -444,7 +434,6 @@ class AptInput:
             # same as the pointing aperture
             self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
 
-
     def expand_for_detectors(self, input_dictionary):
         """Expand dictionary to have one entry per detector, rather than the
         one line per module that is in the input
@@ -465,14 +454,6 @@ class AptInput:
         observation_dictionary['detector'] = []
 
         for index, instrument in enumerate(input_dictionary['Instrument']):
-
-            print('in apt_inputs, index and instrument are: {} {}'.format(index, instrument))
-            if instrument.lower() == 'fgs':
-                print(input_dictionary['Instrument'])
-                print(input_dictionary['Instrument'][index])
-                print(self.input_xml)
-
-
             instrument = instrument.lower()
             if instrument == 'nircam':
                 # NIRCam case: Expand for detectors. Create one entry in each list for each
@@ -502,14 +483,6 @@ class AptInput:
                 detectors = ['NRS']
 
             elif instrument == 'fgs':
-
-                print('just before calling get_guider_number, instrument is {}'.format(instrument))
-                print('index is {}'.format(index))
-                print('and obs_num is {}'.format(input_dictionary['obs_num'][index]))
-                print('confirm instrument: {}'.format(input_dictionary['Instrument'][index]))
-                for key in input_dictionary:
-                    print(key, input_dictionary[key][index])
-
                 guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                 detectors = ['G{}'.format(guider_number)]
 
