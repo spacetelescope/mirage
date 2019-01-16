@@ -315,7 +315,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
     wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width)
     besancon_cat, besancon_model = besancon(outra, outdec, box_width,
                                             email=email, kmag_limits=kmag_limits, seeds=besancon_seeds)
-    besancon_jwst = transform_besancon(besancon_cat, besancon_model, instrument, filter_names)
+    besancon_jwst = transform_besancon(besancon_cat, besancon_model, filter_names)
     if len(filter_names) != len(filters):
         newfilters = []
         for loop in range(len(filter_names)):
@@ -646,7 +646,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     nwise1 = len(gaia_wise_crossref['ra'])
     n2mass2 = len(twomass_cat['ra'])
     nwise2 = len(wise_cat['ra'])
-    nout = ngaia + (n2mass2 - n2mass1) + (nwise2 - nwise1)
+    nout = ngaia + n2mass2 + nwise2
     in_magnitudes = np.zeros((nout, 10), dtype=np.float32) + 10000.0
     raout = np.zeros((nout), dtype=np.float32)
     decout = np.zeros((nout), dtype=np.float32)
@@ -661,9 +661,15 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     in_magnitudes[0:ngaia, 1] = gaia_cat['phot_g_mean_mag']
     raout[0:ngaia] = gaia_cat['ra']
     decout[0:ngaia] = gaia_cat['dec']
-    matchwise, gaiawiseinds = wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat)
+    ngaia2masscr = twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat)
+    twomassflag = [True] * n2mass2
+    for n1 in range(n2mass2):
+        for loop in range(len(gaia_2mass['ra'])):
+            if gaia_2mass['designation'][loop] == twomass_cat['designation'][n1]:
+                if ngaia2masscr[n1] >= 0:
+                    twomassflag[n1] = False
+    matchwise, gaiawiseinds, twomasswiseinds = wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_cat)
     wisekeys = ['w1sigmpro', 'w2sigmpro', 'w3sigmpro', 'w4sigmpro']
-    ngaia2masscr = twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref)
     for loop in range(ngaia):
         try:
             in_magnitudes[loop, 0] = gaia_cat['phot_bp_mean_mag'][loop]
@@ -689,61 +695,36 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
                 for l1 in range(4):
                     if not isinstance(wise_cat[wisekeys[l1]][n2], float):
                         in_magnitudes[loop, 6+l1] = 10000.
-    # locate any 2MASS and WISE sources not in the cross references
-    match2mass = []
-    match2masstowise = []
-    for loop in range(n2mass2):
-        match2mass.append(False)
-    for loop in range(n2mass2):
-        for l1 in range(n2mass1):
-            if gaia_2mass['designation'][l1] == twomass_cat['designation'][loop]:
-                match2mass[loop] = True
-                break
-    # find the nearest position matches from 2MASS to WISE and vice versa
-    ra1 = np.copy(twomass_cat['ra'])
-    dec1 = np.copy(twomass_cat['dec'])
-    ra2 = np.copy(wise_cat['ra'])
-    dec2 = np.copy(wise_cat['dec'])
-    sc1 = SkyCoord(ra=ra1*u.degree, dec=dec1*u.degree)
-    sc2 = SkyCoord(ra=ra2*u.degree, dec=dec2*u.degree)
-    idx1, d2d1, d3d1 = sc1.match_to_catalog_sky(sc2)
-    idx2, d2d2, d3d2 = sc2.match_to_catalog_sky(sc1)
-    # Now populate the 2MASS sources that are not in the GAIA cross-reference,
-    # with cross-referece to WISE where the position match is < 0.4 arc-seconds.
-    matchwise1 = []
-    for loop in range(len(gaia_cat['ra'])):
-        matchwise1.append(False)
-    for loop in range(len(matchwise)):
-        if matchwise[loop]:
-            matchwise1[gaiawiseinds[loop]] = True
+    # Add in any 2MASS sources with no GAIA match
     n1 = 0
+    noff = ngaia
     for loop in range(n2mass2):
-        if not match2mass[loop]:
-            arcdist = d2d1[loop].arcsec
-            in_magnitudes[ngaia+n1, 3] = twomass_cat['j_m'][loop]
-            in_magnitudes[ngaia+n1, 4] = twomass_cat['h_m'][loop]
-            in_magnitudes[ngaia+n1, 5] = twomass_cat['k_m'][loop]
-            raout[ngaia+n1] = twomass_cat['ra'][loop]
-            decout[ngaia+n1] = twomass_cat['dec'][loop]
+        if twomassflag[loop]:
+            raout[noff+n1] = twomass_cat['ra'][loop]
+            decout[noff+n1] = twomass_cat['dec'][loop]
+            in_magnitudes[noff+n1, 3] = twomass_cat['j_m'][loop]
+            in_magnitudes[noff+n1, 4] = twomass_cat['h_m'][loop]
+            in_magnitudes[noff+n1, 5] = twomass_cat['k_m'][loop]
             for l1 in range(3):
                 if twomass_cat['ph_qual'][loop][l1] == 'U':
-                    in_magnitudes[ngaia+n1, 3+l1] = 10000.
-            if arcdist < 0.4:
-                if matchwise1[idx1[loop]] is not True:
-                    matchwise1[idx1[loop]] = True
-                    in_magnitudes[ngaia+n1, 6] = wise_cat['w1mpro'][idx1[loop]]
-                    in_magnitudes[ngaia+n1, 7] = wise_cat['w2mpro'][idx1[loop]]
-                    in_magnitudes[ngaia+n1, 8] = wise_cat['w3mpro'][idx1[loop]]
-                    in_magnitudes[ngaia+n1, 9] = wise_cat['w3mpro'][idx1[loop]]
-                    for l1 in range(4):
-                        if not isinstance(wise_cat[wisekeys[l1]][idx1[loop]], float):
-                            in_magnitudes[ngaia+n1, 6+l1] = 10000.
-            n1 = n1+1
-    # Finally, add in WISE sources that have not been cross-matched.
+                    in_magnitudes[noff+n1, 3+l1] = 10000.
+            # Check to see if there is a WISE cross-match
+            for l1 in range(len(twomasswiseinds)):
+                if twomasswiseinds[l1] == loop:
+                    in_magnitudes[noff+n1, 6] = wise_cat['w1mpro'][l1]
+                    in_magnitudes[noff+n1, 7] = wise_cat['w2mpro'][l1]
+                    in_magnitudes[noff+n1, 8] = wise_cat['w3mpro'][l1]
+                    in_magnitudes[noff+n1, 9] = wise_cat['w4mpro'][l1]
+                    for l2 in range(4):
+                        if not isinstance(wise_cat[wisekeys[l2]][l1], float):
+                            in_magnitudes[noff+n1, 6+l2] = 10000.
+            n1 = n1 + 1
+    # Finally, add in WISE sources that have not been cross-matched to GAIA
+    # or 2MASS.
     noff = ngaia+n1
     n1 = 0
     for loop in range(nwise2):
-        if not matchwise1[loop]:
+        if (not matchwise[loop]) and (twomasswiseinds[loop] < 0):
             raout[noff+n1] = wise_cat['ra'][loop]
             decout[noff+n1] = wise_cat['dec'][loop]
             in_magnitudes[noff+n1, 6] = wise_cat['w1mpro'][loop]
@@ -752,7 +733,6 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
             in_magnitudes[noff+n1, 9] = wise_cat['w3mpro'][loop]
             for l1 in range(4):
                 if not isinstance(wise_cat[wisekeys[l1]][loop], float):
-                #if type(wise_cat[wisekeys[l1]][loop]) != type(dummy_value[0]):
                     in_magnitudes[noff+n1, 6+l1] = 10000.
             n1 = n1+1
     # Now, convert to JWST magnitudes either by transformation (for sources
@@ -791,9 +771,9 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
         n1 = n1+1
     return outcat
 
-def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref):
+def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
     """
-    Take the GAIA to 2MASS cross references and make sure that there is only
+    Take the GAIA to 2MASS cross references and make sure that there is only 
     one GAIA source cross-matched to a given 2MASS source in the table.
     Input values:
     gaia_cat :   (astropy.table.Table)
@@ -802,16 +782,20 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref):
                  contains 2MASS catalogue values from the GAIA DR2 archive
     gaia_2mass_crossref :  (astropy.table.Table)
                            contains GAIA/2MASS cross-references from the GAIA DR2 archive
+    twomass_cat :  (astropy.table.Table)
+                   contains the 2MASS catalogue values from IPAC
     Return values:
     ngaia2masscr :  (numpy array of int)
-                    an array of cross match indexes, giving for each 2MASS source
+                    an array of cross match indexes, giving for each 2MASS source 
                     the index number of the associated GAIA source in the main
                     GAIA table, or a value of -10 where there is no match
     """
     ntable1 = len(gaia_cat['designation'])
     ntable2 = len(gaia_2mass['ra'])
     ntable3 = len(gaia_2mass_crossref['designation'])
-    ngaia2masscr = np.zeros((ntable2),dtype=np.int16) - 10
+    ntable4 = len(twomass_cat['ra'])
+    ngaia2mass = np.zeros((ntable2),dtype=np.int16) - 10
+    ngaia2masscr = np.zeros((ntable4),dtype=np.int16) - 10
     for loop in range(ntable2):
         # find the number of entries of each 2MASS source in the cross references
         nmatch = 0
@@ -840,23 +824,35 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref):
                         dec2 = gaia_2mass['dec'][match1[l1]]
                         p1 = SkyCoord(ra1*u.deg,dec1*u.deg)
                         p2 = SkyCoord(ra2*u.deg,dec2*u.deg)
-                        if p2.separation(p1).degree < 0.3/3600.:
+                        if p2.separation(p1).arcsec < 0.3:
                             gmag = gaia_cat['phot_g_mean_mag'][l2]
+                            # select 2MASS magnitude: first ph_qual = A or if none
+                            # is of quality A the first ph_qual = B or if none is
+                            # of quality A or B then the first non U value.
                             for l3 in range(3):
-                                if gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "A":
+                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "A"):
                                     irmag = gaia_2mass[magkeys[l3]][match1[l1]]
                             for l3 in range(3):
-                                if gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "B":
+                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "B"):
+                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
+                            for l3 in range(3):
+                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] != "U"):
                                     irmag = gaia_2mass[magkeys[l3]][match1[l1]]
                             delm = gmag - irmag
                             if (delm > -1.2) and (delm < 30.0):
                                 if delm < mindelm:
                                     ncross = l2
                                     mindelm = delm
-                ngaia2masscr[loop] = ncross
+                ngaia2mass[loop] = ncross
+    # Now locate the 2MASS sources in the IPAC 2MASS table, and put in the
+    # index values.
+    for loop in range(ntable4):
+        for n1 in range(ntable2):
+            if twomass_cat['designation'][loop] == gaia_2mass['designation'][n1]:
+                ngaia2masscr[loop] = ngaia2mass[n1]
     return ngaia2masscr
 
-def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat):
+def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_cat):
     """
     Relate the GAIA/WISE designations to the WISE catalogue designations, since the names
     change a little between the different catalogues.  Return the boolean list of matches and
@@ -870,33 +866,54 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat):
                            contains GAIA/WISE cross-references from the GAIA DR2 archive
     wise_cat :      (astropy.table.Table)
                     contains WISE data from IPAC in table form
+    twomass_cat :   (astropy.table.Table)
+                    contains 2MASS data from IPAC in table form
+    gaia2masscr :   (list of int)
+                    contains the cross-reference indexes from 2MASS to GAIA
     Return values:
     matchwise :     (list of Booleans)
                     list of length equal to wise_cat with True if there is a cross-match with GAIA
     gaiawiseinds :  (list of int)
-                    list of index values from wise_cat to gaia_cat
+                    list of index values from wise_cat to gaia_cat (i.e. the 
+                    GAIA number to which the WISE source corresponds)
+    twomasswiseinds : (list of int)
+                      list of index values from wise_cat to twomass_cat (i.e. 
+                      the 2MASS number to which the WISE source corresponds)
     """
     num_entries = len(wise_cat['ra'])
+    num_gaia = len(gaia_cat['ra'])
     matchwise = [False] * num_entries
     gaiawiseinds = [-1] * num_entries
-#    ra1 = np.copy(wise_cat['ra'])
-#    dec1 = np.copy(wise_cat['dec'])
-#    ra2 = np.copy(gaia_wise['ra'])
-#    dec2 = np.copy(gaia_wise['dec'])
-#    sc1 = SkyCoord(ra=ra1*u.degree, dec=dec1*u.degree)
-#    sc2 = SkyCoord(ra=ra2*u.degree, dec=dec2*u.degree)
-#    # match wise to GAIA by position
-#    idx, d2d, d3d = sc1.match_to_catalog_sky(sc2)
-
-    for loop in range(len(gaia_wise_crossref['ra'])):
-        for n1 in range(len(gaia_cat['ra'])):
-            if gaia_cat['designation'][n1] == gaia_wise_crossref['designation'][loop]:
-                matchwise[loop] = True
-                for n2 in range(len(gaia_wise['ra'])):
-                    if gaia_wise['designation'][n2] == gaia_wise_crossref['designation_2'][loop]:
-                        gaiawiseinds[n2] = n1
-                        break
-    return matchwise, gaiawiseinds
+    twomasswiseinds = [-1] * num_entries
+    ra1 = np.copy(wise_cat['ra'])
+    dec1 = np.copy(wise_cat['dec'])
+    ra2 = np.copy(gaia_wise['ra'])
+    dec2 = np.copy(gaia_wise['dec'])
+    ra3 = np.copy(gaia_wise_crossref['ra'])
+    dec3 = np.copy(gaia_wise_crossref['dec'])
+    sc1 = SkyCoord(ra=ra1*u.degree, dec=dec1*u.degree)
+    sc2 = SkyCoord(ra=ra2*u.degree, dec=dec2*u.degree)
+    sc3 = SkyCoord(ra=ra3*u.degree, dec=dec3*u.degree)
+    n2mass = len(twomass_cat['ra'])
+    # look at the WISE data and find the sources with listed 2MASS counterparts
+    for loop in range(num_entries):
+        if not np.isnan(wise_cat['h_m_2mass'][loop]):
+            for n1 in range(n2mass):
+                if (abs(twomass_cat['j_m'][n1] - wise_cat['j_m_2mass'][loop]) < 0.001) and \
+                   (abs(twomass_cat['h_m'][n1] - wise_cat['h_m_2mass'][loop]) < 0.001) and \
+                   (abs(twomass_cat['k_m'][n1] - wise_cat['k_m_2mass'][loop]) < 0.001):
+                   twomasswiseinds[loop] = n1
+                   break
+    # match WISE to gaia_wise by position
+    idx, d2d, d3d = sc3.match_to_catalog_sky(sc1)
+    for loop in range(len(idx)):
+        if (d2d[loop].arcsec) < 0.4:
+            matchwise[idx[loop]] = True
+            for n2 in range(num_gaia):
+                if gaia_cat['designation'][n2] == gaia_wise_crossref['designation'][loop]:
+                    gaiawiseinds[idx[loop]] = n2
+                    break
+    return matchwise, gaiawiseinds, twomasswiseinds
 
 
 def interpolate_magnitudes(wl1, mag1, wl2, filternames):
