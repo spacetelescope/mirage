@@ -26,7 +26,8 @@ def create_basic_exposure_list(xml_file, pointing_file):
     from mirage.yaml import yaml_generator
     from mirage.apt import apt_inputs
 
-    dummy_catalogs = {'nircam': {'sw': 'dummy.cat', 'lw': 'dummy.cat'}}
+    dummy_catalogs = {'nircam': {'sw': 'dummy.cat', 'lw': 'dummy.cat'},
+                      'niriss': 'dummy.cat'}
     info = yaml_generator.SimInput(input_xml=xml_file, pointing_file=pointing_file,
                                    catalogs=dummy_catalogs, offline=True)
 
@@ -58,56 +59,59 @@ def for_proposal(xml_filename, pointing_filename, instrument, filter_list, catal
     something
     """
     pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
-    print(pointing_dictionary)
 
     threshold = catalog_splitting_threshold * u.deg
     ra_apertures = np.array(pointing_dictionary['ra_ref'] * u.deg)
     dec_apertures = np.array(pointing_dictionary['dec_ref'] * u.deg)
-    ra_target = np.array(pointing_dictionary['ra'] * u.deg)
-    dec_target = np.array(pointing_dictionary['dec'] * u.deg)
+
+    ra_target = np.array([np.float(num) for num in pointing_dictionary['ra']] * u.deg)
+    dec_target = np.array([np.float(num) for num in pointing_dictionary['dec']] * u.deg)
     mapped = np.array([False] * len(ra_target))
     index = np.arange(len(ra_target))
 
-    targets = []
-    for ra, dec in zip(pointing_dictionary['ra'], pointing_dictionary['dec']):
-        targets.append(SkyCoord(ra, dec, frame='icrs'))
+    targets = SkyCoord(pointing_dictionary['ra'], pointing_dictionary['dec'], frame='icrs', unit=u.deg)
 
-    apertures = []
-    for ra, dec in zip(pointing_dictionary['ra_ref'], pointing_dictionary['dec_ref']):
-        apertures.append(SkyCoord(ra, dec, frame='icrs'))
-
-
-    print(threshold)
-    print(ra_apertures)
-    print(dec_apertures)
-    print(ra_target)
-    print(dec_target)
-    print(targets)
-    print(apertures)
+    #apertures = []
+    #for ra, dec in zip(pointing_dictionary['ra_ref'], pointing_dictionary['dec_ref']):
+    #    apertures.append(SkyCoord(ra, dec, frame='icrs', unit=u.deg))
 
     for indx, target_ra, target_dec, target_pos in zip(index, ra_target, dec_target, targets):
-        if mapped[indx] is False:
-            dithers = ra_target == target_ra & dec_target == target_dec
+        if not mapped[indx]:
+            print('target_ra', target_ra)
+            dithers = ((ra_target == target_ra) & (dec_target == target_dec))
             print('dithers:', dithers)
             min_ra = np.min(ra_apertures[dithers])
             max_ra = np.max(ra_apertures[dithers])
             min_dec = np.min(dec_apertures[dithers])
             max_dec = np.max(dec_apertures[dithers])
-            print('min/max ra: {}, {}'.format(min_ra, ma_ra))
+            print('min/max ra: {}, {}'.format(min_ra, max_ra))
             print('min/max dec: {}, {}'.format(min_dec, max_dec))
 
             separation_distances = target_pos.separation(targets)
             print('separation distances: {}'.format(separation_distances))
-            nearby_targets = separation_distances < catalog_splitting_threshold & mapped is False
+            print(catalog_splitting_threshold)
+            nearby_targets = ((separation_distances < catalog_splitting_threshold) & (mapped==False))
             print('neaby targets: {}'.format(nearby_targets))
             for close_target in nearby_targets:
-                dithers = ra_target == ra_target[close_target] & dec_target == dec_target[close_target]
-                min_ra = np.min([ra_apertures[dithers]].append(min_ra))
-                max_ra = np.max([ra_apertures[dithers]].append(max_ra))
-                min_dec = np.min([dec_apertures[dithers]].append(min_dec))
-                max_dec = np.max([dec_apertures[dithers]].append(max_dec))
+                dithers = np.where((ra_target == ra_target[close_target]) & (dec_target == dec_target[close_target]))[0]
+
+                tmplist = list(ra_apertures[dithers])
+                tmplist.append(min_ra)
+                min_ra = np.min(tmplist)
+                tmplist.append(max_ra)
+                max_ra = np.max(tmplist)
+
+                tmplist = list(dec_apertures[dithers])
+                tmplist.append(min_dec)
+                min_dec = np.min(tmplist)
+                tmplist.append(max_dec)
+                max_dec = np.max(tmplist)
+
+                #max_ra = np.max(list(ra_apertures[dithers]).append(max_ra))
+                #min_dec = np.min(list(dec_apertures[dithers]).append(min_dec))
+                #max_dec = np.max(list(dec_apertures[dithers]).append(max_dec))
             mapped[nearby_targets] = True
-            print('min/max inc dithers ra: {}, {}'.format(min_ra, ma_ra))
+            print('min/max inc dithers ra: {}, {}'.format(min_ra, max_ra))
             print('min/max inc dithers dec: {}, {}'.format(min_dec, max_dec))
 
             # Pad min and max RA and Dec values since so far we have values only at the reference
@@ -122,7 +126,7 @@ def for_proposal(xml_filename, pointing_filename, instrument, filter_list, catal
             delta_ra = max_ra - min_ra
             delta_dec = max_dec - min_dec
             full_width = np.max([delta_ra, delta_dec])
-            print('min/max final ra: {}, {}'.format(min_ra, ma_ra))
+            print('min/max final ra: {}, {}'.format(min_ra, max_ra))
             print('min/max final dec: {}, {}'.format(min_dec, max_dec))
             print('full width: {}'.format(full_width))
 
