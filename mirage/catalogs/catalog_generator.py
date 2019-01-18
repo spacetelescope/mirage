@@ -366,7 +366,7 @@ class MovingPointSourceCatalog(PointSourceCatalog):
         if len(ra_velocity) > 0:
             self._ra_velocity = ra_velocity
             self._dec_velocity = dec_velocity
-            self.velocity_units = 'velocity_RA_Dec'
+            self._velocity_units = 'velocity_RA_Dec'
         else:
             self._ra_velocity = x_velocity
             self._dec_velocity = y_velocity

@@ -12,13 +12,13 @@ import numpy as np
 import os
 
 from astropy.coordinates import SkyCoord
-from astropy.table import Table
+from astropy.table import Table, join
 import astropy.units as u
 from astroquery.gaia import Gaia
 from astroquery.irsa import Irsa
 from pysiaf.utils.projection import deproject_from_tangent_plane
 
-from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
+from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, ExtendedCatalog
 
 
 def for_proposal(pointing_dictionary, instrument, filter_list, catalog_splitting_threshold=1., email=''):
@@ -176,6 +176,13 @@ def query_2MASS_ptsrc_catalog(ra, dec, box_width):
     return query_table, magnitude_column_names
 
 
+def get_wise_ptsrc_catalog(ra, dec, box_width):
+    """Wrapper around Gaia query and creation of mirage-formatted catalog"""
+    wise_cat, wise_mag_cols = query_WISE_ptsrc_catalog(ra, dec, box_width)
+    wise_mirage = mirage_ptsrc_catalog_from_table(wise_cat, 'WISE', wise_mag_cols)
+    return wise_mirage, wise_cat
+
+
 def query_WISE_ptsrc_catalog(ra, dec, box_width):
     """Query the WISE All-Sky Point Source Catalog in a square region around the RA and Dec
     provided. Box width must be in units of arcseconds
@@ -241,24 +248,24 @@ def get_2MASS_ptsrc_catalog(ra, dec, box_width):
     return twomass_mirage, twomass_cat
 
 
-def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', seeds=[None, None]):
+def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', seed=None):
     """Convenience function to create a catalog from 2MASS and add a population of
     fainter stars. In this case, cut down the magnitude limits for the call to the
     Besancon model so that we don't end up with a double population of bright stars
     Parameters
     ----------
-        seeds : list
-        Seeds to use in the random number generator when choosing RA and
+        seed : int
+        Seed to use in the random number generator when choosing RA and
         Dec values for Besancon sources.
     """
     two_mass, twomass_cat = get_2MASS_ptsrc_catalog(ra, dec, box_width)
-    background, background_cat = besancon(ra, dec, box_width, coords='ra_dec', email=email, seeds=seeds)
+    background, background_cat = besancon(ra, dec, box_width, coords='ra_dec', email=email, seed=seed)
     two_mass.add_catalog(background)
     return two_mass
 
 
 def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrument='NIRISS', filters=[],
-                     besancon_seeds=[None, None]):
+                     besancon_seed=None):
     """
     This is a driver function to query the GAIA/2MASS/WISE catalogues
     plus the Besancon model and combine these into a single JWST source list.
@@ -290,8 +297,8 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
         filters:      (list of strings)
                       Either an empty list (which gives all filters) or a list
                       of filter names (i.e. F090W) to be calculated.
-        besancon_seeds : list
-            Seeds to use in the random number generator when choosing RA and
+        besancon_seed : int
+            Seed to use in the random number generator when choosing RA and
             Dec values for Besancon sources.
     Return values:
         source_list:   (astropy.table.Table)
@@ -314,7 +321,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
     wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width)
     besancon_cat, besancon_model = besancon(outra, outdec, box_width,
-                                            email=email, kmag_limits=kmag_limits, seeds=besancon_seeds)
+                                            email=email, kmag_limits=kmag_limits, seed=besancon_seed)
     besancon_jwst = transform_besancon(besancon_cat, besancon_model, filter_names)
     if len(filter_names) != len(filters):
         newfilters = []
@@ -331,6 +338,8 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(10, 29), email='', instrum
                                             gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters)
     print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_cat.ra),
                                                                                   len(observed_jwst.ra)))
+    print('there is some problem with dec in the observed_jwst catalog. Somewhere the dec values have been replaced by ra values')
+    stop
     source_list = combine_catalogs(observed_jwst, besancon_cat)
     return source_list, filter_names
 
@@ -387,7 +396,7 @@ def transform_besancon(besancon_cat, besancon_model, filter_names):
 
 
 def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(13, 29), email='',
-                     seeds=[None, None], output_file=None):
+                     seed=None, output_file=None):
     """Create a Mirage-formatted catalog containing sources from a query of the Besancon model
 
     Parameters
@@ -416,8 +425,8 @@ def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(
     email : str
         Email address needed for the query to the Besancon model
 
-    seeds : list
-        2-element list giving seeds for the random number generator used
+    seed : int
+        Seed for the random number generator used
         to create RA and Dec values for model stars.
 
     output_file : str
@@ -431,7 +440,7 @@ def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(
     """
     # Query the Besancon model and create catalog
     orig_cat, orig_query = besancon(ra, dec, box_width, coords=coords, kmag_limits=kmag_limits, email=email,
-                                    seeds=seeds)
+                                    seed=seed)
 
     # Create list of filter names from filters dictionary
     all_filters = []
@@ -754,7 +763,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
                                         out_wavelengths, out_filter_names)
         out_magnitudes[loop, :] = np.copy(values)
     raout = np.copy(raout[0:nfinal])
-    decout = np.copy(raout[0:nfinal])
+    decout = np.copy(decout[0:nfinal])
     out_magnitudes = np.copy(out_magnitudes[0:nfinal, :])
     outcat = PointSourceCatalog(ra=raout, dec=decout)
     n1 = 0
@@ -771,9 +780,10 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
         n1 = n1+1
     return outcat
 
+
 def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
     """
-    Take the GAIA to 2MASS cross references and make sure that there is only 
+    Take the GAIA to 2MASS cross references and make sure that there is only
     one GAIA source cross-matched to a given 2MASS source in the table.
     Input values:
     gaia_cat :   (astropy.table.Table)
@@ -786,7 +796,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                    contains the 2MASS catalogue values from IPAC
     Return values:
     ngaia2masscr :  (numpy array of int)
-                    an array of cross match indexes, giving for each 2MASS source 
+                    an array of cross match indexes, giving for each 2MASS source
                     the index number of the associated GAIA source in the main
                     GAIA table, or a value of -10 where there is no match
     """
@@ -794,8 +804,8 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
     ntable2 = len(gaia_2mass['ra'])
     ntable3 = len(gaia_2mass_crossref['designation'])
     ntable4 = len(twomass_cat['ra'])
-    ngaia2mass = np.zeros((ntable2),dtype=np.int16) - 10
-    ngaia2masscr = np.zeros((ntable4),dtype=np.int16) - 10
+    ngaia2mass = np.zeros((ntable2), dtype=np.int16) - 10
+    ngaia2masscr = np.zeros((ntable4), dtype=np.int16) - 10
     for loop in range(ntable2):
         # find the number of entries of each 2MASS source in the cross references
         nmatch = 0
@@ -809,7 +819,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
         # Find the matching GAIA sources and select the one with the best
         # magnitude match within a radius of 0.3 arc-seconds of the 2MASS
         # position.
-        magkeys = ['j_m','h_m','ks_m']
+        magkeys = ['j_m', 'h_m', 'ks_m']
         if nmatch > 0:
             mindelm = 10000.0
             ncross = -10
@@ -822,8 +832,8 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                         dec1 = gaia_cat['dec'][l2]
                         ra2 = gaia_2mass['ra'][match1[l1]]
                         dec2 = gaia_2mass['dec'][match1[l1]]
-                        p1 = SkyCoord(ra1*u.deg,dec1*u.deg)
-                        p2 = SkyCoord(ra2*u.deg,dec2*u.deg)
+                        p1 = SkyCoord(ra1*u.deg, dec1*u.deg)
+                        p2 = SkyCoord(ra2*u.deg, dec2*u.deg)
                         if p2.separation(p1).arcsec < 0.3:
                             gmag = gaia_cat['phot_g_mean_mag'][l2]
                             # select 2MASS magnitude: first ph_qual = A or if none
@@ -852,6 +862,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                 ngaia2masscr[loop] = ngaia2mass[n1]
     return ngaia2masscr
 
+
 def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_cat):
     """
     Relate the GAIA/WISE designations to the WISE catalogue designations, since the names
@@ -874,10 +885,10 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_c
     matchwise :     (list of Booleans)
                     list of length equal to wise_cat with True if there is a cross-match with GAIA
     gaiawiseinds :  (list of int)
-                    list of index values from wise_cat to gaia_cat (i.e. the 
+                    list of index values from wise_cat to gaia_cat (i.e. the
                     GAIA number to which the WISE source corresponds)
     twomasswiseinds : (list of int)
-                      list of index values from wise_cat to twomass_cat (i.e. 
+                      list of index values from wise_cat to twomass_cat (i.e.
                       the 2MASS number to which the WISE source corresponds)
     """
     num_entries = len(wise_cat['ra'])
@@ -902,8 +913,8 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_c
                 if (abs(twomass_cat['j_m'][n1] - wise_cat['j_m_2mass'][loop]) < 0.001) and \
                    (abs(twomass_cat['h_m'][n1] - wise_cat['h_m_2mass'][loop]) < 0.001) and \
                    (abs(twomass_cat['k_m'][n1] - wise_cat['k_m_2mass'][loop]) < 0.001):
-                   twomasswiseinds[loop] = n1
-                   break
+                    twomasswiseinds[loop] = n1
+                    break
     # match WISE to gaia_wise by position
     idx, d2d, d3d = sc3.match_to_catalog_sky(sc1)
     for loop in range(len(idx)):
@@ -967,7 +978,7 @@ def interpolate_magnitudes(wl1, mag1, wl2, filternames):
         if (mag1[0] > 100.) or (mag1[2] > 100.):
             # Where the BP and RP magnitudes are not available, make colours
             # matching a K4V star (assumed T=4500, log(g)=5.0)
-            inmags = np.zeros((2),dtype=np.float32)
+            inmags = np.zeros((2), dtype=np.float32)
             inmags[0] = mag1[1] + 0.5923
             inmags[1] = mag1[1] - 0.7217
         else:
@@ -1054,6 +1065,204 @@ def add_filter_names(headerlist, filter_names, filter_labels, filters):
     return headerlist
 
 
+def combine_anytype_catalogs(cat1, cat2):
+    """Combine two Mirage catalog objects. Catalogs must be of the same
+    type (e.g. PointSourceCatalog), and have the same values for position
+    units (RA, Dec or x, y) velocity units (arcsec/hour vs pixels/hour),
+    and galaxy radius units (arcsec vs pixels)
+
+    Parameters
+    ----------
+    cat1 : mirage.catalogs.catalog_generator.XXCatalog
+        First catalog to be joined
+
+    cat2 : mirage.catalogs.catalog_generator.XXCatalog
+        Second catalog to be joined
+
+    Returns
+    -------
+    new_cat : mirage.catalogs.catalog_generator.XXCatalog
+        Combined catalog
+    """
+    # Be sure that location coordinate systems are the same between the
+    # two catalogs
+    # Make sure the catalogs are the same type
+    if type(cat1) != type(cat2):
+        raise TypeError("Catalogs are different types. Cannot be combined.")
+
+    if cat1.location_units != cat2.location_units:
+        raise ValueError('Coordinate mismatch in catalogs to combine.')
+
+    # Join catalog tables
+    combined = join(cat1.table, cat2.table, join_type='outer').filled()
+
+    # --------------------Point Sources-------------------------------
+    if isinstance(cat1, PointSourceCatalog):
+        # Create new catalog object and populate
+        if cat1.location_units == 'position_RA_Dec':
+            new_cat = PointSourceCatalog(ra=combined['x_or_RA'].data,
+                                         dec=combined['y_or_Dec'].data)
+        else:
+            new_cat = PointSourceCatalog(x=combined['x_or_RA'].data,
+                                         y=combined['y_or_Dec'].data)
+
+    # --------------------Galaxies------------------------------------
+    elif isinstance(cat1, GalaxyCatalog):
+        if cat1.radius_units != cat2.radius_units:
+            raise ValueError('Radius unit mismatch in catalogs to combine.')
+
+        if cat1.location_units == 'position_RA_Dec':
+            new_cat = GalaxyCatalog(ra=combined['x_or_RA'].data,
+                                    dec=combined['y_or_Dec'].data,
+                                    ellipticity=combined['ellipticity'].data,
+                                    radius=combined['radius'].data,
+                                    sersic_index=combined['sersic_index'].data,
+                                    position_angle=combined['position_angle'].data,
+                                    radius_units=cat1.radius_units)
+        else:
+            new_cat = GalaxyCatalog(x=combined['x_or_RA'].data,
+                                    y=combined['y_or_Dec'].data,
+                                    ellipticity=combined['ellipticity'].data,
+                                    radius=combined['radius'].data,
+                                    sersic_index=combined['sersic_index'].data,
+                                    position_angle=combined['position_angle'].data,
+                                    radius_units=cat1.radius_units)
+
+    # ------------------Extended Sources-------------------------------
+    elif isinstance(cat1, ExtendedCatalog):
+        if cat1.location_units == 'position_RA_Dec':
+            new_cat = ExtendedCatalog(ra=combined['x_or_RA'].data,
+                                      dec=combined['y_or_Dec'].data,
+                                      filenames=combined['filenames'].data,
+                                      position_angle=combined['position_angle'].data)
+        else:
+            new_cat = ExtendedCatalog(x=combined['x_or_RA'].data,
+                                      y=combined['y_or_Dec'].data,
+                                      filenames=combined['filenames'].data,
+                                      position_angle=combined['position_angle'].data)
+
+    # -------------Moving Point Sources--------------------------------
+    elif isinstance(cat1, MovingPointSourceCatalog):
+        if cat1.velocity_units != cat2.velocity_units:
+            raise ValueError('Velocity unit mismatch in catalogs to combine.')
+
+        if cat1.location_units == 'position_RA_Dec':
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingPointSourceCatalog(ra=combined['x_or_RA'].data,
+                                                   dec=combined['y_or_Dec'].data,
+                                                   ra_velocity=combined['ra_velocity'].data,
+                                                   dec_velocity=combined['dec_velocity'].data)
+            else:
+                new_cat = MovingPointSourceCatalog(ra=combined['x_or_RA'].data,
+                                                   dec=combined['y_or_Dec'].data,
+                                                   x_velocity=combined['ra_velocity'].data,
+                                                   y_velocity=combined['dec_velocity'].data)
+        else:
+            if cat1.location_units == 'velocity_RA_Dec':
+                new_cat = MovingPointSourceCatalog(x=combined['x_or_RA'].data,
+                                                   y=combined['y_or_Dec'].data,
+                                                   ra_velocity=combined['ra_velocity'].data,
+                                                   dec_velocity=combined['dec_velocity'].data)
+            else:
+                new_cat = MovingPointSourceCatalog(x=combined['x_or_RA'].data,
+                                                   y=combined['y_or_Dec'].data,
+                                                   x_velocity=combined['ra_velocity'].data,
+                                                   y_velocity=combined['dec_velocity'].data)
+
+    # --------------Moving Galaxies---------------------------------------
+    elif isinstance(cat1, MovingSersicCatalog):
+        if cat1.velocity_units != cat2.velocity_units:
+            raise ValueError('Velocity unit mismatch in catalogs to combine.')
+        if cat1.radius_units != cat2.radius_units:
+            raise ValueError('Radius unit mismatch in catalogs to combine.')
+
+        if cat1.location_units == 'position_RA_Dec':
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
+                                              dec=combined['y_or_Dec'].data,
+                                              ra_velocity=combined['ra_velocity'].data,
+                                              dec_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['position_angle'].data,
+                                              radius_units=cat1.radius_units)
+            else:
+                new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
+                                              dec=combined['y_or_Dec'].data,
+                                              x_velocity=combined['ra_velocity'].data,
+                                              y_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['position_angle'].data,
+                                              radius_units=cat1.radius_units)
+        else:
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
+                                              y=combined['y_or_Dec'].data,
+                                              ra_velocity=combined['ra_velocity'].data,
+                                              dec_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['position_angle'].data,
+                                              radius_units=cat1.radius_units)
+            else:
+                new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
+                                              y=combined['y_or_Dec'].data,
+                                              x_velocity=combined['ra_velocity'].data,
+                                              y_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['position_angle'].data,
+                                              radius_units=cat1.radius_units)
+
+    # --------------Moving Extended Sources-------------------------------
+    elif isinstance(cat1, MovingExtendedCatalog):
+        if cat1.velocity_units != cat2.velocity_units:
+            raise ValueError('Velocity unit mismatch in catalogs to combine.')
+
+        if cat1.location_units == 'position_RA_Dec':
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
+                                                dec=combined['y_or_Dec'].data,
+                                                ra_velocity=combined['ra_velocity'].data,
+                                                dec_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['position_angle'].data)
+            else:
+                new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
+                                                dec=combined['y_or_Dec'].data,
+                                                x_velocity=combined['ra_velocity'].data,
+                                                y_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['position_angle'].data)
+        else:
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
+                                                y=combined['y_or_Dec'].data,
+                                                ra_velocity=combined['ra_velocity'].data,
+                                                dec_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['position_angle'].data)
+            else:
+                new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
+                                                y=combined['y_or_Dec'].data,
+                                                x_velocity=combined['ra_velocity'].data,
+                                                y_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['position_angle'].data)
+
+    # -------------Add magnitude columns-------------------------------
+    mag_cols = [colname for colname in combined.colnames if 'magnitude' in colname]
+    for col in mag_cols:
+        instrument, filter_name, _ = col.split('_')
+        new_cat.add_magnitude_column(combined[col].data, instrument=instrument, filter_name=filter_name)
+    return new_cat
+
+
 def combine_catalogs(observed_jwst, besancon_jwst):
     """
     This code takes two input PointSourceCatalog objects and returns the
@@ -1087,8 +1296,9 @@ def combine_catalogs(observed_jwst, besancon_jwst):
     dec2 = besancon_jwst.dec
     raout = np.concatenate((ra1, ra2))
     decout = np.concatenate((dec1, dec2))
+
     outcat = PointSourceCatalog(ra=raout, dec=decout)
-    outcat.location_units = observed_jwst.location_units
+    #outcat.location_units = observed_jwst.location_units
     for key in keys1:
         mag1 = observed_jwst.magnitudes[key][1]
         mag2 = besancon_jwst.magnitudes[key][1]
@@ -1194,7 +1404,7 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
 
 
-def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29), seeds=[None, None]):
+def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29), seed=None):
     """
     This routine calls a server to get a Besancon star count model over a given
     small sky area at a defined position.  For documentation of the Besancon
@@ -1233,7 +1443,7 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
                       that for the JWST instruments the 2MASS sources will
                       saturate in full frame imaging in many cases.
                       (tuple)
-        seeds         A 2-element list containing seeds to use in the random
+        seed          Seed to use in the random
                       number generator for the RA and Dec values for the
                       Besancon sources.
     Return values:
@@ -1290,7 +1500,7 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     max_ra = ra + half_width
     min_dec = dec - half_width
     max_dec = dec + half_width
-    ra_values, dec_values = generate_ra_dec(len(k_mags), min_ra, max_ra, min_dec, max_dec, seeds=seeds)
+    ra_values, dec_values = generate_ra_dec(len(k_mags), min_ra, max_ra, min_dec, max_dec, seed=seed)
 
     # Create the catalog object
     cat = PointSourceCatalog(ra=ra_values, dec=dec_values)
@@ -1306,14 +1516,14 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     return cat, model
 
 
-def galactic_plane(box_width, email='', seeds=[None, None]):
+def galactic_plane(box_width, email='', seed=None):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function
     Parameters
     ----------
     box_width : float
-    seeds : list
-        Seeds to use in the random number generator when choosing RA and
+    seed : int
+        Seed to use in the random number generator when choosing RA and
         Dec values for Besancon sources.
     Returns
     -------
@@ -1336,7 +1546,7 @@ def galactic_plane(box_width, email='', seeds=[None, None]):
     representative_galactic_latitude = 0.0  # deg
 
     cat, model = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                          box_width, coords='galactic', email=email, seeds=seeds)
+                          box_width, coords='galactic', email=email, seed=seed)
     return cat, model
 
 
@@ -1360,14 +1570,14 @@ def out_of_plane(box_width, email=''):
     return cat
 
 
-def galactic_bulge(box_width, email='', seeds=[None, None]):
+def galactic_bulge(box_width, email='', seed=None):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
     Parameters
     ----------
     box_width : float
-    seeds : list
-        Seeds to use in the random number generator when choosing RA and
+    seed : int
+        Seed to use in the random number generator when choosing RA and
         Dec values for Besancon sources.
     Returns
     -------
@@ -1381,11 +1591,8 @@ def galactic_bulge(box_width, email='', seeds=[None, None]):
     representative_galactic_latitude = 5.0  # ? deg
 
     cat, model = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                          box_width, coords='galactic', email=email, seeds=seeds)
+                          box_width, coords='galactic', email=email, seed=seed)
     return cat, model
-
-#def from_luminosity_function(self, luminosity_function):
-#    more customizable
 
 
 def filter_bad_ra_dec(table_data):
@@ -1407,7 +1614,7 @@ def filter_bad_ra_dec(table_data):
     return position_mask
 
 
-def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max, seeds=[None, None]):
+def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max, seed=None):
     """
     Generate a list of random RA, Dec values in a square region.  Note that
     this assumes a small sky area so that the change in the sky area per
@@ -1422,18 +1629,24 @@ def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max, seeds=[No
         ra_max:           (float) The maximum RA value of the area, in degrees
         dec_min:          (float) The minimum Dec value of the area, in degrees
         dec_max:          (float) The minimum Dec value of the area, in degrees
+        seed:             (int) Optional seed for random number generator
     Return values:
         ra_list:     (np array)  The list of output RA values in degrees.
         dec_list:    (np array)  The list of output Dec values in degrees.
     """
     delta_ra = ra_max - ra_min
-    if seeds[0] is not None:
-        np.random.seed(seeds[0])
-    ra_list = np.random.random(number_of_stars) * delta_ra + ra_min
     delta_dec = dec_max - dec_min
-    if seeds[1] is not None:
-        np.random.seed(seeds[1])
-    dec_list = np.random.random(number_of_stars) * delta_dec + dec_min
+
+    # If a seed is provided, seed the generator
+    if seed is not None:
+        np.random.seed(seed)
+
+    # Generate random numbers
+    numbers = np.random.random(2 * number_of_stars)
+
+    # Create RA and Dec values
+    ra_list = numbers[0: number_of_stars] * delta_ra + ra_min
+    dec_list = numbers[number_of_stars:] * delta_dec + dec_min
     return ra_list, dec_list
 
 
