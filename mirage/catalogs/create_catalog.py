@@ -21,7 +21,24 @@ from pysiaf.utils.projection import deproject_from_tangent_plane
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, ExtendedCatalog
 
 
-def for_proposal(pointing_dictionary, instrument, filter_list, catalog_splitting_threshold=1., email=''):
+def create_basic_exposure_list(xml_file, pointing_file):
+    """for generating catalogs from apt file"""
+    from mirage.yaml import yaml_generator
+    from mirage.apt import apt_inputs
+
+    dummy_catalogs = {'nircam': {'sw': 'dummy.cat', 'lw': 'dummy.cat'}}
+    info = yaml_generator.SimInput(input_xml=xml_file, pointing_file=pointing_file,
+                                   catalogs=dummy_catalogs, offline=True)
+
+    apt = apt_inputs.AptInput(input_xml=xml_file, pointing_file=pointing_file)
+    apt.observation_list_file = info.observation_list_file
+    apt.apt_xml_dict = info.apt_xml_dict
+    apt.output_dir = info.output_dir
+    apt.create_input_table()
+    return apt.exposure_tab
+
+
+def for_proposal(xml_filename, pointing_filename, instrument, filter_list, catalog_splitting_threshold=1., email=''):
     """
     NOT YET FUNCTIONAL
     Given a pointing dictionary from an APT file, generate source catalogs
@@ -40,6 +57,9 @@ def for_proposal(pointing_dictionary, instrument, filter_list, catalog_splitting
     -------
     something
     """
+    pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
+    print(pointing_dictionary)
+
     threshold = catalog_splitting_threshold * u.deg
     ra_apertures = np.array(pointing_dictionary['ra_ref'] * u.deg)
     dec_apertures = np.array(pointing_dictionary['dec_ref'] * u.deg)
