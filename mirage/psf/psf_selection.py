@@ -9,6 +9,7 @@ import numpy as np
 #from photutils.utils import ShepardIDWInterpolator as idw
 from photutils import FittableImageModel
 from scipy.interpolate import interp2d, RectBivariateSpline
+from webbpsf.utils import to_griddedpsfmodel
 
 
 class PSFCollection:
@@ -39,7 +40,8 @@ class PSFCollection:
             with fits.open(library_file) as hdu:
                 self.library_info = hdu[0].header
                 det_index = self.select_detector(detector, library_file)
-                self.library = hdu[0].data[det_index, :, :, :, :]
+                self.library = to_griddedpsfmodel(hdu, ext=0)
+                need to select detector by det_index first?
         except OSError:
             print("OSError: Unable to open {}.".format(library_file))
         except IndexError:
