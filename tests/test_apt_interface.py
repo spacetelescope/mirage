@@ -82,10 +82,8 @@ def test_complete_input_generation():
     temporary_directory()
 
 
-    # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS', 'NIRCam']:
-    # for instrument in ['NIRISS', 'NIRSpec', 'MIRI', 'FGS']:
-    for instrument in ['NIRISS']:
+    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
+    # for instrument in ['NIRISS']:
     # for instrument in ['misc']:
     # for instrument in ['NIRSpec']:
     # for instrument in ['MIRI']:
@@ -95,16 +93,11 @@ def test_complete_input_generation():
 
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
-            # apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
-            apt_file_seeds = ['com1093']
-            # apt_file_seeds = ['1087']
-            # apt_file_seeds = ['1087_minimal']
+            apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
+            # apt_file_seeds = ['com1093']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
-            # apt_file_seeds = ['NIRCamTest']
-            # apt_file_seeds = ['1069']
-            # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
@@ -163,7 +156,7 @@ def test_complete_input_generation():
             yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
-            # 1/0
+
 
 # for debugging
 if __name__ == '__main__':

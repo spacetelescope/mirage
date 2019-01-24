@@ -506,7 +506,7 @@ class ReadAPTXML():
                     if element.text != 'NONE':
                         number_of_subpixel_positions = np.int(element.text)
                 elif element_tag_stripped == 'PrimaryDithers':
-                    if element.text is not None:
+                    if (element.text is not None) & (element.text != 'NONE'):
                         number_of_primary_dithers = int(element.text)
                 elif element_tag_stripped == 'Dithers':
                     DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
@@ -514,6 +514,11 @@ class ReadAPTXML():
                 elif element_tag_stripped == 'SubpixelDithers':
                     if element.text is not None:
                         number_of_subpixel_dithers = int(element.text)
+
+
+                # handle the NIRISS AMI case
+                if number_of_subpixel_positions > number_of_subpixel_dithers:
+                    number_of_subpixel_dithers = np.copy(number_of_subpixel_positions)
 
                 # Determine if there is an aperture override
                 override = obs.find('.//' + self.apt + 'FiducialPointOverride')
