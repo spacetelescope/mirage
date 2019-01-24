@@ -134,7 +134,7 @@ def test_complete_input_generation():
             print('\n\n' + '=' * 100 + '\n')
             if 'DeepField' in apt_file_seed:
                 continue
-
+                
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
             for file in obs_yaml_files:
                 os.remove(file)

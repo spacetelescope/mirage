@@ -150,6 +150,13 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
+def ensure_dir_exists(fullpath):
+    """Creates dirs from ``fullpath`` if they do not already exist.
+    """
+    if not os.path.exists(fullpath):
+        os.makedirs(fullpath)
+
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.

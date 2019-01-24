@@ -51,7 +51,7 @@ from pysiaf import rotations
 import yaml
 
 from . import read_apt_xml
-from ..utils import siaf_interface
+from ..utils import siaf_interface, constants
 
 
 class AptInput:
@@ -319,6 +319,8 @@ class AptInput:
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
+        self.check_aperture_override()
+
         # print(self.exposure_tab['Instrument'])
         if verbose:
             for key in self.exposure_tab.keys():
@@ -332,11 +334,7 @@ class AptInput:
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
         for inst in np.unique(observation_dictionary['Instrument']):
-            instrument_name = inst
-            if inst == 'NIRCAM':
-                instrument_name = 'NIRCam'
-            if inst == 'NIRSPEC':
-                instrument_name = 'NIRSpec'
+            instrument_name = inst.lower()
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
@@ -348,6 +346,39 @@ class AptInput:
             self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
+
+
+    def check_aperture_override(self):
+        if bool(self.exposure_tab['FiducialPointOverride']) is True:
+            instruments = self.exposure_tab['Instrument']
+            apertures = self.exposure_tab['aperture']
+
+            aperture_key = constants.instrument_abbreviations
+
+            fixed_apertures = []
+            for i, (instrument, aperture) in enumerate(zip(instruments, apertures)):
+                inst_match_ap = aperture.startswith(aperture_key[instrument.lower()])
+                if not inst_match_ap:
+                    # Handle the one case we understand, for now
+                    if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
+                        obs_num = self.exposure_tab['obs_num'][i]
+                        guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                        guider_aperture = 'FGS{}_FULL'.format(guider_number)
+                        fixed_apertures.append(guider_aperture)
+                    else:
+                        raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
+                else:
+                    fixed_apertures.append(aperture)
+
+            # Add new dictionary entry to document the FiducialPointOverride (pointing aperture)
+            self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
+            # Rewrite the existing imaging aperture entry to match the primary instrument
+            self.exposure_tab['aperture'] = fixed_apertures
+        else:
+            # Add new dictionary entry to document that the imaging aperture is the
+            # same as the pointing aperture
+            self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
+
 
     def expand_for_detectors(self, input_dictionary):
         """Expand dictionary to have one entry per detector, rather than the
@@ -374,41 +405,33 @@ class AptInput:
                 # NIRCam case: Expand for detectors. Create one entry in each list for each
                 # detector, rather than a single entry for 'ALL' or 'BSALL'
 
-                # Determine module of the observation
-                module = input_dictionary['Module'][index]
-                if module == 'ALL':
-                    detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-                elif module == 'A':
-                    detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
-                elif module == 'B':
-                    detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
-                elif 'A3' in module:
-                    detectors = ['A3']
-                elif 'B4' in module:
-                    detectors = ['B4']
-                elif 'DHSPIL' in module:
-                    if module[-1] == 'A':
-                        detectors = ['A3']
-                    elif module[-1] == 'B':
-                        detectors = ['B4']
+                # Determine module and subarray of the observation
+                sub = input_dictionary['Subarray'][index]
+                if 'DHSPIL' not in sub and 'FP1' not in sub:
+                    module = input_dictionary['Module'][index]
+                    if module == 'ALL':
+                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+                    elif module == 'A':
+                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
+                    elif module == 'B':
+                        detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
                     else:
-                        ValueError('Unknown module {}'.format(module))
+                        raise ValueError('Unknown module {}'.format(module))
                 else:
-                    raise ValueError('Unknown module {}'.format(module))
+                    # Wait to handle cases where there are subarrays, and so things should not be
+                    # expanded for all detectors.
+                    detectors = ['placeholder']
 
             elif instrument == 'niriss':
                 detectors = ['NIS']
+
             elif instrument == 'nirspec':
                 detectors = ['NRS']
-                # if 'NRS1' in input_dictionary['aperture'][index]:
-                #     detectors = ['NRS1']
-                # elif 'NRS2' in input_dictionary['aperture'][index]:
-                #     detectors = ['NRS2']
+
             elif instrument == 'fgs':
-                if 'FGS1' in input_dictionary['aperture'][index]:
-                    detectors = ['G1']
-                elif 'FGS2' in input_dictionary['aperture'][index]:
-                    detectors = ['G2']
+                guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                detectors = ['G{}'.format(guider_number)]
+
             elif instrument == 'miri':
                 detectors = ['MIR']
 
@@ -417,34 +440,30 @@ class AptInput:
                 observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
             observation_dictionary['detector'].extend(detectors)
 
-        # correct NIRCam aperture names
+        # Correct NIRCam aperture names for commissioning subarrays
         for index, instrument in enumerate(observation_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
-                detector = 'NRC' + observation_dictionary['detector'][index]
+                detector = observation_dictionary['detector'][index]
                 sub = observation_dictionary['Subarray'][index]
 
                 # this should probably better be handled by using the subarray_definitions file upstream
-                if sub == 'SUB96DHSPILA':
-                    aperture_name = 'NRCA3_DHSPIL_SUB96'
-                elif sub == 'SUB96DHSPILB':
-                    aperture_name = 'NRCB4_DHSPIL_SUB96'
-                elif sub == 'SUB96DHSPILB':
-                    aperture_name = 'NRCB4_DHSPIL_SUB96'
-                elif ('NRCB4_DHSPIL' in sub) or ('NRCA3_DHSPIL' in sub):# in ['NRCB4_DHSPIL_SUB96', 'NRCA3_DHSPIL_SUB96']:
-                    aperture_name = sub
-                elif sub == 'SUB8FP1A':
-                    aperture_name = 'NRCA3_FP1_SUB8'
-                elif sub == 'SUB64FP1A':
-                    aperture_name = 'NRCA3_FP1_SUB64'
-                elif sub == 'SUB8FP1B':
-                    aperture_name = 'NRCB4_FP1_SUB8'
-                elif sub == 'SUB64FP1B':
-                    aperture_name = 'NRCB4_FP1_SUB64'
-
+                if 'DHSPIL' in sub:
+                    subarray, module = sub.split('DHSPIL')
+                    subarray_size = subarray[3:]
+                    detector = 'A3' if module == 'A' else 'B4'
+                    aperture_name = 'NRC{}_DHSPIL_SUB{}'.format(detector, subarray_size)
+                elif 'FP1' in sub:
+                    subarray, module = sub.split('FP1')
+                    subarray_size = subarray[3:]
+                    detector = 'A3' if module == 'A' else 'B4'
+                    aperture_name = 'NRC{}_FP1_SUB{}'.format(detector, subarray_size)
                 else:
-                    aperture_name = detector + '_' + sub
+                    aperture_name = 'NRC' + detector + '_' + sub
+
                 observation_dictionary['aperture'][index] = aperture_name
+                observation_dictionary['detector'][index] = detector
+
         return observation_dictionary
 
     def extract_value(self, line):
@@ -711,12 +730,7 @@ class AptInput:
         aperture_dec = []
 
         for i in range(len(self.exposure_tab['Module'])):
-            siaf_instrument = self.exposure_tab["Instrument"][i]
-            if siaf_instrument == 'NIRSPEC':
-                siaf_instrument = 'NIRSpec'
-            if siaf_instrument == 'NIRCAM':
-                siaf_instrument = 'NIRCam'
-
+            siaf_instrument = self.exposure_tab["Instrument"][i].lower()
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
