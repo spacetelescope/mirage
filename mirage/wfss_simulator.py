@@ -53,6 +53,7 @@ from .yaml import yaml_update
 nircam_filters = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
                   'F335M', 'F360M', 'F410M', 'F430M', 'F323N', 'F405N',
                   'F466N', 'F470N']
+niriss_filters = []
 
 
 class WFSSSim():
@@ -77,7 +78,7 @@ class WFSSSim():
         self.save_dispersed_seed = True
         self.disp_seed_filename = None
         self.extrapolate_SED = False
-        self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL"]
+        self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
 
     def create(self):
         # Make sure inputs are correct
@@ -95,15 +96,15 @@ class WFSSSim():
 
         # Create dispersed seed image from
         # the direct images
-        dmode = 'mod{}_{}'.format(self.module,self.direction)
-        loc = os.path.join(self.datadir,"nircam/GRISM_NIRCAM/")
+        dmode = 'mod{}_{}'.format(self.module, self.direction)
+        loc = os.path.join(self.datadir, "nircam/GRISM_NIRCAM/")
         background_file = ("{}_{}_back.fits"
-                           .format(self.crossing_filter,dmode))
+                           .format(self.crossing_filter, dmode))
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
                                dmode, config_path=loc,
                                extrapolate_SED=self.extrapolate_SED)
         disp_seed.observation()
-        disp_seed.finalize(Back = background_file)
+        disp_seed.finalize(Back=background_file)
 
         # Get gain map
         gainfile = cat.params['Reffiles']['gain']
@@ -137,7 +138,7 @@ class WFSSSim():
         if self.save_dispersed_seed:
             hh00 = fits.PrimaryHDU()
             hh11 = fits.ImageHDU(disp_seed.final)
-            hhll = fits.HDUList([hh00,hh11])
+            hhll = fits.HDUList([hh00, hh11])
             hhll[0].header['units'] = 'ADU/sec'
             if self.disp_seed_filename is None:
                 pdir, pf = os.path.split(self.paramfiles[0])
@@ -190,18 +191,18 @@ class WFSSSim():
 
     def check_inputs(self):
         # Make sure input parameters are good
-        if self.module not in ['A','B']:
-            self.invalid('module',self.module)
+        if self.module not in ['A', 'B']:
+            self.invalid('module', self.module)
         else:
             self.module = self.module.upper()
 
-        if self.direction not in ['R','C']:
-            self.invalid('direction',self.direction)
+        if self.direction not in ['R', 'C']:
+            self.invalid('direction', self.direction)
         else:
             self.direction = self.direction.upper()
 
         if self.crossing_filter not in nircam_filters:
-            self.invalid('crossing_filter',self.crossing_filter)
+            self.invalid('crossing_filter', self.crossing_filter)
         else:
             self.crossing_filter = self.crossing_filter.upper()
 

@@ -170,8 +170,9 @@ class Catalog_seed():
         # For seed images to be dispersed in WFSS mode,
         # embed the seed image in a full frame array. The disperser
         # tool does not work on subarrays
+        aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
         if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
-           ('FULL' not in self.params['Readout']['array_name'])):
+           (aperture_suffix not in ['FULL', 'CEN'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
 
         # Save the combined static + moving targets ramp
