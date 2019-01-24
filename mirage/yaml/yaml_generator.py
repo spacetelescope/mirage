@@ -104,7 +104,7 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
-from ..utils.utils import calc_frame_time
+from ..utils.utils import calc_frame_time, ensure_dir_exists
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 
@@ -171,6 +171,7 @@ class SimInput:
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
         self.set_global_definitions()
+        self.path_defs()
 
         if (input_xml is not None) and (catalogs is not None):
 
@@ -305,9 +306,6 @@ class SimInput:
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
             apt.apt_xml_dict = self.apt_xml_dict
-
-            if 'True' in self.apt_xml_dict['FiducialPointOverride']:
-                raise RuntimeError('FiducialPointOverride detected. mirage is not yet capable of handling this correctly.')
 
             apt.output_dir = self.output_dir
             apt.create_input_table()
@@ -477,28 +475,19 @@ class SimInput:
             if module != 'None':
                 if module in ['A', 'B']:
                     n_det = 5
-                    module = ' ' + module
+                    inst_mod = 'NIRCam module ' + module
                 if module == 'ALL':
                     n_det = 10
-                    module = 's A and B'
-                if 'A3' in module:
-                    n_det = 1
-                    module = ' A3'
-                if 'B4' in module:
-                    n_det = 1
-                    module = ' B4'
-                if module == 'SUB96DHSPILA':
-                    n_det = 1
-                    module = ' A3'
+                    inst_mod = 'NIRCam modules A and B'
             else:
                 # number of detectors
                 n_det = 1
-                module = ' NIS'
+                inst_mod = self.info['Instrument'][i_mod]
 
             i_mod += n_tiles * n_det
 
-            print(('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'
-                   .format(obs, n_visits, n_tiles, n_det, module)))
+            print(('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in {}'
+                   .format(obs, n_visits, n_tiles, n_det, inst_mod)))
         print('\n{} exposures total.'.format(len(mosaic_numbers)))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
@@ -994,6 +983,9 @@ class SimInput:
         self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
         if self.table_file is not None:
             self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
+
+        ensure_dir_exists(self.output_dir)
+        ensure_dir_exists(self.simdata_output_dir)
 
         # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
