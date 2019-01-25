@@ -57,7 +57,9 @@ niriss_filters = []
 
 
 class WFSSSim():
-    def __init__(self):
+    def __init__(self, instrument, paramfiles, override_dark, crossing_filter, module=None,
+                 direction, prepDark=None, save_dispersed_seed=True, extrapolate_SED=True,
+                 override_dark=None, disp_seed_filename=None):
         # Set the MIRAGE_DATA environment variable if it is not
         # set already. This is for users at STScI.
         self.env_var = 'MIRAGE_DATA'
@@ -69,15 +71,16 @@ class WFSSSim():
                               "input files needed for the simulation."
                               "These files must be downloaded separately"
                               "from the Mirage package.".format(self.env_var)))
-        self.paramfiles = None
-        self.override_dark = None
-        self.crossing_filter = None
-        self.module = None
-        self.direction = None
-        self.prepDark = None
-        self.save_dispersed_seed = True
-        self.disp_seed_filename = None
-        self.extrapolate_SED = False
+        self.instrument = instrument.lower()
+        self.paramfiles = paramfiles
+        self.override_dark = override_dark
+        self.crossing_filter = crossing_filter
+        self.module = module
+        self.direction = direction
+        self.prepDark = prepDark
+        self.save_dispersed_seed = save_dispersed_seed
+        self.disp_seed_filename = disp_seed_filename
+        self.extrapolate_SED = extrapolate_SED
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
 
     def create(self):
@@ -96,10 +99,17 @@ class WFSSSim():
 
         # Create dispersed seed image from
         # the direct images
-        dmode = 'mod{}_{}'.format(self.module, self.direction)
-        loc = os.path.join(self.datadir, "nircam/GRISM_NIRCAM/")
-        background_file = ("{}_{}_back.fits"
-                           .format(self.crossing_filter, dmode))
+        loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
+                                                               self.instrument.upper()))
+
+        if self.instrument == 'nircam':
+            dmode = 'mod{}_{}'.format(self.module, self.direction)
+            background_file = ("{}_{}_back.fits"
+                               .format(self.crossing_filter, dmode))
+        elif self.instrument == 'niriss':
+            dmode = 'GR150{}'.format(self.direction)
+            background_file = "normalized_background_{}-{}.fits".format(self.crossing_filter, dmode)
+
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
                                dmode, config_path=loc,
                                extrapolate_SED=self.extrapolate_SED)
@@ -180,43 +190,50 @@ class WFSSSim():
         obs.paramfile = y.outname
         obs.create()
 
-
-    def read_dark_product(self,file):
+    def read_dark_product(self, file):
         # Read in dark product that was produced
         # by dark_prep.py
         self.prepDark = read_fits.Read_fits()
         self.prepDark.file = file
         self.prepDark.read_astropy()
 
-
     def check_inputs(self):
         # Make sure input parameters are good
-        if self.module not in ['A', 'B']:
-            self.invalid('module', self.module)
-        else:
-            self.module = self.module.upper()
+        if self.instrument not in ['nircam', 'niriss']:
+            self.invalid('instrument', instrument)
+
+        if self.instrument == 'nircam':
+            if self.module not in ['A', 'B']:
+                self.invalid('module', self.module)
+            else:
+                self.module = self.module.upper()
+
+            if self.crossing_filter not in nircam_filters:
+                self.invalid('crossing_filter', self.crossing_filter)
+            else:
+                self.crossing_filter = self.crossing_filter.upper()
+
+        elif self.instrument == 'niriss':
+            self.module = None
+
+            if self.crossing_filter not in niriss_filters:
+                self.invalid('crossing_filter', self.crossing_filter)
+            else:
+                self.crossing_filter = self.crossing_filter.upper()
 
         if self.direction not in ['R', 'C']:
             self.invalid('direction', self.direction)
         else:
             self.direction = self.direction.upper()
 
-        if self.crossing_filter not in nircam_filters:
-            self.invalid('crossing_filter', self.crossing_filter)
-        else:
-            self.crossing_filter = self.crossing_filter.upper()
-
         if self.override_dark is not None:
             avail = os.path.isfile(self.override_dark)
-            if avail == False:
-                print(("WARNING: {} does not exist."
-                       .format(self.override_dark)))
-                sys.exit()
-
+            if not avail:
+                raise FileNotFoundError(("WARNING: {} does not exist."
+                                         .format(self.override_dark)))
         if len(self.paramfiles) < 2:
-            print("WARNING: self.paramfiles must be a list")
-            print("of 2 or more yaml files.")
-            sys.exit()
+            raise ValueError(("WARNING: self.paramfiles must be a list"
+                              "of 2 or more yaml files."))
 
     def read_param_file(self, file):
         """
