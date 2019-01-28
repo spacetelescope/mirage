@@ -1171,9 +1171,9 @@ class ReadAPTXML():
 
         # Direct and out of field images are never dithered
         primary_dither_direct = '1'
-        primary_dither_type_direct = '1'
+        primary_dither_type_direct = 'NONE'
         subpix_dither_direct = '1'
-        subpix_dither_type_direct = '1'
+        subpix_dither_type_direct = 'NONE'
         direct_number_of_dithers = '1'
 
         # Which grism(s) are to be used
@@ -1267,7 +1267,7 @@ class ReadAPTXML():
                     exp_seq_dict['Mode'] = [grism_typeflag]
                     exp_seq_dict['Module'] = [module]
                     exp_seq_dict['Subarray'] = [subarr]
-                    exp_seq_dict['PrimaryDitherType'] = [primary_dither_grism_type]
+                    exp_seq_dict['PrimaryDitherType'] = [primary_dither_type_grism]
                     exp_seq_dict['PrimaryDithers'] = [primary_dither_grism]
                     exp_seq_dict['SubpixelPositions'] = [subpix_dither_grism]
                     exp_seq_dict['SubpixelDitherType'] = [subpix_dither_type_grism]
