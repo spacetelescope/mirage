@@ -12,22 +12,35 @@ Overview
 --------
 Mirage creates high-fidelity simulated exposures for NIRCam's imaging and wide field slitless spectroscopy (WFSS) modes, NIRISS's imaging, WFSS, and aperture masking interferometery (AMI) modes, and FGS's imaging mode. It supports sidereal as well as non-sidereal tracking (i.e. sources can be made to move across the field of view within an observation). Astronomical sources to add to the scene are specified through the use of source catalogs.
 
-The software is designed such that a single yaml file can be used as input. This file contains various instrument and readout parameters, as well as lists reference files necessary for the production of the simulated data. Details on the contents of the yaml file are given in section 10.
+The software is designed such that a single yaml file can be used as input. This file contains various instrument and readout parameters, as well as lists reference files necessary for the production of the simulated data. Details on the contents of the yaml file are given on the :ref:`Input Yaml File Parameters <input_yaml_file_parameters>` page.
 
-The simulator can be broadly divided into three stages. The first stage is the creation of the “seed image”. This is a noiseless count rate image that contains signal only from the astronomical sources to be simulated. Seed images include instrument distortion effects, so that given RA, Dec values are properly converted to pixel x,y values, with the exception of tangent plane projection, which will be added soon. Mirage currently contains two methods for the construction of seed images:
+Seed Images
++++++++++++
 
-1. Through the use of source catalog files
-2. Extraction from a fits file containing a distortion-free image (e.g. HUDF, GOODS, CANDELS, etc)
+Mirage can be broadly divided into three stages. The first stage is the creation of the :ref:`“seed image” <seed_image>`. This is a noiseless count rate image that contains signal only from the astronomical sources to be simulated. Seed images include instrument distortion effects, so that given RA, Dec values are properly converted to pixel x,y values, with the exception of tangent plane projection, which will be added soon. Mirage currently contains two methods for the construction of seed images:
 
-For WFSS observations, multiple seed images and optional input spectra are then fed into the disperser software, which simulates the effects of the grism by dispersing the signal from the astronomical sources, creating a “grism seed image”.
+1. Through the use of :ref:`source catalog files <source_catalogs>`
+2. Extraction from a fits file containing a :ref:`distortion-free image <mosaic_input>` (e.g. HUDF, GOODS, CANDELS, etc)
+
+For WFSS observations, multiple seed images and optional input spectra are then fed into the `disperser software <https://github.com/npirzkal/NIRCAM_Gsim>`_, which simulates the effects of the grism by dispersing the signal from the astronomical sources, creating a “grism seed image”.
+
+Dark Current Preparation
+++++++++++++++++++++++++
 
 The second stage is the preparation of the dark current exposure to use for the simulation. The input dark current exposure is reorganized into the requested readout pattern and number of groups and cropped to the requested subarray size. Detector non-linearity effects are then removed using the initial steps of the JWST calibration pipeline.
 
 By using actual dark current exposures from ground testing, Mirage is able to capture many effects which are specific to the instrument and detector being simulated. For example, the 1/f noise, bias structure, and hot pixel population.
 
+Observation Generation
+++++++++++++++++++++++
+
 The final stage involves the combination of the seed image and the dark current in order to produce the output exposure. The seed image is expanded into integrations with groups that follow the requested readout pattern. Other effects are also added at this stage, including cosmic rays, interpixel capacitance (IPC) and crosstalk effects.
 
-In addition, the Mirage package includes ancillary convenience functions that allow the user to translate an `Astronomer’s Proposal Tool (APT) <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ proposal into a series of input yaml files for the simulator.
+
+Additional Tools
+++++++++++++++++
+
+In addition, the Mirage package includes ancillary convenience functions that allow the user to translate an Astronomer's Proposal Tool (`APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_) proposal into a series of input yaml files for the simulator.
 
 
 Limitations

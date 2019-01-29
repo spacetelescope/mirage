@@ -1,3 +1,5 @@
+.. _input_yaml_file_parameters:
+
 Input yaml file parameters
 ==========================
 

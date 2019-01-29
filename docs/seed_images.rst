@@ -1,3 +1,5 @@
+.. _seed_images:
+
 Creation of Seed Images
 =======================
 

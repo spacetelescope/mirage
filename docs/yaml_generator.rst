@@ -9,150 +9,55 @@ Export XML and Poining files from APT
 -------------------------------------
 More specifically, open the proposal within APT and under the File menu, choose Export, and select the xml and pointing files. Only one file at a time can be exported, so the process must be repeated for each.
 
-Create an observation list file
--------------------------------
-One other input file is needed in addition to those from the APT proposal. This is an observation list file. This file contains a list of the source catalogs associated with each of the observations in the proposal in both the longwave and shortwave channels. This file is necessary for the catalog names to be populated witin all of the yaml files. Through this file, you can also specify the date as well as the roll angle (V3 position angle) for each observation. In this way, you can simulate different epochs in your observations, with associated changes in telescope roll angle. An example of an observation list file is shown below.
+.. _additional_yaml_generator_inputs:
+
+Additional Yaml Generator Inputs
+--------------------------------
+
+In addition to the xml and pointing files, there are several user-inputs needed by the yaml generator.
+
+Source catalogs
++++++++++++++++
+
+The user must specify source catalogs for each instrument and observation. This is done using a nested dictionary following the form:
 
 ::
 
-	# Example observation list for the APT -> simulator code.
-	#
-	# Observation names must match up with those in the xml
-	# file from APT.
-	# Observation dates should be in the format: YYYY-MM-DD
-	# Roll angle is PAV3, which is available from the
-	# JWST General Target Visibility Tool (GTVT)
-	# Roll angles and dates are not checked against the
-	# GTVT and do not need to agree with the tool's outputs
-	#
-	# For multiple observations that you want taken back-to-back,
-	# use the same date for all
+    catalogs = {'nircam': {'sw': {ptsrc: [list of catalogs], 'galaxy': [list of catalogs]}
+                           'lw' : {ptsrc: [list of catalogs], 'galaxy': [list of catalogs]}
+                'niriss': {'ptsrc': [list of catalogs], 'galaxy': [list of catalogs]}
+               }
 
-	Observation1:
-  	  Name: 'Target #1, Epoch 1'
-  	  Date: 2019-10-14
-  	  PAV3: 0.
-  	  FilterConfig1:
-  	    SW:
-  	      Filter: F200W
-  	      PointSourceCatalog: ptsrc_f200w.cat
-  	      GalaxyCatalog: galaxies_f200w.cat
-  	      ExtendedCatalog: None
-  	      ExtendedScale: 1.0
-  	      ExtendedCenter: 1024,1024
-  	      MovingTargetList: None
-  	      MovingTargetSersic: None
-  	      MovingTargetExtended: None
-  	      MovingTargetConvolveExtended: True
-  	      MovingTargetToTrack: None
-  	      BackgroundRate: medium
-  	    LW:
-  	      Filter: F444W
-  	      PointSourceCatalog: ptsrc_f444w.cat
-  	      GalaxyCatalog: galaxies_f444w.cat
-  	      ExtendedCatalog: None
-  	      ExtendedScale: 1.0
-  	      ExtendedCenter: 1024,1024
-  	      MovingTargetList: None
-  	      MovingTargetSersic: None
-  	      MovingTargetExtended: None
-  	      MovingTargetConvolveExtended: True
-  	      MovingTargetToTrack: None
-  	      BackgroundRate: medium
-  	  FilterConfig2:
-  	    SW:
-  	      Filter: F210M
-  	      PointSourceCatalog: ptsrc_f210m.cat
-  	      GalaxyCatalog: galaxies_f210m.cat
-  	      ExtendedCatalog: None
-  	      ExtendedScale: 1.0
-  	      ExtendedCenter: 1024,1024
-  	      MovingTargetList: None
-  	      MovingTargetSersic: None
-  	      MovingTargetExtended: None
-  	      MovingTargetConvolveExtended: True
-  	      MovingTargetToTrack: None
-  	      BackgroundRate: medium
-  	    LW:
-  	      Filter: F460M
-  	      PointSourceCatalog: ptsrc_f460m.cat
-  	      GalaxyCatalog: galaxies_f460m.cat
-  	      ExtendedCatalog: None
-  	      ExtendedScale: 1.0
-  	      ExtendedCenter: 1024,1024
-  	      MovingTargetList: None
-  	      MovingTargetSersic: None
-  	      MovingTargetExtended: None
-  	      MovingTargetConvolveExtended: True
-  	      MovingTargetToTrack: None
-  	      BackgroundRate: medium
+For each `list of catalogs` instance above, the user may enter a list of catalogs, where there is one catalog for each observation in the APT file where that instrument is used. Alternatively, the user may enter a string containing the name of a single catalog. In this case, the same catalog is used for all observations.
 
-	Observation2:
-	  Name: 'Target #1, Epoch 2'
-	  Date: 2020-04-14
-	  PAV3: 178.
-	  FilterConfig1:
-	    SW:
-	      Filter: F200W
-	      PointSourceCatalog: ptsrc_f200w.cat
-	      GalaxyCatalog: galaxies_f200w.cat
-	      ExtendedCatalog: None
-	      ExtendedScale: 1.0
-	      ExtendedCenter: 1024,1024
-	      MovingTargetList: None
-	      MovingTargetSersic: None
-	      MovingTargetExtended: None
-	      MovingTargetConvolveExtended: True
-	      MovingTargetToTrack: None
-	      BackgroundRate: medium
-	    LW:
-	      Filter: F444W
-	      PointSourceCatalog: ptsrc_f444w.cat
-	      GalaxyCatalog: galaxies_f444w.cat
-	      ExtendedCatalog: None
-	      ExtendedScale: 1.0
-	      ExtendedCenter: 1024,1024
-	      MovingTargetList: None
-	      MovingTargetSersic: None
-	      MovingTargetExtended: None
-	      MovingTargetConvolveExtended: True
-	      MovingTargetToTrack: None
-	      BackgroundRate: medium
-	  FilterConfig2:
-	    SW:
-	      Filter: F210M
-	      PointSourceCatalog: ptsrc_f210m.cat
-	      GalaxyCatalog: galaxies_f210m.cat
-	      ExtendedCatalog: None
-	      ExtendedScale: 1.0
-	      ExtendedCenter: 1024,1024
-	      MovingTargetList: None
-	      MovingTargetSersic: None
-	      MovingTargetExtended: None
-	      MovingTargetConvolveExtended: True
-	      MovingTargetToTrack: None
-	      BackgroundRate: medium
-	    LW:
-	      Filter: F460M
-	      PointSourceCatalog: ptsrc_f460m.cat
-	      GalaxyCatalog: galaxies_f460m.cat
-	      ExtendedCatalog: None
-	      ExtendedScale: 1.0
-	      ExtendedCenter: 1024,1024
-	      MovingTargetList: None
-	      MovingTargetSersic: None
-	      MovingTargetExtended: None
-	      MovingTargetConvolveExtended: True
-	      MovingTargetToTrack: None
-	      BackgroundRate: medium
+Background Specification
+++++++++++++++++++++++++
+
+The user must also supply a nested dictionary containing the background levels to use for each instrument and observation. Allowed values for the background parameter are described in :ref:`bkgdrate <bkgdrate>` section of the Input Yaml Parameters page.
+
+::
+
+    backgrounds = {'nircam': {'sw': [low, medium], 'lw': [low, medium]},
+                   'niriss': [low, medium]
+                  }
+
+Similar to the case above for the catalog inputs, the given background values can be a list, in which case there must be one entry for each observation, or a string, in which case the value is applied to all observations.
+
+Other Parameters
+++++++++++++++++
+
+::
+
+     parameter_defaults['PAV3'] = [110, 110, 20, 20]
+
 
 
 .. _yaml_generator:
 
-Run the yaml generator
+Run the Yaml Generator
 ----------------------
 
-With the XML, pointing, and observation list files in hand, Mirage's *yaml_generator.py* module can be called to create the associated yaml files.
+With the XML and pointing files in hand, and additional inputs defined above, Mirage's *yaml_generator.py* module can be called to create the associated yaml files. In this case, we specify that the yaml files produced by the *yaml_generator* will be output within a subdirectory of the working directory called *yaml_files*. We also define that when Mirage is run, the simulated data will be output into a subdirectory called *simulated_data*. This information will be placed into the constructed yaml files.
 
 ::
 
@@ -161,19 +66,13 @@ With the XML, pointing, and observation list files in hand, Mirage's *yaml_gener
 	# Create a series of data simluator input yaml files
 	# from APT files
 
-	yam = yaml_generator.SimInput()
-	yam.input_xml = 'example_imaging_program.xml'
-	yam.pointing_file = 'example_imaging_program.pointing'
-	yam.output_dir = './'
-	yam.simdata_output_dir = './'
-	yam.observation_table = 'observation_list.yaml'
-	yam.use_JWST_pipeline = True
-	yam.use_linearized_darks = False
-	yam.datatype = 'linear'
-	yam.reffile_setup()
-	yam.create_inputs()
+	yam = yaml_generator.SimInput(xml_file, pointing_file, catalogs=catalogs, verbose=True,
+                                  output_dir='yaml_files', simdata_output_dir='simulated_data',
+                                  parameter_defaults=params, datatype='raw')
+    yam.use_linearized_darks = True
+    yam.create_inputs()
 
-The outptut from this will be the collection of yaml files needed to run Mirage and create all of the observation files. An :ref:`example yaml file <example_yaml>` shows all of the parameters necessary when simulating an exposure.
+The outptut from this will be the collection of yaml files needed to run Mirage and create all of the simulated observation files. An :ref:`example yaml file <example_yaml>` shows all of the parameters necessary when simulating an exposure.
 
 Run Mirage
 ----------
