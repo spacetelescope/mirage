@@ -1515,7 +1515,7 @@ class ReadAPTXML():
             parallel_instrument = False
             prime_instrument = instrument
             dither_direct = 'NO_DITHERING'
-            sdither_type_grism = '1'
+            sdither_type_grism = 'NONE'
             sdither_grism = '1'
             # Dither size can be SMALL, MEDIUM, LARGE. Only look for this if NIRISS is prime
             pdither_type_grism = template.find(ns + 'DitherSize').text
@@ -1574,9 +1574,9 @@ class ReadAPTXML():
                 typeflag = 'imaging'
                 if dither_direct == 'NO_DITHERING':
                     pdither = '1'  # direct image has no dithers
-                    pdither_type = '1'  # direct image has no dithers
+                    pdither_type = 'NONE'  # direct image has no dithers
                     sdither = '1'
-                    sdither_type = '1'
+                    sdither_type = 'NONE'
                 else:
                     pdither = pdither_grism
                     pdither_type = pdither_type_grism
