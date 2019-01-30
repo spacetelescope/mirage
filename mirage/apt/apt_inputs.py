@@ -762,6 +762,58 @@ def get_entry(dict, entry_number):
             return observation[entry_key]
 
 
+def get_filters(pointing_info):
+    """Return a dictionary of instruments and filters contained within a
+    pointing dictionary from an APT file.
+
+    Parameters
+    ----------
+    pointing_info : dict
+        This is the dictionary held in self.exposure_tab from the apt_inputs.APTInput
+        class.
+
+    Returns
+    -------
+    filters : dict
+        Dictionary with instrument names as keys. The value for each is a
+        list containing the names of the filters for that instrument present
+        in the pointing dictionary.
+    """
+    instrument_list = set(pointing_info['Instrument'])
+    filters = {}
+    for inst in instrument_list:
+        good = np.where(np.array(pointing_info['Instrument']) == inst.upper())[0]
+        if inst.upper() == 'NIRCAM':
+            short_filters = np.array(pointing_info['ShortFilter'])[good]
+            long_filters = np.array(pointing_info['LongFilter'])[good]
+            short_pupils = np.array(pointing_info['ShortPupil'])[good]
+            long_pupils = np.array(pointing_info['LongPupil'])[good]
+
+            short_filter_only = np.where(short_pupils == 'CLEAR')[0]
+            long_filter_only = np.where(long_pupils == 'CLEAR')[0]
+
+            filter_list = list(set(short_pupils))
+            filter_list.remove('CLEAR')
+
+            filter_list.extend(list(set(long_pupils)))
+            filter_list.remove('CLEAR')
+
+            filter_list.extend(list(set(short_filters[short_filter_only])))
+            filter_list.extend(list(set(long_filters[long_filter_only])))
+
+        else:
+            short_filters = np.array(pointing_info['FilterWheel'])[good]
+            short_pupils = np.array(pointing_info['PupilWheel'])[good]
+
+            short_filter_only = np.where(short_pupils == 'CLEAR')[0]
+            filter_list = list(set(short_pupils))
+            filter_list.remove('CLEAR')
+            filter_list.append(list(set(short_filters[short_filter_only])))
+
+        filters[inst.upper()] = filter_list
+    return filters
+
+
 # if __name__ == '__main__':
 #
 #     usagestring = 'USAGE: apt_inputs.py NIRCam_obs.xml NIRCam_obs.pointing'
