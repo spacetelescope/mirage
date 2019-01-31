@@ -12,7 +12,7 @@ import math
 import numpy as np
 import os
 
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, Galactic
 from astropy.table import Table, join
 import astropy.units as u
 from astroquery.gaia import Gaia
@@ -101,6 +101,12 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
     galaxy_catalog_list : list
         List of Mirage galaxy source catalog objects
+
+    ptsrc_catalog_names : list
+        List of filenames of the saved point source catalogs
+
+    galaxy_catalog_names : list
+        List of filenames of the saved galaxy catalogs
     """
     pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
     instrument_filter_dict = get_filters(pointing_dictionary)
@@ -122,8 +128,10 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     observation_ids = np.array(pointing_dictionary['ObservationID'])
     unique_observation_ids = list(set(observation_ids))
     mapped_observations = {}
+    ptsrc_catalog_mapping = {}
     ptsrc_catalog_list = []
     ptsrc_catalog_names = []
+    galaxy_catalog_mapping = {}
     galaxy_catalog_list = []
     galaxy_catalog_names = []
     for observation in unique_observation_ids:
@@ -196,7 +204,6 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         mean_ra = np.mean(ralist)
         mean_dec = np.mean(declist)
 
-        # Create catalog(s)
         # Generate a string listing which observations the catalog covers
         for_obs = mapped_observations[str(observation)]
         for_obs_str = ''
@@ -220,6 +227,13 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
             if save_catalogs:
                 ptsrc_catalog_name = 'ptsrc_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
+
+                # Populate dictionary listing ptsrc catalog name associated with each
+                # observation number
+                ptsrc_catalog_mapping[str(observation)] = ptsrc_catalog_name
+                for value in for_obs:
+                    ptsrc_catalog_mapping[str(value)] = ptsrc_catalog_name
+
                 print('POINT SOURCE CATALOG SAVED: {}'.format(ptsrc_catalog_name))
                 full_catalog_path = os.path.join(out_dir, ptsrc_catalog_name)
                 ptsrc_cat.save(full_catalog_path)
@@ -242,6 +256,13 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
             if save_catalogs:
                 gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
+
+                # Populate dictionary listing galaxy catalog name associated with each
+                # observation number
+                galaxy_catalog_mapping[str(observation)] = gal_catalog_name
+                for value in for_obs:
+                    galaxy_catalog_mapping[str(value)] = gal_catalog_name
+
                 print('GALAXY CATALOG SAVED: {}'.format(gal_catalog_name))
                 full_catalog_path = os.path.join(out_dir, gal_catalog_name)
                 galaxy_cat.save(full_catalog_path)
@@ -250,7 +271,8 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
             galaxy_catalog_list.append(galaxy_cat)
         else:
             galaxy_cat = None
-    return ptsrc_catalog_list, galaxy_catalog_list
+    return (ptsrc_catalog_list, galaxy_catalog_list, ptsrc_catalog_names, galaxy_catalog_names,
+            ptsrc_catalog_mapping, galaxy_catalog_mapping)
 
 
 def query_2MASS_ptsrc_catalog(ra, dec, box_width):
@@ -493,8 +515,9 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrum
 
     Returns
     -------
-        source_list : astropy.table.Table
+        source_list : mirage.catalogs.create_catalogs.PointSourceCatalog
             A table with the filter magnitudes
+
         filter_names : list
             A list of the filter name header strings for writing to
             an output file.
@@ -921,10 +944,19 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
                     twomassflag[n1] = False
     matchwise, gaiawiseinds, twomasswiseinds = wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_cat)
     wisekeys = ['w1sigmpro', 'w2sigmpro', 'w3sigmpro', 'w4sigmpro']
+
+    # Set invalid values to NaN
+    try:
+        gaia_bp_mags = gaia_cat['phot_bp_mean_mag'].filled(np.nan)
+        gaia_rp_mags = gaia_cat['phot_rp_mean_mag'].filled(np.nan)
+    except:
+        gaia_bp_mags = gaia_cat['phot_bp_mean_mag']
+        gaia_rp_mags = gaia_cat['phot_rp_mean_mag']
+
     for loop in range(ngaia):
         try:
-            in_magnitudes[loop, 0] = gaia_cat['phot_bp_mean_mag'][loop]
-            in_magnitudes[loop, 2] = gaia_cat['phot_rp_mean_mag'][loop]
+            in_magnitudes[loop, 0] = gaia_bp_mags[loop]
+            in_magnitudes[loop, 2] = gaia_rp_mags[loop]
         except:
             pass
         # see if there is a 2MASS match
@@ -1351,7 +1383,7 @@ def add_filter_names(headerlist, filter_names, filter_labels, filters):
     return headerlist
 
 
-def combine_catalogs(cat1, cat2):
+def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
     """Combine two Mirage catalog objects. Catalogs must be of the same
     type (e.g. PointSourceCatalog), and have the same values for position
     units (RA, Dec or x, y) velocity units (arcsec/hour vs pixels/hour),
@@ -1383,8 +1415,12 @@ def combine_catalogs(cat1, cat2):
     if cat1.location_units != cat2.location_units:
         raise ValueError('Coordinate mismatch in catalogs to combine.')
 
-    # Join catalog tables
-    combined = join(cat1.table, cat2.table, join_type='outer').filled()
+    # Join catalog tables. Set fill value for all magnitude columns
+    combined = join(cat1.table, cat2.table, join_type='outer')
+    mag_cols = [col for col in combined.colnames if 'magnitude' in col]
+    for col in mag_cols:
+        combined[col].fill_value = magnitude_fill_value
+    combined = combined.filled()
 
     # --------------------Point Sources-------------------------------
     if isinstance(cat1, PointSourceCatalog):
@@ -1548,7 +1584,10 @@ def combine_catalogs(cat1, cat2):
     # -------------Add magnitude columns-------------------------------
     mag_cols = [colname for colname in combined.colnames if 'magnitude' in colname]
     for col in mag_cols:
-        instrument, filter_name, _ = col.split('_')
+        elements = col.split('_')
+        instrument = elements[0]
+        minus_inst = col.split('{}_'.format(instrument))[-1]
+        filter_name = minus_inst.split('_magnitude')[0]
         new_cat.add_magnitude_column(combined[col].data, instrument=instrument, filter_name=filter_name)
     return new_cat
 
@@ -1797,7 +1836,7 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
                                retrieve_file=True, email=email)
     except ValueError as e:
         print(e)
-        print("WARNING: Besancon query failed. Returning empty background star table.")
+        print("WARNING: Besancon query failed. Returning background star table with placeholder entry.")
         model = Table()
         model['Dist'] = [99.]
         model['Mv'] = [99.]
@@ -1849,26 +1888,23 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     return cat, model
 
 
-def galactic_plane(box_width, email='', seed=None):
+def galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function.
-
-    RA and Dec values of various features
-    Center of MW
-    center_ra = 17h45.6m
-    center_dec = -28.94 deg
-    anti-center-ra = 5h45.6m
-    anti-center-dec = 28.94deg
-    Galactic Poles
-    north_pole_ra = 12h51.4m
-    north_pole_dec = 27.13deg
-    south_pole_ra = 0h51.4m
-    south_pole_dec = -27.13deg
 
     Parameters
     ----------
     box_width : float
-            Size of the (square) sky area to be simulated, in arc-seconds
+        Size of the (square) sky area to be simulated, in arc-seconds
+
+    instrument : str
+        Name of instrument for the siumulation
+
+    filter_list : list
+        List of filters to use to generate the catalog. (e.g ['F480M', 'F444W'])
+
+    kmag_limits : tup
+        Minimum and maximum magnitudes to use in the query to Besancon model
 
     email : str
         A valid email address is needed to query the Besancon model
@@ -1881,19 +1917,19 @@ def galactic_plane(box_width, email='', seed=None):
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
         Catalog with representative stars pulled from Besancon model
-
-    model : astropy.table.Table
-        Full query results from Besancon
     """
-    representative_galactic_longitude = 45.0  # deg
-    representative_galactic_latitude = 0.0  # deg
+    galactic_longitude = 45.0 * u.deg  # deg
+    galactic_latitude = 0.0 * u.deg  # deg
+    coord = SkyCoord(galactic_longitude, galactic_latitude, frame=Galactic)
 
-    cat, model = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                          box_width, coords='galactic', email=email, seed=seed)
-    return cat, model
+    cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
+                                               kmag_limits=kmag_limits, email=email,
+                                               instrument=instrument, filters=filter_list,
+                                               besancon_seed=seed)
+    return cat
 
 
-def out_of_plane(box_width, email=''):
+def out_of_galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
     """Convenience function to create typical scene looking out of the plane of
     the Milky Way by querying the Besancon model
 
@@ -1902,6 +1938,15 @@ def out_of_plane(box_width, email=''):
     box_width : float
         Size of the (square) sky area to be simulated, in arc-seconds
 
+    instrument : str
+        Name of instrument for the siumulation
+
+    filter_list : list
+        List of filters to use to generate the catalog. (e.g ['F480M', 'F444W'])
+
+    kmag_limits : tup
+        Minimum and maximum magnitudes to use in the query to Besancon model
+
     email : str
         A valid email address is needed to query the Besancon model
 
@@ -1913,26 +1958,36 @@ def out_of_plane(box_width, email=''):
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
         Catalog with representative stars pulled from Besancon model
-
-    model : astropy.table.Table
-        Full query results from Besancon
     """
-    representative_galactic_longitude = 45.0  # deg
-    representative_galactic_latitude = 85.0  # deg
+    galactic_longitude = 45.0 * u.deg  # deg
+    galactic_latitude = 85.0 * u.deg  # deg
+    coord = SkyCoord(galactic_longitude, galactic_latitude, frame=Galactic)
 
-    cat = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                   box_width, coords='galactic', email=email, seed=seed)
+    cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
+                                               kmag_limits=kmag_limits, email=email,
+                                               instrument=instrument, filters=filter_list,
+                                               besancon_seed=seed)
     return cat
 
 
-def galactic_bulge(box_width, email='', seed=None):
+def galactic_bulge(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
+
     Parameters
     ----------
     box_width : float
         Size of the (square) sky area to be simulated, in arc-seconds
 
+    instrument : str
+        Name of instrument for the siumulation
+
+    filter_list : list
+        List of filters to use to generate the catalog. (e.g ['F480M', 'F444W'])
+
+    kmag_limits : tup
+        Minimum and maximum magnitudes to use in the query to Besancon model
+
     email : str
         A valid email address is needed to query the Besancon model
 
@@ -1944,18 +1999,16 @@ def galactic_bulge(box_width, email='', seed=None):
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
         Catalog with representative stars pulled from Besancon model
-
-    model : astropy.table.Table
-        Full query results from Besancon
     """
-    # Look up Besancon limitations. Model breaks down somewhere close to the
-    # galactic core.
-    representative_galactic_longitude = 0.  # ? deg
-    representative_galactic_latitude = 5.0  # ? deg
+    galactic_longitude = 0.0 * u.deg  # deg
+    galactic_latitude = 5.0 * u.deg  # deg
+    coord = SkyCoord(galactic_longitude, galactic_latitude, frame=Galactic)
 
-    cat, model = besancon(representative_galactic_longitude, representative_galactic_latitude,
-                          box_width, coords='galactic', email=email, seed=seed)
-    return cat, model
+    cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
+                                               kmag_limits=kmag_limits, email=email,
+                                               instrument=instrument, filters=filter_list,
+                                               besancon_seed=seed)
+    return cat
 
 
 def filter_bad_ra_dec(table_data):
