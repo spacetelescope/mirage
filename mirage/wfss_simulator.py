@@ -39,6 +39,7 @@ HISTORY:
 import os
 import sys
 import argparse
+import yaml
 
 from numpy import nanmedian, isfinite
 from astropy.io import fits
@@ -50,15 +51,15 @@ from .ramp_generator import obs_generator
 from .utils import read_fits
 from .yaml import yaml_update
 
-nircam_filters = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
-                  'F335M', 'F360M', 'F410M', 'F430M', 'F323N', 'F405N',
-                  'F466N', 'F470N']
-niriss_filters = []
+NIRCAM_GRISM_CROSSING_FILTERS = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
+                                 'F335M', 'F360M', 'F410M', 'F430M', 'F323N', 'F405N',
+                                 'F466N', 'F470N']
+NIRISS_GRISM_CROSSING_FILTERS = ['F200W', 'F150W', 'F140M', 'F158M', 'F115W', 'F090W']
 
 
 class WFSSSim():
-    def __init__(self, instrument, paramfiles, override_dark, crossing_filter, module=None,
-                 direction, prepDark=None, save_dispersed_seed=True, extrapolate_SED=True,
+    def __init__(self, paramfiles, crossing_filter='',
+                 direction='R', prepDark=None, save_dispersed_seed=True, extrapolate_SED=True,
                  override_dark=None, disp_seed_filename=None):
         # Set the MIRAGE_DATA environment variable if it is not
         # set already. This is for users at STScI.
@@ -71,17 +72,25 @@ class WFSSSim():
                               "input files needed for the simulation."
                               "These files must be downloaded separately"
                               "from the Mirage package.".format(self.env_var)))
-        self.instrument = instrument.lower()
+
+        with open(paramfiles[0], 'r') as infile:
+                self.params = yaml.load(infile)
+
+        self.instrument = self.params['Inst']['instrument'].lower()
         self.paramfiles = paramfiles
         self.override_dark = override_dark
         self.crossing_filter = crossing_filter
-        self.module = module
-        self.direction = direction
+        self.direction = direction.upper()
         self.prepDark = prepDark
         self.save_dispersed_seed = save_dispersed_seed
         self.disp_seed_filename = disp_seed_filename
         self.extrapolate_SED = extrapolate_SED
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
+
+        if self.instrument == 'niriss':
+            self.module = None
+        elif self.instrument == 'nircam':
+            self.module = self.params['Inst']['array_name'][3]
 
     def create(self):
         # Make sure inputs are correct
@@ -106,14 +115,16 @@ class WFSSSim():
             dmode = 'mod{}_{}'.format(self.module, self.direction)
             background_file = ("{}_{}_back.fits"
                                .format(self.crossing_filter, dmode))
+            orders = ["+1", "+2"]
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.direction)
             background_file = "normalized_background_{}-{}.fits".format(self.crossing_filter, dmode)
+            orders = None
 
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
-                               dmode, config_path=loc,
+                               dmode, config_path=loc, instrument=self.instrument.upper(),
                                extrapolate_SED=self.extrapolate_SED)
-        disp_seed.observation()
+        disp_seed.observation(orders=orders)
         disp_seed.finalize(Back=background_file)
 
         # Get gain map
@@ -175,10 +186,14 @@ class WFSSSim():
         # integration
         y = yaml_update.YamlUpdate()
         y.file = self.paramfiles[0]
-        y.filter = self.crossing_filter
-        y.pupil = 'GRISM' + self.direction
+        if self.instrument == 'nircam':
+            y.filter = self.crossing_filter
+            y.pupil = 'GRISM' + self.direction
+        elif self.instrument == 'niriss':
+            y.filter = 'GR150' + self.direction
+            y.pupil = self.crossing_filter
         y.outname = ("wfss_dispersed_{}_{}.yaml"
-                     .format(dmode,self.crossing_filter))
+                     .format(dmode, self.crossing_filter))
         y.run()
 
         # Combine into final observation
@@ -208,7 +223,7 @@ class WFSSSim():
             else:
                 self.module = self.module.upper()
 
-            if self.crossing_filter not in nircam_filters:
+            if self.crossing_filter not in NIRCAM_GRISM_CROSSING_FILTERS:
                 self.invalid('crossing_filter', self.crossing_filter)
             else:
                 self.crossing_filter = self.crossing_filter.upper()
@@ -216,7 +231,7 @@ class WFSSSim():
         elif self.instrument == 'niriss':
             self.module = None
 
-            if self.crossing_filter not in niriss_filters:
+            if self.crossing_filter not in NIRISS_GRISM_CROSSING_FILTERS:
                 self.invalid('crossing_filter', self.crossing_filter)
             else:
                 self.crossing_filter = self.crossing_filter.upper()
@@ -271,8 +286,8 @@ class WFSSSim():
             with fits.open(file) as h:
                 image = h[1].data
                 header = h[0].header
-        except:
-            raise IOError("WARNING: Unable to open gain file: {}".format(file))
+        except (FileNotFoundError) as e:
+            print(e)
 
         mngain = nanmedian(image)
 
@@ -301,13 +316,9 @@ class WFSSSim():
         """
         yl, xl = data.shape
         valid = [False, False, False, False]
-        valid = [(b>=0 and b<xl) for b in bounds[0:3:2]]
-        validy = [(b>=0 and b<yl) for b in bounds[1:4:2]]
+        valid = [(b >= 0 and b < xl) for b in bounds[0:3:2]]
+        validy = [(b >= 0 and b < yl) for b in bounds[1:4:2]]
         valid.extend(validy)
-
-        print(valid)
-        print(bounds)
-        print(yl, xl)
 
         if all(valid):
             return data[bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
@@ -321,9 +332,8 @@ class WFSSSim():
         try:
             subdict = ascii.read(subfile, data_start=1, header_start=0)
             return subdict
-        except:
-            raise RuntimeError(("Error: could not read in subarray definitions file "
-                                "{}".format(subfile)))
+        except FileNotFoundError as e:
+            print(e)
 
     def get_subarr_bounds(self, subname, sdict):
         # find the bounds of the requested subarray
@@ -336,28 +346,37 @@ class WFSSSim():
             raise ValueError(("WARNING: {} is not a subarray aperture name present "
                               "in the subarray definition file.".format(subname)))
 
-    def invalid(self,field,value):
-        print(("WARNING: invalid value for {}: {}"
-               .format(field,value)))
-        sys.exit()
+    def invalid(self, field, value):
+        raise ValueError(("WARNING: invalid value for {}: {}"
+                          .format(field, value)))
 
-    def add_options(self,parser = None, usage = None):
+    def add_options(self, parser=None, usage=None):
         if parser is None:
-            parser = argparse.ArgumentParser(usage = usage, description="Wrapper for the creation of WFSS simulated exposures.")
-        parser.add_argument("paramfiles",help='List of files describing the input parameters and instrument settings to use. (YAML format).',nargs='+')
-        parser.add_argument("--crossing_filter",help = "Name of crossing filter to use in conjunction with the grism.",default=None)
-        parser.add_argument("--module",help = "NIRCam module to use for simulation. Use 'A' or 'B'",default=None)
-        parser.add_argument("--direction",help = "Direction of dispersion (along rows or along columns). Use 'R' or 'C'",default=None)
-        parser.add_argument("--override_dark",help="If supplied, skip the dark preparation step and use the supplied dark to make the exposure", default=None)
-        parser.add_argument("--extrapolate_SED", help="If true, the SED created from the filter-averaged magnitudes will be extrapolated to fill the wavelngth range of the grism", action='store_true')
+            parser = argparse.ArgumentParser(usage=usage, description=("Wrapper for the creation of"
+                                                                       " WFSS simulated exposures."))
+        parser.add_argument("paramfiles", help=('List of files describing the input parameters and '
+                                                'instrument settings to use. (YAML format).'), nargs='+')
+        parser.add_argument("--crossing_filter", help=("Name of crossing filter to use in conjunction "
+                                                       "with the grism."), default=None)
+        parser.add_argument("--module", help="NIRCam module to use for simulation. Use 'A' or 'B'",
+                            default=None)
+        parser.add_argument("--direction", help=("Direction of dispersion (along rows or along columns). "
+                                                 "Use 'R' or 'C'"), default=None)
+        parser.add_argument("--override_dark", help=("If supplied, skip the dark preparation step and "
+                                                     "use the supplied dark to make the exposure"),
+                            default=None)
+        parser.add_argument("--extrapolate_SED", help=("If true, the SED created from the filter-averaged "
+                                                       "magnitudes will be extrapolated to fill the "
+                                                       "wavelngth range of the grism"), action='store_true')
         return parser
 
 
 if __name__ == '__main__':
 
-    usagestring = 'USAGE: wfss_simualtor.py file1.yaml file2.yaml --crossing_filter F444W --direction R --module A'
+    usagestring = ('USAGE: wfss_simualtor.py file1.yaml file2.yaml --crossing_filter F444W --direction R '
+                   '--module A')
 
     obs = WFSSSim()
-    parser = obs.add_options(usage = usagestring)
-    args = parser.parse_args(namespace = obs)
+    parser = obs.add_options(usage=usagestring)
+    args = parser.parse_args(namespace=obs)
     obs.create()

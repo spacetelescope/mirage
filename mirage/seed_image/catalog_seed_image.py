@@ -578,7 +578,7 @@ class Catalog_seed():
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
 
-        if instrument.lower() == 'niriss' and self.params['Inst']['mode'] in ["pom", "wfss"]:
+        if instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image']):
             # change the values for the NIRISS POM and WFSS modes.  Add 137
             # pixels extra space around the main image area, full frame.
             self.output_dims = [2322, 2322]
