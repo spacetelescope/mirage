@@ -59,7 +59,8 @@ def create_basic_exposure_list(xml_file, pointing_file):
 
 
 def for_proposal(xml_filename, pointing_filename, point_source=True, extragalactic=True,
-                 catalog_splitting_threshold=0.12, email='', out_dir=None, save_catalogs=True):
+                 catalog_splitting_threshold=0.12, email='', out_dir=None, save_catalogs=True,
+                 besancon_seed=None, galaxy_seed=None):
     """
     Given a pointing dictionary from an APT file, generate source catalogs
     that cover all of the coordinates specifired.
@@ -93,6 +94,13 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     save_catalogs : bool
         If True, save the catalogs to ascii files, in addition to returning
         them. If False, the catalog objects are returned, but not saved.
+
+    besancon_seed : int
+        Seed to use in the random number generator when choosing RA and
+        Dec values for Besancon sources.
+
+    galaxy_seed : int
+        Seed to use in the random number generator used in galaxy_background
 
     Returns
     -------
@@ -219,7 +227,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
                                                         instrument=instrument, filters=filter_list,
-                                                        email=email)
+                                                        email=email, besancon_seed=besancon_seed)
                 if i == 0:
                     ptsrc_cat = copy.deepcopy(tmp_cat)
                 else:
@@ -248,7 +256,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
                                                       filter_list, boxflag=False, brightlimit=14.0,
-                                                      seed=None)
+                                                      seed=galaxy_seed)
                 if i == 0:
                     galaxy_cat = copy.deepcopy(tmp_cat)
                 else:
@@ -803,8 +811,8 @@ def read_standard_magnitudes():
     """
     # read in the values needed to transform the Besancon model magnitudes
     #
-    path = os.environ.get('MIRAGE_DATA')
-    standard_mag_file = os.path.join(path, 'niriss/catalogs/', 'magslist_bosz_normal_mirage.new')
+    module_path = pkg_resources.resource_filename('mirage', '')
+    standard_mag_file = os.pth.join(module_path, 'config/magslist_bosz_normal_mirage.new')
     with open(standard_mag_file, 'r') as infile:
         lines = infile.readlines()
 
@@ -2195,9 +2203,9 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
                   'niriss_f430m_magnitude': 28, 'niriss_f444w_magnitude': 21,
                   'niriss_f480m_magnitude': 30, 'guider1_magnitude': 11,
                   'guider2_magnitude': 11}
-    path = os.environ.get('MIRAGE_DATA')
-    catalog_values = np.loadtxt(os.path.join(path, 'niriss/catalogs/', 'goodss_3dhst.v4.1.jwst_galfit.cat'),
-                                comments='#')
+    module_path = pkg_resources.resource_filename('mirage', '')
+    catalog_file = os.pth.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
+    catalog_values = np.loadtxt(catalog_file, comments='#')
     outinds = np.zeros((nfilters), dtype=np.int16)
     try:
         loop = 0

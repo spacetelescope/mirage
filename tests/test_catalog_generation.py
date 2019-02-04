@@ -21,7 +21,7 @@ from astropy.io import ascii
 from mirage.catalogs import catalog_generator
 from mirage.catalogs import create_catalog
 
-TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'catalogs')
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
 
 
 def test_ptsrc_catalog_creation():
@@ -52,7 +52,7 @@ def test_galaxy_catalog_creation():
     posang = np.zeros(10) + 27.
     sersic = np.zeros(10) + 3.3
 
-    output_file = os.path.join(TEST_DATA_DIR, 'galaxy_test.cat')
+    output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/galaxy_test.cat')
     gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
                                           sersic_index=sersic, position_angle=posang, radius_units='arcsec')
     gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
@@ -72,7 +72,7 @@ def test_2mass_catalog_generation():
     """Test the generation of a catalog from a 2MASS query
     """
     two_mass_mirage, two_mass_query_results = create_catalog.get_2MASS_ptsrc_catalog(80.4, -69.8, 120)
-    comparison_file = os.path.join(TEST_DATA_DIR, 'TwoMass_test.cat')
+    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/TwoMass_test.cat')
     comparison_table = ascii.read(comparison_file)
     assert all(two_mass_mirage.ra == comparison_table['x_or_RA'].data)
 
@@ -124,27 +124,82 @@ def test_2mass_plus_besaoncon_convenience_function():
     assert len(twomass.table) < len(both.table)
 
 
+def test_for_proposal():
+    """Test the creation of source catalogs from a proposal"""
+    xml = os.path.join(TEST_DATA_DIR, 'NIRCam/targets_with_large_separation.xml')
+    pointing = xml.replace('.xml', '.pointing')
+    output_directory = os.path.join(TEST_DATA_DIR, 'catalog_generation')
+    p_cat, g_cat, p_name, g_name, p_map, g_map = create_catalog.for_proposal(xml, pointing,
+                                                                             point_source=True,
+                                                                             extragalactic=True,
+                                                                             catalog_splitting_threshold=0.12,
+                                                                             email='hilbert@stsci.edu',
+                                                                             out_dir=output_directory,
+                                                                             save_catalogs=True,
+                                                                             besancon_seed=2345,
+                                                                             galaxy_seed=2346)
+
+    ptsrc_map = {'1': 'ptsrc_for_targets_with_large_separation_observations_1.cat',
+                 '2': 'ptsrc_for_targets_with_large_separation_observations_2.cat',
+                 '3': 'ptsrc_for_targets_with_large_separation_observations_3.cat'}
+
+    galaxy_map = {'1': 'galaxies_for_targets_with_large_separation_observations_1.cat',
+                  '2': 'galaxies_for_targets_with_large_separation_observations_2.cat',
+                  '3': 'galaxies_for_targets_with_large_separation_observations_3.cat'}
+
+    ptsrc_name = []
+    galaxy_name = []
+    for key in ptsrc_map:
+        ptsrc_name.append(os.path.join(output_directory, ptsrc_map[key]))
+        galaxy_name.append(os.path.join(output_directory, galaxy_map[key]))
+
+    assert ptsrc_map == p_map
+    assert galaxy_map == g_map
+    assert ptsrc_name == p_name
+    assert galaxy_name == g_name
+
+    truth_ptsrc = ['ptsrc_1.cat', 'ptsrc_2.cat', 'ptsrc_3.cat']
+    truth_galaxy = ['galaxy_1.cat', 'galaxy_2.cat', 'galaxy_3.cat']
+
+    for pcat_new, pcat in zip(p_cat, truth_ptsrc):
+        truth_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/{}'.format(pcat))
+        truth = ascii.read(truth_file)
+
+        for col in pcat_new.table.colnames:
+            assert all(pcat_new.table[col].data == truth[col].data)
+
+    for gcat_new, gcat in zip(g_cat, truth_galaxy):
+        truth_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/{}'.format(gcat))
+        truth = ascii.read(truth_file)
+
+        for col in gcat_new.table.colnames:
+            assert all(gcat_new.table[col].data == truth[col].data)
+
+    # Remove the catalog files just produced
+    for del_ptsrc, del_galaxy in zip(ptsrc_name, galaxy_name):
+        os.remove(os.path.join(output_directory, del_ptsrc))
+        os.remove(os.path.join(output_directory, del_galaxy))
+        os.remove(ps.path.join(os.getcwd(), observation_list.yaml))
+
+
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
     dec = -69.8
-    width = 200.
+    width = 120.
     ins = 'NIRCAM'
     filters = ['F150W', 'F356W', 'F444W', 'F480M']
-    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, kmag_limits=(10, 29),
+
+    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, kmag_limits=(13, 29),
                                                    email='hilbert@stsci.edu', instrument=ins, filters=filters,
-                                                   besancon_seeds=[1234, 1235])
-    print(type(cat))
-    #comparison_file = os.path.join(TEST_DATA_DIR, 'get_all_catalogs.cat')
-    #comparison_data = ascii.read(comparison_file)
+                                                   besancon_seed=1234)
+    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/get_all_catalogs.cat')
+    comparison_data = ascii.read(comparison_file)
 
     # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
     # fail without there being a problem with Mirage.
-    assert all(cat.table == comparison_data)
-
-    #for colname in comparison_data.colnames:
-    #    assert colname in headers
-    #assert len(cat[headers[0]]) == len(comparison_data[headers[0]])
+    for col in cat.table.colnames:
+        assert all(cat.table[col].data == comparison_data[col].data)
 
 
 def test_gaia_query():
@@ -166,12 +221,12 @@ def test_random_ra_dec_values():
     ra_max = 1.1
     dec_min = 40.
     dec_max = 40.1
-    ra1, dec1 = create_catalog.generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max,
-                                               seeds=[37465, 927436])
-    ra2, dec2 = create_catalog.generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max,
-                                               seeds=[37465, 927436])
-    assert ra1 == ra2
-    assert dec1 == dec2
+    ra1, dec1 = create_catalog.generate_ra_dec(num_stars, ra_min, ra_max, dec_min, dec_max,
+                                               seed=37465)
+    ra2, dec2 = create_catalog.generate_ra_dec(num_stars, ra_min, ra_max, dec_min, dec_max,
+                                               seed=37465)
+    assert np.all(ra1 == ra2)
+    assert np.all(dec1 == dec2)
     assert np.min(ra1) >= ra_min
     assert np.max(ra1) <= ra_max
     assert np.min(dec1) >= dec_min
