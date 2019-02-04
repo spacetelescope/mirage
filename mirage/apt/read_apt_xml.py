@@ -1171,9 +1171,9 @@ class ReadAPTXML():
 
         # Direct and out of field images are never dithered
         primary_dither_direct = '1'
-        primary_dither_type_direct = 'NONE'
+        primary_dither_type_direct = 'None'
         subpix_dither_direct = '1'
-        subpix_dither_type_direct = 'NONE'
+        subpix_dither_type_direct = 'None'
         direct_number_of_dithers = '1'
 
         # Which grism(s) are to be used
@@ -1496,7 +1496,7 @@ class ReadAPTXML():
         if parallel:
             prime_template = obs.find(self.apt + 'Template')[0]
             prime_template_name = etree.QName(prime_template).localname
-            prime_ns = "{{{}/Template/{}}}".format(self.apt.replace('{','').replace('}',''), prime_template_name)
+            prime_ns = "{{{}/Template/{}}}".format(self.apt.replace('{', '').replace('}', ''), prime_template_name)
 
             # Boolean indicating which instrument is not prime but parallel
             parallel_instrument = True
@@ -1515,7 +1515,7 @@ class ReadAPTXML():
             parallel_instrument = False
             prime_instrument = instrument
             dither_direct = 'NO_DITHERING'
-            sdither_type_grism = 'NONE'
+            sdither_type_grism = 'None'
             sdither_grism = '1'
             # Dither size can be SMALL, MEDIUM, LARGE. Only look for this if NIRISS is prime
             pdither_type_grism = template.find(ns + 'DitherSize').text
@@ -1574,9 +1574,9 @@ class ReadAPTXML():
                 typeflag = 'imaging'
                 if dither_direct == 'NO_DITHERING':
                     pdither = '1'  # direct image has no dithers
-                    pdither_type = 'NONE'  # direct image has no dithers
+                    pdither_type = 'None'  # direct image has no dithers
                     sdither = '1'
-                    sdither_type = 'NONE'
+                    sdither_type = 'None'
                 else:
                     pdither = pdither_grism
                     pdither_type = pdither_type_grism
