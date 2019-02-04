@@ -66,6 +66,7 @@ def test_galaxy_catalog_creation():
     assert all(gal.position_angle == posang)
     assert all(gal.sersic_index == sersic)
     assert all(gal.table == as_read_in)
+    os.remove(output_file)
 
 
 def test_2mass_catalog_generation():
@@ -179,7 +180,11 @@ def test_for_proposal():
     for del_ptsrc, del_galaxy in zip(ptsrc_name, galaxy_name):
         os.remove(os.path.join(output_directory, del_ptsrc))
         os.remove(os.path.join(output_directory, del_galaxy))
-        os.remove(ps.path.join(os.getcwd(), observation_list.yaml))
+        cwd = os.getcwd()
+        try:
+            os.remove(ps.path.join(cwd, 'observation_list.yaml'))
+            os.remove(ps.path.join(cwd, 'expand_for_detectors.csv'))
+            os.remove(ps.path.join(cwd, 'Observation_table_for_targets_with_large_separation.csv'))
 
 
 def test_get_all_catalogs():
