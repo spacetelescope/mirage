@@ -81,7 +81,7 @@ class Catalog_seed():
         # and those of the expanded array. These are needed
         # mostly for WFSS observations, where the nominal output
         # array will not sit centered in the expanded output image.
-        self.coord_adjust = {'x': 1., 'xoffset': 0., 'y': 1., 'yoffset': 0.}
+        self.coord_adjust = {'x': 1., 'xoffset': 0, 'y': 1., 'yoffset': 0}
 
         # NIRCam rough noise values. Used to make educated guesses when
         # creating segmentation maps
