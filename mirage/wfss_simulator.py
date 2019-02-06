@@ -58,7 +58,7 @@ NIRISS_GRISM_CROSSING_FILTERS = ['F200W', 'F150W', 'F140M', 'F158M', 'F115W', 'F
 
 
 class WFSSSim():
-    def __init__(self, paramfiles, crossing_filter='',
+    def __init__(self, paramfiles, SED_file=None, crossing_filter='',
                  direction='R', prepDark=None, save_dispersed_seed=True, extrapolate_SED=True,
                  override_dark=None, disp_seed_filename=None):
         # Set the MIRAGE_DATA environment variable if it is not
@@ -78,6 +78,7 @@ class WFSSSim():
 
         self.instrument = self.params['Inst']['instrument'].lower()
         self.paramfiles = paramfiles
+        self.SED_file = SED_file
         self.override_dark = override_dark
         self.crossing_filter = crossing_filter
         self.direction = direction.upper()
@@ -118,12 +119,12 @@ class WFSSSim():
             orders = ["+1", "+2"]
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.direction)
-            background_file = "normalized_background_{}-{}.fits".format(self.crossing_filter, dmode)
+            background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
             orders = None
 
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
                                dmode, config_path=loc, instrument=self.instrument.upper(),
-                               extrapolate_SED=self.extrapolate_SED)
+                               extrapolate_SED=self.extrapolate_SED, SED_file=SED_file)
         disp_seed.observation(orders=orders)
         disp_seed.finalize(Back=background_file)
 
