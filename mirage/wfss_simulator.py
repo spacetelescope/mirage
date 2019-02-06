@@ -61,6 +61,19 @@ class WFSSSim():
     def __init__(self, paramfiles, SED_file=None, crossing_filter='',
                  direction='R', prepDark=None, save_dispersed_seed=True, extrapolate_SED=True,
                  override_dark=None, disp_seed_filename=None):
+
+        print('TRY to grab what info you can from the input param files. Crossing filter, direction')
+        print('should not have to be user inputs.')
+
+        print('what if the input is a list of only imaging yamls? then user can give direction and')
+        print('crossing filter and everything will proceed ok? need to modify the yaml a little more')
+        print('for obs_prep then, to add grism name.')
+
+        print('when you go to make the direct seed image in the case where a wfss yaml is provided')
+        print('catalog_seed_image will need to ignore the grism name')
+
+        print('This should be a change to catalog_seed_image? or modify the yaml here? Probably the former')
+
         # Set the MIRAGE_DATA environment variable if it is not
         # set already. This is for users at STScI.
         self.env_var = 'MIRAGE_DATA'
@@ -93,25 +106,27 @@ class WFSSSim():
         elif self.instrument == 'nircam':
             self.module = self.params['Inst']['array_name'][3]
 
-    def create(self):
         # Make sure inputs are correct
         self.check_inputs()
+
+    def create(self):
+        """MAIN FUNCTION"""
 
         # Loop over the yaml files and create
         # a direct seed image for each
         imseeds = []
-        # Create imaging seed images
         for pfile in self.paramfiles:
             cat = catalog_seed_image.Catalog_seed()
             cat.paramfile = pfile
             cat.make_seed()
             imseeds.append(cat.seed_file)
 
-        # Create dispersed seed image from
-        # the direct images
+        # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
                                                                self.instrument.upper()))
 
+        # Determine the name of the background file to use, as well as the
+        # orders to disperse.
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.direction)
             background_file = ("{}_{}_back.fits"
@@ -122,6 +137,7 @@ class WFSSSim():
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
             orders = None
 
+        # Create dispersed seed image from the direct images
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
                                dmode, config_path=loc, instrument=self.instrument.upper(),
                                extrapolate_SED=self.extrapolate_SED, SED_file=SED_file)
@@ -139,14 +155,24 @@ class WFSSSim():
             print("Dispersed seed image size: {}".format(disp_seed.final.shape))
             disp_seed.final = self.crop_to_subarray(disp_seed.final, cat.subarray_bounds)
             gain = self.crop_to_subarray(gain, cat.subarray_bounds)
+
             # Segmentation map will be centered in a frame that is larger
             # than full frame by a factor of sqrt(2), so crop appropriately
+            print("Need to make this work for subarrays...")
             segy, segx = cat.seed_segmap.shape
             dx = int((segx - 2048) / 2)
             dy = int((segy - 2048) / 2)
             segbounds = [cat.subarray_bounds[0] + dx, cat.subarray_bounds[1] + dy,
                          cat.subarray_bounds[2] + dx, cat.subarray_bounds[3] + dy]
             cat.seed_segmap = self.crop_to_subarray(cat.seed_segmap, segbounds)
+
+
+        # Save the dispersed seed image if requested
+        # Save in units of e/s, under the idea that this should be a
+        # "perfect" noiseless view of the scene that does not depend on
+        # detector effects, such as gain.
+        if self.save_dispersed_seed:
+            self.save_dispersed_seed_image(disp_seed.final)
 
         # Convert seed image to ADU/sec to be consistent
         # with other simulator outputs
@@ -155,20 +181,6 @@ class WFSSSim():
         # Update seed image header to reflect the
         # division by the gain
         cat.seedinfo['units'] = 'ADU/sec'
-
-        # Save the dispersed seed image
-        if self.save_dispersed_seed:
-            hh00 = fits.PrimaryHDU()
-            hh11 = fits.ImageHDU(disp_seed.final)
-            hhll = fits.HDUList([hh00, hh11])
-            hhll[0].header['units'] = 'ADU/sec'
-            if self.disp_seed_filename is None:
-                pdir, pf = os.path.split(self.paramfiles[0])
-                dname = 'dispersed_seed_image_for_' + pf + '.fits'
-                self.disp_seed_filename = os.path.join(pdir, dname)
-            hhll.writeto(self.disp_seed_filename, overwrite=True)
-            print(("Dispersed seed image saved to {}"
-                   .format(self.disp_seed_filename)))
 
         # Prepare dark current exposure if
         # needed.
@@ -214,42 +226,54 @@ class WFSSSim():
         self.prepDark.read_astropy()
 
     def check_inputs(self):
-        # Make sure input parameters are good
+        """Make sure input parameters are acceptible"""
+
+        ####################Instrument Name##################
         if self.instrument not in ['nircam', 'niriss']:
             self.invalid('instrument', instrument)
 
+        ####################Module Name##################
         if self.instrument == 'nircam':
             if self.module not in ['A', 'B']:
                 self.invalid('module', self.module)
             else:
                 self.module = self.module.upper()
 
+            ####################Crossing Filter##################
             if self.crossing_filter not in NIRCAM_GRISM_CROSSING_FILTERS:
                 self.invalid('crossing_filter', self.crossing_filter)
             else:
                 self.crossing_filter = self.crossing_filter.upper()
 
         elif self.instrument == 'niriss':
-            self.module = None
-
             if self.crossing_filter not in NIRISS_GRISM_CROSSING_FILTERS:
                 self.invalid('crossing_filter', self.crossing_filter)
             else:
                 self.crossing_filter = self.crossing_filter.upper()
 
+        ####################Dispersion Direction##################
         if self.direction not in ['R', 'C']:
             self.invalid('direction', self.direction)
         else:
             self.direction = self.direction.upper()
 
+        ####################Dark File to Use##################
         if self.override_dark is not None:
             avail = os.path.isfile(self.override_dark)
             if not avail:
                 raise FileNotFoundError(("WARNING: {} does not exist."
                                          .format(self.override_dark)))
-        if len(self.paramfiles) < 2:
-            raise ValueError(("WARNING: self.paramfiles must be a list"
-                              "of 2 or more yaml files."))
+
+        ####################Parameter File(s) and SED File##################
+        if isinstance(self.paramfiles, str):
+            self.paramfiles = [self.paramfiles]
+
+        if ((len(self.paramfiles) < 2) and (self.SED_file is None)):
+            print(("INFO: Only one parameter file provided and no SED file. All "
+                   "sources will have flat continuums."))
+
+        if ((len(self.paramfiles) > 1) and (self.SED_file is not None)):
+            raise ValueError(("WARNING: When using an SED file, you must provide only one parameter file."))
 
     def read_param_file(self, file):
         """
@@ -350,6 +374,19 @@ class WFSSSim():
     def invalid(self, field, value):
         raise ValueError(("WARNING: invalid value for {}: {}"
                           .format(field, value)))
+
+    def save_dispersed_seed_image(self, seed_image):
+        """Save the dispersed seed image"""
+        primary_hdu = fits.PrimaryHDU()
+        image_hdu = fits.ImageHDU(seed_image)
+        hdu_list = fits.HDUList([primary_hdu, image_hdu])
+        hdu_list[0].header['units'] = 'e/sec'
+        if self.disp_seed_filename is None:
+            pdir, pf = os.path.split(self.paramfiles[0])
+            dname = 'dispersed_seed_image_for_{}.fits'.format(pf)
+            self.disp_seed_filename = os.path.join(pdir, dname)
+        hdu_list.writeto(self.disp_seed_filename, overwrite=True)
+        print(("Dispersed seed image saved to {}".format(self.disp_seed_filename)))
 
     def add_options(self, parser=None, usage=None):
         if parser is None:
