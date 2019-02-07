@@ -73,6 +73,7 @@ class Catalog_seed():
         # track sources that are outside the requested subarray
         # in order to calculate contamination.
         self.grism_direct_factor = np.sqrt(2.)
+        print('change me for niriss')
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -584,6 +585,7 @@ class Catalog_seed():
             self.output_dims = [2322, 2322]
             self.coord_adjust['x'] = 2322./2048.
             self.coord_adjust['y'] = 2322./2048.
+            self.grism_direct_factor = 2322./2048.
             self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
                                                   (self.subarray_bounds[2] -
                                                    self.subarray_bounds[0] + 1) / 2.)

@@ -36,6 +36,7 @@ HISTORY:
 13 July 2018 - updated for name change to Mirage, Bryan Hilbert
 '''
 
+import copy
 import os
 import sys
 import argparse
@@ -58,16 +59,8 @@ NIRISS_GRISM_CROSSING_FILTERS = ['F200W', 'F150W', 'F140M', 'F158M', 'F115W', 'F
 
 
 class WFSSSim():
-    def __init__(self, paramfiles, SED_file=None, crossing_filter='',
-                 direction='R', prepDark=None, save_dispersed_seed=True, extrapolate_SED=True,
-                 override_dark=None, disp_seed_filename=None):
-
-        print('TRY to grab what info you can from the input param files. Crossing filter, direction')
-        print('should not have to be user inputs.')
-
-        print('what if the input is a list of only imaging yamls? then user can give direction and')
-        print('crossing filter and everything will proceed ok? need to modify the yaml a little more')
-        print('for obs_prep then, to add grism name.')
+    def __init__(self, paramfiles, SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
+                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None):
 
         print('when you go to make the direct seed image in the case where a wfss yaml is provided')
         print('catalog_seed_image will need to ignore the grism name')
@@ -86,25 +79,27 @@ class WFSSSim():
                               "These files must be downloaded separately"
                               "from the Mirage package.".format(self.env_var)))
 
-        with open(paramfiles[0], 'r') as infile:
-                self.params = yaml.load(infile)
-
-        self.instrument = self.params['Inst']['instrument'].lower()
+        # Make sure the input param file(s) is a list
         self.paramfiles = paramfiles
+        if isinstance(paramfiles, str):
+            self.paramfiles = [self.paramfiles]
+
+        # Set the user-input parameters
         self.SED_file = SED_file
         self.override_dark = override_dark
-        self.crossing_filter = crossing_filter
-        self.direction = direction.upper()
-        self.prepDark = prepDark
         self.save_dispersed_seed = save_dispersed_seed
+        self.source_stamps_file = source_stamps_file
         self.disp_seed_filename = disp_seed_filename
         self.extrapolate_SED = extrapolate_SED
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
 
-        if self.instrument == 'niriss':
-            self.module = None
-        elif self.instrument == 'nircam':
-            self.module = self.params['Inst']['array_name'][3]
+        # Make sure the right combination of parameter files and SED file
+        # are given
+        self.param_checks()
+
+        # Attempt to find the crossing filter and dispersion direction
+        # from the input paramfiles
+        self.find_param_info()
 
         # Make sure inputs are correct
         self.check_inputs()
@@ -128,19 +123,21 @@ class WFSSSim():
         # Determine the name of the background file to use, as well as the
         # orders to disperse.
         if self.instrument == 'nircam':
-            dmode = 'mod{}_{}'.format(self.module, self.direction)
+            dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             background_file = ("{}_{}_back.fits"
                                .format(self.crossing_filter, dmode))
             orders = ["+1", "+2"]
         elif self.instrument == 'niriss':
-            dmode = 'GR150{}'.format(self.direction)
+            dmode = 'GR150{}'.format(self.dispersion_direction)
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
+            print('Background file is {}'.format(background_file))
             orders = None
 
         # Create dispersed seed image from the direct images
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
                                dmode, config_path=loc, instrument=self.instrument.upper(),
-                               extrapolate_SED=self.extrapolate_SED, SED_file=SED_file)
+                               extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
+                               SBE_save=self.source_stamps_file)
         disp_seed.observation(orders=orders)
         disp_seed.finalize(Back=background_file)
 
@@ -190,24 +187,27 @@ class WFSSSim():
             d.prepare()
             obslindark = d.prepDark
         else:
-            self.read_dark_product(self.override_dark)
-            obslindark = self.prepDark
+            self.read_dark_product()
+            obslindark = self.darkPrep
 
         # Using the first of the imaging seed image yaml
         # files as a base, adjust to create the yaml file
         # for the creation of the final dispersed
         # integration
-        y = yaml_update.YamlUpdate()
-        y.file = self.paramfiles[0]
-        if self.instrument == 'nircam':
-            y.filter = self.crossing_filter
-            y.pupil = 'GRISM' + self.direction
-        elif self.instrument == 'niriss':
-            y.filter = 'GR150' + self.direction
-            y.pupil = self.crossing_filter
-        y.outname = ("wfss_dispersed_{}_{}.yaml"
-                     .format(dmode, self.crossing_filter))
-        y.run()
+
+        # I think we won't need this anymore assuming that
+        # one of the input yaml files is for wfss mode
+        #y = yaml_update.YamlUpdate()
+        #y.file = self.paramfiles[0]
+        #if self.instrument == 'nircam':
+        #    y.filter = self.crossing_filter
+        #    y.pupil = 'GRISM' + self.direction
+        #elif self.instrument == 'niriss':
+        #    y.filter = 'GR150' + self.direction
+        #    y.pupil = self.crossing_filter
+        #y.outname = ("wfss_dispersed_{}_{}.yaml"
+        #             .format(dmode, self.crossing_filter))
+        #y.run()
 
         # Combine into final observation
         obs = obs_generator.Observation()
@@ -215,65 +215,95 @@ class WFSSSim():
         obs.seed = disp_seed.final
         obs.segmap = cat.seed_segmap
         obs.seedheader = cat.seedinfo
-        obs.paramfile = y.outname
+        #obs.paramfile = y.outname
+        obs.paramfile = self.wfss_yaml
         obs.create()
 
-    def read_dark_product(self, file):
-        # Read in dark product that was produced
-        # by dark_prep.py
-        self.prepDark = read_fits.Read_fits()
-        self.prepDark.file = file
-        self.prepDark.read_astropy()
-
-    def check_inputs(self):
-        """Make sure input parameters are acceptible"""
-
-        ####################Instrument Name##################
-        if self.instrument not in ['nircam', 'niriss']:
-            self.invalid('instrument', instrument)
-
-        ####################Module Name##################
-        if self.instrument == 'nircam':
-            if self.module not in ['A', 'B']:
-                self.invalid('module', self.module)
-            else:
-                self.module = self.module.upper()
-
-            ####################Crossing Filter##################
-            if self.crossing_filter not in NIRCAM_GRISM_CROSSING_FILTERS:
-                self.invalid('crossing_filter', self.crossing_filter)
-            else:
-                self.crossing_filter = self.crossing_filter.upper()
-
-        elif self.instrument == 'niriss':
-            if self.crossing_filter not in NIRISS_GRISM_CROSSING_FILTERS:
-                self.invalid('crossing_filter', self.crossing_filter)
-            else:
-                self.crossing_filter = self.crossing_filter.upper()
-
-        ####################Dispersion Direction##################
-        if self.direction not in ['R', 'C']:
-            self.invalid('direction', self.direction)
-        else:
-            self.direction = self.direction.upper()
-
-        ####################Dark File to Use##################
-        if self.override_dark is not None:
-            avail = os.path.isfile(self.override_dark)
-            if not avail:
-                raise FileNotFoundError(("WARNING: {} does not exist."
-                                         .format(self.override_dark)))
-
-        ####################Parameter File(s) and SED File##################
-        if isinstance(self.paramfiles, str):
-            self.paramfiles = [self.paramfiles]
-
+    def param_checks(self):
+        """Check parameter file inputs"""
         if ((len(self.paramfiles) < 2) and (self.SED_file is None)):
             print(("INFO: Only one parameter file provided and no SED file. All "
                    "sources will have flat continuums."))
 
         if ((len(self.paramfiles) > 1) and (self.SED_file is not None)):
             raise ValueError(("WARNING: When using an SED file, you must provide only one parameter file."))
+
+    def read_dark_product(self):
+        # Read in dark product that was produced
+        # by dark_prep.py
+        self.prepDark = read_fits.Read_fits()
+        self.prepDark.file = self.override_dark
+        self.prepDark.read_astropy()
+
+    def check_inputs(self):
+        """Make sure input parameters are acceptible"""
+
+        # ###################Instrument Name##################
+        if self.instrument not in ['nircam', 'niriss']:
+            self.invalid('instrument', instrument)
+
+        # ###################Module Name##################
+        if self.instrument == 'nircam':
+            if self.module not in ['A', 'B']:
+                self.invalid('module', self.module)
+            else:
+                self.module = self.module.upper()
+
+            # ###################Crossing Filter##################
+            if self.crossing_filter not in NIRCAM_GRISM_CROSSING_FILTERS:
+                self.invalid('crossing_filter', self.crossing_filter)
+
+        elif self.instrument == 'niriss':
+            if self.crossing_filter not in NIRISS_GRISM_CROSSING_FILTERS:
+                self.invalid('crossing_filter', self.crossing_filter)
+
+        # ###################Dispersion Direction##################
+        if self.dispersion_direction not in ['R', 'C']:
+            self.invalid('dispersion_direction', self.dispersion_direction)
+
+        # ###################Dark File to Use##################
+        if self.override_dark is not None:
+            avail = os.path.isfile(self.override_dark)
+            if not avail:
+                raise FileNotFoundError(("WARNING: {} does not exist."
+                                         .format(self.override_dark)))
+
+    def find_param_info(self):
+        """Extract dispersion direction and crossing filter from the input
+        param files"""
+        wfss_files_found = 0
+        for i, pfile in enumerate(self.paramfiles):
+            with open(pfile, 'r') as infile:
+                params = yaml.load(infile)
+
+            if i == 0:
+                self.instrument = params['Inst']['instrument'].lower()
+                if self.instrument == 'niriss':
+                    self.module = None
+                elif self.instrument == 'nircam':
+                    self.module = params['Inst']['array_name'][3]
+
+            # The grism elements are in NIRCam's pupil wheel, and NIRISS's
+            # filter wheel
+            if params['Inst']['mode'].lower() == 'wfss':
+                self.wfss_yaml = copy.deepcopy(pfile)
+
+                # Only 1 input yaml file should be for wfss mode
+                wfss_files_found += 1
+                if wfss_files_found == 2:
+                    raise ValueError("WARNING: only one of the parameter files can be WFSS mode.")
+                filter_name = params['Readout']['filter']
+                pupil_name = params['Readout']['pupil']
+                if self.instrument == 'niriss':
+                    self.crossing_filter = pupil_name.upper()
+                    self.dispersion_direction = filter_name[-1].upper()
+                elif slf.instrument == 'nircam':
+                    self.crossing_filter = filter_name.upper()
+                    self.dispersion_direction = pupil_name[-1].upper()
+
+        if wfss_files_found == 0:
+            raise ValueError(("WARNING: No WFSS mode parameter files found. One of the parameter "
+                              "files must be wfss mode in order to define grism and crossing filter."))
 
     def read_param_file(self, file):
         """
@@ -292,8 +322,8 @@ class WFSSSim():
         try:
             with open(file, 'r') as infile:
                 data = yaml.load(infile)
-        except:
-            raise IOError("WARNING: unable to open {}".format(file))
+        except (FileNotFoundError, IOError) as e:
+            print(e)
 
     def read_gain_file(self, file):
         """
@@ -311,7 +341,7 @@ class WFSSSim():
             with fits.open(file) as h:
                 image = h[1].data
                 header = h[0].header
-        except (FileNotFoundError) as e:
+        except (FileNotFoundError, IOError) as e:
             print(e)
 
         mngain = nanmedian(image)
@@ -357,7 +387,7 @@ class WFSSSim():
         try:
             subdict = ascii.read(subfile, data_start=1, header_start=0)
             return subdict
-        except FileNotFoundError as e:
+        except (FileNotFoundError, IOError) as e:
             print(e)
 
     def get_subarr_bounds(self, subname, sdict):
