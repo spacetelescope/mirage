@@ -506,7 +506,7 @@ class SimInput:
             else:
                 # number of detectors
                 n_det = 1
-                
+
             if coord_par == 'true':
                 instrument_string = '    Prime: {}, Parallel: {}'.format(prime_instrument, parallel_instrument)
             else:
@@ -603,7 +603,6 @@ class SimInput:
         ----------
         detector : str
             Name of detector being used
-
         Returns
         -------
         files : str
@@ -1183,6 +1182,7 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0004.asdf'))[0]
+                        self.lindark_list[instrument][det] = [None]
 
                     elif det == 'G2':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
@@ -1191,11 +1191,15 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0003.asdf'))[0]
+                        self.lindark_list[instrument][det] = [None]
 
                     elif det == 'NIS':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument],
+                                                                           'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
-                                               '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+                                                                            '*uncal.fits'))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/linearized',
+                                                                               '*linear_dark_prep_object.fits'))
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion*.asdf'))[0]
@@ -1204,12 +1208,10 @@ class SimInput:
                     self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
                     self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
 
-
                     # suspecting that the FGS wcs reference file has a problem
                     # self.astrometric_list[instrument][det] = 'none'
 
                     self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'pam/*area*.fits'))[0]
-                    self.lindark_list[instrument][det] = [None]
 
     def set_config(self, file, prop):
         """
