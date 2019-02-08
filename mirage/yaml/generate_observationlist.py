@@ -243,7 +243,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                         catalog_file_list = [catalog_files] * number_of_obs[key]
                         catalogs[key][module_key] = catalog_file_list
                     if len(catalogs[key][module_key]) != number_of_obs[key]:
-                        raise RuntimeError('Please specify one catalog per observation for {}'.format(key.lower()))
+                        raise RuntimeError(('Please specify one catalog per observation for {}. '
+                                            'Current catalog is {}').format(key.lower(),
+                                                                            catalogs[key][module_key]))
 
         else:
             catalog_files = catalogs[key]
@@ -251,8 +253,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                 catalog_file_list = [catalog_files] * number_of_obs[key]
                 catalogs[key] = catalog_file_list
             if len(catalogs[key]) != number_of_obs[key]:
-                raise RuntimeError(
-                    'Please specify one catalog per observation for {}'.format(key.lower()))
+                raise RuntimeError(('Please specify one catalog per observation for {}. '
+                                    'Current catalog is {}').format(key.lower(), catalogs[key]))
 
     # if verbose:
     #     print('Summary of dictionary extracted from {}'.format(xml_file))

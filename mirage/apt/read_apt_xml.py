@@ -1585,7 +1585,8 @@ class ReadAPTXML():
 
                 tile = '1'
                 direct_grismvalue = 'N/A'
-                pupil = 'CLEARP'  # NIRISS filter MUST be in filter wheel, not PUPIL wheel
+                #pupil = 'CLEARP'  # NIRISS filter MUST be in filter wheel, not PUPIL wheel
+                pupil = 'CLEAR'
                 rpatt = directexp.find(ns + 'ReadoutPattern').text
                 grps = directexp.find(ns + 'Groups').text
                 ints = directexp.find(ns + 'Integrations').text
@@ -1613,7 +1614,8 @@ class ReadAPTXML():
                 exp_seq_dict['TileNumber'] = [tile] * repeats
                 exp_seq_dict['APTTemplate'] = [template_name] * repeats
                 exp_seq_dict['ObservationName'] = [proposal_param_dict['ObservationName']] * repeats
-                exp_seq_dict['FilterWheel'] = [filter_name] * repeats
+                #exp_seq_dict['FilterWheel'] = [filter_name] * repeats
+                exp_seq_dict['PupilWheel'] = [filter_name] * repeats
                 exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * repeats
 
                 if not both_grisms:
@@ -1630,7 +1632,8 @@ class ReadAPTXML():
                     exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
                                                          str(int(pdither_grism)*int(sdither_grism)),
                                                          str(int(pdither)*int(sdither))]
-                    exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                    #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                    exp_seq_dict['FilterWheel'] = [pupil, grism_pupil, pupil]
                 else:
                     if grism_number == 0:
                         exp_seq_dict['Mode'] = [typeflag, grism_typeflag]
@@ -1645,7 +1648,8 @@ class ReadAPTXML():
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism]
                         exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
                                                              str(int(pdither_grism)*int(sdither_grism))]
-                        exp_seq_dict['PupilWheel'] = [pupil, grism_pupil]
+                        #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil]
+                        exp_seq_dict['FilterWheel'] = [pupil, grism_pupil]
                     elif grism_number == 1:
                         exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]
                         exp_seq_dict['PrimaryDitherType'] = [pdither_type, pdither_type_grism, pdither_type]
@@ -1660,7 +1664,8 @@ class ReadAPTXML():
                         exp_seq_dict['number_of_dithers'] = [str((int(pdither)*int(sdither))*2),
                                                              str(int(pdither_grism)*int(sdither_grism)),
                                                              str(int(pdither)*int(sdither))]
-                        exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                        #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                        exp_seq_dict['FilterWheel'] = [pupil, grism_pupil, pupil]
                 #######################################################################
                 # Update exposure dictionary to return
                 # Add out_of_field_dict to the exposures_dictionary
