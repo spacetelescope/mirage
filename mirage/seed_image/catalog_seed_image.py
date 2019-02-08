@@ -256,6 +256,25 @@ class Catalog_seed():
         except:
             raise IOError('WARNING: unable to read in {}'.format(fname))
 
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
+            # If the simulation is for WFSS or POM data, make sure the
+            # reference pixels around the PAM are also set to
+            # non-zero, otherwise you will get a 4 pixel wide picture frame of 0's
+            # in the expanded seed image
+            bottom = pam[4, :]
+            top = pam[2043, :]
+            left = pam[:, 4]
+            right = pam[:, 2043]
+            for i in range(4):
+                pam[i, :] = bottom
+                pam[i+2044, :] = top
+                pam[:, i] = left
+                pam[:, i+2044] = right
+            pam[0:4, 0:4] = pam[4, 4]
+            pam[2044:, 0:4] = pam[2043, 4]
+            pam[0:4, 2044:] = pam[4, 2043]
+            pam[2044:, 2044:] = pam[2043, 2043]
+
         # Crop to expected subarray
         try:
             pam = pam[self.subarray_bounds[1]:self.subarray_bounds[3]+1,
