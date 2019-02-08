@@ -185,7 +185,7 @@ class WFSSSim():
         # needed.
         if self.override_dark is None:
             d = dark_prep.DarkPrep()
-            d.paramfile = self.paramfiles[0]
+            d.paramfile = self.wfss_yaml
             d.prepare()
             obslindark = d.prepDark
         else:

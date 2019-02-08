@@ -2539,6 +2539,15 @@ class Observation():
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
+        elif ((self.params['Inst']['instrument'].lower() == 'niriss') and
+              (self.params['Inst']['mode'].lower() == 'wfss')):
+            # In NIRISS WFSS mode, the grism is actually in the filter wheel
+            # and the filter is in the pupil wheel. But from APT onwards
+            # they are reversed and the grism is in the pupeil wheel. We
+            # need to put them back to reality when saving the fits files though.
+            # The grism needs to be in the filter wheel.
+            pw = self.params['Readout']['filter']
+            fw = self.params['Readout']['pupil']
         else:
             pw = self.params['Readout']['pupil']
             fw = self.params['Readout']['filter']
