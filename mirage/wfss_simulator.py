@@ -98,8 +98,10 @@ class WFSSSim():
         self.param_checks()
 
         # Attempt to find the crossing filter and dispersion direction
-        # from the input paramfiles
-        self.find_param_info()
+        # from the input paramfiles. Adjust any imaging mode parameter
+        # files to have the mode set to wfss. This will ensure the seed
+        # images will be the proper (expanded) dimensions
+        self.paramfiles = self.find_param_info()
 
         # Make sure inputs are correct
         self.check_inputs()
@@ -222,8 +224,8 @@ class WFSSSim():
     def param_checks(self):
         """Check parameter file inputs"""
         if ((len(self.paramfiles) < 2) and (self.SED_file is None)):
-            print(("INFO: Only one parameter file provided and no SED file. All "
-                   "sources will have flat continuums."))
+            raise ValueError(("WARNING: Only one parameter file provided and no SED file. More "
+                              "yaml files or an SED file needed in order to disperse."))
 
         if ((len(self.paramfiles) > 1) and (self.SED_file is not None)):
             raise ValueError(("WARNING: When using an SED file, you must provide only one parameter file."))
@@ -271,6 +273,7 @@ class WFSSSim():
     def find_param_info(self):
         """Extract dispersion direction and crossing filter from the input
         param files"""
+        yamls_to_disperse = []
         wfss_files_found = 0
         for i, pfile in enumerate(self.paramfiles):
             with open(pfile, 'r') as infile:
@@ -283,8 +286,6 @@ class WFSSSim():
                 elif self.instrument == 'nircam':
                     self.module = params['Inst']['array_name'][3]
 
-            # The grism elements are in NIRCam's pupil wheel, and NIRISS's
-            # filter wheel
             if params['Inst']['mode'].lower() == 'wfss':
                 self.wfss_yaml = copy.deepcopy(pfile)
 
@@ -294,16 +295,36 @@ class WFSSSim():
                     raise ValueError("WARNING: only one of the parameter files can be WFSS mode.")
                 filter_name = params['Readout']['filter']
                 pupil_name = params['Readout']['pupil']
-                if self.instrument == 'niriss':
-                    self.crossing_filter = pupil_name.upper()
-                    self.dispersion_direction = filter_name[-1].upper()
-                elif slf.instrument == 'nircam':
-                    self.crossing_filter = filter_name.upper()
-                    self.dispersion_direction = pupil_name[-1].upper()
+
+                # In reality, the grism elements are in NIRCam's pupil wheel, and NIRISS's
+                # filter wheel. But in the APT xml file, NIRISS grisms are in the pupil
+                # wheel and the crossing filter is listed in the filter wheel. At that
+                # point, NIRISS and NIRCam are consistent, so let's keep with this reversed
+                # information
+                #if self.instrument == 'niriss':
+                #    self.crossing_filter = pupil_name.upper()
+                #    self.dispersion_direction = filter_name[-1].upper()
+                #elif slf.instrument == 'nircam':
+                self.crossing_filter = filter_name.upper()
+                self.dispersion_direction = pupil_name[-1].upper()
+                yamls_to_disperse.append(pfile)
+
+            elif params['Inst']['mode'].lower() == 'imaging':
+                # If the other yaml files are for imaging mode, we need to update them to
+                # be wfss mode so that the resulting seed images have the correct dimensions.
+                # Save these modified yaml files to new files.
+                params['Inst']['mode'] = 'imaging'
+                params['Output']['grism_source_image'] = True
+                outdir, basename = os.path.split(pfile)
+                modified_file = os.path.join(outdir, 'tmp_update_to_wfss_mode_{}'.format(basename))
+                with open(modified_file, 'w') as output:
+                    yaml.dump(params, output, default_flow_style=False)
+                yamls_to_disperse.append(modified_file)
 
         if wfss_files_found == 0:
             raise ValueError(("WARNING: No WFSS mode parameter files found. One of the parameter "
                               "files must be wfss mode in order to define grism and crossing filter."))
+        return yamls_to_disperse
 
     def read_param_file(self, file):
         """
