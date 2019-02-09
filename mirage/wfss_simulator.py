@@ -301,12 +301,12 @@ class WFSSSim():
                 # wheel and the crossing filter is listed in the filter wheel. At that
                 # point, NIRISS and NIRCam are consistent, so let's keep with this reversed
                 # information
-                #if self.instrument == 'niriss':
-                #    self.crossing_filter = pupil_name.upper()
-                #    self.dispersion_direction = filter_name[-1].upper()
-                #elif slf.instrument == 'nircam':
-                self.crossing_filter = filter_name.upper()
-                self.dispersion_direction = pupil_name[-1].upper()
+                if self.instrument == 'niriss':
+                    self.crossing_filter = pupil_name.upper()
+                    self.dispersion_direction = filter_name[-1].upper()
+                elif slf.instrument == 'nircam':
+                    self.crossing_filter = filter_name.upper()
+                    self.dispersion_direction = pupil_name[-1].upper()
                 yamls_to_disperse.append(pfile)
 
             elif params['Inst']['mode'].lower() == 'imaging':

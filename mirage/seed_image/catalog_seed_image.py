@@ -17,7 +17,7 @@ import math
 import yaml
 import time
 import pkg_resources
-from asdf import AsdfFile
+import asdf
 import scipy.signal as s1
 import numpy as np
 from photutils import detect_sources
@@ -3328,7 +3328,7 @@ class Catalog_seed():
         """
         coord_transform = None
         if self.runStep['astrometric']:
-            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
+            with asdf.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
         # else:
         #    coord_transform = self.simple_coord_transform()
