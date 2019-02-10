@@ -49,19 +49,19 @@ Interpixel capacitance (IPC) effects are added to the seed exposure at this poin
 | 0.0002 | 0.0050 | 0.0002 |
 +--------+--------+--------+
 
-This is the inverse of the kernel that can be used by the JWST calibration pipeline to remove IPC effects, like that shown below. Therefore, `mirage` has an option to accept a pipeline-formatted kernel that will then be inverted before being used to add IPC effects. It is also possible to use a file with a separate 3x3 kernel for each pixel. In this case the total kernel will have a shape of 2048 x 2048 x 3 x 3.
+This is the inverse of the kernel that can be used by the JWST calibration pipeline to remove IPC effects, like that shown below. Therefore, `Mirage` has an option to accept a pipeline-formatted kernel that will then be inverted before being used to add IPC effects. It is also possible to use a file with a separate 3x3 kernel for each pixel. In this case the total kernel will have a shape of 2048 x 2048 x 3 x 3.
 
 
 **ADD CORRECT VALUES IN HERE**
-+--------+--------+--------+
++--------+--------+-----------+
 | -0.0002 | -0.0052 | -0.0002 |
-+--------+--------+--------+
-| -0.0052 | 0.9792 | -0.0052 |
-+--------+--------+--------+
++--------+--------+-----------+
+| -0.0052 | 0.9792 | -0.0052  |
++--------+--------+-----------+
 | -0.0002 | -0.0052 | -0.0002 |
-+--------+--------+--------+
++--------+--------+-----------+
 
-The latest IPC kernels for all instruments and detectors are provided in the reference files assocaited with `mirage`.
+The latest IPC kernels for all instruments and detectors are provided in the reference files assocaited with `Mirage`.
 
 
 Add Seed Exposure to Dark Current Exposure

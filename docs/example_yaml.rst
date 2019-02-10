@@ -3,7 +3,7 @@
 Example yaml Input File
 =======================
 
-Below is an example yaml input file for `mirage`.
+Below is an example yaml input file for `Mirage`. For more information on the individual input paramters, see the :ref:`Input Yaml Parameters <input_yaml_file_parameters>` page.
 
 
 ::

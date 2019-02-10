@@ -57,22 +57,25 @@ Other Parameters
 Run the Yaml Generator
 ----------------------
 
-With the XML and pointing files in hand, and additional inputs defined above, Mirage's *yaml_generator.py* module can be called to create the associated yaml files. In this case, we specify that the yaml files produced by the *yaml_generator* will be output within a subdirectory of the working directory called *yaml_files*. We also define that when Mirage is run, the simulated data will be output into a subdirectory called *simulated_data*. This information will be placed into the constructed yaml files.
+With the XML and pointing files in hand, and additional inputs defined above, Mirage's *yaml_generator.py* module can be called to create the associated yaml files. We specify a location for the oputput yaml files using the *output_dir* keyword. We also define the directory into which the final simulated data will be placed, using the *simulated_output_dir* keyword. This information will be placed into the constructed yaml files.
+
+Setting the *use_linearized_darks* option to True will cause the *yaml_generator* to look for linearized dark current files to use with the simulations. These files may be present in the collection of `Mirage` reference files. If linearized darks are not present, leaving this option as False will cause `Mirage` to use raw dark current ramps as inputs.
 
 ::
 
-	from mirage.yaml import yaml_generator
+	  from mirage.yaml import yaml_generator
 
-	# Create a series of data simluator input yaml files
-	# from APT files
-
-	yam = yaml_generator.SimInput(xml_file, pointing_file, catalogs=catalogs, verbose=True,
-                                  output_dir='yaml_files', simdata_output_dir='simulated_data',
+	  yam = yaml_generator.SimInput(xml_file, pointing_file, catalogs=catalogs, verbose=True,
+                                  output_dir='/location/to/place/yaml_files',
+                                  simdata_output_dir='/location/to/place/simulated_data',
                                   parameter_defaults=params, datatype='raw')
     yam.use_linearized_darks = True
     yam.create_inputs()
 
+
 The outptut from this will be the collection of yaml files needed to run Mirage and create all of the simulated observation files. An :ref:`example yaml file <example_yaml>` shows all of the parameters necessary when simulating an exposure.
+
+See the Imaging and WFSS notebooks in the `Mirage` repository for examples of *yaml_generator* use.
 
 Run Mirage
 ----------
@@ -81,14 +84,14 @@ The collection of yaml files can then be fed into Mirage one at a time.
 
 ::
 
-	from glob import glob
-	from mirage import imaging_simulator
+	  from glob import glob
+	  from mirage import imaging_simulator
 
-	yaml_files = glob('*.yaml')
-	for yfile in yaml_files:
-	    im = imaging_simulator.ImgSim()
-	    im.paramfile = yfile
-	    im.create()
+	  yaml_files = glob('*.yaml')
+	  for yfile in yaml_files:
+	      im = imaging_simulator.ImgSim()
+	      im.paramfile = yfile
+	      im.create()
 
 
 

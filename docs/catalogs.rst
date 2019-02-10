@@ -1,7 +1,7 @@
+.. _catalogs:
+
 Source Catalog Files
 ====================
-
-.. _catalogs:
 
 Mirage accepts 7 different types of source catalogs. These include:
 

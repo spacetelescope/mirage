@@ -570,7 +570,7 @@ True/False.  If True, intermediate products are saved to disk. These products ar
 grism_source_image
 ++++++++++++++++++
 
-True/False. If True, the size of the output image is enlarged from the requested array size by a factor of √2 in the x and y dimensions. This extra area is required if the image is passed to the grism disperser software. In this case, the disperser software is able to include sources which fall just outside the nominal field of view but whose dispersed spectra fall into the nominal field of view.
+True/False. If True, the size of the output image is enlarged from the requested array size by a multiplicative factor in the x and y dimensions. For NIRCam this factor is √2, while it NIRISS it is 1.134. This extra area is required if the image is passed to the grism disperser software. In this case, the disperser software is able to include sources which fall just outside the nominal field of view but whose dispersed spectra fall into the nominal field of view.
 
 program_number
 ++++++++++++++

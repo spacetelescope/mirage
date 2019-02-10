@@ -22,7 +22,7 @@ Mirage can be broadly divided into three stages. The first stage is the creation
 1. Through the use of :ref:`source catalog files <source_catalogs>`
 2. Extraction from a fits file containing a :ref:`distortion-free image <mosaic_input>` (e.g. HUDF, GOODS, CANDELS, etc)
 
-For WFSS observations, multiple seed images and optional input spectra are then fed into the `disperser software <https://github.com/npirzkal/NIRCAM_Gsim>`_, which simulates the effects of the grism by dispersing the signal from the astronomical sources, creating a “grism seed image”.
+For WFSS observations, multiple seed images or optional input spectra are then fed into the `disperser software <https://github.com/npirzkal/NIRCAM_Gsim>`_, which simulates the effects of the grism by dispersing the signal from the astronomical sources, creating a “grism seed image”.
 
 Dark Current Preparation
 ++++++++++++++++++++++++
@@ -45,7 +45,7 @@ In addition, the Mirage package includes ancillary convenience functions that al
 
 Limitations
 -----------
-Mirage currently does not simulate coronagraphic observations.
+Mirage currently does not simulate coronagraphic observations directly. However the user can input an image of an occulted PSF using the :ref:`extended source catalog <extended>`.
 
 When adding PSFs to simulated data, MIRAGE uses the PSFs in the user-provided library. The libraries currently provided in the Mirage reference files collection contain fits files that are 301x301 pixels. This limited size keeps the file sizes small, but cuts off the wings of the PSFs. For very bright sources, the truncated wings will be visible in the data. In addition, when MIRAGE normalizes a PSF to the requested brightness, signal that should be in the truncated wings will instead be in the central 301x301 pixels of the PSF. The total brightness of the source will be as expected, but the signal will be slightly more concentrated in the center of the PSF than it should be.
 

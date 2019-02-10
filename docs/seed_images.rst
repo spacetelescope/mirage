@@ -19,9 +19,9 @@ To create a seed image from user-specified source catalogs, the *catalog_seed_im
 
 For each type of target, Mirage creates or retrieves a small stamp image of the target based on the user-supplied parameters in the catalog. This stamp image is then placed into the seed image at the x,y or RA, Dec location specified by the user. Source locations on the detector take into account instrument distortion. If source locations in the catalogs are specified using RA and Dec, `Mirage` will use the distortion model from a distortion reference file if supplied in the input yaml file. If no reference file is given, `Mirage` will fall back to using distortion information in the Science Instrument Aperture File (`SIAF <https://jwst-docs.stsci.edu/display/JTI/JWST+Field+of+View>`_).
 
-For point sources, `mirage` selects the appropriate PSF for each source from a PSF library. This PSF is scaled to the requested brightness, and then placed in the correct location on the detector.
+For point sources, `Mirage` selects the appropriate PSF for each source from a PSF library. This PSF is scaled to the requested brightness, and then placed in the correct location on the detector.
 
-Galaxies in `mirage` are represented by 2 dimensional Seric profiles. These are created using astropy's `Sersic2D model <http://docs.astropy.org/en/stable/api/astropy.modeling.functional_models.Sersic2D.html>`_, scaled to the requested brightness, and placed in the seed image.
+Galaxies in `Mirage` are represented by 2 dimensional Seric profiles. These are created using astropy's `Sersic2D model <http://docs.astropy.org/en/stable/api/astropy.modeling.functional_models.Sersic2D.html>`_, scaled to the requested brightness, and placed in the seed image.
 
 "External sources" is the term used for stamp images that are read in from supplied fits files. In this case, the user-suppied fits file is read in and the image is scaled and placed in the seed image at the requested location. See the :ref:`Catalogs <catalogs>` page for more details.
 
@@ -31,7 +31,7 @@ For a given pointing, `jwst_backgrounds` will calculate the total expected backg
 
 Users can also provide a custom background through the use of an input fits file referenced in the "zodiacal" entry of the input yaml file. In this case, the contents of the file are read in and added to the seed image.
 
-Finally, `mirage` uses the pixel area map to mimic the effects of distortion on the simulated sources. While the locations of the simulated sources within the seed image accurately account for distortion, the brightness of the sources are not affected. The seed image (minus any point sources) is multiplied by the pixel area map in order to adjust the extended sources’ brightness to account for the relative differences in pixel areas across the detector.
+Finally, `Mirage` uses the pixel area map to mimic the effects of distortion on the simulated sources. While the locations of the simulated sources within the seed image accurately account for distortion, the brightness of the sources are not affected. The seed image (minus any point sources) is multiplied by the pixel area map in order to adjust the extended sources’ brightness to account for the relative differences in pixel areas across the detector.
 
 .. _mosaic_input:
 
