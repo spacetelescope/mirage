@@ -407,7 +407,7 @@ class SimInput:
             if par.lower() == 'false':
                 seq.append('1')
         self.info['sequence_id'] = seq
-        self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
+        # self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
@@ -1511,7 +1511,7 @@ class SimInput:
             f.write("  obs_id: '{}'   # Observation ID number\n".format(input['observation_id']))
             f.write("  date_obs: '{}'  # Date of observation\n".format(input['date_obs']))
             f.write("  time_obs: '{}'  # Time of observation\n".format(input['time_obs']))
-            f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
+            # f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
             f.write("  primary_dither_type: {}  # Primary dither pattern name\n".format(input['PrimaryDitherType']))
             f.write("  total_primary_dither_positions: {}  # Total number of primary dither positions\n".format(input['PrimaryDithers']))
             f.write("  primary_dither_position: {}  # Primary dither position number\n".format(np.int(input['primary_dither_num'])))
