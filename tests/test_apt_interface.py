@@ -248,7 +248,7 @@ def test_xml_reader():
                 if isinstance(data[0], np.int64):
                     data = [str(d) for d in data]
                     comparison_dict[col] = data
-                assert all(exposure_dict[col] == comparison_dict[col].data), print(col,
+                assert all(exposure_dict[col] == comparison_dict[col].data), print(program, col,
                                                                                    exposure_dict[col],
                                                                                    comparison_dict[col].data)
 
