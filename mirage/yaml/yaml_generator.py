@@ -555,12 +555,16 @@ class SimInput:
         """
         self.datadir = os.environ.get(ENV_VAR)
         if self.datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
+            raise ValueError(("WARNING: {} environment variable is not set. "
+                              "This must be set to the base directory "
+                              "containing the darks, cosmic ray, PSF, etc "
+                              "input files needed for the simulation. "
+                              "These files must be downloaded separately "
                               "from the Mirage package.".format(ENV_VAR)))
+        if not os.path.isdir(self.datadir):
+            raise FileNotFoundError(("WARNING: The directory contained in the {} "
+                                     "environment variable: {} does not exist or "
+                                     "is not accessible.".format(ENV_VAR, self.datadir)))
 
     def find_ipc_file(self, inputipc):
         """Given a list of potential IPC kernel files for a given
