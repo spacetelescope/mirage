@@ -57,15 +57,7 @@ class Catalog_seed():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = utils.expand_environment_variable(self.env_var)
 
         # if a grism signal rate image is requested, expand
         # the width and height of the signal rate image by this
