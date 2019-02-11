@@ -1915,17 +1915,18 @@ class Observation():
             newkernel = np.copy(kern)
             newkernel[:, :, ys:ye, xs:xe] = realout1
 
-        # Save the inverted kernel for future simulator runs
-        h0 = fits.PrimaryHDU()
-        h1 = fits.ImageHDU(newkernel)
-        h1.header["DETECTOR"] = self.detector
-        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
-        hlist = fits.HDUList([h0, h1])
-        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
-        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
-        hlist.writeto(outname, overwrite=True)
-        print(("Inverted IPC kernel saved to {} for future simulator "
-               "runs.".format(outname)))
+        if self.params['Output']['save_intermediates']:
+            # Save the inverted kernel for future simulator runs
+            h0 = fits.PrimaryHDU()
+            h1 = fits.ImageHDU(newkernel)
+            h1.header["DETECTOR"] = self.detector
+            h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+            hlist = fits.HDUList([h0, h1])
+            indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+            outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+            hlist.writeto(outname, overwrite=True)
+            print(("Inverted IPC kernel saved to {} for future simulator "
+                   "runs.".format(outname)))
         return newkernel
 
     def mask_refpix(self, ramp, zero):
