@@ -620,19 +620,20 @@ class DarkPrep():
         # future. Use the linearity coefficient file if provided
         base_name = self.params['Output']['file'].split('/')[-1]
         linearoutfile = base_name[0:-5] + '_linearized_dark_current_ramp.fits'
-        linearoutfile = os.path.join(self.params['Output']['directory'], linearoutfile)
         if self.runStep['linearity']:
             linDark = LinearityStep.call(linDark,
                                          config_file=self.params['newRamp']['linear_configfile'],
                                          override_linearity=self.params['Reffiles']['linearity'],
-                                         output_file=linearoutfile)
+                                         output_file=linearoutfile, save_results=True,
+                                         output_dir=self.params['Output']['directory'])
         else:
             linDark = LinearityStep.call(linDark,
                                          config_file=self.params['newRamp']['linear_configfile'],
-                                         output_file=linearoutfile)
+                                         output_file=linearoutfile, save_results=True,
+                                         output_dir=self.params['Output']['directory'])
 
         print(("Linearized dark (output directly from pipeline saved as {}"
-               .format(linearoutfile)))
+               .format(os.path.join(self.params['Output']['directory'], linearoutfile))))
 
         # Now we need to put the data back into a read_fits object
         linDarkobj = read_fits.Read_fits()

@@ -66,13 +66,13 @@ class AptInput:
         pointing_file (str): Description
     """
 
-    def __init__(self, input_xml=None, pointing_file=None):
-
+    def __init__(self, input_xml=None, pointing_file=None, output_dir=None, output_csv=None,
+                 observation_list_file=None):
         self.input_xml = input_xml
         self.pointing_file = pointing_file
-
-        self.output_csv = None
-        self.observation_list_file = None
+        self.output_dir = output_dir
+        self.output_csv = output_csv
+        self.observation_list_file = observation_list_file
 
     def add_epochs(self, intab):
         """NOT CURRENTLY USED"""
@@ -304,10 +304,68 @@ class AptInput:
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
              'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']),
-             len(pointing_dictionary['obs_num'])))
+                                                         len(pointing_dictionary['obs_num'])))
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
+
+
+
+
+        """
+        if self.pointing_file == '/Users/hilbert/python_repos/mirage/tests/test_data/misc/01148/OTE13-1148.pointing':
+            print('checking dictionary combination in apt_inputs')
+            print(observation_dictionary.keys())
+            print(self.apt_xml_dict.keys())
+            print(pointing_dictionary.keys())
+
+            print(self.apt_xml_dict['ObservationID'])
+            print(observation_dictionary['ObservationID'])
+            print('')
+            print(pointing_dictionary['obs_num'])
+            print(observation_dictionary['obs_num'])
+            print('')
+
+            print(('need to use zfill to add preceding zeros to ObservationID?'
+            'Looks like dictionary is being reordered to increasing ObservationID'
+            'order (even though they are strings????!), but the same is not happening'
+            'for the pointing dictionary.'))
+
+
+
+
+
+            print('dictionary lengths:')
+            print(len(pointing_dictionary['obs_num']))
+            print(len(self.apt_xml_dict['ObservationID']))
+            print(len(observation_dictionary['ObservationID']))
+
+            obs2 = np.where(np.array(pointing_dictionary['obs_num']) == '002')[0]
+            print('obs2 in pointing: {}'.format(obs2))
+            if len(obs2) > 0:
+                for keyname in pointing_dictionary:
+                    print(keyname, pointing_dictionary[keyname][obs2[0]])
+            obs2_xml = np.where(np.array(self.apt_xml_dict['ObservationID']) == '2')[0]
+            print('')
+            print('obs2 in xml: {}'.format(obs2_xml))
+            if len(obs2_xml) > 0:
+                for keyname in self.apt_xml_dict:
+                    print(keyname, self.apt_xml_dict[keyname][obs2_xml[0]])
+            obs2_comb = np.where(np.array(observation_dictionary['obs_num']) == '002')[0]
+            print('')
+            print('obs2 in combined: {}'.format(obs2_comb))
+            if len(obs2_comb) > 0:
+                for keyname in observation_dictionary:
+                    print(keyname, observation_dictionary[keyname][obs2_comb[0]])
+            print('')
+            print('entry {} in xml_dict, for comparison'.format(obs2))
+            for keyname in self.apt_xml_dict:
+                    print(keyname, observation_dictionary[keyname][obs2[0]])
+            """
+
+
+
+
 
         # Add epoch and catalog information
         observation_dictionary = self.add_observation_info(observation_dictionary)
@@ -321,20 +379,18 @@ class AptInput:
 
         self.check_aperture_override()
 
-        # print(self.exposure_tab['Instrument'])
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
-        detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
-
-        ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
-        print('Wrote exposure table to {}'.format(detectors_file))
+        #detectors_file = os.path.join(self.output_dir,
+        #                              '{}_expanded_for_detectors.csv'.format(infile.split('.')[0]))
+        #ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
+        #print('Wrote exposure table to {}'.format(detectors_file))
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
-        for inst in np.unique(observation_dictionary['Instrument']):
-            instrument_name = inst.lower()
+        for instrument_name in np.unique(observation_dictionary['Instrument']):
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
@@ -346,7 +402,6 @@ class AptInput:
             self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
-
 
     def check_aperture_override(self):
         if bool(self.exposure_tab['FiducialPointOverride']) is True:
@@ -378,7 +433,6 @@ class AptInput:
             # Add new dictionary entry to document that the imaging aperture is the
             # same as the pointing aperture
             self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
-
 
     def expand_for_detectors(self, input_dictionary):
         """Expand dictionary to have one entry per detector, rather than the
@@ -668,10 +722,12 @@ class AptInput:
                             type_str.append(elements[18])
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
-                            if elements[18] == 'PARALLEL':
-                                ddist.append(None)
-                            else:
-                                ddist.append(np.float(elements[21]))
+                            #if elements[18] == 'PARALLEL':
+                            #    ddist.append(None)
+                            #else:
+                                #print('line is: {}'.format(elements))
+                                #print(ddist)
+                                #ddist.append(np.float(elements[21]))
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.
@@ -730,7 +786,7 @@ class AptInput:
         aperture_dec = []
 
         for i in range(len(self.exposure_tab['Module'])):
-            siaf_instrument = self.exposure_tab["Instrument"][i].lower()
+            siaf_instrument = self.exposure_tab["Instrument"][i]
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
