@@ -2745,8 +2745,12 @@ class Observation():
         # gets reset to -1, which screws up saturation flagging
         # I think the answer is to save as uint16...
 
+        # Create HDU List of Mirage-centric info
+        extra_fits_hdulist = self.add_mirage_info()
+        extra_header0 = extra_fits_hdulist[0].header
+
         if mod == 'ramp':
-            ex0 = fits.PrimaryHDU()
+            ex0 = fits.PrimaryHDU(header=extra_header0)
             ex1 = fits.ImageHDU(ramp.astype(np.float32), name='SCI')
             ex2 = fits.ImageHDU(pixel_dq.astype(np.uint32), name='PIXELDQ')
             ex3 = fits.ImageHDU(group_dq.astype(np.uint8), name='GROUPDQ')
@@ -2757,7 +2761,7 @@ class Observation():
             groupextnum = 6
 
         elif mod == '1b':
-            ex0 = fits.PrimaryHDU()
+            ex0 = fits.PrimaryHDU(header=extra_header0)
             ex1 = fits.ImageHDU(ramp.astype(np.uint16), name='SCI')
             ex2 = fits.ImageHDU(zeroframe.astype(np.uint16), name='ZEROFRAME')
             ex3 = fits.BinTableHDU(name='GROUP')
