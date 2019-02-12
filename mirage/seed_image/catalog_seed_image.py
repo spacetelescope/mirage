@@ -48,7 +48,15 @@ WFEGROUP_OPTIONS = np.arange(5)
 
 
 class Catalog_seed():
-    def __init__(self):
+    def __init__(self, offline=False):
+        """Instantiate the Catalog_seed class
+
+        Parameters
+        ----------
+        offline : bool
+            If True, the check for the existence of the MIRAGE_DATA
+            directory is skipped. This is primarily for Travis testing
+        """
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -57,7 +65,7 @@ class Catalog_seed():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = utils.expand_environment_variable(self.env_var)
+        datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
         # if a grism signal rate image is requested, expand
         # the width and height of the signal rate image by this

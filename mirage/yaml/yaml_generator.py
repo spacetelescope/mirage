@@ -165,7 +165,7 @@ class SimInput:
         self.tracking = 'sidereal'
 
         # Expand the MIRAGE_DATA environment variable
-        self.datadir = expand_environment_variable(ENV_VAR)
+        self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')

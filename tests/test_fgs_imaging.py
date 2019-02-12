@@ -21,6 +21,6 @@ os.environ['TEST_FGS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data
 
 
 def test_fgs_imaging():
-    m = im.ImgSim()
+    m = im.ImgSim(offline=True)
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/FGS/fgs_imaging_example.yaml')
     m.create()

@@ -157,7 +157,7 @@ def ensure_dir_exists(fullpath):
         os.makedirs(fullpath)
 
 
-def expand_environment_variable(variable_name):
+def expand_environment_variable(variable_name, offline=False):
     """ Expand an environment variable and check that the directory exists
 
     Parameters
@@ -178,10 +178,11 @@ def expand_environment_variable(variable_name):
                           "input files needed for the simulation. "
                           "These files must be downloaded separately "
                           "from the Mirage package.".format(variable_name)))
-    if not os.path.isdir(variable_directory):
-        raise FileNotFoundError(("The directory contained in the {} "
-                                 "environment variable: {} does not exist or "
-                                 "is not accessible.".format(variable_name, variable_directory)))
+    if not offline:
+        if not os.path.isdir(variable_directory):
+            raise FileNotFoundError(("The directory contained in the {} "
+                                     "environment variable: {} does not exist or "
+                                     "is not accessible.".format(variable_name, variable_directory)))
     return variable_directory
 
 
