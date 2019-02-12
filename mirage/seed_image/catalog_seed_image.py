@@ -2813,7 +2813,7 @@ class Catalog_seed():
             # Write the adjusted lines to a new copy of the input file
             with open(self.paramfile, 'w') as f:
                 for item in read_data:
-                    f.write("{}\n".format(item))
+                    f.write("{}".format(item))
 
         # Load the yaml file
         try:
