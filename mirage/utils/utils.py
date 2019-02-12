@@ -172,14 +172,14 @@ def expand_environment_variable(variable_name):
     """
     variable_directory = os.environ.get(variable_name)
     if variable_directory is None:
-        raise ValueError(("WARNING: {} environment variable is not set. "
+        raise ValueError(("{} environment variable is not set. "
                           "This must be set to the base directory "
                           "containing the darks, cosmic ray, PSF, etc "
                           "input files needed for the simulation. "
                           "These files must be downloaded separately "
                           "from the Mirage package.".format(variable_name)))
     if not os.path.isdir(variable_directory):
-        raise FileNotFoundError(("WARNING: The directory contained in the {} "
+        raise FileNotFoundError(("The directory contained in the {} "
                                  "environment variable: {} does not exist or "
                                  "is not accessible.".format(variable_name, variable_directory)))
     return variable_directory
