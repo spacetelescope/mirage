@@ -48,6 +48,7 @@ from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import read_fits
+from .utils.utils import expand_environment_variable
 from .yaml import yaml_update
 
 nircam_filters = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
@@ -56,18 +57,12 @@ nircam_filters = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
 
 
 class WFSSSim():
-    def __init__(self):
+    def __init__(self, offline=False):
         # Set the MIRAGE_DATA environment variable if it is not
         # set already. This is for users at STScI.
         self.env_var = 'MIRAGE_DATA'
-        self.datadir = os.environ.get(self.env_var)
-        if self.datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        self.datadir = expand_environment_variable(self.env_var, offline=offline)
+
         self.paramfiles = None
         self.override_dark = None
         self.crossing_filter = None
@@ -78,6 +73,7 @@ class WFSSSim():
         self.disp_seed_filename = None
         self.extrapolate_SED = False
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL"]
+        self.offline = offline
 
     def create(self):
         # Make sure inputs are correct
@@ -88,7 +84,7 @@ class WFSSSim():
         imseeds = []
         # Create imaging seed images
         for pfile in self.paramfiles:
-            cat = catalog_seed_image.Catalog_seed()
+            cat = catalog_seed_image.Catalog_seed(offline=self.offline)
             cat.paramfile = pfile
             cat.make_seed()
             imseeds.append(cat.seed_file)
@@ -150,7 +146,7 @@ class WFSSSim():
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
-            d = dark_prep.DarkPrep()
+            d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfiles[0]
             d.prepare()
             obslindark = d.prepDark
@@ -171,7 +167,7 @@ class WFSSSim():
         y.run()
 
         # Combine into final observation
-        obs = obs_generator.Observation()
+        obs = obs_generator.Observation(offline=self.offline)
         obs.linDark = obslindark
         obs.seed = disp_seed.final
         obs.segmap = cat.seed_segmap

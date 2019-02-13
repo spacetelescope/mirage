@@ -21,6 +21,6 @@ os.environ['TEST_NIRISS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_d
 
 
 def test_niriss_imaging():
-    m = im.ImgSim()
+    m = im.ImgSim(offline=True)
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_example.yaml')
     m.create()

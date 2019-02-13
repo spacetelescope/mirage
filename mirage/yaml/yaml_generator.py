@@ -104,7 +104,7 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
-from ..utils.utils import calc_frame_time, ensure_dir_exists
+from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 
@@ -165,7 +165,7 @@ class SimInput:
         self.tracking = 'sidereal'
 
         # Expand the MIRAGE_DATA environment variable
-        self.expand_env_var()
+        self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -548,19 +548,6 @@ class SimInput:
                                             visit_group, parallel_sequence_id, activity_id,
                                             exposure)
         return base
-
-    def expand_env_var(self):
-        """ Expand the MIRAGE_DATA environment variable
-        so that reference files can be found
-        """
-        self.datadir = os.environ.get(ENV_VAR)
-        if self.datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(ENV_VAR)))
 
     def find_ipc_file(self, inputipc):
         """Given a list of potential IPC kernel files for a given

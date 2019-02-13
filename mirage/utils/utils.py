@@ -157,6 +157,35 @@ def ensure_dir_exists(fullpath):
         os.makedirs(fullpath)
 
 
+def expand_environment_variable(variable_name, offline=False):
+    """ Expand an environment variable and check that the directory exists
+
+    Parameters
+    ----------
+    variable_name : str
+        Environment variable name
+
+    Returns
+    -------
+    variable_directory : str
+        Path pointed to by the environment variable
+    """
+    variable_directory = os.environ.get(variable_name)
+    if variable_directory is None:
+        raise ValueError(("{} environment variable is not set. "
+                          "This must be set to the base directory "
+                          "containing the darks, cosmic ray, PSF, etc "
+                          "input files needed for the simulation. "
+                          "These files must be downloaded separately "
+                          "from the Mirage package.".format(variable_name)))
+    if not offline:
+        if not os.path.isdir(variable_directory):
+            raise FileNotFoundError(("The directory contained in the {} "
+                                     "environment variable: {} does not exist or "
+                                     "is not accessible.".format(variable_name, variable_directory)))
+    return variable_directory
+
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.
