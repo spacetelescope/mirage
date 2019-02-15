@@ -113,6 +113,7 @@ class WFSSSim():
         # a direct seed image for each
         imseeds = []
         for pfile in self.paramfiles:
+            print('Running catalog_seed_image for {}'.format(pfile))
             cat = catalog_seed_image.Catalog_seed()
             cat.paramfile = pfile
             cat.make_seed()
@@ -309,7 +310,7 @@ class WFSSSim():
                     self.dispersion_direction = pupil_name[-1].upper()
                 yamls_to_disperse.append(pfile)
 
-            elif params['Inst']['mode'].lower() == 'imaging':
+            elif params['Inst']['mode'].lower() in ['imaging', 'pom']:
                 # If the other yaml files are for imaging mode, we need to update them to
                 # be wfss mode so that the resulting seed images have the correct dimensions.
                 # Save these modified yaml files to new files.
