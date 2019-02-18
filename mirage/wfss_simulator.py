@@ -50,6 +50,7 @@ from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import read_fits
+from .utils.utils import expand_environment_variable
 from .yaml import yaml_update
 
 NIRCAM_GRISM_CROSSING_FILTERS = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
@@ -60,7 +61,7 @@ NIRISS_GRISM_CROSSING_FILTERS = ['F200W', 'F150W', 'F140M', 'F158M', 'F115W', 'F
 
 class WFSSSim():
     def __init__(self, paramfiles, SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
-                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None):
+                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, offline=False):
 
         print('when you go to make the direct seed image in the case where a wfss yaml is provided')
         print('catalog_seed_image will need to ignore the grism name')
@@ -114,7 +115,7 @@ class WFSSSim():
         imseeds = []
         for pfile in self.paramfiles:
             print('Running catalog_seed_image for {}'.format(pfile))
-            cat = catalog_seed_image.Catalog_seed()
+            cat = catalog_seed_image.Catalog_seed(offline=self.offline)
             cat.paramfile = pfile
             cat.make_seed()
             imseeds.append(cat.seed_file)
@@ -185,7 +186,7 @@ class WFSSSim():
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
-            d = dark_prep.DarkPrep()
+            d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.wfss_yaml
             d.prepare()
             obslindark = d.prepDark
@@ -213,7 +214,7 @@ class WFSSSim():
         #y.run()
 
         # Combine into final observation
-        obs = obs_generator.Observation()
+        obs = obs_generator.Observation(offline=self.offline)
         obs.linDark = obslindark
         obs.seed = disp_seed.final
         obs.segmap = cat.seed_segmap

@@ -32,36 +32,32 @@ from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import read_fits
+from .utils.utils import expand_environment_variable
 
 
 class ImgSim():
-    def __init__(self, paramfile=None, override_dark=None):
+    def __init__(self, paramfile=None, override_dark=None, offline=False):
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = expand_environment_variable(self.env_var, offline=offline)
+
         self.paramfile = paramfile
         self.override_dark = override_dark
+        self.offline = offline
 
     def create(self):
         # Create seed image
-        cat = catalog_seed_image.Catalog_seed()
+        cat = catalog_seed_image.Catalog_seed(offline=self.offline)
         cat.paramfile = self.paramfile
         cat.make_seed()
 
         # Create observation generator object
-        obs = obs_generator.Observation()
+        obs = obs_generator.Observation(offline=self.offline)
 
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
             print('Perform dark preparation:')
-            d = dark_prep.DarkPrep()
+            d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfile
             d.prepare()
             obs.linDark = d.prepDark
