@@ -25,6 +25,8 @@ Use
 import astropy.units as u
 import h5py
 
+from mirage.utils.constants import FLAMBDA_UNITS
+
 
 def open(filename):
     """Read in contents of an hdf5 file
@@ -47,10 +49,20 @@ def open(filename):
     """
     contents = {}
     with h5py.File(filename, 'r') as file_obj:
+        no_wave_units = False
+        no_flux_units = False
         for key in file_obj.keys():
             dataset = file_obj[key]
-            wave_units_string = dataset.attrs['wavelength_units']
-            flux_units_string = dataset.attrs['flux_units']
+            try:
+                wave_units_string = dataset.attrs['wavelength_units']
+            except KeyError:
+                wave_units_string = 'micron'
+                no_wave_units = True
+            try:
+                flux_units_string = dataset.attrs['flux_units']
+            except KeyError:
+                flux_units_string = 'flam'
+                no_flux_units = True
 
             # Catch common errors
             if wave_units_string.lower() in ['microns', 'angstroms', 'nanometers']:
@@ -71,15 +83,18 @@ def open(filename):
                 else:
                     raise ValueError("Wavelength units of {} in dataset {} are not compatible with microns."
                                      .format(wave_units, key))
-            f_lambda_cgs = u.erg / u.second / u.cm / u.cm / u.angstrom
-            if flux_units != f_lambda_cgs:
-                if flux_units.is_equivalent(f_lambda_cgs):
-                    fluxes = fluxes.to(f_lambda_cgs)
+            if flux_units != FLAMBDA_UNITS:
+                if flux_units.is_equivalent(FLAMBDA_UNITS):
+                    fluxes = fluxes.to(FLAMBDA_UNITS)
                 else:
-                    raise ValueError("Flux units of {} in dataset {} are not compatible with f_lambda."
+                    raise ValueError("Flux density units of {} in dataset {} are not compatible with f_lambda."
                                      .format(flux_units, key))
 
             contents[int(key)] = {'wavelengths': waves, 'fluxes': fluxes}
+    if no_wave_units:
+        print("{}: No wavelength units provided. Assuming MIRCONS.".format(filename))
+    if no_flux_units:
+        print("{}: No flux density units provided. Assuming Flambda (erg/sec/cm^2/A)".format(filename))
     return contents
 
 
@@ -109,15 +124,19 @@ def save(contents, filename, wavelength_unit=None, flux_unit=None):
             # and flux_unit
             if isinstance(wavelength, u.quantity.Quantity):
                 wavelength_units = units_to_string(wavelength.unit)
+                wavelength_values = wavelength.value
             else:
                 wavelength_units = wavelength_unit
+                wavelength_values = wavelength
             if isinstance(flux, u.quantity.Quantity):
                 flux_units = units_to_string(flux.unit)
+                flux_values = flux.value
             else:
                 flux_units = flux_unit
+                flux_values = flux
 
-            dset = file_obj.create_dataset(str(key), data=[wavelength, flux], dtype='f', compression="gzip",
-                                           compression_opts=9)
+            dset = file_obj.create_dataset(str(key), data=[wavelength_values, flux_values], dtype='f',
+                                           compression="gzip", compression_opts=9)
 
             # Set dataset units. Not currently inspected by mirage.
             dset.attrs[u'wavelength_units'] = wavelength_units
@@ -136,13 +155,16 @@ def string_to_units(unit_string):
     -------
     units : astropy.units Quantity
     """
-    try:
-        return u.Unit(unit_string)
-    except ValueError as e:
-        print(e)
+    if unit_string == 'flam':
+        return FLAMBDA_UNITS
+    else:
+        try:
+            return u.Unit(unit_string)
+        except ValueError as e:
+            print(e)
 
 
-def units_to_string(quantity):
+def units_to_string(unit):
     """Convert the units of an astropy.units Quantity to a string
 
     Parameters
@@ -154,4 +176,7 @@ def units_to_string(quantity):
     unit_string : str
         String representation of the units in quantity
     """
-    return quantity.unit.to_string()
+    if unit == FLAMBDA_UNITS:
+        return 'flam'
+    else:
+        return unit.to_string()

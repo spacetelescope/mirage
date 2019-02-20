@@ -456,6 +456,8 @@ class Catalog_seed():
         # throughput of the NRM, while the 0.84 value is the throughput of the
         # imaging CLEARP element that is in place in the pupil wheel for the
         # normal imaging observations.
+        remove_this_function_and()
+        point_to_utils.magnitude_to_countrate_instead()
         if self.params['Inst']['mode'] in ['ami']:
             count_scale = 0.15 / 0.84
         else:
