@@ -74,10 +74,7 @@ def open(filename):
 
             # Get the data
             waves = dataset[0] * wave_units
-            if flux_units != u.pct:
-                fluxes = dataset[1] * flux_units
-            else:
-                fluxes = dataset[1] * 100. * u.pct
+            fluxes = dataset[1] * flux_units
 
             # Convert wavelengths to microns and flux values to f_lambda in cgs
             if wave_units != u.micron:
@@ -103,7 +100,7 @@ def open(filename):
     return contents
 
 
-def save(contents, filename, wavelength_unit=None, flux_unit=None):
+def save(contents, filename, wavelength_unit='', flux_unit=''):
     """Save a dictionary into an hdf5 file
 
     Paramters
@@ -136,8 +133,6 @@ def save(contents, filename, wavelength_unit=None, flux_unit=None):
             if isinstance(flux, u.quantity.Quantity):
                 flux_units = units_to_string(flux.unit)
                 flux_values = flux.value
-                if flux_units == 'normalized':
-                    flux_values /= 100.
             else:
                 flux_units = flux_unit
                 flux_values = flux
@@ -146,8 +141,10 @@ def save(contents, filename, wavelength_unit=None, flux_unit=None):
                                            compression="gzip", compression_opts=9)
 
             # Set dataset units. Not currently inspected by mirage.
-            dset.attrs[u'wavelength_units'] = wavelength_units
-            dset.attrs[u'flux_units'] = flux_units
+            if wavelength_units != '':
+                dset.attrs[u'wavelength_units'] = wavelength_units
+            if flux_units != '':
+                dset.attrs[u'flux_units'] = flux_units
 
 
 def string_to_units(unit_string):
@@ -187,7 +184,7 @@ def units_to_string(unit):
     """
     if unit == FLAMBDA_UNITS:
         return 'flam'
-    elif unit == u.pct
+    elif unit == u.pct:
         return 'normalized'
     else:
         return unit.to_string()

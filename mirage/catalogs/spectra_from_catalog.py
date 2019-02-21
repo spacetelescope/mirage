@@ -42,12 +42,104 @@ ZEROPOINT_FILES = {'niriss': os.path.join(CONFIG_PATH, 'niriss_zeropoints.list')
                    'fgs': os.path.join(CONFIG_PATH, 'guider_zeropoints.list')}
 
 
+def add_flam_columns(cat, mag_sys):
+    """Convert magnitudes to flux densities in units of f_lambda and add
+    to catalog.
+
+    Parameters
+    ----------
+    cat : astropy.table.Table
+        Catalog table (output from read_catalog)
+
+    mag_sys : str
+        Magnitude system of the data (e.g. 'abmag')
+
+    Returns
+    -------
+    cat : astropy.table.Table
+        Modified table with "<instrument>_<filter>_flam" columns added
+
+    parameters : dict
+        Dictionary of tuples, where each tuple contains the photflam,
+        photfnu, zeropoint, and pivot wavelength for a filter
+    """
+    # Get all of the magnitude columns
+    magnitude_columns = [col for col in cat.colnames if 'magnitude' in col]
+
+    # Organize magnitude columns by instrument to minimize file i/o when
+    # getting photflam and zeropoint values
+    nircam_mag_cols = []
+    niriss_mag_cols = []
+    fgs_mag_cols = []
+    for col in magnitude_columns:
+        if 'nircam' in col.lower():
+            nircam_mag_cols.append(col)
+        elif 'niriss' in col.lower():
+            niriss_mag_cols.append(col)
+        elif 'fgs' in col.lower():
+            fgs_mag_cols.append(col)
+
+    # Get PHOTFLAM and filter zeropoint values
+    parameters = {}
+    if len(nircam_mag_cols) > 0:
+        nrc_params = get_filter_info(nircam_mag_cols, mag_sys)
+        parameters = {**parameters, **nrc_params}
+    if len(niriss_mag_cols) > 0:
+        nrs_params = get_filter_info(niriss_mag_cols, mag_sys)
+        parameters = {**parameters, **nrs_params}
+    if len(fgs_mag_cols) > 0:
+        fgs_params = get_filter_info(fgs_mag_cols, mag_sys)
+        parameters = {**parameters, **fgs_params}
+
+    # Create a corresponding f_lambda column for each magnitude column
+    for key in parameters:
+        tmp_adjusted_key = key.split('_mod')[0]
+        magnitude_values = cat[tmp_adjusted_key].data
+        flam_values = convert_to_flam(magnitude_values, parameters[key], mag_sys)
+        new_column_name = key.replace('magnitude', 'flam')
+        cat[new_column_name] = flam_values
+    return cat, parameters
+
+
 def calculate_flambda(source_catalog, magnitude_system, outfile=None):
     """Calculate and add f_lambda columns to an existing source catalog"""
     updated_catalog, filter_information = add_flam_columns(source_catalog, magnitude_system)
     updated_catalog.write(outfile, format='ascii', overwrite=True)
     print('Catalog updated with f_lambda columns, saved to: {}'.format(outfile))
     return updated_catalog, filter_information
+
+
+def convert_to_flam(magnitudes, param_tuple, magnitude_system):
+    """Convert the magnitude values for a given magnitude column into
+    units of f_lambda.
+
+    Parameters
+    ----------
+    colname : str
+        Name of magnitude column (e.g. 'nircam_f480m_magnitude_modA')
+
+    magnitudes : list
+        List of magnitude values for the column
+
+    param_tuple : tup
+        Tuple of (photflam, zeropoint) for the given filter
+
+    Returns
+    -------
+    flambda : list
+        List of f_lambda values corresponding to the list of input magnitudes
+    """
+    photflam, photfnu, zeropoint, pivot = param_tuple
+
+    if magnitude_system in ['stmag', 'vegamag']:
+        countrate = magnitude_to_countrate('wfss', magnitude_system, magnitudes, photfnu=photfnu,
+                                           photflam=photflam, vegamag_zeropoint=zeropoint)
+        flam = countrate * photflam
+
+    if magnitude_system == 'abmag':
+        flam = 1. / (3.34e4 * pivot.to(u.AA).value**2) * 10**(-0.4*(magnitudes-8.9))
+
+    return flam
 
 
 def create_output_sed_filename(catalog_file, spec_file):
@@ -75,7 +167,7 @@ def create_output_sed_filename(catalog_file, spec_file):
     if spec_file is not None:
         in_spec_dir, in_spec_file = os.path.split(spec_file)
         dot = in_spec_file.rfind('.')
-        in_spec_base = in_spec_dir[0: dot]
+        in_spec_base = in_spec_file[0: dot]
         sed_file = "source_sed_file_from_{}_and_{}.hdf5".format(in_base, in_spec_base)
     else:
         sed_file = "source_sed_file_from_{}.hdf5".format(in_base)
@@ -159,178 +251,6 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
     return spectra
 
 
-def overall_wrapper(catalog_file, input_spectra=None, input_spectra_file=None, flambda_catalog_file=None,
-                    extrapolate_SED=True, output_filename=None):
-    """Overall wrapper function
-
-    Parameters
-    ----------
-    source_catalog : str
-        Name of Mirage-formatted source catalog file
-
-    input_spectra : dict
-        Dictionary containing spectra for some/all targets
-
-    input_specctra_file : str
-        Name of an hdf5 file containing spectra for some/all targets
-
-    Returns
-    -------
-    ??
-    """
-    all_input_spectra = {}
-    # Read in input spectra from file, add to all_input_spectra dictionary
-    if input_spectra_file is not None:
-        spectra_from_file = hdf5_catalog.open(input_spectra_file)
-        all_input_spectra = {**all_input_spectra, **spectra_from_file}
-
-    # If both an input spectra file and dictionary are given, combine into
-    # a single dictionary. Running in this order means that dictionary
-    # inputs override inputs from a file.
-    if input_spectra is not None:
-        all_input_spectra = {**all_input_spectra, **input_spectra}
-
-    # Read in input catalog
-    ascii_catalog, mag_sys = read_catalog(catalog_file)
-
-    # Check to see if input spectra are normalized and if so, scale using
-    # magnitudes from catalog_file
-    #for key in all_input_spectra:
-    #    check_if_normalized()
-    #    rescale_if_necessary()
-
-    # Create catalog output name if none is given
-    if flambda_catalog_file is None:
-        cat_dir, cat_file = os.path.split(catalog_file)
-        index = cat_file.rindex('.')
-        suffix = cat_file[index:]
-        outbase = cat_file[0: index] + '_with_flambda' + suffix
-        flambda_catalog_file = os.path.join(cat_dir, outbase)
-
-    catalog, filter_info = calculate_flambda(ascii_catalog, mag_sys, outfile=flambda_catalog_file)
-
-    # For sources in catalog_file but not in all_input_spectra, use the
-    # magnitudes in the catalog_file, interpolate/extrapolate as necessary
-    # and create continuum spectra
-    indexes_to_create = []
-    for i, line in enumerate(ascii_catalog):
-        if line['index'] not in all_input_spectra.keys():
-            print('Source {} is in ascii catalog but not input spectra.'.format(line['index']))
-            indexes_to_create.append(i)
-
-    if len(indexes_to_create) > 0:
-        continuum = create_spectra(ascii_catalog[indexes_to_create], filter_info,
-                                   extrapolate_SED=extrapolate_SED)
-        all_input_spectra = {**all_input_spectra, **continuum}
-    print('all_input_spectra', all_input_spectra)
-
-    # For convenience, reorder the sources by index number
-    spectra = OrderedDict({})
-    for item in sorted(all_input_spectra.items()):
-        spectra[item[0]] = item[1]
-
-    print('')
-    print('spectra')
-    for tmp_key in spectra:
-        print(tmp_key, spectra[tmp_key])
-    # Save the source spectra in an hdf5 file
-    if output_filename is None:
-        output_filename = create_output_sed_filename(catalog_file, input_spectra_file)
-    hdf5_catalog.save(spectra, output_filename, wavelength_unit='micron', flux_unit='flam')
-    print('Spectra catalog file saved to {}'.format(output_filename))
-
-
-def read_catalog(filename):
-    """Read in the Mirage-formatted catalog
-
-    Parameters
-    ----------
-    filename : str
-        Name of catalog file
-
-    Returns
-    -------
-    catalog : astropy.table.Table
-        Catalog contents
-
-    mag_sys : str
-        Magnitude system (e.g. 'abmag', 'stmag', 'vegamag')
-    """
-    catalog = ascii.read(filename)
-
-    # Check to be sure index column is present
-    if 'index' not in catalog.colnames:
-        raise ValueError(('WARNING: input catalog must have an index column '
-                          'so that object spectra can be associated with the '
-                          'correct object in the seed image/segmentation map.'))
-    min_index_value = min(catalog['index'].data)
-    if min_index_value < 1:
-        raise ValueError(("WARNING: input catalog cannot have index values less"
-                          "than 1, for the purposes of creating the segmentation map."))
-
-    # Get the magnitude system
-    mag_sys = [l.lower() for l in catalog.meta['comments'][0:4] if 'mag' in l][0]
-    if mag_sys not in ['abmag', 'stmag', 'vegamag']:
-        raise ValueError(('WARNING: unrecognized magnitude system {}. Must be'
-                          'one of "abmag", "stmag", or "vegamag".').format(mag_sys))
-    return catalog, mag_sys
-
-
-def add_flam_columns(cat, mag_sys):
-    """Convert magnitudes to flux densities in units of f_lambda and add
-    to catalog.
-
-    Parameters
-    ----------
-    cat : astropy.table.Table
-        Catalog table (output from read_catalog)
-
-    mag_sys : str
-        Magnitude system of the data (e.g. 'abmag')
-
-    Returns
-    -------
-    cat : astropy.table.Table
-        Modified table with "<instrument>_<filter>_flam" columns added
-    """
-    # Get all of the magnitude columns
-    magnitude_columns = [col for col in cat.colnames if 'magnitude' in col]
-
-    # Organize magnitude columns by instrument to minimize file i/o when
-    # getting photflam and zeropoint values
-    nircam_mag_cols = []
-    niriss_mag_cols = []
-    fgs_mag_cols = []
-    for col in magnitude_columns:
-        if 'nircam' in col.lower():
-            nircam_mag_cols.append(col)
-        elif 'niriss' in col.lower():
-            niriss_mag_cols.append(col)
-        elif 'fgs' in col.lower():
-            fgs_mag_cols.append(col)
-
-    # Get PHOTFLAM and filter zeropoint values
-    parameters = {}
-    if len(nircam_mag_cols) > 0:
-        nrc_params = get_filter_info(nircam_mag_cols, mag_sys)
-        parameters = {**parameters, **nrc_params}
-    if len(niriss_mag_cols) > 0:
-        nrs_params = get_filter_info(niriss_mag_cols, mag_sys)
-        parameters = {**parameters, **nrs_params}
-    if len(fgs_mag_cols) > 0:
-        fgs_params = get_filter_info(fgs_mag_cols, mag_sys)
-        parameters = {**parameters, **fgs_params}
-
-    # Create a corresponding f_lambda column for each magnitude column
-    for key in parameters:
-        tmp_adjusted_key = key.split('_mod')[0]
-        magnitude_values = cat[tmp_adjusted_key].data
-        flam_values = convert_to_flam(key, magnitude_values, parameters[key], mag_sys)
-        new_column_name = key.replace('magnitude', 'flam')
-        cat[new_column_name] = flam_values
-    return cat, parameters
-
-
 def get_filter_info(column_names, magsys):
     """Given a list of catalog columns names (e.g. 'nircam_f480m_magnitude')
     get the corresponding PHOTFLAM and filter zeropoint values
@@ -385,40 +305,124 @@ def get_filter_info(column_names, magsys):
     return info
 
 
-def convert_to_flam(colname, magnitudes, param_tuple, magnitude_system):
-    """Convert the magnitude values for a given magnitude column into
-    units of f_lambda.
+def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, flambda_catalog_file=None,
+                     extrapolate_SED=True, output_filename=None, normalizing_mag_column=None):
+    """Overall wrapper function
 
     Parameters
     ----------
-    colname : str
-        Name of magnitude column (e.g. 'nircam_f480m_magnitude_modA')
+    source_catalog : str
+        Name of Mirage-formatted source catalog file
 
-    magnitudes : list
-        List of magnitude values for the column
+    input_spectra : dict
+        Dictionary containing spectra for some/all targets
 
-    param_tuple : tup
-        Tuple of (photflam, zeropoint) for the given filter
+    input_specctra_file : str
+        Name of an hdf5 file containing spectra for some/all targets
 
     Returns
     -------
-    flambda : list
-        List of f_lambda values corresponding to the list of input magnitudes
+    ??
     """
-    photflam, photfnu, zeropoint, pivot = param_tuple
+    all_input_spectra = {}
+    # Read in input spectra from file, add to all_input_spectra dictionary
+    if input_spectra_file is not None:
+        spectra_from_file = hdf5_catalog.open(input_spectra_file)
+        all_input_spectra = {**all_input_spectra, **spectra_from_file}
 
-    if magnitude_system in ['stmag', 'vegamag']:
-        countrate = magnitude_to_countrate('wfss', magnitude_system, magnitudes, photfnu=photfnu,
-                                           photflam=photflam, vegamag_zeropoint=zeropoint)
-        flam = countrate * photflam
+    # If both an input spectra file and dictionary are given, combine into
+    # a single dictionary. Running in this order means that dictionary
+    # inputs override inputs from a file.
+    if input_spectra is not None:
+        all_input_spectra = {**all_input_spectra, **input_spectra}
 
-    if magnitude_system == 'abmag':
-        flam = 1. / (3.34e4 * pivot.to(u.AA).value**2) * 10**(-0.4*(magnitudes-8.9))
+    # Read in input catalog
+    ascii_catalog, mag_sys = read_catalog(catalog_file)
 
-    return flam
+    # Create catalog output name if none is given
+    if flambda_catalog_file is None:
+        cat_dir, cat_file = os.path.split(catalog_file)
+        index = cat_file.rindex('.')
+        suffix = cat_file[index:]
+        outbase = cat_file[0: index] + '_with_flambda' + suffix
+        flambda_catalog_file = os.path.join(cat_dir, outbase)
+
+    #catalog, filter_info = calculate_flambda(ascii_catalog, mag_sys, outfile=flambda_catalog_file)
+    #OR
+    catalog, filter_info = add_flam_columns(ascii_catalog, mag_sys)
+    catalog.write(flambda_catalog_file, format='ascii', overwrite=True)
+    print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_catalog_file))
+
+    # Remormalize here so you have access to filter_info
+    if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
+        rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
+        rescaling_parameters = filter_info[normalizing_mag_column]
+        all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
+                                                       rescaling_parameters, mag_sys)
+
+    # For sources in catalog_file but not in all_input_spectra, use the
+    # magnitudes in the catalog_file, interpolate/extrapolate as necessary
+    # and create continuum spectra
+    indexes_to_create = []
+    for i, line in enumerate(ascii_catalog):
+        if line['index'] not in all_input_spectra.keys():
+            indexes_to_create.append(i)
+
+    if len(indexes_to_create) > 0:
+        continuum = create_spectra(ascii_catalog[indexes_to_create], filter_info,
+                                   extrapolate_SED=extrapolate_SED)
+        all_input_spectra = {**all_input_spectra, **continuum}
+
+    # For convenience, reorder the sources by index number
+    spectra = OrderedDict({})
+    for item in sorted(all_input_spectra.items()):
+        spectra[item[0]] = item[1]
+
+    # Save the source spectra in an hdf5 file
+    if output_filename is None:
+        output_filename = create_output_sed_filename(catalog_file, input_spectra_file)
+    hdf5_catalog.save(spectra, output_filename, wavelength_unit='micron', flux_unit='flam')
+    print('Spectra catalog file saved to {}'.format(output_filename))
+    return output_filename
 
 
-def rescale_normalized_spectra(seds, source_catalog, normalizing_column):
+def read_catalog(filename):
+    """Read in the Mirage-formatted catalog
+
+    Parameters
+    ----------
+    filename : str
+        Name of catalog file
+
+    Returns
+    -------
+    catalog : astropy.table.Table
+        Catalog contents
+
+    mag_sys : str
+        Magnitude system (e.g. 'abmag', 'stmag', 'vegamag')
+    """
+    catalog = ascii.read(filename)
+
+    # Check to be sure index column is present
+    if 'index' not in catalog.colnames:
+        raise ValueError(('WARNING: input catalog must have an index column '
+                          'so that object spectra can be associated with the '
+                          'correct object in the seed image/segmentation map.'))
+    min_index_value = min(catalog['index'].data)
+    if min_index_value < 1:
+        raise ValueError(("WARNING: input catalog cannot have index values less"
+                          "than 1, for the purposes of creating the segmentation map."))
+
+    # Get the magnitude system
+    mag_sys = [l.lower() for l in catalog.meta['comments'][0:4] if 'mag' in l][0]
+    if mag_sys not in ['abmag', 'stmag', 'vegamag']:
+        raise ValueError(('WARNING: unrecognized magnitude system {}. Must be'
+                          'one of "abmag", "stmag", or "vegamag".').format(mag_sys))
+    return catalog, mag_sys
+
+
+def rescale_normalized_spectra(seds, catalog_info, filter_parameters, magnitude_system):
     """Rescale any input spectra that are normalized
 
     Parameters
@@ -427,23 +431,37 @@ def rescale_normalized_spectra(seds, source_catalog, normalizing_column):
         Dictionary of SEDs
 
     source_catalog : astropy.table.Table
-        Ascii source catalog
+        Index column and magnitude column to use for rescaling
 
     normalizing_column : str
         Name of magnitude column within source_catalog to use to scale the
         normalized SEDs
+
+    filter_parameters : tup
+        photflam, photfnu, zeropoint, pivot wavelength for filter to use
+        for rescaling
 
     Returns
     -------
     seds : OrderedDict
         with flux values rescaled for sources that are normalized
     """
-    for object in seds:
-        waves = seds[object]['wavelength']
-        flux = seds[object]['fluxes']
-        median_flux = np.median(flux)
-        flux_units = flux.unit
-        print("Median value of SED flux: ", median_flux)
-        if ((flux_units == u.pct) or (np.abs(median_flux - 1) > 0.2)):
-            but in this case, percent seds and those with no units are difft by factor of 100!!!
+    photflam, photfnu, zp, pivot = filter_parameters
+    mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
+    print('Normalizing magnitude column name is {}'.format(mag_colname))
 
+    for dataset in seds:
+        waves = seds[dataset]['wavelengths']
+        flux = seds[dataset]['fluxes']
+        flux_units = flux.unit
+        if (flux_units == u.pct):
+            # print('SED for source {} is normalized. Rescaling.'.format(dataset))
+            match = catalog_info['index'] == dataset
+            if not any(match):
+                raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
+                                  'number {}. Unable to rescale.').format(dataset))
+            magnitude = catalog_info[mag_colname][match]
+            mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
+            flux *= mag_in_flam
+            seds[dataset]['fluxes'] = flux * FLAMBDA_UNITS
+    return seds
