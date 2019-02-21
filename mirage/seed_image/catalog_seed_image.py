@@ -2110,7 +2110,7 @@ class Catalog_seed():
             # Use SIAF to do the calucations if the distortion reffile is not present.
             # In this case, add 1 to the input pixel values since SIAF works in a 1-indexed
             # coordinate system.
-            loc_v2s, loc_v3s = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
+            loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
 
         ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
 
@@ -2529,6 +2529,18 @@ class Catalog_seed():
         # Loop over input lines in the source list
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
+
+            #################FOR TESTING####################
+            print('input x, y: {}, {}'.format(values['x_or_RA'], values['y_or_Dec']))
+
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                              values['y_or_Dec'],
+                                                                              pixelflag, 4096)
+            print(pixelx, pixely)
+            #################FOR TESTING####################
+
+
+
             try:
                 pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                               values['y_or_Dec'],
