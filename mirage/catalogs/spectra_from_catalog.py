@@ -19,7 +19,7 @@ Use
     ::
 
         from mirage.catalogs import spectra_from_catalog
-        spectra_dict = spectra_from_catalog.calculate_flambda('my_catalog_file.cat')
+        spectra_dict = spectra_from_catalog.make_all_spectra('my_catalog_file.cat')
 """
 from collections import OrderedDict
 import copy
@@ -101,32 +101,25 @@ def add_flam_columns(cat, mag_sys):
     return cat, parameters
 
 
-def calculate_flambda(source_catalog, magnitude_system, outfile=None):
-    """Calculate and add f_lambda columns to an existing source catalog"""
-    updated_catalog, filter_information = add_flam_columns(source_catalog, magnitude_system)
-    updated_catalog.write(outfile, format='ascii', overwrite=True)
-    print('Catalog updated with f_lambda columns, saved to: {}'.format(outfile))
-    return updated_catalog, filter_information
-
-
 def convert_to_flam(magnitudes, param_tuple, magnitude_system):
     """Convert the magnitude values for a given magnitude column into
     units of f_lambda.
 
     Parameters
     ----------
-    colname : str
-        Name of magnitude column (e.g. 'nircam_f480m_magnitude_modA')
-
     magnitudes : list
-        List of magnitude values for the column
+        List of magnitude values to be converted
 
     param_tuple : tup
-        Tuple of (photflam, zeropoint) for the given filter
+        Tuple of (photflam, photfnu, zeropoint, pivot_wavelength) for the
+        filter corresponding to the input magnitudes
+
+    magnitude_system : str
+        Name of the magnitude system for the input magnitudes (e.g. 'abmag')
 
     Returns
     -------
-    flambda : list
+    flam : list
         List of f_lambda values corresponding to the list of input magnitudes
     """
     photflam, photfnu, zeropoint, pivot = param_tuple
@@ -153,12 +146,12 @@ def create_output_sed_filename(catalog_file, spec_file):
         Name of ascii source catalog file
 
     spec_file : str
-        Name of hdf5 file containing object spectra. In None it is ignored
+        Name of hdf5 file containing object spectra. If None it is ignored
 
     Returns
     -------
     sed_file : str
-        Name of hd5 file to contain object SEDs
+        Name of hdf5 file to contain object SEDs
     """
     in_dir, in_file = os.path.split(catalog_file)
     last_dot = in_file.rfind('.')
@@ -180,10 +173,17 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
 
     Parameters
     ----------
-    table : astropy.table.Table
-        Source catalog containing f_lambda columns
+    catalog_with_flambda : astropy.table.Table
+        Source catalog containing f_lambda columns (i.e. output from
+        add_flam_columns)
 
-        OR MAKE THIS THE OVERALL WRAPPER FUNCTION...
+    filter_params : tup
+        Tuple of photometric information for a filter.
+        (photflam, photfnu, zeropoint, pivot wavelength)
+
+    extrapolate_SED : bool
+        If True and an input SED does not cover the entire wavelength range
+        of the grism, linear interpolation is used to extend the SED
 
     Returns
     -------
@@ -195,7 +195,6 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
     """
     flambda_cols = [col for col in catalog_with_flambda.colnames if 'flam' in col]
     filter_name = [colname.split('_')[1] for colname in flambda_cols]
-    print('above: what about fgs? are mag cols for fgs "fgs_guider1_magnitude?" or just "fgs_magnitude"?')
     instrument = np.array([colname.split('_')[0] for colname in flambda_cols])
     min_wave = 0.9  # microns
     max_wave = 5.15  # microns
@@ -253,7 +252,8 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
 
 def get_filter_info(column_names, magsys):
     """Given a list of catalog columns names (e.g. 'nircam_f480m_magnitude')
-    get the corresponding PHOTFLAM and filter zeropoint values
+    get the corresponding PHOTFLAM, PHOTFNU, filter zeropoint and pivot
+    wavelength values
 
     Parameters
     ----------
@@ -267,7 +267,8 @@ def get_filter_info(column_names, magsys):
     -------
     info : dict
         Dictionary of values
-        (e.g. info['nircam_f480m_magnitude'] = (photflam, zeropoint))
+        (e.g. info['nircam_f480m_magnitude'] = (<photflam>, <photfnu>,
+        <zeropoint>, <pivot>))
     """
     # Get the correct zeropoint file name
     instrument = column_names[0].split('_')[0].lower()
@@ -292,15 +293,15 @@ def get_filter_info(column_names, magsys):
             pivot = zp_table['Pivot_wave'].data[match][0] * u.micron
             info[entry] = (photflam, photfnu, zp, pivot)
 
+    # For FGS, just use the values for GUIDER1 detector.
     elif instrument == 'fgs':
-        for line in zp_table:
-            detector = line['Detector']
-            zp = line[magsys]
-            photflam = line['PHOTFLAM'] * FLAMBDA_UNITS
-            photfnu = line['PHOTFNU'] * FNU_UNITS
-            pivot = line['Pivot_wave'] * u.micron
-            new_col_name = column_names[0] + '_{}'.format(detector.lower())
-            info[new_col_name] = (photflam, photfnu, zp, pivot)
+        line = zp_table[0]
+        # detector = line['Detector']
+        zp = line[magsys]
+        photflam = line['PHOTFLAM'] * FLAMBDA_UNITS
+        photfnu = line['PHOTFNU'] * FNU_UNITS
+        pivot = line['Pivot_wave'] * u.micron
+        info[column_names[0]] = (photflam, photfnu, zp, pivot)
 
     return info
 
@@ -311,18 +312,46 @@ def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, 
 
     Parameters
     ----------
-    source_catalog : str
-        Name of Mirage-formatted source catalog file
+    catalog_file : str
+        Name of Mirage-formatted source catalog file (ascii)
 
     input_spectra : dict
-        Dictionary containing spectra for some/all targets
+        Dictionary containing spectra for some/all targets. Dictionary
+        keys are the object indexes (such as from the index column in
+        the catalog_file. Entries must be e.g.
+        d[1] = {"wavelengths": <wavelength_list>,
+                "fluxes": <List of spectral flux densities>}
+        Wavelengths and fluxes can be lists, or lists with astropy units
+        attached. If no units are supplied, Mirage assumes wavelengths
+        in microns and flux densities in Flambda units.
 
     input_specctra_file : str
         Name of an hdf5 file containing spectra for some/all targets
 
+    flambda_catalog_file : str
+        Output filename for file containing the ascii catalog with added
+        columns giving Flambda values corresponding to all magnitudes.
+        If None, the catalog is saved in the same location as the input
+        catalog_file.
+
+    extrapolate_SED : bool
+        If True and an input SED does not cover the entire wavelength range
+        of the grism, linear interpolation is used to extend the SED
+
+    output_filename : str
+        Name of the output HDF5 file, which will contain SEDs for all
+        targets.
+
+    normalizing_mag_column : str
+        If some/all of the input spectra (from input_spectra or
+        input_spectra_file) are normalized (to a median of 1.0), they will
+        be scaled based on the magnitude values given in this specified
+        column from the input catalog_file.
+
     Returns
     -------
-    ??
+    output_filename : str
+        Name of the saved HDF5 file containing all object spectra.
     """
     all_input_spectra = {}
     # Read in input spectra from file, add to all_input_spectra dictionary
@@ -347,8 +376,6 @@ def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, 
         outbase = cat_file[0: index] + '_with_flambda' + suffix
         flambda_catalog_file = os.path.join(cat_dir, outbase)
 
-    #catalog, filter_info = calculate_flambda(ascii_catalog, mag_sys, outfile=flambda_catalog_file)
-    #OR
     catalog, filter_info = add_flam_columns(ascii_catalog, mag_sys)
     catalog.write(flambda_catalog_file, format='ascii', overwrite=True)
     print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_catalog_file))
@@ -392,7 +419,7 @@ def read_catalog(filename):
     Parameters
     ----------
     filename : str
-        Name of catalog file
+        Name of (ascii) catalog file
 
     Returns
     -------
@@ -400,7 +427,8 @@ def read_catalog(filename):
         Catalog contents
 
     mag_sys : str
-        Magnitude system (e.g. 'abmag', 'stmag', 'vegamag')
+        Magnitude system (e.g. 'abmag', 'stmag', 'vegamag') of the
+        source magnitudes in the catalog
     """
     catalog = ascii.read(filename)
 
@@ -422,37 +450,46 @@ def read_catalog(filename):
     return catalog, mag_sys
 
 
-def rescale_normalized_spectra(seds, catalog_info, filter_parameters, magnitude_system):
+def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_system):
     """Rescale any input spectra that are normalized
 
     Parameters
     ----------
-    seds : OrderedDict
-        Dictionary of SEDs
+    spec : OrderedDict
+        Dictionary containing spectra for some/all targets. Dictionary
+        keys are the object indexes (such as from the index column in
+        the catalog_file. Entries must be e.g.
+        d[1] = {"wavelengths": <wavelength_list>,
+                "fluxes": <List of spectral flux densities>}
+        Wavelengths and fluxes can be lists, or lists with astropy units
+        attached. If no units are supplied, Mirage assumes wavelengths
+        in microns and flux densities in Flambda units.
 
-    source_catalog : astropy.table.Table
-        Index column and magnitude column to use for rescaling
 
-    normalizing_column : str
-        Name of magnitude column within source_catalog to use to scale the
-        normalized SEDs
+    catalog_info : astropy.table.Table
+        Index column and magnitude column to use for rescaling. Extracted
+        from the original input catalog.
 
     filter_parameters : tup
-        photflam, photfnu, zeropoint, pivot wavelength for filter to use
+        Photflam, photfnu, zeropoint, pivot wavelength for filter to use
         for rescaling
+
+    magnitude_system : str
+        Magnitude system corresponding to the input magnitudes (e.g. 'abmag')
 
     Returns
     -------
-    seds : OrderedDict
-        with flux values rescaled for sources that are normalized
+    spec : OrderedDict
+        Input dictionary, with flux values rescaled for sources that are
+        normalized
     """
     photflam, photfnu, zp, pivot = filter_parameters
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
     print('Normalizing magnitude column name is {}'.format(mag_colname))
 
-    for dataset in seds:
-        waves = seds[dataset]['wavelengths']
-        flux = seds[dataset]['fluxes']
+    for dataset in spec:
+        waves = spec[dataset]['wavelengths']
+        flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
             # print('SED for source {} is normalized. Rescaling.'.format(dataset))
@@ -463,5 +500,5 @@ def rescale_normalized_spectra(seds, catalog_info, filter_parameters, magnitude_
             magnitude = catalog_info[mag_colname][match]
             mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
             flux *= mag_in_flam
-            seds[dataset]['fluxes'] = flux * FLAMBDA_UNITS
-    return seds
+            spec[dataset]['fluxes'] = flux * FLAMBDA_UNITS
+    return spec

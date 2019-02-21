@@ -448,39 +448,6 @@ class Catalog_seed():
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
 
-    def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
-        # Convert object magnitude to counts/sec
-        #
-        # For NIRISS AMI mode, the count rate values calculated need to be
-        # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
-        # throughput of the NRM, while the 0.84 value is the throughput of the
-        # imaging CLEARP element that is in place in the pupil wheel for the
-        # normal imaging observations.
-        remove_this_function_and()
-        point_to_utils.magnitude_to_countrate_instead()
-        if self.params['Inst']['mode'] in ['ami']:
-            count_scale = 0.15 / 0.84
-        else:
-            count_scale = 1.
-        if magsys.lower() == 'abmag':
-            try:
-                return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
-            except:
-                raise ValueError(("AB mag to countrate conversion failed."
-                                  "magnitude = {}, photfnu = {}".format(mag, photfnu)))
-        if magsys.lower() == 'vegamag':
-            try:
-                return count_scale * (10**((self.vegazeropoint - mag) / 2.5))
-            except:
-                raise ValueError(("Vega mag to countrate conversion failed."
-                                  "magnitude = {}".format(mag)))
-        if magsys.lower() == 'stmag':
-            try:
-                return count_scale * (10**((mag + 21.099934378) / -2.5) / photflam)
-            except:
-                raise ValueError(("ST mag to countrate conversion failed."
-                                  "magnitude = {}, photflam = {}".format(mag, photflam)))
-
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
         countrate image containing the static sources
@@ -1021,9 +988,9 @@ class Catalog_seed():
             stamp /= totalsignal
 
             # Scale the stamp image to the requested magnitude
-            rate = self.mag_to_countrate(magsys, entry[mag_column],
-                                         photfnu=self.photfnu,
-                                         photflam=self.photflam)
+            rate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, entry[mag_column],
+                                                photfnu=self.photfnu, photflam=self.photflam,
+                                                vegamag_zeropoint=self.vegazeropoint)
             stamp *= rate
 
             # Now that we have stamp images for galaxies and extended
@@ -1661,8 +1628,9 @@ class Catalog_seed():
                 entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
                 # Calculate the countrate for the source
-                countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
-                                                  photflam=self.photflam)
+                countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                                                         photfnu=self.photfnu, photflam=self.photflam,
+                                                         vegamag_zeropoint=self.vegazeropoint)
                 framecounts = countrate * self.frametime
 
                 # add the countrate and the counts per frame to pointSourceList
@@ -2265,7 +2233,9 @@ class Catalog_seed():
                 entry.append(mag)
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                rate = self.mag_to_countrate(magsystem, mag, photfnu=self.photfnu, photflam=self.photflam)
+                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsystem, mag,
+                                                    photfnu=self.photfnu, photflam=self.photflam,
+                                                    vegamag_zeropoint=self.vegazeropoint)
                 framecounts = rate * self.frametime
 
                 # add the countrate and the counts per frame to pointSourceList
@@ -2648,8 +2618,9 @@ class Catalog_seed():
                         # magwrite = mag
 
                         # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                        countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
-                                                          photflam=self.photflam)
+                        countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                                                         photfnu=self.photfnu, photflam=self.photflam,
+                                                         vegamag_zeropoint=self.vegazeropoint)
                         framecounts = countrate * self.frametime
                         magwrite = mag
 
