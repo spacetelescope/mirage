@@ -74,7 +74,10 @@ def open(filename):
 
             # Get the data
             waves = dataset[0] * wave_units
-            fluxes = dataset[1] * flux_units
+            if flux_units != u.pct:
+                fluxes = dataset[1] * flux_units
+            else:
+                fluxes = dataset[1] * 100. * u.pct
 
             # Convert wavelengths to microns and flux values to f_lambda in cgs
             if wave_units != u.micron:
@@ -86,6 +89,8 @@ def open(filename):
             if flux_units != FLAMBDA_UNITS:
                 if flux_units.is_equivalent(FLAMBDA_UNITS):
                     fluxes = fluxes.to(FLAMBDA_UNITS)
+                elif flux_units == u.pct:
+                    pass
                 else:
                     raise ValueError("Flux density units of {} in dataset {} are not compatible with f_lambda."
                                      .format(flux_units, key))
@@ -131,6 +136,8 @@ def save(contents, filename, wavelength_unit=None, flux_unit=None):
             if isinstance(flux, u.quantity.Quantity):
                 flux_units = units_to_string(flux.unit)
                 flux_values = flux.value
+                if flux_units == 'normalized':
+                    flux_values /= 100.
             else:
                 flux_units = flux_unit
                 flux_values = flux
@@ -155,8 +162,10 @@ def string_to_units(unit_string):
     -------
     units : astropy.units Quantity
     """
-    if unit_string == 'flam':
+    if unit_string in ['flam', "FLAM"]:
         return FLAMBDA_UNITS
+    elif unit_string in ['normalized', 'NORMALIZED', 'Normalized']:
+        return u.pct
     else:
         try:
             return u.Unit(unit_string)
@@ -178,5 +187,7 @@ def units_to_string(unit):
     """
     if unit == FLAMBDA_UNITS:
         return 'flam'
+    elif unit == u.pct
+        return 'normalized'
     else:
         return unit.to_string()

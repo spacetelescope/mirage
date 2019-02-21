@@ -193,6 +193,12 @@ def overall_wrapper(catalog_file, input_spectra=None, input_spectra_file=None, f
     # Read in input catalog
     ascii_catalog, mag_sys = read_catalog(catalog_file)
 
+    # Check to see if input spectra are normalized and if so, scale using
+    # magnitudes from catalog_file
+    #for key in all_input_spectra:
+    #    check_if_normalized()
+    #    rescale_if_necessary()
+
     # Create catalog output name if none is given
     if flambda_catalog_file is None:
         cat_dir, cat_file = os.path.split(catalog_file)
@@ -202,12 +208,6 @@ def overall_wrapper(catalog_file, input_spectra=None, input_spectra_file=None, f
         flambda_catalog_file = os.path.join(cat_dir, outbase)
 
     catalog, filter_info = calculate_flambda(ascii_catalog, mag_sys, outfile=flambda_catalog_file)
-
-    # Check to see if input spectra are normalized and if so, scale using
-    # magnitudes from catalog_file
-    #for key in all_input_spectra:
-    #    check_if_normalized()
-    #    rescale_if_necessary()
 
     # For sources in catalog_file but not in all_input_spectra, use the
     # magnitudes in the catalog_file, interpolate/extrapolate as necessary
@@ -416,3 +416,34 @@ def convert_to_flam(colname, magnitudes, param_tuple, magnitude_system):
         flam = 1. / (3.34e4 * pivot.to(u.AA).value**2) * 10**(-0.4*(magnitudes-8.9))
 
     return flam
+
+
+def rescale_normalized_spectra(seds, source_catalog, normalizing_column):
+    """Rescale any input spectra that are normalized
+
+    Parameters
+    ----------
+    seds : OrderedDict
+        Dictionary of SEDs
+
+    source_catalog : astropy.table.Table
+        Ascii source catalog
+
+    normalizing_column : str
+        Name of magnitude column within source_catalog to use to scale the
+        normalized SEDs
+
+    Returns
+    -------
+    seds : OrderedDict
+        with flux values rescaled for sources that are normalized
+    """
+    for object in seds:
+        waves = seds[object]['wavelength']
+        flux = seds[object]['fluxes']
+        median_flux = np.median(flux)
+        flux_units = flux.unit
+        print("Median value of SED flux: ", median_flux)
+        if ((flux_units == u.pct) or (np.abs(median_flux - 1) > 0.2)):
+            but in this case, percent seds and those with no units are difft by factor of 100!!!
+
