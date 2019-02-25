@@ -67,6 +67,7 @@ Tangent plane projection is currently not performed when translating from detect
    yaml_generator.rst
    input_yaml_parameters.rst
    example_yaml.rst
+   wfss_simulations.rst
    quickstart.ipynb
    api.rst
 
