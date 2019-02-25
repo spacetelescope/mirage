@@ -11,6 +11,7 @@ import copy
 import math
 import numpy as np
 import os
+import pkg_resources
 
 from astropy.coordinates import SkyCoord, Galactic
 from astropy.table import Table, join
@@ -812,7 +813,7 @@ def read_standard_magnitudes():
     # read in the values needed to transform the Besancon model magnitudes
     #
     module_path = pkg_resources.resource_filename('mirage', '')
-    standard_mag_file = os.pth.join(module_path, 'config/magslist_bosz_normal_mirage.new')
+    standard_mag_file = os.path.join(module_path, 'config/magslist_bosz_normal_mirage.new')
     with open(standard_mag_file, 'r') as infile:
         lines = infile.readlines()
 
