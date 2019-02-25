@@ -93,6 +93,7 @@ class WFSSSim():
         self.disp_seed_filename = disp_seed_filename
         self.extrapolate_SED = extrapolate_SED
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
+        self.offline = offline
 
         # Make sure the right combination of parameter files and SED file
         # are given
