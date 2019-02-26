@@ -42,23 +42,24 @@ def test_hdf5_file_input():
     normalized spectrum"""
     catfile = os.path.join(TEST_DATA_DIR, 'point_sources.cat')
     output_hdf5 = os.path.join(TEST_DATA_DIR, 'all_spectra.hdf5')
-    flambda_catalog = os.path.join(TEST_DATA_DIR, 'flambda.cat')
     sed_file = os.path.join(TEST_DATA_DIR, 'sed_file_with_normalized_dataset.hdf5')
     sed_catalog = spec.make_all_spectra(catfile, input_spectra_file=sed_file,
                                         normalizing_mag_column='nircam_f444w_magnitude',
-                                        flambda_catalog_file=flambda_catalog,
                                         output_filename=output_hdf5)
 
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_hdf5_input_including_normalized.hdf5'))
     constructed = hdf5.open(sed_catalog)
     for key in comparison:
         assert key in constructed.keys()
-        print(comparison[key]["wavelengths"])
         assert all(comparison[key]["wavelengths"].value == constructed[key]["wavelengths"].value)
         assert all(comparison[key]["fluxes"].value == constructed[key]["fluxes"].value)
         assert comparison[key]["wavelengths"].unit == constructed[key]["wavelengths"].unit
         assert comparison[key]["fluxes"].unit == constructed[key]["fluxes"].unit
-    os.remove(flambda_catalog)
+
+    cat_base = catfile.split('.')[0]
+    outbase = cat_base + '_with_flambda.cat'
+    flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
+    os.remove(flambda_output_catalog)
     os.remove(sed_catalog)
 
 
@@ -66,24 +67,25 @@ def test_manual_inputs():
     """Case where spectra are input manually along side ascii catalog"""
     # Test case where spectra are input manually
     catfile = os.path.join(TEST_DATA_DIR, 'point_sources.cat')
-    flambda_catalog = os.path.join(TEST_DATA_DIR, 'flambda.cat')
     output_hdf5 = os.path.join(TEST_DATA_DIR, 'all_spectra.hdf5')
     hdf5file = os.path.join(TEST_DATA_DIR, 'sed_file_with_normalized_dataset.hdf5')
     sed_dict = hdf5.open(hdf5file)
     sed_catalog = spec.make_all_spectra(catfile, input_spectra=sed_dict,
                                         normalizing_mag_column='nircam_f444w_magnitude',
-                                        flambda_catalog_file=flambda_catalog,
                                         output_filename=output_hdf5)
     constructed = hdf5.open(sed_catalog)
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_manual_input.hdf5'))
     for key in comparison:
         assert key in constructed.keys()
-        print(comparison[key]["wavelengths"])
         assert all(comparison[key]["wavelengths"].value == constructed[key]["wavelengths"].value)
         assert all(comparison[key]["fluxes"].value == constructed[key]["fluxes"].value)
         assert comparison[key]["wavelengths"].unit == constructed[key]["wavelengths"].unit
         assert comparison[key]["fluxes"].unit == constructed[key]["fluxes"].unit
-    os.remove(flambda_catalog)
+
+    cat_base = catfile.split('.')[0]
+    outbase = cat_base + '_with_flambda.cat'
+    flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
+    os.remove(flambda_output_catalog)
     os.remove(sed_catalog)
 
 
@@ -91,45 +93,47 @@ def test_manual_plus_file_inputs():
     """Case where spectra are input via hdf5 file as well as manually"""
     catfile = os.path.join(TEST_DATA_DIR, 'point_sources.cat')
     sed_file = os.path.join(TEST_DATA_DIR, 'sed_file_with_normalized_dataset.hdf5')
-    flambda_catalog = os.path.join(TEST_DATA_DIR, 'flambda.cat')
     output_hdf5 = os.path.join(TEST_DATA_DIR, 'all_spectra.hdf5')
     manual_sed = {}
     manual_sed[7] = {"wavelengths": [0.9, 1.4, 1.9, 3.5, 5.1]*u.micron,
                      "fluxes": [1e-17, 1.1e-17, 1.5e-17, 1.4e-17, 1.1e-17] * FLAMBDA_UNITS}
     sed_catalog = spec.make_all_spectra(catfile, input_spectra=manual_sed, input_spectra_file=sed_file,
                                         normalizing_mag_column='nircam_f444w_magnitude',
-                                        flambda_catalog_file=flambda_catalog,
                                         output_filename=output_hdf5)
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_file_plus_manual_input.hdf5'))
     constructed = hdf5.open(output_hdf5)
     for key in comparison:
         assert key in constructed.keys()
-        print(comparison[key]["wavelengths"])
         assert all(comparison[key]["wavelengths"].value == constructed[key]["wavelengths"].value)
         assert all(comparison[key]["fluxes"].value == constructed[key]["fluxes"].value)
         assert comparison[key]["wavelengths"].unit == constructed[key]["wavelengths"].unit
         assert comparison[key]["fluxes"].unit == constructed[key]["fluxes"].unit
-    os.remove(flambda_catalog)
+
+    cat_base = catfile.split('.')[0]
+    outbase = cat_base + '_with_flambda.cat'
+    flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
+    os.remove(flambda_output_catalog)
     os.remove(sed_catalog)
 
 
 def test_multiple_mag_columns():
     """Case where ascii catalog with multiple magnitude columns is input"""
     catfile = os.path.join(TEST_DATA_DIR, 'point_sources.cat')
-    flambda_catalog = os.path.join(TEST_DATA_DIR, 'flambda.cat')
     output_hdf5 = os.path.join(TEST_DATA_DIR, 'all_spectra.hdf5')
-    sed_catalog = spec.make_all_spectra(catfile, flambda_catalog_file=flambda_catalog,
-                                        output_filename=output_hdf5)
+    sed_catalog = spec.make_all_spectra(catfile, output_filename=output_hdf5)
     constructed = hdf5.open(sed_catalog)
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_multiple_filter.hdf5'))
     for key in comparison:
         assert key in constructed.keys()
-        print(comparison[key]["wavelengths"])
         assert all(comparison[key]["wavelengths"].value == constructed[key]["wavelengths"].value)
         assert all(comparison[key]["fluxes"].value == constructed[key]["fluxes"].value)
         assert comparison[key]["wavelengths"].unit == constructed[key]["wavelengths"].unit
         assert comparison[key]["fluxes"].unit == constructed[key]["fluxes"].unit
-    os.remove(flambda_catalog)
+
+    cat_base = catfile.split('.')[0]
+    outbase = cat_base + '_with_flambda.cat'
+    flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
+    os.remove(flambda_output_catalog)
     os.remove(sed_catalog)
 
 
@@ -152,18 +156,42 @@ def test_single_mag_column():
     """Case where input ascii catalog contains only one magntude column.
     In this case extrapolation is necessary."""
     catfile = os.path.join(TEST_DATA_DIR, 'point_sources_one_filter.cat')
-    flambda_catalog = os.path.join(TEST_DATA_DIR, 'flambda.cat')
     output_hdf5 = os.path.join(TEST_DATA_DIR, 'all_spectra.hdf5')
-    sed_catalog = spec.make_all_spectra(catfile, flambda_catalog_file=flambda_catalog,
-                                        output_filename=output_hdf5)
+    sed_catalog = spec.make_all_spectra(catfile, output_filename=output_hdf5)
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_one_filter.hdf5'))
     constructed = hdf5.open(output_hdf5)
     for key in comparison:
         assert key in constructed.keys()
-        print(comparison[key]["wavelengths"])
         assert all(comparison[key]["wavelengths"].value == constructed[key]["wavelengths"].value)
         assert all(comparison[key]["fluxes"].value == constructed[key]["fluxes"].value)
         assert comparison[key]["wavelengths"].unit == constructed[key]["wavelengths"].unit
         assert comparison[key]["fluxes"].unit == constructed[key]["fluxes"].unit
-    os.remove(flambda_catalog)
+
+    cat_base = catfile.split('.')[0]
+    outbase = cat_base + '_with_flambda.cat'
+    flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
+    os.remove(flambda_output_catalog)
+    os.remove(sed_catalog)
+
+
+def test_multiple_ascii_catalogs():
+    """Case where multiple ascii catalogs are input"""
+    catfile = os.path.join(TEST_DATA_DIR, 'point_sources.cat')
+    galfile = os.path.join(TEST_DATA_DIR, 'galaxies.cat')
+    catalogs = [catfile, galfile]
+    output_hdf5 = os.path.join(TEST_DATA_DIR, 'all_spectra.hdf5')
+    sed_catalog = spec.make_all_spectra(catalogs, output_filename=output_hdf5)
+    comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'source_sed_file_from_point_sources.hdf5'))
+    constructed = hdf5.open(output_hdf5)
+    for key in comparison:
+        assert key in constructed.keys()
+        assert all(comparison[key]["wavelengths"].value == constructed[key]["wavelengths"].value)
+        assert all(comparison[key]["fluxes"].value == constructed[key]["fluxes"].value)
+        assert comparison[key]["wavelengths"].unit == constructed[key]["wavelengths"].unit
+        assert comparison[key]["fluxes"].unit == constructed[key]["fluxes"].unit
+    for catfile in catalogs:
+        cat_base = catfile.split('.')[0]
+        outbase = cat_base + '_with_flambda.cat'
+        flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
+        os.remove(flambda_output_catalog)
     os.remove(sed_catalog)

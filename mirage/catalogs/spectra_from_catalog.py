@@ -306,14 +306,14 @@ def get_filter_info(column_names, magsys):
     return info
 
 
-def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, flambda_catalog_file=None,
+def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                      extrapolate_SED=True, output_filename=None, normalizing_mag_column=None):
     """Overall wrapper function
 
     Parameters
     ----------
-    catalog_file : str
-        Name of Mirage-formatted source catalog file (ascii)
+    catalog_files : str or list
+        Name(s) of Mirage-formatted source catalog file(s) (ascii)
 
     input_spectra : dict
         Dictionary containing spectra for some/all targets. Dictionary
@@ -327,12 +327,6 @@ def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, 
 
     input_specctra_file : str
         Name of an hdf5 file containing spectra for some/all targets
-
-    flambda_catalog_file : str
-        Output filename for file containing the ascii catalog with added
-        columns giving Flambda values corresponding to all magnitudes.
-        If None, the catalog is saved in the same location as the input
-        catalog_file.
 
     extrapolate_SED : bool
         If True and an input SED does not cover the entire wavelength range
@@ -365,40 +359,47 @@ def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, 
     if input_spectra is not None:
         all_input_spectra = {**all_input_spectra, **input_spectra}
 
-    # Read in input catalog
-    ascii_catalog, mag_sys = read_catalog(catalog_file)
+    # If a single input source catalog is provided, make it a list, in order
+    # to be consistent with the case of multiple input catalogs
+    if isinstance(catalog_files, str):
+        catalog_files = [catalog_files]
 
-    # Create catalog output name if none is given
-    if flambda_catalog_file is None:
+    # Loop over input catalogs, which may be of different types
+    # (e.g. point source, galaxy, etc)
+    for catalog_file in catalog_files:
+        # Read in input catalog
+        ascii_catalog, mag_sys = read_catalog(catalog_file)
+
+        # Create catalog output name if none is given
         cat_dir, cat_file = os.path.split(catalog_file)
         index = cat_file.rindex('.')
         suffix = cat_file[index:]
         outbase = cat_file[0: index] + '_with_flambda' + suffix
-        flambda_catalog_file = os.path.join(cat_dir, outbase)
+        flambda_output_catalog = os.path.join(cat_dir, outbase)
 
-    catalog, filter_info = add_flam_columns(ascii_catalog, mag_sys)
-    catalog.write(flambda_catalog_file, format='ascii', overwrite=True)
-    print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_catalog_file))
+        catalog, filter_info = add_flam_columns(ascii_catalog, mag_sys)
+        catalog.write(flambda_output_catalog, format='ascii', overwrite=True)
+        print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
 
-    # Remormalize here so you have access to filter_info
-    if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
-        rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
-        rescaling_parameters = filter_info[normalizing_mag_column]
-        all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
-                                                       rescaling_parameters, mag_sys)
+        # Remormalize here so you have access to filter_info
+        if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
+            rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
+            rescaling_parameters = filter_info[normalizing_mag_column]
+            all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
+                                                           rescaling_parameters, mag_sys)
 
-    # For sources in catalog_file but not in all_input_spectra, use the
-    # magnitudes in the catalog_file, interpolate/extrapolate as necessary
-    # and create continuum spectra
-    indexes_to_create = []
-    for i, line in enumerate(ascii_catalog):
-        if line['index'] not in all_input_spectra.keys():
-            indexes_to_create.append(i)
+        # For sources in catalog_file but not in all_input_spectra, use the
+        # magnitudes in the catalog_file, interpolate/extrapolate as necessary
+        # and create continuum spectra
+        indexes_to_create = []
+        for i, line in enumerate(ascii_catalog):
+            if line['index'] not in all_input_spectra.keys():
+                indexes_to_create.append(i)
 
-    if len(indexes_to_create) > 0:
-        continuum = create_spectra(ascii_catalog[indexes_to_create], filter_info,
-                                   extrapolate_SED=extrapolate_SED)
-        all_input_spectra = {**all_input_spectra, **continuum}
+        if len(indexes_to_create) > 0:
+            continuum = create_spectra(ascii_catalog[indexes_to_create], filter_info,
+                                       extrapolate_SED=extrapolate_SED)
+            all_input_spectra = {**all_input_spectra, **continuum}
 
     # For convenience, reorder the sources by index number
     spectra = OrderedDict({})
@@ -407,7 +408,7 @@ def make_all_spectra(catalog_file, input_spectra=None, input_spectra_file=None, 
 
     # Save the source spectra in an hdf5 file
     if output_filename is None:
-        output_filename = create_output_sed_filename(catalog_file, input_spectra_file)
+        output_filename = create_output_sed_filename(catalog_file[0], input_spectra_file)
     hdf5_catalog.save(spectra, output_filename, wavelength_unit='micron', flux_unit='flam')
     print('Spectra catalog file saved to {}'.format(output_filename))
     return output_filename
