@@ -178,10 +178,10 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
             nearby_target_dec = np.array(pointing_dictionary['dec'])[nearby_targets]
             near_positions = np.array([(ra_val, dec_val) for ra_val, dec_val in zip(nearby_target_ra,
                                                                                     nearby_target_dec)])
-            unique_nearby = np.unique(near_positions)
+            unique_nearby = np.unique(near_positions, axis=0)
             for near_coords in unique_nearby:
-                near_ra = near_coords[0]
-                near_dec = near_coords[1]
+                near_ra = float(near_coords[0])
+                near_dec = float(near_coords[1])
                 tmp_dither = ((ra_targets == near_ra) & (dec_targets == near_dec))
                 all_dithers = all_dithers | np.array(tmp_dither)
                 tmp_aperture_position = [(r, d) for r, d in zip(np.array(pointing_dictionary['ra_ref'])[tmp_dither],
@@ -2205,7 +2205,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
                   'niriss_f480m_magnitude': 30, 'guider1_magnitude': 11,
                   'guider2_magnitude': 11}
     module_path = pkg_resources.resource_filename('mirage', '')
-    catalog_file = os.pth.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
+    catalog_file = os.path.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
     catalog_values = np.loadtxt(catalog_file, comments='#')
     outinds = np.zeros((nfilters), dtype=np.int16)
     try:

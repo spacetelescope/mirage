@@ -487,6 +487,158 @@ def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_un
     return input_table
 
 
+def cat_from_file(filename, catalog_type='point_source'):
+    """Read in a Mirage-formatted ascii catalog file and place into an
+    instance of a catalog object
+
+    Parameters
+    ----------
+    filename : str
+        Name of ascii catalog to be read in
+
+    catalog_type : str
+        Type of source catalog. Allowed values are:
+        point_source, galaxy, extended, moving_point_source, moving_sersic,
+        moving_extended, non_sidereal
+
+    Returns
+    -------
+    catalog_object : mirage.catalogs.catalog_generator object
+    """
+    catalog_type = catalog_type.lower()
+    allowed_types = ['point_source', 'galaxy', 'extended', 'moving_point_source',
+                     'moving_sersic', 'moving_extended', 'non_sidereal']
+    if catalog_type not in allowed_types:
+        raise ValueError(("Input catalog type {} is not one of the allowed types: {}"
+                         .format(catalog_type, allowed_types)))
+
+    cat_table = ascii.read(filename)
+
+    if 'position_pixels' in cat_table.meta['comments'][0:4]:
+        xpos = 'x'
+        ypos = 'y'
+    else:
+        xpos = 'ra'
+        ypos = 'dec'
+
+    magnitude_columns = [col for col in cat_table.colnames if 'magnitude' in col]
+
+    # Point Source catalog
+    if catalog_type == 'point_source':
+        catalog_object = PointSourceCatalog(**{xpos: cat_table['x_or_RA']}, **{ypos: cat_table['y_or_Dec']})
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+
+    # Galaxy catalog
+    elif catalog_type == 'galaxy':
+        radius_units = 'arcsec'
+        if 'radius_pixels' in cat_table.meta['comments'][0:4]:
+            radius_units = 'pixels'
+        catalog_object = GalaxyCatalog(**{xpos: cat_table['x_or_RA']}, **{ypos: cat_table['y_or_Dec']},
+                                       ellipticity=cat_table['ellipticity'], radius=cat_table['radius'],
+                                       sersic_index=cat_table['sersic_index'], position_angle=cat_table['pos_angle'],
+                                       radius_units=radius_units)
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+
+    # Extended catalog
+    elif catalog_type == 'extended':
+        catalog_object = ExtendedCatalog(**{xpos: cat_table['x_or_RA']}, **{ypos: cat_table['y_or_Dec']},
+                                         filenames=cat_table['filename'], position_angle=cat_table['pos_angle'])
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+
+    # Moving point source catalog
+    elif catalog_type == 'moving_point_source':
+        velocity_units = 'velocity_RA_Dec'
+        xvel = 'ra_velocity'
+        yvel = 'dec_velocity'
+        if 'velocity_pixels' in cat_table.meta['comments'][0:4]:
+            velocity_units = 'velocity_pixels'
+            xvel = 'x_velocity'
+            yvel = 'y_velocity'
+        catalog_object = MovingPointSourceCatalog(**{xpos: cat_table['x_or_RA']},
+                                                  **{ypos: cat_table['y_or_Dec']},
+                                                  **{xvel: cat_table['x_or_RA_velocity']},
+                                                  **{yvel: cat_table['y_or_Dec_velocity']})
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+
+    # Moving sersic catalog
+    elif catalog_type == 'moving_sersic':
+        velocity_units = 'velocity_RA_Dec'
+        xvel = 'ra_velocity'
+        yvel = 'dec_velocity'
+        if 'velocity_pixels' in cat_table.meta['comments'][0:4]:
+            velocity_units = 'velocity_pixels'
+            xvel = 'x_velocity'
+            yvel = 'y_velocity'
+        radius_units = 'arcsec'
+        if 'radius_pixels' in cat_table.meta['comments'][0:4]:
+            radius_units = 'pixels'
+        catalog_object = MovingSersicCatalog(**{xpos: cat_table['x_or_RA']},
+                                             **{ypos: cat_table['y_or_Dec']},
+                                             **{xvel: cat_table['x_or_RA_velocity']},
+                                             **{yvel: cat_table['y_or_Dec_velocity']},
+                                             ellipticity=cat_table['ellipticity'],
+                                             radius=cat_table['radius'],
+                                             sersic_index=cat_table['sersic_index'],
+                                             position_angle=cat_table['pos_angle'],
+                                             radius_units=radius_units)
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+
+    # Moving extended catalog
+    elif catalog_type == 'moving_extended':
+        velocity_units = 'velocity_RA_Dec'
+        xvel = 'ra_velocity'
+        yvel = 'dec_velocity'
+        if 'velocity_pixels' in cat_table.meta['comments'][0:4]:
+            velocity_units = 'velocity_pixels'
+            xvel = 'x_velocity'
+            yvel = 'y_velocity'
+        catalog_object = MovingExtendedCatalog(**{xpos: cat_table['x_or_RA']},
+                                               **{ypos: cat_table['y_or_Dec']},
+                                               **{xvel: cat_table['x_or_RA_velocity']},
+                                               **{yvel: cat_table['y_or_Dec_velocity']},
+                                               filenames=cat_table['filename'],
+                                               position_angle=cat_table['pos_angle'])
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+
+    # Non-sidereal catalog
+    elif catalog_type == 'non_sidereal':
+        velocity_units = 'velocity_RA_Dec'
+        xvel = 'ra_velocity'
+        yvel = 'dec_velocity'
+        if 'velocity_pixels' in cat_table.meta['comments'][0:4]:
+            velocity_units = 'velocity_pixels'
+            xvel = 'x_velocity'
+            yvel = 'y_velocity'
+        catalog_object = NonSiderealCatalog(**{xpos: cat_table['x_or_RA']},
+                                            **{ypos: cat_table['y_or_Dec']},
+                                            **{xvel: cat_table['x_or_RA_velocity']},
+                                            **{yvel: cat_table['y_or_Dec_velocity']},
+                                            object_type=cat_table['object'])
+        for magcol in magnitude_columns:
+            instrument, filtername = get_inst_filter_from_colname(magcol)
+            catalog_object.add_magnitude_column(cat_table[magcol], instrument=instrument,
+                                                filter_name=filtername)
+    return catalog_object
+
+
 def create_basic_table(ra_values, dec_values, magnitudes, location_units):
     """Create astropy table containing the basic catalog info
     NOTE THAT THIS IS OUTSIDE CLASSES
@@ -516,6 +668,31 @@ def create_basic_velocity_table(ra_values, dec_values, magnitudes, location_unit
     tab = create_basic_table(ra_values, dec_values, magnitudes, location_units)
     tab = add_velocity_columns(tab, ra_velocities, dec_velocities, velocity_units)
     return tab
+
+
+def get_inst_filter_from_colname(column_name):
+    """Get the instrument and filter name from a magnitude column string
+
+    Parameters
+    ----------
+    column_name : str
+        Magnitude column header from catalog (e.g. 'nircam_f444w_magnitude')
+
+    Returns
+    -------
+    instrument : str
+        Instrument name
+
+    filten_name : str
+        Filter name
+    """
+    parts = column_name.split('_')
+    instrument = parts[0].lower()
+    if instrument == 'guider':
+        filter_name = ''
+    else:
+        filter_name = parts[1].lower()
+    return instrument, filter_name
 
 
 def pad_table_comments(input_table):

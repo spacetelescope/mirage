@@ -1,0 +1,15 @@
+# position_RA_Dec
+# abmag
+# velocity_RA_Dec
+# 
+index filename x_or_RA y_or_Dec x_or_RA_velocity y_or_Dec_velocity pos_angle nircam_f090w_magnitude
+1 f0.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+2 f1.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+3 f2.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+4 f3.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+5 f4.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+6 f5.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+7 f6.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+8 f7.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+9 f8.fits 80.0 -69.8 0.432 0.875 14.5 19.0
+10 f9.fits 80.0 -69.8 0.432 0.875 14.5 19.0
