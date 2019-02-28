@@ -85,11 +85,12 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
-    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
+    # for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
+    for instrument in ['NIRISS']:
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
-            apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
-            # apt_file_seeds = ['com1093']
+            # apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
+            apt_file_seeds = ['com1093']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']

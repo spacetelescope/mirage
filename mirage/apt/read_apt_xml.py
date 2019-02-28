@@ -229,7 +229,7 @@ class ReadAPTXML():
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs,
                                                                           proposal_parameter_dictionary,
                                                                           verbose=verbose)
-            if coordparallel == 'true':
+                if coordparallel == 'true':
                     parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
                     if parallel_template_name in ['MiriImaging']:
                         pass
@@ -334,7 +334,6 @@ class ReadAPTXML():
         if verbose:
             print('Finished reading APT xml file.')
             print('+'*100)
-
         # Temporary for creating truth tables to use in tests
         #bool_cols = ['ParallelInstrument']
         #int_cols = ['Groups', 'Integrations']
