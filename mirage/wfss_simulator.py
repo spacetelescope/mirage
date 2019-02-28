@@ -298,6 +298,8 @@ class WFSSSim():
                     raise ValueError("WARNING: only one of the parameter files can be WFSS mode.")
                 filter_name = params['Readout']['filter']
                 pupil_name = params['Readout']['pupil']
+                dispname = ('{}_dispsersed_seed_image.fits'.format(params['Output']['file'].split('.fits')[0]))
+                self.default_dispersed_filename = os.path.join(params['Output']['directory'], dispname)
 
                 # In reality, the grism elements are in NIRCam's pupil wheel, and NIRISS's
                 # filter wheel. But in the APT xml file, NIRISS grisms are in the pupil
@@ -436,9 +438,7 @@ class WFSSSim():
         hdu_list = fits.HDUList([primary_hdu, image_hdu])
         hdu_list[0].header['units'] = 'e/sec'
         if self.disp_seed_filename is None:
-            pdir, pf = os.path.split(self.paramfiles[0])
-            dname = 'dispersed_seed_image_for_{}.fits'.format(pf)
-            self.disp_seed_filename = os.path.join(pdir, dname)
+            self.disp_seed_filename = self.default_dispersed_filename
         hdu_list.writeto(self.disp_seed_filename, overwrite=True)
         print(("Dispersed seed image saved to {}".format(self.disp_seed_filename)))
 
