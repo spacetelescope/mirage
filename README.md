@@ -27,6 +27,11 @@ pip install .
 
 ## Dependencies
 
+``pip`` should install all required dependencies, but if desired, the list of packages required for MIRaGE can 
+be viewed in the ``install_requires`` part of this repository's [setup.py file](setup.py).
+
+### Optional dependencies
+
 To simulate wide field slitless spectroscopy (WFSS) data:
 
 * [NIRCam_Gsim][d1]: to disperse imaging data

@@ -52,7 +52,15 @@ MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
 
 
 class Observation():
-    def __init__(self):
+    def __init__(self, offline=False):
+        """Instantiate the Observation class
+
+        Parameters
+        ----------
+        offline : bool
+            If True, the check for the existence of the MIRAGE_DATA
+            directory is skipped. This is primarily for Travis testing
+        """
         self.linDark = None
         self.seed = None
         self.segmap = None
@@ -73,14 +81,7 @@ class Observation():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure

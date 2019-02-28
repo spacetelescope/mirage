@@ -40,8 +40,15 @@ INST_LIST = ['nircam', 'niriss', 'fgs']
 
 
 class DarkPrep():
+    def __init__(self, offline=False):
+        """Instantiate DarkPrep object.
 
-    def __init__(self):
+        Parameters
+        ----------
+        offline : bool
+            If True, the check for the existence of the MIRAGE_DATA
+            directory is skipped. This is primarily for Travis testing
+        """
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -50,14 +57,7 @@ class DarkPrep():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
     def check_params(self):
         """Check for acceptible values for the input parameters in the
@@ -620,19 +620,20 @@ class DarkPrep():
         # future. Use the linearity coefficient file if provided
         base_name = self.params['Output']['file'].split('/')[-1]
         linearoutfile = base_name[0:-5] + '_linearized_dark_current_ramp.fits'
-        linearoutfile = os.path.join(self.params['Output']['directory'], linearoutfile)
         if self.runStep['linearity']:
             linDark = LinearityStep.call(linDark,
                                          config_file=self.params['newRamp']['linear_configfile'],
                                          override_linearity=self.params['Reffiles']['linearity'],
-                                         output_file=linearoutfile)
+                                         output_file=linearoutfile, save_results=True,
+                                         output_dir=self.params['Output']['directory'])
         else:
             linDark = LinearityStep.call(linDark,
                                          config_file=self.params['newRamp']['linear_configfile'],
-                                         output_file=linearoutfile)
+                                         output_file=linearoutfile, save_results=True,
+                                         output_dir=self.params['Output']['directory'])
 
         print(("Linearized dark (output directly from pipeline saved as {}"
-               .format(linearoutfile)))
+               .format(os.path.join(self.params['Output']['directory'], linearoutfile))))
 
         # Now we need to put the data back into a read_fits object
         linDarkobj = read_fits.Read_fits()

@@ -17,7 +17,11 @@ import os
 import pytest
 import shutil
 
+from astropy.io import ascii
+import numpy as np
+
 from mirage.yaml import generate_observationlist, yaml_generator
+from mirage.apt.read_apt_xml import ReadAPTXML
 # for debugging
 from mirage.apt import read_apt_xml, apt_inputs
 from mirage.utils import siaf_interface
@@ -70,7 +74,7 @@ def test_observation_list_generation_minimal():
     # Write observationlist.yaml
     observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
-    generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs=catalogs)
+    outputs = generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs)
 
     assert os.path.isfile(observation_list_file)
 
@@ -81,16 +85,7 @@ def test_complete_input_generation():
     # generate output directory
     temporary_directory()
 
-
     for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
-    # for instrument in ['NIRISS']:
-    # for instrument in ['misc']:
-    # for instrument in ['NIRSpec']:
-    # for instrument in ['MIRI']:
-    # for instrument in ['FGS']:
-    # for instrument in ['NIRCam']:
-
-
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
@@ -125,9 +120,14 @@ def test_complete_input_generation():
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
-            if 'DeepField' in apt_file_seed:
+
+            # For the moment, skip tests that contain NirissImaging observations
+            # or that take too long for Travis
+            skip_for_now = ['DeepField', 'NCam010', '1071']
+            skip_bool = any([True if prop in apt_file_seed else False for prop in skip_for_now])
+            if skip_bool:
                 continue
-                
+
             obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
             for file in obs_yaml_files:
                 os.remove(file)
@@ -135,7 +135,8 @@ def test_complete_input_generation():
             if '.xml' in apt_file_seed:
                 apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
                 apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
-                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
+                observation_list_file = os.path.join(TEMPORARY_DIR,
+                                                     '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
 
             else:
                 observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed))
@@ -143,6 +144,7 @@ def test_complete_input_generation():
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             print('Processing program {}'.format(apt_file_xml))
+
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
                                           catalogs=catalogs, observation_list_file=observation_list_file,
                                           verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
@@ -153,11 +155,100 @@ def test_complete_input_generation():
                 print('\nERROR detected. Skipping {} because of error\n{}\n\n'.format(apt_file_xml, e))
                 continue
 
-            yfiles = glob.glob(os.path.join(yam.output_dir,'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
+            yfiles = glob.glob(os.path.join(yam.output_dir, 'jw*{}*.yaml'.format(yam.info['ProposalID'][0])))
             valid_instrument_list = [s for s in yam.info['Instrument'] if s.lower() in 'fgs nircam niriss'.split()]
             assert len(valid_instrument_list) == len(yfiles)
+
+            if os.path.basename(apt_file_xml) in ['54321_niriss_wfss_prime_nircam_imaging_parallel.xml',
+                                                  '12345_nircam_imaging_prime_niriss_wfss_parallel.xml']:
+                prog = os.path.basename(apt_file_xml).split('_')[0]
+                expected_nircam_files = {'54321': [60, 75], '12345': [40, 90, 40, 20]}
+                expected_niriss_files = {'54321': [12, 15], '12345': [8, 18, 8, 0]}
+                nircam_files_from_list = np.array([True if s.lower() == 'nircam' else False for s in valid_instrument_list])
+                num_nircam_files = np.sum(nircam_files_from_list)
+                num_niriss_files = len(yfiles) - num_nircam_files
+                assert num_nircam_files == np.sum(np.array(expected_nircam_files[prog]))
+                assert num_niriss_files == np.sum(np.array(expected_niriss_files[prog]))
+
+                num_obs = len(expected_nircam_files[prog])
+                for i in range(1, num_obs+1):
+                    obs_num = str(i).zfill(3)
+                    obs_yfiles_nircam = glob.glob(os.path.join(yam.output_dir, 'jw{}{}*nrc*.yaml'.format(prog, obs_num)))
+                    obs_yfiles_niriss = glob.glob(os.path.join(yam.output_dir, 'jw{}{}*nis*.yaml'.format(prog, obs_num)))
+                    assert len(obs_yfiles_nircam) == expected_nircam_files[prog][i-1]
+                    assert len(obs_yfiles_niriss) == expected_niriss_files[prog][i-1]
+
+
+def read_xml(xml_file):
+    """Read in and parse xml file from APT
+
+    Parameters
+    ----------
+    xml_file : str
+        XML file from APT
+
+    Returns
+    -------
+    exposure_dictionary : dict
+        Dictionary containing exposure information for observations in xml_file
+    """
+    xml = ReadAPTXML()
+    exposure_dict = xml.read_xml(xml_file)
+    return exposure_dict
+
+
+def test_xml_reader():
+    """Tests for the xml reader in read_apt_xml.py"""
+
+    programs_to_test = ['08888', '12345', '54321']
+
+    for program in programs_to_test:
+        apt_dir = os.path.join(TEST_DATA_DIR, 'misc/{}'.format(program))
+        xml_filename = glob.glob(os.path.join(apt_dir, '*.xml'))[0]
+        comp_file = xml_filename.replace('.xml', '.txt')
+
+        # Create a new exposure dictionary. Compare to the truth version
+        exposure_dict = read_xml(xml_filename)
+        comparison_dict = ascii.read(comp_file)
+
+        # Columns to convert to strings since astropy defaults to reading them in as integers
+        int_to_string_cols = ['ProposalID', 'PrimaryDithers', 'SubpixelPositions', 'ObservationID',
+                              'number_of_dithers', 'Groups', 'Integrations', 'TileNumber']
+        # Boolean columns to convert to strings in order for the comparison to work
+        bool_to_string_cols = ['ParallelInstrument', 'FiducialPointOverride']
+
+        # Convert integer columns to string
+        for col in int_to_string_cols:
+            data = comparison_dict[col].data
+            if col == 'ProposalID':
+                data = [str(entry).zfill(5) for entry in data]
+            elif col == 'ObservationID':
+                data = [str(entry).zfill(3) for entry in data]
+            else:
+                data = [str(entry) for entry in data]
+            comparison_dict[col] = data
+        # Convert boolean columns to string
+        for col in bool_to_string_cols:
+            data = exposure_dict[col]
+            data = [str(entry) for entry in data]
+            exposure_dict[col] = data
+
+        # Check table lengths
+        assert len(exposure_dict['Instrument']) == len(comparison_dict['Instrument'])
+
+        # Compare values in each column (skip ETC-related columns)
+        for col in comparison_dict.colnames:
+            if col[0:3] != 'Etc':
+                data = comparison_dict[col].data
+                if isinstance(data[0], np.int64):
+                    data = [str(d) for d in data]
+                    comparison_dict[col] = data
+                assert all(exposure_dict[col] == comparison_dict[col].data), print(program, col,
+                                                                                   exposure_dict[col],
+                                                                                   comparison_dict[col].data)
 
 
 # for debugging
 if __name__ == '__main__':
     test_complete_input_generation()
+    #test_xml_reader()
