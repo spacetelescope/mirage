@@ -128,7 +128,7 @@ setup(
                   },
     install_requires=[
         'astropy>=1.2',
-        'numpy>=1.9',
+        'numpy<=1.15',
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
         'asdf>=1.2.0',
