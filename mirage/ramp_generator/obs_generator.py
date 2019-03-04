@@ -957,6 +957,9 @@ class Observation():
         # Calculate the rate of cosmic ray hits expected per frame
         self.get_cr_rate()
 
+        # Multiply by the frametime to get probability per pixel per frame
+        self.crrate = self.crrate * self.frametime
+
         # Read in saturation file
         if self.params['Reffiles']['saturation'] is not None:
             self.read_saturation_file()
@@ -1793,7 +1796,6 @@ class Observation():
         if "FLARES" in self.params["cosmicRay"]["library"]:
             self.crrate = 0.10546
 
-        self.crrate = self.crrate/self.frametime
         if self.crrate > 0.:
             print("Base cosmic ray probability per pixel per second: {}".format(self.crrate))
 
