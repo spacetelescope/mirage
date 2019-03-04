@@ -83,17 +83,17 @@ class PyTest(TestCommand):
 
 
 # make sure jwst is available
-try:
-    import jwst
-except ImportError:
-    try:
-        subprocess.check_call(['git', 'clone',
-                               'https://github.com/spacetelescope/jwst.git'])
-        sys.path.insert(1, 'jwst')
-        # import jwst
-    except subprocess.CalledProcessError as e:
-        print(e)
-        exit(1)
+#try:
+#    import jwst
+#except ImportError:
+#    try:
+#        subprocess.check_call(['git', 'clone',
+#                               'https://github.com/spacetelescope/jwst.git'])
+#        sys.path.insert(1, 'jwst')
+#        # import jwst
+#    except subprocess.CalledProcessError as e:
+#        print(e)
+#        exit(1)
 
 
 setup(
@@ -127,15 +127,19 @@ setup(
                              'config/*.*']
                   },
     install_requires=[
-        'astropy>=1.2',
-        'numpy<=1.15',
+        'astropy>=3.1',
+        'numpy>=1.13',
         'matplotlib>=1.4.3',
         'lxml>=3.6.4',
-        'asdf>=1.2.0',
-        'scipy>=0.17',
-        'photutils>=0.4.0',
-        'pysiaf>=0.1.11'
+        'asdf>=2.3.2',
+        'scipy>=1.0',
+        'photutils>=0.6.0',
+        'pysiaf>=0.2.5',
+        'jwst @ git+https://github.com/spacetelescope/jwst@stable#egg=jwst'
     ],
+
+    tests_require=['pytest'],
+
     include_package_data=True,
     cmdclass={
         'test': PyTest,
