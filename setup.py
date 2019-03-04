@@ -128,13 +128,14 @@ setup(
                   },
     install_requires=[
         'astropy>=3.1',
-        'numpy>=1.13',
-        'matplotlib>=1.4.3',
+        'numpy==1.15.4',
+        'matplotlib>=3.0.2',
         'lxml>=3.6.4',
         'asdf>=2.3.2',
         'scipy>=1.0',
         'photutils>=0.6.0',
         'pysiaf>=0.2.5',
+        'pyyaml>=3.10',
         'jwst @ git+https://github.com/spacetelescope/jwst@stable#egg=jwst'
     ],
 
