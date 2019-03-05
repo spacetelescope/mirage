@@ -9,7 +9,7 @@ xml_name = 'input_files/793.xml'
 pointing_name = 'input_files/793.pointing'
 output_directory = './yaml_files/'
 simdata_output_directory = './simulated_mirage_data/'
-data_type = 'linear, raw'
+datatype = 'linear, raw'
 #AB Dor is in field 19 in Kevin's targets.xlsx file
 catalogues = {'niriss' : 'stars_field19_combined_allfilters.list'}
 observation_file = '793_observation_list.yaml'
