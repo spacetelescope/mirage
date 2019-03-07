@@ -18,7 +18,7 @@ parameter_defaults = {'PAV3': 275.,'DATE':'2020-09-20'}
 yam = yaml_generator.SimInput(input_xml=xml_name, pointing_file=pointing_name,
                               catalogs=catalogues, observation_list_file=observation_file,
                               verbose=True, output_dir=output_directory, simdata_output_dir=simdata_output_directory,
-                              use_JWST_pipeline=True,offline=True, parameter_defaults=parameter_defaults)
+                              use_JWST_pipeline=True, offline=True, parameter_defaults=parameter_defaults)
 
 yam.reffile_setup()
 yam.create_inputs()

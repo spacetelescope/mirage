@@ -23,6 +23,7 @@ mirages.egg-info/*
 
 # exceptions
 !tests/test_data/*/*.list
+!examples/*/*.list
 !tests/test_data/*/*.yaml
 
 # Other #
