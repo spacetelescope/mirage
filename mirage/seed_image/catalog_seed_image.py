@@ -2016,19 +2016,19 @@ class Catalog_seed():
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
         # values hh:mm:ss
-        if alpha1 < 0.:
-            alpha1 = alpha1 + 360.
+        if ((alpha1 < 0) or (alpha1 >= 360.)):
+            alpha1 = alpha1 % 360
         if delta1 < 0.:
             sign = "-"
             d1 = abs(delta1)
         else:
-            sign = " + "
+            sign = "+"
             d1 = delta1
         decd = int(d1)
         value = 60. * (d1 - float(decd))
         decm = int(value)
         decs = 60. * (value - decm)
-        a1 = alpha1/15.0
+        a1 = alpha1 / 15.0
         radeg = int(a1)
         value = 60. * (a1 - radeg)
         ramin = int(value)
@@ -2037,13 +2037,6 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
-        # The following fixes a format issue; it is not clear why the signa
-        # can have spaces around it in view of the above format string, but
-        # that is what happens.
-        alpha2 = alpha2.replace("0+0",'+')
-        delta2 = alpha2.replace("0+0",'+')
-        alpha2 = alpha2.replace("0-0",'-')
-        delta2 = alpha2.replace("0-0",'-')
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
@@ -2138,9 +2131,9 @@ class Catalog_seed():
         if self.coord_transform is not None:
             loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
-            # Use SIAF to do the calucations if the distortion reffile is not present.
-            # In this case, add 1 to the input pixel values since SIAF works in a 1-indexed
-            # coordinate system.
+            # Use SIAF to do the calculations if the distortion reffile is
+            # not present. In this case, add 1 to the input pixel values
+            # since SIAF works in a 1-indexed coordinate system.
             loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
 
         ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)

@@ -1,0 +1,15 @@
+# position_RA_Dec
+# abmag
+# 
+# 
+index x_or_RA y_or_Dec filename nircam_f090w_magnitude pos_angle
+1 80.0 -69.8 f0.fits 19.0 14.5
+2 80.0 -69.8 f1.fits 19.0 14.5
+3 80.0 -69.8 f2.fits 19.0 14.5
+4 80.0 -69.8 f3.fits 19.0 14.5
+5 80.0 -69.8 f4.fits 19.0 14.5
+6 80.0 -69.8 f5.fits 19.0 14.5
+7 80.0 -69.8 f6.fits 19.0 14.5
+8 80.0 -69.8 f7.fits 19.0 14.5
+9 80.0 -69.8 f8.fits 19.0 14.5
+10 80.0 -69.8 f9.fits 19.0 14.5
