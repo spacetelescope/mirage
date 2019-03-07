@@ -1,0 +1,25 @@
+# APT Output Product
+# 
+# APT Version: Version 26.2  JWST PRD: PRDOPSSOC-J-019 
+# Date: Fri Feb 08 02:00:08 GMT 2019
+
+JWST Pointing Report for JWST Draft Proposal (niriss_wfss_example.xml.aptx)
+
+========================================
+* wfss-observation (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   +0.000   +0.000 TARGET     DIRECT       289    289  0.000 (base)
+  1    1   2    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   +0.000   +0.000 FILTER     SCIENCE      246    540  0.000          
+  1    1   2    2 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.229   +0.230 -290.327 -697.267   +0.229   +0.230 DITHER     SCIENCE      246      0  0.325          
+  1    1   3    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.229   +0.230 -290.327 -697.267   +0.229   +0.230 FILTER     DIRECT       289    289  0.000          
+  1    1   4    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   +0.000   +0.000 FILTER     DIRECT       375    375  0.325          
+  1    1   5    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   +0.000   +0.000 FILTER     SCIENCE      418    884  0.000          
+  1    1   5    2 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.229   +0.230 -290.327 -697.267   +0.229   +0.230 DITHER     SCIENCE      418      0  0.325          
+  1    1   6    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.229   +0.230 -290.327 -697.267   +0.229   +0.230 FILTER     DIRECT       375    375  0.000          
+  1    1   7    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   +0.000   +0.000 FILTER     DIRECT       246    246  0.325          
+  1    1   8    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.000   +0.000 -290.100 -697.500   +0.000   +0.000 FILTER     SCIENCE      332    712  0.000          
+  1    1   8    2 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.229   +0.230 -290.327 -697.267   +0.229   +0.230 DITHER     SCIENCE      332      0  0.325          
+  1    1   9    1 NIS_CEN                   1 MAIN-TAR  +12.20014  +12.19961   +0.000   +0.000   +0.229   +0.230 -290.327 -697.267   +0.229   +0.230 FILTER     DIRECT       246    246  0.000          
+
+
