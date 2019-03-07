@@ -1260,7 +1260,11 @@ class SimInput:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             # set the FilterWheel and PupilWheel for NIRISS
-            if input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
+            if input['APTTemplate'] in ['NirissAmi']:
+                filter_name = input['Filter']
+                input[filtkey] = filter_name
+                input[pupilkey] = 'NRM'
+            elif input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
                 filter_name = input['Filter']
                 if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
                     input[pupilkey] = filter_name

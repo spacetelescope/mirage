@@ -35,7 +35,7 @@ if 1:
     yam.datatype = datatype
     yam.create_inputs()
 
-
+    1/0
 
 yaml_files = glob.glob(os.path.join(output_directory, 'jw*.yaml'))
 
