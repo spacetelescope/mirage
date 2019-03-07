@@ -104,8 +104,9 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
-from ..utils.utils import calc_frame_time
+from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
+from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 
 ENV_VAR = 'MIRAGE_DATA'
 
@@ -163,18 +164,19 @@ class SimInput:
         self.tracking = 'sidereal'
 
         # Expand the MIRAGE_DATA environment variable
-        self.expand_env_var()
+        self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
         self.set_global_definitions()
+        self.path_defs()
 
         if (input_xml is not None) and (catalogs is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs, verbose=self.verbose,
-                                                     parameter_defaults=parameter_defaults)
+            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
+                                                     verbose=self.verbose, parameter_defaults=parameter_defaults)
 
         self.reffile_setup(offline=offline)
 
@@ -297,20 +299,17 @@ class SimInput:
                                       '_with_yaml_parameters.csv')
 
             # Read XML file and make observation table
-            apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file)
+            apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file,
+                                      output_dir=self.output_dir)
             # apt.input_xml = self.input_xml
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
             apt.apt_xml_dict = self.apt_xml_dict
 
-            if 'True' in self.apt_xml_dict['FiducialPointOverride']:
-                raise RuntimeError('FiducialPointOverride detected. mirage is not yet capable of handling this correctly.')
-
             apt.output_dir = self.output_dir
             apt.create_input_table()
 
             self.info = apt.exposure_tab
-            # pprint.pprint(self.info)
 
             # Add start time info to each element
             self.make_start_times()
@@ -355,6 +354,7 @@ class SimInput:
             astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
             ipc.append(self.get_reffile(self.ipc_list[instrument], det))
             pam.append(self.get_reffile(self.pam_list[instrument], det))
+
         self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
@@ -381,11 +381,12 @@ class SimInput:
         grism_source_image = ['False'] * len(self.info['Mode'])
         grism_input_only = ['False'] * len(self.info['Mode'])
         for i in range(len(self.info['Mode'])):
-            if self.info['Mode'][i] == 'WFSS':
-                grism_source_image[i] = 'True'
-                grism_input_only[i] = 'True'
+            if self.info['Mode'][i].lower() == 'wfss':
+                if self.info['detector'][i] == 'NIS' or self.info['detector'][i][-1] == '5':
+                    grism_source_image[i] = 'True'
+                    grism_input_only[i] = 'True'
                 # SW detectors shouldn't be wfss
-                if self.info['detector'][i][-1] != '5':
+                if self.info['Instrument'][i] == 'NIRCAM' and self.info['detector'][i][-1] != '5':
                     self.info['Mode'][i] = 'imaging'
         self.info['grism_source_image'] = grism_source_image
         self.info['grism_input_only'] = grism_input_only
@@ -401,13 +402,13 @@ class SimInput:
             if par.lower() == 'false':
                 seq.append('1')
         self.info['sequence_id'] = seq
-        self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
+        # self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
 
         # write out the updated table, including yaml filenames
         # start times, and reference files
-        if 0: #for debugging
-            for key in self.info.keys():
-                print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
+        #if 0: #for debugging
+        #    for key in self.info.keys():
+        #        print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
         # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
@@ -453,46 +454,68 @@ class SimInput:
             yamls.append(fname)
 
         # Write out summary of all written yaml files
-        # yaml_path = os.path.join(self.output_dir, 'V*.yaml')
-
         filenames = [y.split('/')[-1] for y in yamls]
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
-        obs_ids = sorted(list(set([m[9:12] for m in mosaic_numbers])))
+        obs_ids = sorted(list(set([m[7:10] for m in mosaic_numbers])))
 
         print('\n')
-        i_mod = 0
+
+        total_exposures = 0
         for obs in obs_ids:
-            n_visits = len(list(set([m[6:9] for m in mosaic_numbers if m[9:12] == obs])))
-            n_tiles = len(list(set([m[-2:] for m in mosaic_numbers if m[9:12] == obs])))
+            visit_list = list(set([m[10:] for m in mosaic_numbers if m[7:10] == obs]))
+            n_visits = len(visit_list)
+            exposure_list = list(set([vf[20:25] for vf in self.info['yamlfile'] if vf[7:10] == obs and vf[10:13] in visit_list]))
+            n_exposures = len(exposure_list)
+            total_exposures += n_exposures
+            all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs and m[10:13] in visit_list]
+            total_files = len(all_obs_files)
 
-            module = self.info['Module'][i_mod]
+            obs_id_int = np.array([np.int(ele) for ele in self.info['ObservationID']])
+            obs_indexes = np.where(obs_id_int == np.int(obs))[0]
+            obs_entries = np.array(self.info['ParallelInstrument'])[obs_indexes]
+            coord_par = self.info['CoordinatedParallel'][obs_indexes[0]]
+            if coord_par:
+                par_indexes = np.where(obs_entries)[0]
+                if len(par_indexes) > 0:
+                    parallel_instrument = self.info['Instrument'][obs_indexes[par_indexes[0]]]
+                else:
+                    parallel_instrument = 'NONE'
+            else:
+                parallel_instrument = 'NONE'
 
-            if module != 'None':
+            # Note that changing the == below to 'is' results in an error
+            pri_indexes = np.where(obs_entries == False)[0]
+            prime_instrument = self.info['Instrument'][obs_indexes[pri_indexes[0]]]
+
+            if prime_instrument.upper() == 'NIRCAM':
+                module = self.info['Module'][obs_indexes[pri_indexes[0]]]
+            elif parallel_instrument.upper() == 'NIRCAM':
+                module = self.info['Module'][obs_indexes[par_indexes[0]]]
+
+            if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
                 if module in ['A', 'B']:
                     n_det = 5
-                    module = ' ' + module
                 if module == 'ALL':
                     n_det = 10
-                    module = 's A and B'
-                if 'A3' in module:
-                    n_det = 1
-                    module = ' A3'
-                if 'B4' in module:
-                    n_det = 1
-                    module = ' B4'
-                if module == 'SUB96DHSPILA':
-                    n_det = 1
-                    module = ' A3'
+                    module = 'A and B'
             else:
                 # number of detectors
                 n_det = 1
-                module = ' NIS'
 
-            i_mod += n_tiles * n_det
+            if coord_par == 'true':
+                instrument_string = '    Prime: {}, Parallel: {}'.format(prime_instrument, parallel_instrument)
+            else:
+                instrument_string = '    Prime: {}'.format(prime_instrument)
 
-            print(('Observation {}: \n   {} visit(s) \n   {} exposure(s)\n   {} detector(s) in module{}'
-                   .format(obs, n_visits, n_tiles, n_det, module)))
-        print('\n{} exposures total.'.format(len(mosaic_numbers)))
+            print('Observation {}:'.format(obs))
+            print(instrument_string)
+            print('    {} visit(s)'.format(n_visits))
+            print('    {} exposure(s)'.format(n_exposures))
+            print('    {} file(s)'.format(total_files))
+            if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
+                print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
+
+        print('\n{} exposures total.'.format(total_exposures))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
     def create_output_name(self, input_obj, index=0):
@@ -520,19 +543,6 @@ class SimInput:
                                             visit_group, parallel_sequence_id, activity_id,
                                             exposure)
         return base
-
-    def expand_env_var(self):
-        """ Expand the MIRAGE_DATA environment variable
-        so that reference files can be found
-        """
-        self.datadir = os.environ.get(ENV_VAR)
-        if self.datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(ENV_VAR)))
 
     def find_ipc_file(self, inputipc):
         """Given a list of potential IPC kernel files for a given
@@ -575,7 +585,6 @@ class SimInput:
         ----------
         detector : str
             Name of detector being used
-
         Returns
         -------
         files : str
@@ -868,8 +877,6 @@ class SimInput:
                     # We don't want aperture as a list
                     aperture = aperture[0]
 
-                # print(aperture)
-
                 amp = subarray_def['num_amps'][match][0]
                 namp.append(amp)
 
@@ -879,7 +886,6 @@ class SimInput:
                     date_obs.append(base_date)
                     time_obs.append(base_time)
                     expstart.append(base.mjd)
-                    # print(actid, visit, obsname, base_date, base_time)
                     continue
 
                 epoch_date = self.info['epoch_start_date'][i]
@@ -988,7 +994,9 @@ class SimInput:
         if self.table_file is not None:
             self.table_file = os.path.abspath(os.path.expandvars(self.table_file))
 
-        # 1/0
+        ensure_dir_exists(self.output_dir)
+        ensure_dir_exists(self.simdata_output_dir)
+
         # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
         # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
         # self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
@@ -1092,8 +1100,11 @@ class SimInput:
 
             if offline:
                 # no access to central store. Set all files to none.
-                default_value = 'none'
                 for list_name in list_names:
+                    if list_name in 'dark lindark'.split():
+                        default_value = ['None']
+                    else:
+                        default_value = 'None'
                     for det in self.det_list[instrument]:
                         getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
 
@@ -1153,6 +1164,7 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0004.asdf'))[0]
+                        self.lindark_list[instrument][det] = [None]
 
                     elif det == 'G2':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
@@ -1161,11 +1173,15 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0003.asdf'))[0]
+                        self.lindark_list[instrument][det] = [None]
 
                     elif det == 'NIS':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
+                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument],
+                                                                           'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
-                                               '*NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal*.fits'))
+                                                                            '*uncal.fits'))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/linearized',
+                                                                               '*linear_dark_prep_object.fits'))
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion*.asdf'))[0]
@@ -1174,12 +1190,10 @@ class SimInput:
                     self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
                     self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
 
-
                     # suspecting that the FGS wcs reference file has a problem
                     # self.astrometric_list[instrument][det] = 'none'
 
                     self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'pam/*area*.fits'))[0]
-                    self.lindark_list[instrument][det] = [None]
 
     def set_config(self, file, prop):
         """
@@ -1236,7 +1250,23 @@ class SimInput:
         """
         instrument = input['Instrument']
         # select the right filter
-        if input['detector'] in ['NIS', 'FGS']:
+        if input['detector'] in ['NIS']:
+            # if input['APTTemplate'] == 'NirissExternalCalibration': 'NirissImaging':
+            filtkey = 'FilterWheel'
+            pupilkey = 'PupilWheel'
+            # set the FilterWheel and PupilWheel for NIRISS
+            if input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
+                filter_name = input['Filter']
+                if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                    input[pupilkey] = filter_name
+                    input[filtkey] = 'CLEAR'
+                elif filter_name in NIRISS_FILTER_WHEEL_ELEMENTS:
+                    input[pupilkey] = 'CLEARP'
+                    input[filtkey] = filter_name
+                else:
+                    raise RuntimeError('Filter {} not valid'.format(filter_name))
+            catkey = ''
+        elif input['detector'] in ['FGS']:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             catkey = ''
@@ -1463,7 +1493,7 @@ class SimInput:
             f.write("  obs_id: '{}'   # Observation ID number\n".format(input['observation_id']))
             f.write("  date_obs: '{}'  # Date of observation\n".format(input['date_obs']))
             f.write("  time_obs: '{}'  # Time of observation\n".format(input['time_obs']))
-            f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
+            # f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
             f.write("  primary_dither_type: {}  # Primary dither pattern name\n".format(input['PrimaryDitherType']))
             f.write("  total_primary_dither_positions: {}  # Total number of primary dither positions\n".format(input['PrimaryDithers']))
             f.write("  primary_dither_position: {}  # Primary dither position number\n".format(np.int(input['primary_dither_num'])))
@@ -1487,8 +1517,6 @@ class SimInput:
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
 
-        # if instrument.lower()=='niriss':
-        #     1/0
         return yamlout
 
     def add_options(self, parser=None, usage=None):

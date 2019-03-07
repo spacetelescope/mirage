@@ -12,6 +12,8 @@ import sys
 import glob
 import os
 import copy
+import re
+import shutil
 
 import math
 import yaml
@@ -48,7 +50,15 @@ WFEGROUP_OPTIONS = np.arange(5)
 
 
 class Catalog_seed():
-    def __init__(self):
+    def __init__(self, offline=False):
+        """Instantiate the Catalog_seed class
+
+        Parameters
+        ----------
+        offline : bool
+            If True, the check for the existence of the MIRAGE_DATA
+            directory is skipped. This is primarily for Travis testing
+        """
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -57,15 +67,7 @@ class Catalog_seed():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
         # if a grism signal rate image is requested, expand
         # the width and height of the signal rate image by this
@@ -1341,14 +1343,14 @@ class Catalog_seed():
         # Read in the list of point sources to add
         # Adjust point source locations using astrometric distortion
         # Translate magnitudes to counts in a single frame
-        if self.runStep['pointsource'] == True:
+        if self.runStep['pointsource'] is True:
             pslist = self.getPointSourceList(self.params['simSignals']['pointsource'])
 
             # translate the point source list into an image
             psfimage, ptsrc_segmap = self.makePointSourceImage(pslist)
 
             # save the point source image for examination by user
-            if self.params['Output']['save_intermediates'] == True:
+            if self.params['Output']['save_intermediates'] is True:
                 psfImageName = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(psfimage)
                 h1 = fits.ImageHDU(ptsrc_segmap)
@@ -1367,7 +1369,7 @@ class Catalog_seed():
         # Simulated galaxies
         # Read in the list of galaxy positions/magnitudes to simulate
         # and create a countrate image of those galaxies.
-        if self.runStep['galaxies'] == True:
+        if self.runStep['galaxies'] is True:
             galaxyCRImage, galaxy_segmap = self.makeGalaxyImage(self.params['simSignals']['galaxyListFile'], self.centerpsf)
 
             # Multiply by the pixel area map
@@ -1377,7 +1379,7 @@ class Catalog_seed():
             segmentation_map += galaxy_segmap
 
             # save the galaxy image for examination by the user
-            if self.params['Output']['save_intermediates'] == True:
+            if self.params['Output']['save_intermediates'] is True:
                 galImageName = self.basename + '_galaxyRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(galaxyCRImage)
                 h1 = fits.ImageHDU(galaxy_segmap)
@@ -1390,7 +1392,7 @@ class Catalog_seed():
             signalimage = signalimage + galaxyCRImage
 
         # read in extended signal image and add the image to the overall image
-        if self.runStep['extendedsource'] == True:
+        if self.runStep['extendedsource'] is True:
             extlist, extstamps = self.getExtendedSourceList(self.params['simSignals']['extended'])
 
             # translate the extended source list into an image
@@ -1419,7 +1421,7 @@ class Catalog_seed():
             signalimage = signalimage + extimage
 
         # ZODIACAL LIGHT
-        if self.runStep['zodiacal'] == True:
+        if self.runStep['zodiacal'] is True:
             #zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
             zodiangle = self.params['Telescope']['rotation']
             zodiacalimage, zodiacalheader = self.getImage(self.params['simSignals']['zodiacal'], arrayshape, True, zodiangle, arrayshape/2)
@@ -2766,19 +2768,52 @@ class Catalog_seed():
             qy = [float(s) for s in strinstrumentqy]
             self.countvalues = dict(zip(instrumentfilternames, instrumentmag15countrates))
             self.qydict = dict(zip(instrumentfilternames, qy))
-
         except:
-            print("WARNING: Unable to read in {}.".format(self.params['Reffiles']['phot']))
-            sys.exit()
+            raise IOError("WARNING: Unable to read in {}.".format(self.params['Reffiles']['phot']))
 
     def readParameterFile(self):
-        # read in the parameter file
+        """Read in the parameter file"""
+        # List of fields in the yaml file to check for extra colons
+        search_cats = ['title:', 'PI_Name:', 'Science_category:', 'observation_label:']
+
+        # Open the yaml file and check for the presence of extra colons
+        adjust_file = False
+        with open(self.paramfile) as infile:
+            read_data = infile.readlines()
+            for i, line in enumerate(read_data):
+                for search_term in search_cats:
+                    if search_term in line:
+                        idx = []
+                        hashidx = [200]
+                        for m in re.finditer(':', line):
+                            idx.append(m.start())
+                        for mm in re.finditer('#', line):
+                            hashidx.append(mm.start())
+                        num = np.sum(np.array(idx) < min(hashidx))
+                        if num > 1:
+                            adjust_file = True
+                            later_string = line[idx[0]+1:]
+                            later_string = later_string.replace(':', ',')
+                            newline = line[0: idx[0]+1] + later_string
+                            read_data[i] = newline
+
+        if adjust_file:
+            # Make a copy of the original file and then delete it
+            yaml_copy = 'orig_{}'.format(self.paramfile)
+            shutil.copy2(self.paramfile, yaml_copy)
+            os.remove(self.paramfile)
+
+            # Write the adjusted lines to a new copy of the input file
+            with open(self.paramfile, 'w') as f:
+                for item in read_data:
+                    f.write("{}".format(item))
+
+        # Load the yaml file
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.load(infile)
-        except:
-            print("WARNING: unable to open {}".format(self.paramfile))
-            sys.exit()
+        except (ScannerError, FileNotFoundError, IOError) as e:
+            print(e)
 
     def check_params(self):
         """Check input parameters for expected datatypes, values"""
@@ -3022,8 +3057,10 @@ class Catalog_seed():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
-            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+        instrument_siaf = siaf_interface.get_instance(siaf_inst)
+        self.siaf = instrument_siaf[self.params['Readout']['array_name']]
+        self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(instrument_siaf,
                                                                        self.params['Readout']['array_name'],
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])

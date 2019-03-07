@@ -51,7 +51,7 @@ from pysiaf import rotations
 import yaml
 
 from . import read_apt_xml
-from ..utils import siaf_interface
+from ..utils import siaf_interface, constants
 
 
 class AptInput:
@@ -66,13 +66,13 @@ class AptInput:
         pointing_file (str): Description
     """
 
-    def __init__(self, input_xml=None, pointing_file=None):
-
+    def __init__(self, input_xml=None, pointing_file=None, output_dir=None, output_csv=None,
+                 observation_list_file=None):
         self.input_xml = input_xml
         self.pointing_file = pointing_file
-
-        self.output_csv = None
-        self.observation_list_file = None
+        self.output_dir = output_dir
+        self.output_csv = output_csv
+        self.observation_list_file = observation_list_file
 
     def add_epochs(self, intab):
         """NOT CURRENTLY USED"""
@@ -282,7 +282,6 @@ class AptInput:
         #     readxml_obj = read_apt_xml.ReadAPTXML()
         #     tab = readxml_obj.read_xml(self.input_xml)
 
-
         # This affects on NIRCam exposures (right?)
         # If the number of dithers is set to '3TIGHT'
         # (currently only used in NIRCam)
@@ -303,10 +302,70 @@ class AptInput:
 
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
-            'Inconsistent table size from XML file ({}) and pointing file ({}). Something was not processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']), len(pointing_dictionary['obs_num']))
+            ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
+             'processed correctly in apt_inputs.'.format(len(self.apt_xml_dict['ProposalID']),
+                                                         len(pointing_dictionary['obs_num'])))
 
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
+
+
+
+
+        """
+        if self.pointing_file == '/Users/hilbert/python_repos/mirage/tests/test_data/misc/01148/OTE13-1148.pointing':
+            print('checking dictionary combination in apt_inputs')
+            print(observation_dictionary.keys())
+            print(self.apt_xml_dict.keys())
+            print(pointing_dictionary.keys())
+
+            print(self.apt_xml_dict['ObservationID'])
+            print(observation_dictionary['ObservationID'])
+            print('')
+            print(pointing_dictionary['obs_num'])
+            print(observation_dictionary['obs_num'])
+            print('')
+
+            print(('need to use zfill to add preceding zeros to ObservationID?'
+            'Looks like dictionary is being reordered to increasing ObservationID'
+            'order (even though they are strings????!), but the same is not happening'
+            'for the pointing dictionary.'))
+
+
+
+
+
+            print('dictionary lengths:')
+            print(len(pointing_dictionary['obs_num']))
+            print(len(self.apt_xml_dict['ObservationID']))
+            print(len(observation_dictionary['ObservationID']))
+
+            obs2 = np.where(np.array(pointing_dictionary['obs_num']) == '002')[0]
+            print('obs2 in pointing: {}'.format(obs2))
+            if len(obs2) > 0:
+                for keyname in pointing_dictionary:
+                    print(keyname, pointing_dictionary[keyname][obs2[0]])
+            obs2_xml = np.where(np.array(self.apt_xml_dict['ObservationID']) == '2')[0]
+            print('')
+            print('obs2 in xml: {}'.format(obs2_xml))
+            if len(obs2_xml) > 0:
+                for keyname in self.apt_xml_dict:
+                    print(keyname, self.apt_xml_dict[keyname][obs2_xml[0]])
+            obs2_comb = np.where(np.array(observation_dictionary['obs_num']) == '002')[0]
+            print('')
+            print('obs2 in combined: {}'.format(obs2_comb))
+            if len(obs2_comb) > 0:
+                for keyname in observation_dictionary:
+                    print(keyname, observation_dictionary[keyname][obs2_comb[0]])
+            print('')
+            print('entry {} in xml_dict, for comparison'.format(obs2))
+            for keyname in self.apt_xml_dict:
+                    print(keyname, observation_dictionary[keyname][obs2[0]])
+            """
+
+
+
+
 
         # Add epoch and catalog information
         observation_dictionary = self.add_observation_info(observation_dictionary)
@@ -318,15 +377,21 @@ class AptInput:
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
-        # print(self.exposure_tab['Instrument'])
+        self.check_aperture_override()
+
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
-        detectors_file = os.path.join(self.output_dir, 'expand_for_detectors.csv')
+        #detectors_file = os.path.join(self.output_dir,
+        #                              '{}_expanded_for_detectors.csv'.format(infile.split('.')[0]))
+        #ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
+        #print('Wrote exposure table to {}'.format(detectors_file))
 
-        ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
-        print('Wrote exposure table to {}'.format(detectors_file))
+        # Create a pysiaf.Siaf instance for each instrument in the proposal
+        self.siaf = {}
+        for instrument_name in np.unique(observation_dictionary['Instrument']):
+            self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
         self.ra_dec_update()
@@ -337,6 +402,37 @@ class AptInput:
             self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
         print('csv exposure list written to {}'.format(self.output_csv))
+
+    def check_aperture_override(self):
+        if bool(self.exposure_tab['FiducialPointOverride']) is True:
+            instruments = self.exposure_tab['Instrument']
+            apertures = self.exposure_tab['aperture']
+
+            aperture_key = constants.instrument_abbreviations
+
+            fixed_apertures = []
+            for i, (instrument, aperture) in enumerate(zip(instruments, apertures)):
+                inst_match_ap = aperture.startswith(aperture_key[instrument.lower()])
+                if not inst_match_ap:
+                    # Handle the one case we understand, for now
+                    if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
+                        obs_num = self.exposure_tab['obs_num'][i]
+                        guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                        guider_aperture = 'FGS{}_FULL'.format(guider_number)
+                        fixed_apertures.append(guider_aperture)
+                    else:
+                        raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
+                else:
+                    fixed_apertures.append(aperture)
+
+            # Add new dictionary entry to document the FiducialPointOverride (pointing aperture)
+            self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
+            # Rewrite the existing imaging aperture entry to match the primary instrument
+            self.exposure_tab['aperture'] = fixed_apertures
+        else:
+            # Add new dictionary entry to document that the imaging aperture is the
+            # same as the pointing aperture
+            self.exposure_tab['pointing_aperture'] = self.exposure_tab['aperture']
 
     def expand_for_detectors(self, input_dictionary):
         """Expand dictionary to have one entry per detector, rather than the
@@ -363,79 +459,64 @@ class AptInput:
                 # NIRCam case: Expand for detectors. Create one entry in each list for each
                 # detector, rather than a single entry for 'ALL' or 'BSALL'
 
-                # Determine module of the observation
-                module = input_dictionary['Module'][index]
-                if module == 'ALL':
-                    detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-                elif module == 'A':
-                    detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
-                elif module == 'B':
-                    detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
-                elif 'A3' in module:
-                    detectors = ['A3']
-                elif 'B4' in module:
-                    detectors = ['B4']
-                elif 'DHSPIL' in module:
-                    if module[-1] == 'A':
-                        detectors = ['A3']
-                    elif module[-1] == 'B':
-                        detectors = ['B4']
+                # Determine module and subarray of the observation
+                sub = input_dictionary['Subarray'][index]
+                if 'DHSPIL' not in sub and 'FP1' not in sub:
+                    module = input_dictionary['Module'][index]
+                    if module == 'ALL':
+                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+                    elif module == 'A':
+                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
+                    elif module == 'B':
+                        detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
                     else:
-                        ValueError('Unknown module {}'.format(module))
+                        raise ValueError('Unknown module {}'.format(module))
                 else:
-                    raise ValueError('Unknown module {}'.format(module))
+                    # Wait to handle cases where there are subarrays, and so things should not be
+                    # expanded for all detectors.
+                    detectors = ['placeholder']
 
             elif instrument == 'niriss':
                 detectors = ['NIS']
+
             elif instrument == 'nirspec':
                 detectors = ['NRS']
-                # if 'NRS1' in input_dictionary['aperture'][index]:
-                #     detectors = ['NRS1']
-                # elif 'NRS2' in input_dictionary['aperture'][index]:
-                #     detectors = ['NRS2']
-            elif instrument == 'fgs':
-                if 'FGS1' in input_dictionary['aperture'][index]:
-                    detectors = ['G1']
-                elif 'FGS2' in input_dictionary['aperture'][index]:
-                    detectors = ['G2']
-            elif instrument== 'miri':
-                detectors = ['MIR']
 
+            elif instrument == 'fgs':
+                guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                detectors = ['G{}'.format(guider_number)]
+
+            elif instrument == 'miri':
+                detectors = ['MIR']
 
             n_detectors = len(detectors)
             for key in input_dictionary:
                 observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
             observation_dictionary['detector'].extend(detectors)
 
-        #correct NIRCam aperture names
+        # Correct NIRCam aperture names for commissioning subarrays
         for index, instrument in enumerate(observation_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
-                detector = 'NRC' + observation_dictionary['detector'][index]
+                detector = observation_dictionary['detector'][index]
                 sub = observation_dictionary['Subarray'][index]
 
                 # this should probably better be handled by using the subarray_definitions file upstream
-                if sub == 'SUB96DHSPILA':
-                    aperture_name = 'NRCA3_DHSPIL_SUB96'
-                elif sub == 'SUB96DHSPILB':
-                    aperture_name = 'NRCB4_DHSPIL_SUB96'
-                elif sub == 'SUB96DHSPILB':
-                    aperture_name = 'NRCB4_DHSPIL_SUB96'
-                elif ('NRCB4_DHSPIL' in sub) or ('NRCA3_DHSPIL' in sub):# in ['NRCB4_DHSPIL_SUB96', 'NRCA3_DHSPIL_SUB96']:
-                    aperture_name = sub
-                elif sub == 'SUB8FP1A':
-                    aperture_name = 'NRCA3_FP1_SUB8'
-                elif sub == 'SUB64FP1A':
-                    aperture_name = 'NRCA3_FP1_SUB64'
-                elif sub == 'SUB8FP1B':
-                    aperture_name = 'NRCB4_FP1_SUB8'
-                elif sub == 'SUB64FP1B':
-                    aperture_name = 'NRCB4_FP1_SUB64'
-
+                if 'DHSPIL' in sub:
+                    subarray, module = sub.split('DHSPIL')
+                    subarray_size = subarray[3:]
+                    detector = 'A3' if module == 'A' else 'B4'
+                    aperture_name = 'NRC{}_DHSPIL_SUB{}'.format(detector, subarray_size)
+                elif 'FP1' in sub:
+                    subarray, module = sub.split('FP1')
+                    subarray_size = subarray[3:]
+                    detector = 'A3' if module == 'A' else 'B4'
+                    aperture_name = 'NRC{}_FP1_SUB{}'.format(detector, subarray_size)
                 else:
-                    aperture_name = detector + '_' + sub
-                observation_dictionary['aperture'][index] = aperture_name
+                    aperture_name = 'NRC' + detector + '_' + sub
 
+                observation_dictionary['aperture'][index] = aperture_name
+                observation_dictionary['detector'][index] = detector
 
         return observation_dictionary
 
@@ -535,7 +616,7 @@ class AptInput:
         with open(file) as f:
             for line in f:
 
-                #skip comments and new lines
+                # skip comments and new lines
                 if (line[0] == '#') or (line in ['\n']) or ('=====' in line):
                     continue
                 # extract proposal ID
@@ -544,12 +625,11 @@ class AptInput:
                     try:
                         propid = np.int(propid_header)
                     except ValueError:
-                        #adopt value passed to function
+                        # adopt value passed to function
                         pass
                     if verbose:
                         print('Extracted proposal ID {}'.format(propid))
                     continue
-
 
                 elif (len(line) > 1):
                     elements = line.split()
@@ -642,10 +722,12 @@ class AptInput:
                             type_str.append(elements[18])
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
-                            if elements[18] == 'PARALLEL':
-                                ddist.append(None)
-                            else:
-                                ddist.append(np.float(elements[21]))
+                            #if elements[18] == 'PARALLEL':
+                            #    ddist.append(None)
+                            #else:
+                                #print('line is: {}'.format(elements))
+                                #print(ddist)
+                                #ddist.append(np.float(elements[21]))
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.
@@ -705,9 +787,6 @@ class AptInput:
 
         for i in range(len(self.exposure_tab['Module'])):
             siaf_instrument = self.exposure_tab["Instrument"][i]
-            if siaf_instrument == 'NIRSPEC':
-                siaf_instrument = 'NIRSpec'
-
             aperture_name = self.exposure_tab['aperture'][i]
             pointing_ra = np.float(self.exposure_tab['ra'][i])
             pointing_dec = np.float(self.exposure_tab['dec'][i])
@@ -721,10 +800,12 @@ class AptInput:
 
             telescope_roll = pav3
 
-            aperture, local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                siaf_interface.get_siaf_information(
-                siaf_instrument, aperture_name, pointing_ra, pointing_dec, telescope_roll,
-                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+            aperture = self.siaf[siaf_instrument][aperture_name]
+
+            local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
+                                                    pointing_ra, pointing_dec, telescope_roll,
+                                                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
 
             # calculate RA, Dec of reference location for the detector
             ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
@@ -739,8 +820,11 @@ class AptInput:
             parser = argparse.ArgumentParser(usage=usage, description='Simulate JWST ramp')
         parser.add_argument("input_xml", help='XML file from APT describing the observations.')
         parser.add_argument("pointing_file", help='Pointing file from APT describing observations.')
-        parser.add_argument("--output_csv", help="Name of output CSV file containing list of observations.", default=None)
-        parser.add_argument("--observation_list_file", help='Ascii file containing a list of observations, times, and roll angles, catalogs', default=None)
+        parser.add_argument("--output_csv", help="Name of output file containing list of observations.",
+                            default=None)
+        parser.add_argument("--observation_list_file", help=('Ascii file containing a list of '
+                                                             'observations, times, and roll angles, '
+                                                             'catalogs'), default=None)
         return parser
 
 

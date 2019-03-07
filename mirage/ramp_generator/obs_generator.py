@@ -52,7 +52,15 @@ MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
 
 
 class Observation():
-    def __init__(self):
+    def __init__(self, offline=False):
+        """Instantiate the Observation class
+
+        Parameters
+        ----------
+        offline : bool
+            If True, the check for the existence of the MIRAGE_DATA
+            directory is skipped. This is primarily for Travis testing
+        """
         self.linDark = None
         self.seed = None
         self.segmap = None
@@ -73,14 +81,7 @@ class Observation():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure
@@ -752,8 +753,10 @@ class Observation():
         siaf_inst = self.params['Inst']['instrument']
         if siaf_inst.lower() == 'nircam':
             siaf_inst = 'NIRCam'
-        self.siaf, self.local_roll, self.attitude_matrix, self.ffsize, \
-            self.subarray_bounds = siaf_interface.get_siaf_information(siaf_inst,
+        instrument_siaf = siaf_interface.get_instance(siaf_inst)
+        self.siaf = instrument_siaf[self.params['Readout']['array_name']]
+        self.local_roll, self.attitude_matrix, self.ffsize, \
+            self.subarray_bounds = siaf_interface.get_siaf_information(instrument_siaf,
                                                                        self.params['Readout']['array_name'],
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])
@@ -953,6 +956,9 @@ class Observation():
 
         # Calculate the rate of cosmic ray hits expected per frame
         self.get_cr_rate()
+
+        # Multiply by the frametime to get probability per pixel per frame
+        self.crrate = self.crrate * self.frametime
 
         # Read in saturation file
         if self.params['Reffiles']['saturation'] is not None:
@@ -1790,7 +1796,6 @@ class Observation():
         if "FLARES" in self.params["cosmicRay"]["library"]:
             self.crrate = 0.10546
 
-        self.crrate = self.crrate/self.frametime
         if self.crrate > 0.:
             print("Base cosmic ray probability per pixel per second: {}".format(self.crrate))
 
@@ -1913,17 +1918,18 @@ class Observation():
             newkernel = np.copy(kern)
             newkernel[:, :, ys:ye, xs:xe] = realout1
 
-        # Save the inverted kernel for future simulator runs
-        h0 = fits.PrimaryHDU()
-        h1 = fits.ImageHDU(newkernel)
-        h1.header["DETECTOR"] = self.detector
-        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
-        hlist = fits.HDUList([h0, h1])
-        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
-        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
-        hlist.writeto(outname, overwrite=True)
-        print(("Inverted IPC kernel saved to {} for future simulator "
-               "runs.".format(outname)))
+        if self.params['Output']['save_intermediates']:
+            # Save the inverted kernel for future simulator runs
+            h0 = fits.PrimaryHDU()
+            h1 = fits.ImageHDU(newkernel)
+            h1.header["DETECTOR"] = self.detector
+            h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+            hlist = fits.HDUList([h0, h1])
+            indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+            outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+            hlist.writeto(outname, overwrite=True)
+            print(("Inverted IPC kernel saved to {} for future simulator "
+                   "runs.".format(outname)))
         return newkernel
 
     def mask_refpix(self, ramp, zero):
