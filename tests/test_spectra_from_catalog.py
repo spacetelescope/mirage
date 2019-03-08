@@ -1,12 +1,12 @@
-"""Test the functions provided by siaf_interface.
+"""Test the functions provided by spectra_from_catalog.py
 
 Authors
 -------
-    - Johannes Sahlmann
+    - Bryan Hilbert
 
 Use
 ---
-    >>> pytest -s test_siaf_interface.py
+    >>> pytest -s test_spectra_from_catalog.py
 
 
 """
