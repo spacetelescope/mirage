@@ -7,6 +7,7 @@ Use
         inst_abb = constants.instrument_abbreviations
 """
 import astropy.units as u
+import numpy as np
 
 instrument_abbreviations = {'nircam': 'NRC',
                             'fgs': 'FGS',
@@ -16,3 +17,26 @@ instrument_abbreviations = {'nircam': 'NRC',
 
 FLAMBDA_UNITS = u.erg / u.second / u.cm / u.cm / u.AA
 FNU_UNITS = u.erg / u.second / u.cm / u.cm / u.Hz
+
+CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
+                        'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
+
+
+def grism_factor(instrument_name):
+    """Return the factor by which the field of view is expanded when
+    creating grism simulations compared to direct image simulations
+
+    Parameters
+    ----------
+    instrument_name : str
+        JWST instrument name
+
+    Returns
+    -------
+    factor : float
+        Multiplicative factor by which the fov is enlarged
+    """
+    if instrument_name.lower() == 'nircam':
+        return np.sqrt(2.)
+    elif instrument_name.lower() == 'niriss':
+        return 2322./2048.

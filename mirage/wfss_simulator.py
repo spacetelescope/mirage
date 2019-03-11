@@ -42,14 +42,16 @@ import sys
 import argparse
 import yaml
 
-from numpy import nanmedian, isfinite
+import numpy as np
 from astropy.io import fits
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 
+from .catalogs import spectra_from_catalog
 from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import read_fits
+from .utils.constants import CATALOG_YAML_ENTRIES
 from .utils.utils import expand_environment_variable
 from .yaml import yaml_update
 
@@ -60,13 +62,10 @@ NIRISS_GRISM_CROSSING_FILTERS = ['F200W', 'F150W', 'F140M', 'F158M', 'F115W', 'F
 
 
 class WFSSSim():
-    def __init__(self, paramfiles, SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
-                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, offline=False):
-
-        print('when you go to make the direct seed image in the case where a wfss yaml is provided')
-        print('catalog_seed_image will need to ignore the grism name')
-
-        print('This should be a change to catalog_seed_image? or modify the yaml here? Probably the former')
+    def __init__(self, paramfiles, SED_file=None, SED_normalizing_catalog_column=None,
+                 final_SED_file=None, SED_dict=None, save_dispersed_seed=True, source_stamps_file=None,
+                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, offline=False,
+                 create_continuum_seds=True):
 
         # Set the MIRAGE_DATA environment variable if it is not
         # set already. This is for users at STScI.
@@ -86,7 +85,11 @@ class WFSSSim():
             self.paramfiles = [self.paramfiles]
 
         # Set the user-input parameters
+        self.create_continuum_seds = create_continuum_seds
         self.SED_file = SED_file
+        self.SED_dict = SED_dict
+        self.SED_normalizing_catalog_column = SED_normalizing_catalog_column
+        self.final_SED_file = final_SED_file
         self.override_dark = override_dark
         self.save_dispersed_seed = save_dispersed_seed
         self.source_stamps_file = source_stamps_file
@@ -108,6 +111,21 @@ class WFSSSim():
         # Make sure inputs are correct
         self.check_inputs()
 
+        # Determine whether Mirage will create a final hdf5 file that
+        # contains all sources. If only one paramfile is provided, this
+        # must be done.
+        if len(self.paramfiles) == 1:
+            self.create_continuum_seds = True
+        else:
+            # If spectra are provided, this step must be done
+            if self.SED_file is not None or self.SED_dict is not None:
+                self.create_continuum_seds = True
+            else:
+                # If multiple paramfiles are given and no input spectra,
+                # then we leave the choice up to the user, as either case
+                # is ok.
+                pass
+
     def create(self):
         """MAIN FUNCTION"""
 
@@ -120,6 +138,18 @@ class WFSSSim():
             cat.paramfile = pfile
             cat.make_seed()
             imseeds.append(cat.seed_file)
+            # If Mirage is going to produce an hdf5 file of spectra,
+            # then we only need a single direct seed image.
+            if self.create_continuum_seds:
+                break
+
+        # Create hdf5 file with spectra of all sources if requested.
+        if self.create_continuum_seds:
+            self.SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files, input_spectra=self.SED_dict,
+                                                                  input_spectra_file=self.SED_file,
+                                                                  extrapolate_SED=self.extrapolate_SED,
+                                                                  output_filename=self.final_SED_file,
+                                                                  normalizing_mag_column=self.SED_normalizing_catalog_column)
 
         # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
@@ -226,9 +256,9 @@ class WFSSSim():
 
     def param_checks(self):
         """Check parameter file inputs"""
-        if ((len(self.paramfiles) < 2) and (self.SED_file is None)):
-            raise ValueError(("WARNING: Only one parameter file provided and no SED file. More "
-                              "yaml files or an SED file needed in order to disperse."))
+        #if ((len(self.paramfiles) < 2) and (self.SED_file is None)):
+        #    raise ValueError(("WARNING: Only one parameter file provided and no SED file. More "
+        #                      "yaml files or an SED file needed in order to disperse."))
 
         if ((len(self.paramfiles) > 1) and (self.SED_file is not None)):
             raise ValueError(("WARNING: When using an SED file, you must provide only one parameter file."))
@@ -277,10 +307,15 @@ class WFSSSim():
         """Extract dispersion direction and crossing filter from the input
         param files"""
         yamls_to_disperse = []
+        self.catalog_files = []
         wfss_files_found = 0
         for i, pfile in enumerate(self.paramfiles):
             with open(pfile, 'r') as infile:
                 params = yaml.load(infile)
+
+            cats = [params['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
+            cats = [e for e in cats if e.lower() != 'none']
+            self.catalog_files.extend(cats)
 
             if i == 0:
                 self.instrument = params['Inst']['instrument'].lower()
@@ -370,12 +405,12 @@ class WFSSSim():
         except (FileNotFoundError, IOError) as e:
             print(e)
 
-        mngain = nanmedian(image)
+        mngain = np.nanmedian(image)
 
         # Set pixels with a gain value of 0 equal to mean
         image[image == 0] = mngain
         # Set any pixels with non-finite values equal to mean
-        image[~isfinite(image)] = mngain
+        image[~np.isfinite(image)] = mngain
         return image, header
 
     def crop_to_subarray(self, data, bounds):

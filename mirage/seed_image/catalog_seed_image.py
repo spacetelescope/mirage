@@ -35,6 +35,7 @@ from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
+from ..utils.constants import grism_factor
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -69,14 +70,6 @@ class Catalog_seed():
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
-        # if a grism signal rate image is requested, expand
-        # the width and height of the signal rate image by this
-        # factor, so that the grism simulation software can
-        # track sources that are outside the requested subarray
-        # in order to calculate contamination.
-        self.grism_direct_factor = np.sqrt(2.)
-        print('change me for niriss')
-
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -109,6 +102,7 @@ class Catalog_seed():
         self.check_params()
         self.params = utils.get_subarray_info(self.params, self.subdict)
         self.coord_transform = self.read_distortion_reffile()
+        self.grism_direct_factor = grism_factor(self.params['Inst']['instrument'].lower())
 
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
@@ -559,27 +553,14 @@ class Catalog_seed():
         instrument = self.params['Inst']['instrument']
 
         # Normal imaging with grism image requested
-        if instrument.lower() == 'nircam' and self.params['Output']['grism_source_image']:
+        if (instrument.lower() == 'nircam' and self.params['Output']['grism_source_image']) or \
+           (instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image'])):
             self.coord_adjust['x'] = self.grism_direct_factor
             self.coord_adjust['y'] = self.grism_direct_factor
             self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
                                                   (self.subarray_bounds[2] -
                                                    self.subarray_bounds[0] + 1) / 2.)
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
-                                                  (self.subarray_bounds[3] -
-                                                   self.subarray_bounds[1] + 1) / 2.)
-
-        if instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image']):
-            # change the values for the NIRISS POM and WFSS modes.  Add 137
-            # pixels extra space around the main image area, full frame.
-            self.output_dims = [2322, 2322]
-            self.coord_adjust['x'] = 2322./2048.
-            self.coord_adjust['y'] = 2322./2048.
-            self.grism_direct_factor = 2322./2048.
-            self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
-                                                  (self.subarray_bounds[2] -
-                                                   self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.coord_adjust['y'] - 1.) *
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
 

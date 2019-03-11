@@ -347,6 +347,10 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     output_filename : str
         Name of the saved HDF5 file containing all object spectra.
     """
+    # Create the output filename if needed
+    if output_filename is None:
+        output_filename = create_output_sed_filename(catalog_files[0], input_spectra_file)
+
     all_input_spectra = {}
     # Read in input spectra from file, add to all_input_spectra dictionary
     if input_spectra_file is not None:
@@ -407,8 +411,6 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         spectra[item[0]] = item[1]
 
     # Save the source spectra in an hdf5 file
-    if output_filename is None:
-        output_filename = create_output_sed_filename(catalog_file[0], input_spectra_file)
     hdf5_catalog.save(spectra, output_filename, wavelength_unit='micron', flux_unit='flam')
     print('Spectra catalog file saved to {}'.format(output_filename))
     return output_filename
@@ -489,13 +491,17 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
     print('Normalizing magnitude column name is {}'.format(mag_colname))
 
     for dataset in spec:
+        print('dataset is: ', dataset, type(dataset))
         waves = spec[dataset]['wavelengths']
         flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
             # print('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
+            print('match', match)
             if not any(match):
+                print(dataset)
+                print(type(dataset))
                 raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
                                   'number {}. Unable to rescale.').format(dataset))
             magnitude = catalog_info[mag_colname][match]
