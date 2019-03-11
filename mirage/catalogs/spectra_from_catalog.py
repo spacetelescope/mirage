@@ -32,7 +32,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from . import hdf5_catalog
-from mirage.utils.constants import FLAMBDA_UNITS, FNU_UNITS
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS
 from mirage.utils.utils import magnitude_to_countrate
 
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
@@ -245,7 +245,7 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
         final_sorted_fluxes[final_sorted_fluxes < 0.] = 0.
 
         spectra[index] = {'wavelengths': final_wavelengths * u.micron,
-                          'fluxes': final_sorted_fluxes * FLAMBDA_UNITS}
+                          'fluxes': final_sorted_fluxes * FLAMBDA_CGS_UNITS}
 
     return spectra
 
@@ -288,8 +288,8 @@ def get_filter_info(column_names, magsys):
             elif instrument == 'niriss':
                 match = zp_table['Filter'] == filter_name
             zp = zp_table[magsys].data[match][0]
-            photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_UNITS
-            photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_UNITS
+            photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
+            photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS
             pivot = zp_table['Pivot_wave'].data[match][0] * u.micron
             info[entry] = (photflam, photfnu, zp, pivot)
 
@@ -298,8 +298,8 @@ def get_filter_info(column_names, magsys):
         line = zp_table[0]
         # detector = line['Detector']
         zp = line[magsys]
-        photflam = line['PHOTFLAM'] * FLAMBDA_UNITS
-        photfnu = line['PHOTFNU'] * FNU_UNITS
+        photflam = line['PHOTFLAM'] * FLAMBDA_CGS_UNITS
+        photfnu = line['PHOTFNU'] * FNU_CGS_UNITS
         pivot = line['Pivot_wave'] * u.micron
         info[column_names[0]] = (photflam, photfnu, zp, pivot)
 
@@ -491,21 +491,17 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
     print('Normalizing magnitude column name is {}'.format(mag_colname))
 
     for dataset in spec:
-        print('dataset is: ', dataset, type(dataset))
         waves = spec[dataset]['wavelengths']
         flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
             # print('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
-            print('match', match)
             if not any(match):
-                print(dataset)
-                print(type(dataset))
                 raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
                                   'number {}. Unable to rescale.').format(dataset))
             magnitude = catalog_info[mag_colname][match]
             mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
             flux *= mag_in_flam
-            spec[dataset]['fluxes'] = flux * FLAMBDA_UNITS
+            spec[dataset]['fluxes'] = flux * FLAMBDA_CGS_UNITS
     return spec

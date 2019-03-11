@@ -15,8 +15,10 @@ instrument_abbreviations = {'nircam': 'NRC',
                             'nirspec': 'NRS',
                             'miri': 'MIR'}
 
-FLAMBDA_UNITS = u.erg / u.second / u.cm / u.cm / u.AA
-FNU_UNITS = u.erg / u.second / u.cm / u.cm / u.Hz
+FLAMBDA_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.AA
+FLAMBDA_MKS_UNITS = u.watt / u.meter**2 / u.micron
+FNU_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.Hz
+FNU_MKS_UNITS = u.watt / u.m**2 / u.Hz
 
 CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
                         'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']

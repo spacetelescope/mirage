@@ -25,7 +25,7 @@ Use
 import astropy.units as u
 import h5py
 
-from mirage.utils.constants import FLAMBDA_UNITS
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FLAMBDA_MKS_UNITS, FNU_CGS_UNITS, FNU_MKS_UNITS
 
 
 def open(filename):
@@ -61,7 +61,7 @@ def open(filename):
             try:
                 flux_units_string = dataset.attrs['flux_units']
             except KeyError:
-                flux_units_string = 'flam'
+                flux_units_string = 'flam_cgs'
                 no_flux_units = True
 
             # Catch common errors
@@ -80,12 +80,16 @@ def open(filename):
             if wave_units != u.micron:
                 if wave_units.is_equivalent(u.micron):
                     waves = waves.to(u.micron)
+                elif wave_units.is_equivalent(u.Hz):
+                    waves = waves.to(u.micron, equivalencies=u.spectral())
                 else:
                     raise ValueError("Wavelength units of {} in dataset {} are not compatible with microns."
                                      .format(wave_units, key))
-            if flux_units != FLAMBDA_UNITS:
-                if flux_units.is_equivalent(FLAMBDA_UNITS):
-                    fluxes = fluxes.to(FLAMBDA_UNITS)
+            if flux_units != FLAMBDA_CGS_UNITS:
+                if flux_units.is_equivalent(FLAMBDA_CGS_UNITS):
+                    fluxes = fluxes.to(FLAMBDA_CGS_UNITS)
+                elif flux_units.is_equivalent(FNU_CGS_UNITS):
+                    fluxes = fluxes.to(FLAMBDA_CGS_UNITS, u.spectral_density(waves))
                 elif flux_units == u.pct:
                     pass
                 else:
@@ -96,7 +100,7 @@ def open(filename):
     if no_wave_units:
         print("{}: No wavelength units provided. Assuming MIRCONS.".format(filename))
     if no_flux_units:
-        print("{}: No flux density units provided. Assuming Flambda (erg/sec/cm^2/A)".format(filename))
+        print("{}: No flux density units provided. Assuming F_lambda in CGS (erg/sec/cm^2/A)".format(filename))
     return contents
 
 
@@ -153,14 +157,20 @@ def string_to_units(unit_string):
     Parameters
     ----------
     unit_string : str
-        String containing units (e.g. 'erg/sec/cm/cm/A/A')
+        String containing units (e.g. 'erg/sec/cm/cm/A')
 
     Returns
     -------
     units : astropy.units Quantity
     """
-    if unit_string in ['flam', "FLAM"]:
-        return FLAMBDA_UNITS
+    if unit_string.lower() in ['flam', "flam_cgs"]:
+        return FLAMBDA_CGS_UNITS
+    elif unit_string.lower() == 'flam_mks':
+        return FLAMBDA_MKS_UNITS
+    elif unit_string.lower() in ['fnu', 'fnu_cgs']:
+        return FNU_CGS_UNITS
+    elif unit_string.lower() == 'fnu_mks':
+        return FNU_MKS_UNITS
     elif unit_string in ['normalized', 'NORMALIZED', 'Normalized']:
         return u.pct
     else:
@@ -182,8 +192,14 @@ def units_to_string(unit):
     unit_string : str
         String representation of the units in quantity
     """
-    if unit == FLAMBDA_UNITS:
-        return 'flam'
+    if unit == FLAMBDA_CGS_UNITS:
+        return 'flam_cgs'
+    elif unit == FLAMBDA_MKS_UNITS:
+        return 'flam_mks'
+    elif unit == FNU_CGS_UNITS:
+        return 'fnu_cgs'
+    elif unit == FNU_MKS_UNITS:
+        return 'fnu_mks'
     elif unit == u.pct:
         return 'normalized'
     else:
