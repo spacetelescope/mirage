@@ -36,7 +36,7 @@ from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 # from .psf_generator import PSF
-from ..psf.psf_selection import PSFCollection
+from ..psf.psf_selection import get_gridded_psf_library
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -142,12 +142,25 @@ class Catalog_seed():
         self.prepare_PAM()
 
         # Read in the PSF library file corresponding to the detector and filter
-        if self.params['Readout']['pupil'].upper() == 'CLEAR':
-            filt = self.params['Readout']['filter']
-        else:
-            filt = self.params['Readout']['pupil']
-        self.psf_library = PSFCollection(self.params['Inst']['instrument'], self.detector, filt,
-                                         self.params['simSignals']['psfpath'])
+        # For WFSS simulations, use the PSF libraries with the appropriate CLEAR element
+        psf_pupil = self.params['Readout']['pupil']
+        psf_filter = self.params['Readout']['filter']
+        if self.params['Readout']['pupil'].lower() in ['grismr', 'grismc']:
+            psf_pupil = 'CLEAR'
+        if self.params['Readout']['filter'].lower() in ['gr150r', 'gr150c']:
+            psf_filter = 'CLEAR'
+
+        self.psf_library = get_gridded_psf_library(self.params['Inst']['instrument'], self.detector,
+                                                   psf_filter, psf_pupil,
+                                                   self.params['simSignals']['psf_size'],
+                                                   self.params['simSignals']['psf_oversample'],
+                                                   self.params['simSignals']['psfs_per_grid'],
+                                                   self.params['simSignals']['psfwfe'],
+                                                   self.params['simSignals']['psfwfegroup'],
+                                                   self.params['simSignals']['psfpath'])
+        self.psf_library_y_dim, self.psf_library_x_dim = self.psf_library.data.shape[-2:]
+        self.psf_library_x_dim /= self.psf_library.oversampling
+        self.psf_library_y_dim /= self.psf_library.oversampling
 
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
@@ -979,7 +992,7 @@ class Catalog_seed():
         time_reported = False
         for index, entry in zip(indexes, mtlist):
             start_time = time.time()
-             # For each object, calculate x,y or RA,Dec of initial position
+            # For each object, calculate x,y or RA,Dec of initial position
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
                 entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
 
@@ -1021,7 +1034,7 @@ class Catalog_seed():
             # the stamp lands on the detector.
             status = 'on'
             if input_type == 'pointSource':
-                psf_dimensions = (self.psf_library.psf_x_dim, self.psf_library.psf_y_dim)
+                psf_dimensions = (self.psf_library_x_dim, self.psf_library_y_dim)
                 status = self.on_detector(x_frames, y_frames, psf_dimensions,
                                           (newdimsx, newdimsy))
             if status == 'off':
@@ -1037,12 +1050,24 @@ class Catalog_seed():
             # Interpolate the PSF from the library to create the PSF at the integer pixel location
             # close to the requested location on the detector (use floor so we know how the
             # residual sub-pixel distance is related to the integer.
-            subpix_x, int_x = np.modf(entry['pixelx'] + self.subarray_bounds[0])
-            subpix_y, int_y = np.modf(entry['pixely'] + self.subarray_bounds[1])
-            psf_integer_interp = self.psf_library.position_interpolation(int_x, int_y, method='idw')
-            # Sub-pixel location interpolation is handled within the FittableImageModel instance
-            eval_psf = self.psf_library.minimal_psf_evaluation(psf_integer_interp, deltax=subpix_x,
-                                                               deltay=subpix_y)
+            #subpix_x, int_x = np.modf(entry['pixelx'] + self.subarray_bounds[0])
+            #subpix_y, int_y = np.modf(entry['pixely'] + self.subarray_bounds[1])
+            #psf_integer_interp = self.psf_library.position_interpolation(int_x, int_y, method='idw')
+            ## Sub-pixel location interpolation is handled within the FittableImageModel instance
+            #eval_psf = self.psf_library.minimal_psf_evaluation(psf_integer_interp, deltax=subpix_x,
+            #                                                   deltay=subpix_y)
+
+
+            print('CLEAN UP HERE')
+            x_in_full_frame = entry['pixelx'] + self.subarray_bounds[0]
+            y_in_full_frame = entry['pixely'] + self.subarray_bounds[1]
+            stampy, stampx = np.mgrid[0:self.psf_library_y_dim, 0:self.psf_library_x_dim]
+            eval_psf = self.psf_library.evaluate(x=stampx, y=stampy, flux=1, x_0=x_in_full_frame,
+                                                 y_0=y_in_full_frame)
+
+
+
+
 
             if input_type == 'pointSource':
                 stamp = eval_psf
@@ -1587,8 +1612,8 @@ class Catalog_seed():
             #h = fits.open(psflibfiles[0])
             #edgex = h[0].header['NAXIS1'] / 2 - 1
             #edgey = h[0].header['NAXIS2'] / 2 - 1
-            edgex = self.psf_library.psf_x_dim // 2
-            edgey = self.psf_library.psf_y_dim // 2
+            edgex = self.psf_library_x_dim // 2
+            edgey = self.psf_library_y_dim // 2
             self.psfhalfwidth = np.array([edgex, edgey])
             #h.close()
         else:
@@ -1808,33 +1833,39 @@ class Catalog_seed():
         # source list to account for case where we make a
         # seed image that is extra-large, to be used as a grism
         # direct image
-        deltax = 0
-        deltay = 0
+        #deltax = 0
+        #deltay = 0
 
-        newdimsx = np.int(dims[1] * self.coord_adjust['x'])
-        newdimsy = np.int(dims[0] * self.coord_adjust['y'])
-        deltax = self.coord_adjust['xoffset']
-        deltay = self.coord_adjust['yoffset']
-        dims = np.array([newdimsy, newdimsx])
+        #newdimsx = np.int(dims[1] * self.coord_adjust['x'])
+        #newdimsy = np.int(dims[0] * self.coord_adjust['y'])
+        #deltax = self.coord_adjust['xoffset']
+        #deltay = self.coord_adjust['yoffset']
+        #dims = np.array([newdimsy, newdimsx])
 
         # Create the empty image
-        psfimage = np.zeros((dims[0], dims[1]))
+        #psfimage = np.zeros((dims[0], dims[1]))
+        psfimage = np.zeros(self.output_dims)
 
         # Create empty segmentation map
         seg = segmap.SegMap()
-        seg.xdim = newdimsx
-        seg.ydim = newdimsy
+        #seg.xdim = newdimsx
+        #seg.ydim = newdimsy
+        seg.ydim, seg.xdim = self.output_dims
         seg.initialize_map()
 
         # Loop over the entries in the point source list
-        interval = self.params['simSignals']['psfpixfrac']
-        numperpix = int(1./interval)
+        #interval = self.params['simSignals']['psfpixfrac']
+        #numperpix = int(1./interval)
         for entry in pointSources:
             # Adjust x, y position if the grism output image is requested
-            xpos = entry['pixelx'] + deltax
-            ypos = entry['pixely'] + deltay
-            nx = math.floor(xpos)
-            ny = math.floor(ypos)
+            #xpos = entry['pixelx'] + deltax
+            #ypos = entry['pixely'] + deltay
+            xpos_aperture = entry['pixelx'] + self.coord_adjust['xoffset']
+            ypos_aperture = entry['pixely'] + self.coord_adjust['yoffset']
+            xpos_fullframe = entry['pixelx'] + self.subarray_bounds[0]
+            ypos_fullframe = entry['pixely'] + self.subarray_bounds[1]
+            #nx = math.floor(xpos)
+            #ny = math.floor(ypos)
 
             # Desired counts per second in the point source
             counts = entry['countrate_e/s']  # / self.frametime
@@ -1848,12 +1879,13 @@ class Catalog_seed():
 
             # Separate the coordinates of the PSF into rounded integer and fractional pixels.
             # Work in full frame coordinates. Adjust if simulating a subarray.
-            subpix_x, integx = np.modf(entry['pixelx'] + self.subarray_bounds[0])
-            subpix_y, integy = np.modf(entry['pixely'] + self.subarray_bounds[1])
+            #subpix_x, integx = np.modf(entry['pixelx'] + self.subarray_bounds[0])
+            #subpix_y, integy = np.modf(entry['pixely'] + self.subarray_bounds[1])
 
             # Interpolate the oversampled PSF to the nearest whole pixel
             # This creates a 2d interpolated PSF
-            psf_integer_interp = self.psf_library.position_interpolation(integx, integy, method='idw')
+            print("CLEAN UP HERE")
+            #psf_integer_interp = self.psf_library.position_interpolation(integx, integy, method='idw')
 
             # FOR USE WITH OLD PSF LIBRARY---------------------------------
             # psf_obj = PSF(entry['pixelx'], entry['pixely'], self.psfname,
@@ -1861,18 +1893,34 @@ class Catalog_seed():
 
             # Calculate the coordinate limits of the aperture/PSF stamp overlap
             # psf_ydim, psf_xdim = psf_obj.model.shape
-            psf_xdim, psf_ydim = (self.psf_library.psf_x_dim, self.psf_library.psf_y_dim)
-            (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, psf_xdim, psf_ydim,
-                                                                   newdimsx, newdimsy)
+            #psf_xdim, psf_ydim = (self.psf_library_x_dim, self.psf_library_y_dim)
+            (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos_aperture, ypos_aperture,
+                                                                   self.psf_library_x_dim,
+                                                                   self.psf_library_y_dim,
+                                                                   self.output_dims[1], self.output_dims[0])
+            (i1_ff, i2_ff, j1_ff, j2_ff, k1_ff, k2_ff, l1_ff, l2_ff) = self.cropped_coords(xpos_fullframe, ypos_fullframe,
+                                                                                           self.psf_library_x_dim,
+                                                                                           self.psf_library_y_dim,
+                                                                                           self.ffsize, self.ffsize)
 
-            try:
+
+            print(i1, i2, j1, j2, k1, k2, l1, l2)
+            print(i1_ff, i2_ff, j1_ff, j2_ff, k1_ff, k2_ff, l1_ff, l2_ff)
+
+
+
+            #try:
+            if 1>0:
                 ypts, xpts = np.mgrid[j1:j2, i1:i2]
+                ypts_ff, xpts_ff = np.mgrid[j1_ff:j2_ff, i1_ff:i2_ff]
 
                 # FOR USE WITH OLD PSF LIBRARY
                 # scaled_psf = psf_obj.model.evaluate(x=xpts, y=ypts, flux=counts, x_0=nx, y_0=ny)
 
                 # FOR USE WITH NEW PSF LIBRARY
-                scaled_psf = psf_integer_interp.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos, y_0=ypos)
+                scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=counts, x_0=xpos_fullframe,
+                                                       y_0=xpos_fullframe)
+                #scaled_psf = psf_integer_interp.evaluate(x=xpts, y=ypts, flux=counts, x_0=xpos, y_0=ypos)
                 psfimage[ypts, xpts] += scaled_psf
 
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
@@ -1880,7 +1928,8 @@ class Catalog_seed():
                 if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                     noiseval += self.grism_background
                 seg.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
-            except:
+            else:
+            #except:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
                 # getpointsourcelist because if the PSF is not centered

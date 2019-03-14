@@ -12,12 +12,99 @@ from scipy.interpolate import interp2d, RectBivariateSpline
 from webbpsf.utils import to_griddedpsfmodel
 
 
+def get_gridded_psf_library(instrument, detector, filtername, pupilname, width, oversamp,
+                            number_of_psfs, wavefront_error, wavefront_error_group, library_path):
+    """
+    Find the filename for the appropriate gridded PSF library and read it in
+    """
+    library_file = get_library_file(instrument, detector, filtername, pupilname, width,
+                                    oversamp, number_of_psfs, wavefront_error,
+                                    wavefront_error_group, library_path)
+    print(library_file)
+
+    try:
+        library = to_griddedpsfmodel(library_file)
+    except OSError:
+        print("OSError: Unable to open {}.".format(library_file))
+    return library
+
+
+def get_library_file(instrument, detector, filt, pupil, fov_pix, oversample, num_psf, wfe,
+                     wfe_group, library_path):
+        """Given an instrument and filter name along with the path of
+        the PSF library, find the appropriate library file to load.
+
+        Parameters:
+        -----------
+        instrument : str
+            Name of instrument the PSFs are from
+
+        detector : str
+            Name of the detector within ```instrument```
+
+        filt : str
+            Name of filter used for PSF library creation
+
+        pupil : str
+            Name of pupil wheel element used for PSF library creation
+
+        fov_pix : int
+            With of the PSF stamps in units of nominal pixels
+
+        oversample : int
+            Oversampling factor of the PSF stamps. (e.g oversamp=2 means
+            NIRCam SW PSFs of 0.031 / 2 arcsec per pixel)
+
+        num_psf : int
+            Number of PSFs across the detector in the library. (e.g. for
+            a 3x3 library of PSFs, num_psf=9)
+
+        wfe : str
+            Wavefront error. Can be 'predicted' or 'requirements'
+
+        wfe_group : int
+            Wavefront error realization group. Must be an integer from 0 - 9.
+
+        library_path : str
+            Path pointing to the location of the PSF library
+
+        Returns:
+        --------
+        lib_file : str
+            Name of the PSF library file for the instrument and filtername
+        """
+        filename = '{}_{}_{}_{}_fovp{}_samp{}_npsf{}_wfe_{}_wfegroup{}.fits'.format(instrument.lower(),
+                                                                                   detector.lower(),
+                                                                                   filt.lower(),
+                                                                                   pupil.lower(),
+                                                                                   fov_pix, oversample,
+                                                                                   num_psf, wfe, wfe_group)
+        lib_file = os.path.join(library_path, filename)
+
+        # If no matching files are found, or more than 1 matching file is
+        # found, raise an error.
+        if not os.path.isfile:
+            raise FileNotFoundError("PSF library file {} does not exist."
+                                    .format(lib_file))
+        return lib_file
+
+
+
+
+
+
+
+
+
+
+
 class PSFCollection:
     """Class to contain a PSF library across a single detector for a
     single filter. Through interpolation, the PSF at any location on
     the detector can be created."""
 
-    def __init__(self, instrument, detector, filtername, library_path):
+    def __init__(self, instrument, detector, filtername, pupilname, width, oversamp,
+                 number_of_psfs, wavefront_error, wavefront_error_group, library_path):
         """Upon instantiation of the class, read in the PSF library
         contained in the given fits file. Also pull out relevant
         information such as the oversampling factor and the locations
@@ -34,40 +121,35 @@ class PSFCollection:
         --------
         None
         """
-        library_file = self.get_library_file(instrument, filtername, library_path)
+        library_file = self.get_library_file(instrument, detector, filtername, pupilname, width,
+                                             oversamp, number_of_psfs, wavefront_error,
+                                             wavefront_error_group, library_path)
 
         try:
-            with fits.open(library_file) as hdu:
-                self.library_info = hdu[0].header
-                det_index = self.select_detector(detector, library_file)
-                self.library = to_griddedpsfmodel(hdu, ext=0)
-                need to select detector by det_index first?
+            self.library = to_griddedpsfmodel(library_file)
         except OSError:
             print("OSError: Unable to open {}.".format(library_file))
-        except IndexError:
-            print(("IndexError: File {} has no data in extension 0."
-                   .format(library_file)))
 
         # Get some basic information about the library
-        self.psf_y_dim, self.psf_x_dim = self.library.shape[-2:]
-        self.psf_x_dim /= self.library_info['OVERSAMP']
-        self.psf_y_dim /= self.library_info['OVERSAMP']
-        self.num_psfs = self.library_info['NUM_PSFS']
-        self.x_det = []
-        self.y_det = []
-        self.x_index = []
-        self.y_index = []
-        for num in range(self.num_psfs):
-            yval, xval = literal_eval(self.library_info['DET_YX' + str(num)])
-            self.x_det.append(xval)
-            self.y_det.append(yval)
-            yi, xi = literal_eval(self.library_info['DET_JI' + str(num)])
-            self.x_index.append(xi)
-            self.y_index.append(yi)
-        if self.num_psfs > 1:
-            self.interpolator = self.create_interpolator()
-        else:
-            self.interpolator = None
+        self.psf_y_dim, self.psf_x_dim = self.library.data.shape[-2:]
+        self.psf_x_dim /= self.library.oversampling
+        self.psf_y_dim /= self.library.oversampling
+        self.num_psfs = len(self.library.grid_xypos)
+        #self.x_det = []
+        #self.y_det = []
+        #self.x_index = []
+        #self.y_index = []
+        #for num in range(self.num_psfs):
+        #    yval, xval = literal_eval(self.library_info['DET_YX' + str(num)])
+        #    self.x_det.append(xval)
+        #    self.y_det.append(yval)
+        #    yi, xi = literal_eval(self.library_info['DET_JI' + str(num)])
+        #    self.x_index.append(xi)
+        #    self.y_index.append(yi)
+        #if self.num_psfs > 1:
+        #    self.interpolator = self.create_interpolator()
+        #else:
+        #    self.interpolator = None
 
     def create_interpolator(self, interp_type='interp2d'):
         """Create an interpolator function for the detector-dependent
@@ -175,7 +257,8 @@ class PSFCollection:
         result = (x_nearest, y_nearest, distances[match_index])
         return result
 
-    def get_library_file(self, instrument, filt, library_path):
+    def get_library_file(self, instrument, filt, pupil, fov_pix, oversample, num_psf, wfe,
+                         wfe_group, library_path):
         """Given an instrument and filter name along with the path of
         the PSF library, find the appropriate library file to load.
 
@@ -184,8 +267,31 @@ class PSFCollection:
         instrument : str
             Name of instrument the PSFs are from
 
+        detector : str
+            Name of the detector within ```instrument```
+
         filt : str
             Name of filter used for PSF library creation
+
+        pupil : str
+            Name of pupil wheel element used for PSF library creation
+
+        fov_pix : int
+            With of the PSF stamps in units of nominal pixels
+
+        oversample : int
+            Oversampling factor of the PSF stamps. (e.g oversamp=2 means
+            NIRCam SW PSFs of 0.031 / 2 arcsec per pixel)
+
+        num_psf : int
+            Number of PSFs across the detector in the library. (e.g. for
+            a 3x3 library of PSFs, num_psf=9)
+
+        wfe : str
+            Wavefront error. Can be 'predicted' or 'requirements'
+
+        wfe_group : int
+            Wavefront error realization group. Must be an integer from 0 - 9.
 
         library_path : str
             Path pointing to the location of the PSF library
@@ -195,18 +301,19 @@ class PSFCollection:
         lib_file : str
             Name of the PSF library file for the instrument and filtername
         """
-        lib_file = glob(os.path.join(library_path, instrument.lower() + '_' +
-                                     filt.lower() + '*.fits'))
+        filename = '{}_{}_{}_{}_fov{}_samp{}_npsf{}_wfe_{}_wfegroup{}.fits'.format(instrument.lower(),
+                                                                                    detector.lower(),
+                                                                                    filt.lower(),
+                                                                                    pupil.lower(),
+                                                                                    fov_pix, oversample,
+                                                                                    num_psf, wfe, wfe_group)
+        lib_file = os.path.join(library_path, filename)
 
         # If no matching files are found, or more than 1 matching file is
         # found, raise an error.
-        if len(lib_file) == 0:
-            raise FileNotFoundError("No files matching {}, {} found in {}."
-                                    .format(instrument, filt, library_path))
-        elif len(lib_file) > 1:
-            raise ValueError("Multiple files matching {}, {} found in {}."
-                             .format(instrument, filt, library_path))
-
+        if not os.path.isfile:
+            raise FileNotFoundError("PSF library file {} does not exist."
+                                    .format(lib_file))
         return lib_file[0]
 
     def make_interp2d_functions(self, xpos, ypos, psfdata):
@@ -366,6 +473,20 @@ class PSFCollection:
     def select_detector(self, det_name, input_file):
         """Given a PSF library, select only the PSFs associated with a
         given detector.
+
+
+
+
+
+        NOT NEEDED ANYMORE
+
+
+
+
+
+
+
+
 
         Parameters:
         -----------
