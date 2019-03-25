@@ -21,6 +21,7 @@ import time
 import pkg_resources
 import asdf
 import scipy.signal as s1
+from scipy.ndimage import rotate
 import numpy as np
 from photutils import detect_sources
 from astropy.coordinates import SkyCoord
@@ -824,25 +825,26 @@ class Catalog_seed():
 
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
-    def basic_get_image(self, filename):
-        """
-        Read in image from a fits file
+    #def basic_get_image(self, filename):
+    #    """
+    #    Read in image from a fits file
+    #
+    #    Parameters:
+    #    -----------
+    #    filename : str
+    #        Name of fits file to be read in
 
-        Parameters:
-        -----------
-        filename : str
-            Name of fits file to be read in
+    #    Returns:
+    #    --------
+    #    data : obj
+    #
+    #        numpy array of data within file
 
-        Returns:
-        --------
-        data : obj
-            numpy array of data within file
-
-        header : obj
-            Header from 0th extension of data file
-        """
-        data, header = fits.getdata(filename, header=True)
-        return data, header
+    #    header : obj
+    #        Header from 0th extension of data file
+    #    """
+    #    data, header = fits.getdata(filename, header=True)
+    #    return data, header
 
     def get_index_numbers(self, catalog_table):
         """Get index numbers associated with the sources in a catalog
@@ -1075,8 +1077,8 @@ class Catalog_seed():
 
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
-                if entry['pos_angle'] != 0.:
-                    stamp = self.basicRotateImage(stamp, entry['pos_angle'])
+                print('Extended source rotations turned off while evaluating rotate bug')
+                #stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
 
                 # Convolve with instrument PSF if requested
                 if self.params['simSignals']['PSFConvolveExtended']:
@@ -1089,9 +1091,10 @@ class Catalog_seed():
 
                 pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
 
-                north_to_east_V3ang = rotations.posangle(self.attitude_matrix, pixelv2, pixelv3)
-                xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle']
-                                + 90. + self.params['Telescope']['rotation'])
+                xposang = self.calc_x_position_angle(pixelv2, pixelv3, entry['pos_angle'])
+                #north_to_east_V3ang = rotations.posangle(self.attitude_matrix, pixelv2, pixelv3)
+                #xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle']
+                #                + 90. + self.params['Telescope']['rotation'])
 
                 # First create the galaxy
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
@@ -2925,9 +2928,10 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            north_to_east_V3ang = rotations.posangle(self.attitude_matrix, entry['V2'], entry['V3'])
-            xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle']
-                            + 90. + self.params['Telescope']['rotation'])
+            xposang = self.calc_x_position_angle(entry['V2'], entry['V3'], entry['pos_angle'])
+            #north_to_east_V3ang = rotations.posangle(self.attitude_matrix, entry['V2'], entry['V3'])
+            #xposang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - entry['pos_angle']
+            #                + 90. + self.params['Telescope']['rotation'])
 
             # First create the galaxy
             #stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
@@ -3103,6 +3107,33 @@ class Catalog_seed():
 
         return galimage, segmentation.segmap
 
+    def calc_x_position_angle(self, v2_value, v3_value, position_angle):
+        """Calcuate the position angle of the source relative to the x
+        axis of the detector given the source's v2, v3 location and the
+        user-input position angle (degrees east of north).
+
+        Parameters
+        ----------
+        v2_value : float
+            V2 location of source in units of arcseconds
+
+        v3_value : float
+            V3 location of source in units of arcseconds
+
+        position_angle : float
+            Position angle of source in degrees east of north
+
+        Returns
+        -------
+        x_posang : float
+            Position angle of source relative to detector x
+            axis, in units of degrees
+        """
+        north_to_east_V3ang = rotations.posangle(self.attitude_matrix, v2_value, v3_value)
+        x_posang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - position_angle
+                         + 90. + self.params['Telescope']['rotation'])
+        return x_posang
+
     def getExtendedSourceList(self, filename):
         # read in the list of point sources to add, and adjust the
         # provided positions for astrometric distortion
@@ -3156,6 +3187,8 @@ class Catalog_seed():
         # Loop over input lines in the source list
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
+            if not os.path.isfile(values['filename']):
+                raise FileNotFoundError('{} from extended source catalog does not exist.'.format(values['filename']))
             try:
                 pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                               values['y_or_Dec'],
@@ -3172,13 +3205,22 @@ class Catalog_seed():
                 if len(ext_stamp.shape) != 2:
                     ext_stamp = fits.getdata(values['filename'], 1)
 
+
+                print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
+                print('extended source size:', ext_stamp.shape)
+
+                # Rotate the stamp image if requested
+                print('Extended source rotations turned off while evaluating rotate bug')
+                #ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+
+                print('after rotation:', ext_stamp.shape)
+
                 eshape = np.array(ext_stamp.shape)
                 if len(eshape) == 2:
                     edgey, edgex = eshape / 2
                 else:
-                    print(("WARNING, extended source image {} is not 2D! "
-                           "Not sure how to proceed. Quitting.".format(values['filename'])))
-                    sys.exit()
+                    raise ValueError(("WARNING, extended source image {} is not 2D! "
+                                      "This is not supported.".format(values['filename'])))
 
                 # Define the min and max source locations (in pixels) that fall onto the subarray
                 # Inlude the effects of a requested grism_direct image, and also keep sources that
@@ -3287,6 +3329,43 @@ class Catalog_seed():
             print("The extended source image option is being turned off")
 
         return extSourceList, all_stamps
+
+    def rotate_extended_image(self, stamp_image, pos_angle, right_ascention, declination):
+        """Given the user-input position angle for the extended source
+        image, calculate the appropriate angle of the stamp image
+        relative to the detector x axis, and rotate the stamp image.
+        TO DO: if the stamp image contains a WCS, use that to
+        determine rotation angle
+
+        Parameters
+        ----------
+        stamp_image : numpy.ndarray
+            2D stamp image of the extended source
+
+        pos_angle : float
+            Position angle of stamp image relative to north in degrees
+
+        right_ascention : float
+            RA of source, in decimal degrees
+
+        declination : float
+            Dec of source, in decimal degrees
+
+        Returns
+        -------
+        rotated : numpy.ndarray
+            Rotated stamp image
+        """
+        # Add later: check for WCS and use that
+        # if no WCS:
+        pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
+        print('extended v2, v3:', pixelv2, pixelv3)
+        x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
+        print('extended position angle:', x_pos_ang)
+        print('scipy rotate seems to be failing with no error raised')
+        rotated = rotate(stamp_image, x_pos_angle, mode='nearest')
+        print('rotated shape: ', rotated.shape)
+        return rotated
 
     def makeExtendedSourceImage(self, extSources, extStamps):
         #dims = np.array(self.nominal_dims)
