@@ -79,6 +79,7 @@ def get_library_file(instrument, detector, filt, pupil, fov_pix, oversample, num
                                                                                    pupil.lower(),
                                                                                    fov_pix, oversample,
                                                                                    num_psf, wfe, wfe_group)
+        print('PSF file to use: {}'.format(filename))
         lib_file = os.path.join(library_path, filename)
 
         # If no matching files are found, or more than 1 matching file is

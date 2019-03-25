@@ -1889,8 +1889,11 @@ class Catalog_seed():
                                                                                                self.psf_library_x_dim),
                                                                                               coord_sys='full_frame')
 
-            scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=entry['countrate_e/s'],
+            scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=1,
                                                    x_0=xfullframe, y_0=yfullframe)
+            print('Max of PSF as evaluated: {}'.format(np.max(scaled_psf)))
+            total_signal = np.sum(scaled_psf)
+            scaled_psf /= total_signal
 
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'],
                                                                                               entry['pixely'],
@@ -1967,7 +1970,8 @@ class Catalog_seed():
 
                 # These both work
                 #psfimage[ypts, xpts] += scaled_psf
-                psfimage[j1:j2, i1:i2] += scaled_psf
+                psfimage[j1:j2, i1:i2] += (scaled_psf * entry['countrate_e/s'])
+                print('Max of PSF after manual rescale: {}'.format(np.max(scaled_psf * entry['countrate_e/s'])))
 
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
