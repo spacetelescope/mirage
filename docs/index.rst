@@ -17,7 +17,7 @@ The software is designed such that a single yaml file can be used as input. This
 Seed Images
 +++++++++++
 
-Mirage can be broadly divided into three stages. The first stage is the creation of the :ref:`“seed image” <seed_image>`. This is a noiseless count rate image that contains signal only from the astronomical sources to be simulated. Seed images include instrument distortion effects, so that given RA, Dec values are properly converted to pixel x,y values, with the exception of tangent plane projection, which will be added soon. Mirage currently contains two methods for the construction of seed images:
+Mirage can be broadly divided into three stages. The first stage is the creation of the :ref:`“seed image” <seed_images>`. This is a noiseless count rate image that contains signal only from the astronomical sources to be simulated. Seed images include instrument distortion effects, so that given RA, Dec values are properly converted to pixel x,y values, with the exception of tangent plane projection, which will be added soon. Mirage currently contains two methods for the construction of seed images:
 
 1. Through the use of :ref:`source catalog files <source_catalogs>`
 2. Extraction from a fits file containing a :ref:`distortion-free image <mosaic_input>` (e.g. HUDF, GOODS, CANDELS, etc)
