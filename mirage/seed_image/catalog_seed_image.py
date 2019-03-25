@@ -1889,6 +1889,8 @@ class Catalog_seed():
                                                                                                self.psf_library_x_dim),
                                                                                               coord_sys='full_frame')
 
+            print('xpts_ff and ypts_ff min and max:',np.min(xpts_ff), np.max(xpts_ff), np.min(ypts_ff), np.max(ypts_ff))
+
             scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=1,
                                                    x_0=xfullframe, y_0=yfullframe)
             print('Max of PSF as evaluated: {}'.format(np.max(scaled_psf)))
