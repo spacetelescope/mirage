@@ -1876,6 +1876,11 @@ class Catalog_seed():
                 print(j2, i2, l2, k2)
                 print('bad high')
 
+
+            print('i1, i2, j1, j2, k1, k2, l1, l2')
+            print(i1, i2, j1, j2, k1, k2, l1, l2)
+
+
             try:
                 psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
