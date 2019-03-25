@@ -1973,6 +1973,14 @@ class Catalog_seed():
                 psfimage[j1:j2, i1:i2] += (scaled_psf * entry['countrate_e/s'])
                 print('Max of PSF after manual rescale: {}'.format(np.max(scaled_psf * entry['countrate_e/s'])))
 
+
+
+                print('i1, i2, j1, j2')
+                print(i1, i2, j1, j2)
+                print('k1, k2, l1, l2')
+                print(k1, k2, l1, l2)
+
+
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
                 if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
