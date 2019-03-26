@@ -1850,9 +1850,18 @@ class Catalog_seed():
 
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
-            nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
-            nyshift = nyshift[0]
-            nxshift = nxshift[0]
+            #nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
+            #nyshift = nyshift[0]
+            #nxshift = nxshift[0]
+            psfshape = webbpsfimage.shape
+            if ((psfshape[0] % 2 == 0) | (psfshape[1] % 2 == 0)):
+                print(('WARNING: PSF file contains an even number of rows and/or columns. '
+                       'Odd numbers are recommended. Mirage assumes the PSF is centered in '
+                       'the array. For an even number of rows or columns, Mirage assumes the '
+                       'PSF is centered on the pixel to the left and/or below the center of '
+                       'the array. If this is not true, there will be source placement errors.'))
+            nyshift = psfshape[0] // 2
+            nxshift = psfshape[1] // 2
 
             psfdims = webbpsfimage.shape
             nx = int(xoff)
