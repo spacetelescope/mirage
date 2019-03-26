@@ -1804,20 +1804,6 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-            a_in = interval * int(numperpix*xfract + 0.5) - 0.5
-            b_in = interval * int(numperpix*yfract + 0.5) - 0.5
-
-            print('PSF name inputs:')
-            print(interval, numperpix, xfract)
-
-
-
-
-
-
-            print('Fix for selecting the correct library file')
-            print('This should go outside the loop in the real fix')
-
             a_in = interval * int(numperpix*xfract + 0.5)
             b_in = interval * int(numperpix*yfract + 0.5)
             if a_in > 0.5:
@@ -1830,40 +1816,6 @@ class Catalog_seed():
                 ypos += 1
                 yoff = math.floor(ypos)
                 yfract = abs(ypos-yoff)
-
-
-
-
-
-
-            #pos = np.arange(0., 0.50001, interval)
-            #neg = 0 - pos[1:]
-            #phases = np.append(pos, neg)
-
-            #xfract, xint = np.modf(xpos)
-            #differences = np.abs(xfract - phases)
-            #matchx = np.where(differences == np.min(differences))[0][0]
-
-            #yfract, yint = np.modf(ypos)
-            #differences = np.abs(yfract - phases)
-            #matchy = np.where(differences == np.min(differences))[0][0]
-
-            #print('')
-            #print('PSF match for position {}, {} is: {}, {}'.format(xpos, ypos, phases[matchx], phases[matchy]))
-            #print('THIS ISNT QUITE RIGHT. NEED TO DEAL WITH PHASES OF E.G. 0.75. SEE YELLOW STICKY Note')
-
-            #astr = "{0:.{1}f}".format(phases[matchx], 2)
-            #bstr = "{0:.{1}f}".format(phases[matchy], 2)
-            #print(astr, bstr)
-            #frag = astr + '_' + bstr
-            #frag = frag.replace('-', 'm')
-            #frag = frag.replace('.', 'p')
-            #psffn = self.psfname + '_' + frag + '.fits'
-            #print(frag)
-            #print(psffn)
-            #print('')
-            #print('')
-
 
             astr = "{0:.{1}f}".format(a_in, 2)
             bstr = "{0:.{1}f}".format(b_in, 2)
@@ -1885,10 +1837,6 @@ class Catalog_seed():
                 try:
                     psffn = self.psfname + '_' + frag + '.fits'
                     local = os.path.isfile(psffn)
-                    print('')
-                    print('x, y is {}, {}'.format(entry['pixelx'] + deltax, entry['pixely'] + deltay))
-                    print('PSF library file is: {}'.format(psffn))
-                    print('')
                     if local:
                         webbpsfimage = fits.getdata(psffn)
                     else:
@@ -1937,11 +1885,6 @@ class Catalog_seed():
             if j2 > (dims[0] + 1) or i2 > (dims[1] + 1) or l2 > (psfdims[1] + 1) or k2 > (psfdims[1] + 1):
                 print(j2, i2, l2, k2)
                 print('bad high')
-
-
-            print('i1, i2, j1, j2, k1, k2, l1, l2')
-            print(i1, i2, j1, j2, k1, k2, l1, l2)
-
 
             try:
                 psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
@@ -3094,9 +3037,7 @@ class Catalog_seed():
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
-                print('')
-                print('PSF filename is: {}'.format(self.psfname))
-                print('')
+
                 # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF
                 # files are in a separate directory and have the altered file names
                 # compared to imaging.  Hence one can point to the same base
