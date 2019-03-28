@@ -2709,8 +2709,6 @@ class Catalog_seed():
         #y_subpix, y_int = np.modf(ycenter)
         xc = (meshmax // 2)
         yc = (meshmax // 2)
-        #print('input center coords:', xcenter, ycenter)
-        print('x and y center coords:', xc, yc)
 
         # Create model
         mod = Sersic2D(amplitude=1, r_eff=radius, n=sersic, x_0=xc, y_0=yc,
@@ -2720,7 +2718,7 @@ class Catalog_seed():
         img = mod(x, y)
 
 
-
+        print('saving stamp for testing...')
         h00 = fits.PrimaryHDU(img)
         hll = fits.HDUList([h00])
         hll.writeto('original_sersic.fits', overwrite=True)
@@ -3086,6 +3084,11 @@ class Catalog_seed():
             print(stamp[l1:l2, k1:k2].shape)
 
             stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
+
+            # Nornalize the stamp image to be used such that it
+            # has the requested total signal
+            stamp /= np.sum(stamp)
+            stamp *= entry['counts_per_frame_e']
 
             print('psf image shape again:', psf_image.shape)
             print('stamp shape:', stamp.shape)
