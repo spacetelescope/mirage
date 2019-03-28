@@ -2689,8 +2689,31 @@ class Catalog_seed():
         return filteredList
 
     def create_galaxy(self, radius, ellipticity, sersic, posang, totalcounts):
-        # given relevent parameters, create a model sersic image with a given radius, eccentricity,
-        # position angle, and total counts.
+        """Create a model 2d sersic image with a given radius, eccentricity,
+        position angle, and total counts.
+
+        Parameters
+        ----------
+        radius : float
+            Half light radius of the sersic profile, in units of pixels
+
+        ellipticity : float
+            Ellipticity of sersic profile
+
+        sersic : float
+            Sersic index
+
+        posang : float
+            Position angle in units of degrees
+
+        totalcounts : float
+            Total summed signal of the output image
+
+        Returns
+        -------
+        img : numpy.ndarray
+            2D array containing the 2D sersic profile
+        """
 
         # create the grid of pixels
         meshmax = np.min([np.int(self.ffsize * self.coord_adjust['y']), np.int(radius * 100.)])
