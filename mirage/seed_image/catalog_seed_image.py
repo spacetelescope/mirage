@@ -2950,6 +2950,11 @@ class Catalog_seed():
             #                           xposang*np.pi/180., entry['counts_per_frame_e'])
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['counts_per_frame_e'])
+            # Nornalize the stamp image to be used such that it
+            # has the requested total signal
+            stamp /= np.sum(stamp)
+            stamp *= entry['counts_per_frame_e']
+
             galdims = stamp.shape
 
 
@@ -3017,6 +3022,9 @@ class Catalog_seed():
             #print(x_half_width, y_half_width, xmin, xmax, ymin, ymax)
             ypts_psf, xpts_psf = np.mgrid[ymin:ymax, xmin:xmax]
             print('psf center coords:', xff, yff)
+            print('for notebook:')
+            print(xmin, xmax, ymin, ymax)
+            print(xff, yff)
             print(xpts_psf[20:23, 20:23], np.min(ypts_psf))
 
 
@@ -3024,6 +3032,7 @@ class Catalog_seed():
 
             psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=1,
                                                   x_0=xff, y_0=yff)
+            psf_image /= np.sum(psf_image)
 
             #try having the psf centered and only the galaxy at the sppropriate subpix location, or vice versa
             #if that does not work.
@@ -3084,11 +3093,6 @@ class Catalog_seed():
             print(stamp[l1:l2, k1:k2].shape)
 
             stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
-
-            # Nornalize the stamp image to be used such that it
-            # has the requested total signal
-            stamp /= np.sum(stamp)
-            stamp *= entry['counts_per_frame_e']
 
             print('psf image shape again:', psf_image.shape)
             print('stamp shape:', stamp.shape)
@@ -3397,9 +3401,6 @@ class Catalog_seed():
         #deltay = self.coord_adjust['yoffset']
         #dims = np.array([newdimsy, newdimsx])
 
-
-        print('Make sure rotation is treated correctly here....')
-
         # create the empty image
         #extimage = np.zeros((dims[0], dims[1]))
         yd, xd = self.output_dims
@@ -3490,6 +3491,11 @@ class Catalog_seed():
 
 
                 stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
+
+                # Nornalize the stamp image to be used such that it
+                # has the requested total signal
+                stamp /= np.sum(stamp)
+                stamp *= entry['counts_per_frame_e']
 
                 print('psf image shape again:', psf_image.shape)
                 print('stamp shape:', stamp.shape)
