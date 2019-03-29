@@ -1891,11 +1891,18 @@ class Catalog_seed():
 
             print('xpts_ff and ypts_ff min and max:',np.min(xpts_ff), np.max(xpts_ff), np.min(ypts_ff), np.max(ypts_ff))
 
-            scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=1,
+            flux_scaling_factor = self.psf_library.oversampling**2
+            scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=flux_scaling_factor,
                                                    x_0=xfullframe, y_0=yfullframe)
+
             print('Max of PSF as evaluated: {}'.format(np.max(scaled_psf)))
-            total_signal = np.sum(scaled_psf)
-            scaled_psf /= total_signal
+            print('Total of PSF as evaluated: {}'.format(np.sum(scaled_psf)))
+            scaled_psf *= entry['countrate_e/s']
+            print('Total of PSF after scaling by requested countrate of {}: {}'.format(entry['countrate_e/s'], np.sum(scaled_psf)))
+
+
+            #total_signal = np.sum(scaled_psf)
+            #scaled_psf /= total_signal
 
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'],
                                                                                               entry['pixely'],
@@ -1972,9 +1979,7 @@ class Catalog_seed():
 
                 # These both work
                 #psfimage[ypts, xpts] += scaled_psf
-                psfimage[j1:j2, i1:i2] += (scaled_psf * entry['countrate_e/s'])
-                print('Max of PSF after manual rescale: {}'.format(np.max(scaled_psf * entry['countrate_e/s'])))
-
+                psfimage[j1:j2, i1:i2] += scaled_psf  # * entry['countrate_e/s'])
 
 
                 print('i1, i2, j1, j2')
@@ -2978,9 +2983,19 @@ class Catalog_seed():
             stamp /= np.sum(stamp)
             stamp *= entry['counts_per_frame_e']
 
+            # If the stamp image is smaller than the PSF in either
+            # dimension, embed the stamp in an array that matches
+            # the psf size. This is so the upcoming convolution will
+            # produce an output that includes the wings of the PSF
             galdims = stamp.shape
+            psf_dimensions = np.array(self.psf_library.data.shape[-2:])
+            psf_shape = np.array(psf_dimensions / self.psf_library.oversampling).astype(np.int)
+            if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
+                print('Enlarging galaxy stamp to be the same size or larger than the psf')
+                stamp = self.enlarge_stamp(stamp, psf_shape)
+                galdims = stamp.shape
 
-
+            print('Stamp total counts after creation: {}'.format(np.sum(stamp)))
 
             hh0 = fits.PrimaryHDU(stamp)
             hhl = fits.HDUList([hh0])
@@ -3052,10 +3067,24 @@ class Catalog_seed():
 
 
 
-
-            psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=1,
+            flux_scaling_factor = self.psf_library.oversampling**2
+            psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=flux_scaling_factor,
                                                   x_0=xff, y_0=yff)
-            psf_image /= np.sum(psf_image)
+
+            print('PSF total counts after creation: {}'.format(np.sum(psf_image)))
+
+            # Scale the galaxy such that the total signal is higher than requested
+            # by a factor equal to the summed signal in the PSF. For webbpsf derived
+            # PSFs, this is often just under 1.0 (probably because of chopped off PSF
+            # wings.) Scale up the stamp by this amount. That way when you convolve
+            # with the PSF that has a total signal of just under 1.0, the result will
+            # be properly scaled.
+            stamp /= np.sum(psf_image)
+
+
+            print('Stamp total counts after scaling up: {}'.format(np.sum(stamp)))
+
+            #psf_image /= np.sum(psf_image)
 
             #try having the psf centered and only the galaxy at the sppropriate subpix location, or vice versa
             #if that does not work.
@@ -3115,7 +3144,16 @@ class Catalog_seed():
             print((i1, i2), (j1, j2), (k1, k2), (l1, l2))
             print(stamp[l1:l2, k1:k2].shape)
 
+            print('CONVOLUTION INPUT SIZES:')
+            print(stamp[l1:l2, k1:k2].shape)
+            print(psf_image.shape)
+
             stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
+
+
+            print('Stamp total counts after convolution: {}'.format(np.sum(stamp)))
+            print('Requested signal: {}'.format(entry['counts_per_frame_e']))
+            print('')
 
             print('psf image shape again:', psf_image.shape)
             print('stamp shape:', stamp.shape)
@@ -3441,6 +3479,25 @@ class Catalog_seed():
         for entry, stamp in zip(extSources, extStamps):
             stamp_dims = stamp.shape
 
+            print('stamp dimensions coming in: ', stamp_dims)
+
+
+            print('')
+            print('*****************************')
+            print('For galaxies and extended sources and point sources, be careful to')
+            print('properly scale the stamp image in the case where the stamp is only')
+            print('half on the detector. If you scale the partial stamp then it will be')
+            print('too bright')
+            print('To get around this we need to evaluate (or evaluate and convolve for galaxies and extended')
+            print('scale, and THEN crop and add to the seed image.')
+            print('*****************************')
+
+
+            print('stamp total signal coming in to makeExtendedSourceImage: {}'.format(np.sum(stamp)))
+            stamp *= entry['counts_per_frame_e']
+            print('stamp total signal after scaling to requested value of {}: {}'.format(entry['counts_per_frame_e'], np.sum(stamp)))
+
+
             # adjust x, y position if the grism output image is requested
             #xpos = entry['pixelx'] + deltax
             #ypos = entry['pixely'] + deltay
@@ -3463,6 +3520,17 @@ class Catalog_seed():
                 #psf_image = self.psf_library.minimal_psf_evaluation(psf_integer_interp, deltax=subpix_x,
                 #                                                    deltay=subpix_y)
 
+                # If the stamp image is smaller than the PSF in either
+                # dimension, embed the stamp in an array that matches
+                # the psf size. This is so the upcoming convolution will
+                # produce an output that includes the wings of the PSF
+                psf_dimensions = np.array(self.psf_library.data.shape[-2:])
+                psf_shape = np.array(psf_dimensions / self.psf_library.oversampling).astype(np.int)
+                if ((stamp_dims[0] < psf_shape[0]) or (stamp_dims[1] < psf_shape[1])):
+                    print('Enlarging extended stamp to be the same size or larger than the psf shape of {}'.format(psf_shape))
+                    stamp = self.enlarge_stamp(stamp, psf_shape)
+                    stamp_dims = stamp.shape
+                    print('New stamp dimensions are: {}'.format(stamp_dims))
 
 
                 #########CODE FROM WORKING GALAXY SOURCE EXAMPLE################
@@ -3476,6 +3544,7 @@ class Catalog_seed():
                                                                                                         entry['pixely'],
                                                                                                         stamp_dims,
                                                                                                         coord_sys='full_frame')
+
                 print("source coords in aperture coordsys:", entry['pixelx'], entry['pixely'])
                 print("extended stamp dimensions:", stamp_dims)
 
@@ -3486,16 +3555,39 @@ class Catalog_seed():
                 xmin, xmax, ymin, ymax = self.ensure_odd_lengths(cropped_x_dim, cropped_y_dim, xff, yff)
                 ypts_psf, xpts_psf = np.mgrid[ymin:ymax, xmin:xmax]
                 print('psf center coords:', xff, yff)
-                print(xpts_psf[20:23, 20:23], np.min(ypts_psf))
 
-                psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=1,
+
+
+                flux_scaling_factor = self.psf_library.oversampling**2
+                psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=flux_scaling_factor,
                                                       x_0=xff, y_0=yff)
 
-                xappsf, yappsf, xptspsf, yptspsf, (i1psf, i2psf), (j1psf, j2psf), (k1psf, k2psf), \
-                    (l1psf, l2psf) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
-                                                                  psf_image.shape, coord_sys='aperture')
+                print('PSF total counts after creation: {}'.format(np.sum(psf_image)))
+                print('PSF size: {}'.format(psf_image.shape))
+
+
+                # Scale the galaxy such that the total signal is higher than requested
+                # by a factor equal to the summed signal in the PSF. For webbpsf derived
+                # PSFs, this is often just under 1.0 (probably because of chopped off PSF
+                # wings.) Scale up the stamp by this amount. That way when you convolve
+                # with the PSF that has a total signal of just under 1.0, the result will
+                # be properly scaled.
+                stamp /= np.sum(psf_image)
+
+                print('stamp total signal after scaling up by extra factor of {}: {}'.format(np.sum(psf_image), np.sum(stamp)))
+
+
+                #psf_image /= np.sum(psf_image)
+
+                #xappsf, yappsf, xptspsf, yptspsf, (i1psf, i2psf), (j1psf, j2psf), (k1psf, k2psf), \
+                #    (l1psf, l2psf) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+                #                                                  psf_image.shape, coord_sys='aperture')
 
                 print("original psf shape: ", psf_image.shape)
+
+                hh0 = fits.PrimaryHDU(stamp)
+                hhl = fits.HDUList([hh0])
+                hhl.writeto('extended_stamp.fits', overwrite=True)
 
                 hh0 = fits.PrimaryHDU(psf_image)
                 #hh1 = fits.ImageHDU(cropped_psf)
@@ -3507,18 +3599,26 @@ class Catalog_seed():
 
                 print('output coords in aperture:')
                 print((i1, i2), (j1, j2), (k1, k2), (l1, l2))
-                print(stamp[l1:l2, k1:k2].shape)
+                print('cropped stamp shape: ', stamp[l1:l2, k1:k2].shape)
 
                 # FOR TESTING!
                 orig_stamp = copy.deepcopy(stamp)
 
 
+                print('CONVOLUTION INPUT SIZES:')
+                print(stamp[l1:l2, k1:k2].shape)
+                print(psf_image.shape)
+                print('CONVOLUTION SIGNALS:')
+                print(np.sum(stamp[l1:l2, k1:k2]))
+                print(np.sum(psf_image))
+
+
                 stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
 
-                # Nornalize the stamp image to be used such that it
-                # has the requested total signal
-                stamp /= np.sum(stamp)
-                stamp *= entry['counts_per_frame_e']
+
+                print('Total signal of stamp after convolution: {}'.format(np.sum(stamp)))
+                print('Requested signal: {}'.format(entry['counts_per_frame_e']))
+                print('')
 
                 print('psf image shape again:', psf_image.shape)
                 print('stamp shape:', stamp.shape)
@@ -3542,7 +3642,7 @@ class Catalog_seed():
             #if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < dims[0]) and (i1 < dims[0])):
             if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                 #galimage[j1:j2, i1:i2] = galimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2]
-                extimage[j1:j2, i1:i2] = extimage[j1:j2, i1:i2] + stamp * entry['countrate_e/s']
+                extimage[j1:j2, i1:i2] = extimage[j1:j2, i1:i2] + stamp #  * entry['countrate_e/s']
 
             #########CODE FROM WORKING GALAXY SOURCE EXAMPLE################
 
@@ -3586,6 +3686,45 @@ class Catalog_seed():
                                              entry['index'], noiseval)
             segmentation.segmap[j1:j2, i1:i2] += indseg
         return extimage, segmentation.segmap
+
+    def enlarge_stamp(self, image, dims):
+        """Place the given image within an enlarged array of zeros. If the
+        requested dimension lengths are odd while ``image``'s dimension
+        lengths are even, then the new array is expanded by one to also have
+        even dimensions. This ensures that ``image`` will be centered
+        within ``array``.
+
+        Parameters
+        ----------
+        image : numpy.ndarray
+            2D image
+
+        dims : list
+            2-element list of (y-dimension, x-dimension) to embed ``image``
+            within
+
+        Returns
+        -------
+        array : numpy/.ndarray
+            Expanded image
+        """
+        dim_y, dim_x = dims
+        image_size_y, image_size_x = image.shape
+        if dim_y % 2 != image_size_y % 2:
+            dim_y += 1
+        if dim_x % 2 != image_size_x % 2:
+            dim_x += 1
+
+        array = np.zeros((dim_y, dim_x))
+
+        dx = dim_x - image_size_x
+        dx = np.int(dx / 2)
+
+        dy = dim_y - image_size_y
+        dy = np.int(dy / 2)
+
+        array[dy:dim_y-dy, dx:dim_x-dx] = image
+        return array
 
     def seg_from_photutils(self, image, number, noise):
         # Create a segmentation map for the input image
