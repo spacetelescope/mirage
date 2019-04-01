@@ -1,7 +1,7 @@
 .. _catalog_generation:
 
-Creation of Source Catalogs
-===========================
+Tools for Creating Source Catalogs
+==================================
 
 To help users create source catalogs in the proper format, `Mirage` contains the `catalog generator <https://github.com/spacetelescope/mirage/blob/master/mirage/catalogs/catalog_generator.py>`_ and `create catalog <https://github.com/spacetelescope/mirage/blob/master/mirage/catalogs/create_catalog.py>`_ modules. *catalog_generator.py* contains classes for each of the types of catalogs accepted by `Mirage`. The *create_catalog.py* module contains functions that will query several astronomical databases and attempt to construct realistic point source and extragalactic catalogs for a given pointing. There is also a function for automated catalog creation from an input APT file. See the `Catalog Generation Tools notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ in the `Mirage` repository for examples of all of this functionality.
 

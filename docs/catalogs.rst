@@ -1,7 +1,7 @@
 .. _catalogs:
 
-Source Catalog Files
-====================
+Source Catalog File Formats
+===========================
 
 Mirage accepts 7 different types of source catalogs, all of which can be generated using `Mirage's` :ref:`catalog generation <catalog_generation>` functionality. These include:
 

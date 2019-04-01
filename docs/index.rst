@@ -6,41 +6,63 @@
 MIRAGE: Multi-Instrument RAmp GEnerator
 ===============================================
 
-Mirage is a Python package that creates realistic simulated data products for JWST's NIRCam, NIRISS, and FGS instruments. The output files are in a format that is as close as possible to that which real JWST data will have, which allows Mirage data to be used for data analysis software development and testing, including the official `JWST calibration pipeline <https://jwst-pipeline.readthedocs.io/en/latest/>`_.
+.. toctree::
+   :maxdepth: 1
+   :caption: Contents:
+
+   install.rst
+
+   catalogs.rst
+   catalog_creation.rst
+
+   seed_images.rst
+   dark_preparation.rst
+   observation_generator.rst
+
+   yaml_generator.rst
+   input_yaml_parameters.rst
+   example_yaml.rst
+
+   wfss_simulations.rst
+   quickstart.ipynb
+   api.rst
+
 
 Overview
 --------
-Mirage creates high-fidelity simulated exposures for NIRCam's imaging and wide field slitless spectroscopy (WFSS) modes, NIRISS's imaging, WFSS, and aperture masking interferometery (AMI) modes, and FGS's imaging mode. It supports sidereal as well as non-sidereal tracking (i.e. sources can be made to move across the field of view within an observation). Astronomical sources to add to the scene are specified through the use of source catalogs.
 
-The software is designed such that a single yaml file can be used as input. This file contains various instrument and readout parameters, as well as lists reference files necessary for the production of the simulated data. Details on the contents of the yaml file are given on the :ref:`Input Yaml File Parameters <input_yaml_file_parameters>` page.
+Mirage is a Python package that creates realistic simulated data products for JWST's NIRCam, NIRISS, and FGS instruments. The output files are in a format that is as close as possible to that which real JWST data will have, which allows Mirage data to be used for data analysis software development and testing, including the official `JWST calibration pipeline <https://jwst-pipeline.readthedocs.io/en/latest/>`_.
 
-Seed Images
-+++++++++++
+Mirage creates high-fidelity simulated exposures for NIRCam's imaging and wide field slitless spectroscopy (WFSS) modes, NIRISS's imaging, WFSS, and aperture masking interferometery (AMI) modes, and FGS's imaging mode. It supports sidereal as well as non-sidereal tracking (i.e. sources can be made to move across the field of view within an observation).
 
-Mirage can be broadly divided into three stages. The first stage is the creation of the :ref:`“seed image” <seed_images>`. This is a noiseless count rate image that contains signal only from the astronomical sources to be simulated. Seed images include instrument distortion effects, so that given RA, Dec values are properly converted to pixel x,y values, with the exception of tangent plane projection, which will be added soon. Mirage currently contains two methods for the construction of seed images:
+Astronomical sources to add to the scene are specified through the use of source catalogs.
 
-1. Through the use of :ref:`source catalog files <source_catalogs>`
-2. Extraction from a fits file containing a :ref:`distortion-free image <mosaic_input>` (e.g. HUDF, GOODS, CANDELS, etc)
+The software is designed such that a single yaml file can be used as input. This file contains various instrument and readout parameters, as well as lists reference files necessary for the production of the simulated data. Details on the contents of the yaml file are given on the :ref:`Input Yaml File Parameters <input_yaml_file_parameters>` page. One yaml file contains all the information necessary to produce a simulated exposure from a single detector.
 
-For WFSS observations, multiple seed images or optional input spectra are then fed into the `disperser software <https://github.com/npirzkal/NIRCAM_Gsim>`_, which simulates the effects of the grism by dispersing the signal from the astronomical sources, creating a “grism seed image”.
-
-Dark Current Preparation
-++++++++++++++++++++++++
-
-The second stage is the preparation of the dark current exposure to use for the simulation. The input dark current exposure is reorganized into the requested readout pattern and number of groups and cropped to the requested subarray size. Detector non-linearity effects are then removed using the initial steps of the JWST calibration pipeline.
-
-By using actual dark current exposures from ground testing, Mirage is able to capture many effects which are specific to the instrument and detector being simulated. For example, the 1/f noise, bias structure, and hot pixel population.
-
-Observation Generation
-++++++++++++++++++++++
-
-The final stage involves the combination of the seed image and the dark current in order to produce the output exposure. The seed image is expanded into integrations with groups that follow the requested readout pattern. Other effects are also added at this stage, including cosmic rays, interpixel capacitance (IPC) and crosstalk effects.
+For software developement and testing, users may wish to simulate all data from a given JWST proposal. In order to do this, Mirage requires one yaml file for each exposure/detector combination. To facilitate this, the Mirage package includes ancillary convenience functions that allow the user to translate an Astronomer's Proposal Tool (`APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_) proposal into a series of input yaml files. These tools are described in detail on the :ref:`Simulating Observations from an APT File <from_apt>` page.
 
 
-Additional Tools
-++++++++++++++++
+The basic order of steps necessary to produce simulated data with Mirage is:
 
-In addition, the Mirage package includes ancillary convenience functions that allow the user to translate an Astronomer's Proposal Tool (`APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_) proposal into a series of input yaml files for the simulator.
+1. Create the appropriate :ref:`Source Catalogs <catalogs>`. Mirage contains :ref:`tools to aid in the creation of source catalogs <catalog_generation>`.
+2. Create the needed :ref:`yaml files <>` to descirbe the observations. An easy way to do this is to start with an APT proposal and use Mirage's :ref:`yaml file generator <from_apt>` tool.
+3. Run the appropriate module. Most often this will be the imaging simulator or the :ref:`wfss simulator <wfss_data>`. To produce only noiseless, background-free countrate images of the scene, the :ref:`catalog generator module <seed_images>` can be used.
+
+See the :ref:`Examples <examples>` page for basic examples of each of these situations. There are also several notebooks in the Mirage repository showing more in-depth examples of these steps. These include the:
+
+::
+
+    `Catalog generation notebook <>`_
+    `Imaging simulator example notebook <>`_
+    `WFSS simulator example notebook <>`_
+
+and for more advanced use:
+
+::
+
+    `Commissionning data generation notebook <>`_
+    `Moving Target notebook <>`_
+
 
 
 Limitations
@@ -55,21 +77,6 @@ Source brightnesses are constant. There is currently no way to simulate a variab
 
 Tangent plane projection is currently not performed when translating from detector pixel x,y values to RA, Dec values. This leads to small errors in the calculated RA, Dec values. This will be corrected in a future version of MIRAGE.
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Contents:
-
-   install.rst
-   seed_images.rst
-   catalogs.rst
-   dark_preparation.rst
-   observation_generator.rst
-   yaml_generator.rst
-   input_yaml_parameters.rst
-   example_yaml.rst
-   wfss_simulations.rst
-   quickstart.ipynb
-   api.rst
 
 .. admonition:: Getting Help
 
