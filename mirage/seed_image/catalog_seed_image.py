@@ -1061,16 +1061,23 @@ class Catalog_seed():
 
 
             print('CLEAN UP HERE')
+            print('need to fix galaxies and extended here to be consistent with non-moving case')
 
 
-            x_in_full_frame = entry['pixelx'] + self.subarray_bounds[0]
-            y_in_full_frame = entry['pixely'] + self.subarray_bounds[1]
-            xstart, xend, ystart, yend = ensure_odd_lengths(self.psf_library_x_dim,
-                                                            self.psf_library_y_dim,
-                                                            x_in_full_frame, y_in_full_frame)
-            stampy, stampx = np.mgrid[ystart:yend, xstart:xend]
-            eval_psf = self.psf_library.evaluate(x=stampx, y=stampy, flux=1, x_0=x_in_full_frame,
-                                                 y_0=y_in_full_frame)
+            eval_psf = self.create_psf_stamp(entry['pixelx'], entry['pixely'], ignore_detector=True)
+            print('In moving targets: psf shape is:', eval_psf.shape)
+
+
+
+
+            #x_in_full_frame = entry['pixelx'] + self.subarray_bounds[0]
+            #y_in_full_frame = entry['pixely'] + self.subarray_bounds[1]
+            #xstart, xend, ystart, yend = ensure_odd_lengths(self.psf_library_x_dim,
+            #                                                self.psf_library_y_dim,
+            #                                                x_in_full_frame, y_in_full_frame)
+            #stampy, stampx = np.mgrid[ystart:yend, xstart:xend]
+            #eval_psf = self.psf_library.evaluate(x=stampx, y=stampy, flux=1, x_0=x_in_full_frame,
+            #                                     y_0=y_in_full_frame)
 
             if input_type == 'pointSource':
                 stamp = eval_psf
@@ -1101,6 +1108,24 @@ class Catalog_seed():
                                            xposang*np.pi/180., 1.)
                 #stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                 #                           entry['pos_angle'], 1.)
+
+
+                # If the stamp image is smaller than the PSF in either
+                # dimension, embed the stamp in an array that matches
+                # the psf size. This is so the upcoming convolution will
+                # produce an output that includes the wings of the PSF
+                galdims = stamp.shape
+                psf_shape = eval_psf.shape
+                if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
+                    print('Enlarging galaxy stamp to be the same size or larger than the psf')
+                    stamp = self.enlarge_stamp(stamp, psf_shape)
+                    galdims = stamp.shape
+
+
+
+
+
+
 
                 # Convolve the galaxy with the instrument PSF
                 stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
@@ -1875,25 +1900,23 @@ class Catalog_seed():
         #interval = self.params['simSignals']['psfpixfrac']
         #numperpix = int(1./interval)
         for entry in pointSources:
-            # Adjust x, y position if the grism output image is requested
-            #xpos = entry['pixelx'] + deltax
-            #ypos = entry['pixely'] + deltay
 
-            #scaled_psf = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-            #                                   (self.psf_library_y_dim, self.psf_library_x_dim),
-            #                                   entry['countrate_e/s'])
+            scaled_psf = self.create_psf_stamp(entry['pixelx'], entry['pixely'])
+            print('')
+            print('SCALED PSF SHAPE:', scaled_psf.shape)
+            print('')
+            # Below lines replaced with the call to create_psf_stamp above
+            #xfullframe, yfullframe, xpts_ff, ypts_ff, (i1_ff, i2_ff), (j1_ff, j2_ff), (k1_ff, k2_ff), (l1_ff, l2_ff) = self.create_psf_stamp_coords(entry['pixelx'],
+            #                                                                                  entry['pixely'],
+            #                                                                                  (self.psf_library_y_dim,
+            #                                                                                   self.psf_library_x_dim),
+            #                                                                                  coord_sys='full_frame')
 
-            xfullframe, yfullframe, xpts_ff, ypts_ff, (i1_ff, i2_ff), (j1_ff, j2_ff), (k1_ff, k2_ff), (l1_ff, l2_ff) = self.create_psf_stamp_coords(entry['pixelx'],
-                                                                                              entry['pixely'],
-                                                                                              (self.psf_library_y_dim,
-                                                                                               self.psf_library_x_dim),
-                                                                                              coord_sys='full_frame')
+            #print('xpts_ff and ypts_ff min and max:',np.min(xpts_ff), np.max(xpts_ff), np.min(ypts_ff), np.max(ypts_ff))
 
-            print('xpts_ff and ypts_ff min and max:',np.min(xpts_ff), np.max(xpts_ff), np.min(ypts_ff), np.max(ypts_ff))
-
-            flux_scaling_factor = self.psf_library.oversampling**2
-            scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=flux_scaling_factor,
-                                                   x_0=xfullframe, y_0=yfullframe)
+            #flux_scaling_factor = self.psf_library.oversampling**2
+            #scaled_psf = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=flux_scaling_factor,
+            #                                       x_0=xfullframe, y_0=yfullframe)
 
             print('Max of PSF as evaluated: {}'.format(np.max(scaled_psf)))
             print('Total of PSF as evaluated: {}'.format(np.sum(scaled_psf)))
@@ -1912,7 +1935,7 @@ class Catalog_seed():
 
 
             print('xpts and ypts min and max:',np.min(xpts), np.max(xpts), np.min(ypts), np.max(ypts))
-            print('psf center location in ff and then subarr coords:', xfullframe, yfullframe, entry['pixelx'], entry['pixely'])
+            print('psf center location in subarr coords:', entry['pixelx'], entry['pixely'])
 
             #xpos_aperture = entry['pixelx'] + self.coord_adjust['xoffset']
             #ypos_aperture = entry['pixely'] + self.coord_adjust['yoffset']
@@ -2004,7 +2027,7 @@ class Catalog_seed():
 
         return psfimage, seg.segmap
 
-    def create_psf_stamp(self, aperture_x, aperture_y, stamp_dims, total_flux):
+    def create_psf_stamp(self, x_location, y_location, ignore_detector=False):
         """
         From the gridded PSF model, location within the aperture, and
         dimensions of the stamp image (either the library PSF image, or
@@ -2014,56 +2037,50 @@ class Catalog_seed():
 
         Parameters
         ----------
-        aperture_x : float
+        x_location : float
             X-coordinate of the PSF in the coordinate system of the
             aperture being simulated.
 
-        aperture_y : float
+        y_location : float
             Y-coordinate of the PSF in the coordinate system of the
             aperture being simulated.
 
-        stamp_dims : tup
-            (x, y) dimensions of the stamp image that will be placed
-            into the final seed image. This stamp image can be either the
-            PSF image itself, or the stamp image of the galaxy/extended
-            source that the PSF is going to be convolved with.
-
-        total_flux : float
-            The total counts that the PSF should be scaled to.
+        ignore_detector : bool
+            If True, the returned coordinates can have values outside the
+            size of the subarray/detector (i.e. coords can be negative or
+            larger than full frame). If False, coordinates are constrained
+            to be on the detector.
 
         Returns
         -------
-        psf_image : numpy.ndarray
-            2D array containing the PSF image
+        psf : numpy.ndarray
+            2D array containing the normalized PSF image. Total signal should
+            be close to 1.0 (not exactly 1.0 due to asymmetries and distortion)
         """
-        xpos_in_fullframe = aperture_x + self.subarray_bounds[0]
-        ypos_in_fullframe = aperture_y + self.subarray_bounds[1]
+        xcenter, ycenter, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
+            (l1, l2) = self.create_psf_stamp_coords(x_location, y_location, (self.psf_library_y_dim,
+                                                    self.psf_library_x_dim), coord_sys='full_frame',
+                                                    ignore_detector=ignore_detector)
 
-        stamp_y_dim, stamp_x_dim = stamp_dims
+        print('xpts_ff and ypts_ff min and max:', np.min(xpts), np.max(xpts), np.min(ypts), np.max(ypts))
+        print('psf center location in ff coords:', xcenter, ycenter)
+
+        print('')
+        print('xcenter, ycenter:', xcenter, ycenter)
+        print()
+        print('')
 
 
-        print('pos in full frame: {}, {}'.format(xpos_in_fullframe, ypos_in_fullframe))
-        print(stamp_dims)
 
+        flux_scaling_factor = self.psf_library.oversampling**2
+        psf = self.psf_library.evaluate(x=xpts, y=ypts, flux=flux_scaling_factor,
+                                        x_0=xcenter, y_0=ycenter)
+        print('Total signal of evaluated PSF (should be close to 1.0): {}'.format(np.sum(psf)))
+        print('UPDATE THE DOCSTRING')
+        return psf
 
-        (i1_ff, i2_ff, j1_ff, j2_ff, k1_ff, k2_ff, l1_ff, l2_ff) = self.cropped_coords(xpos_in_fullframe,
-                                                                                       ypos_in_fullframe,
-                                                                                       stamp_y_dim,
-                                                                                       stamp_x_dim,
-                                                                                       self.ffsize,
-                                                                                       self.ffsize)
-        print('stamp coordinates full frame:')
-        #print(i1, i2, j1, j2, k1, k2, l1, l2)
-        print(i1_ff, i2_ff, j1_ff, j2_ff, k1_ff, k2_ff, l1_ff, l2_ff)
-
-        #y_points, x_points = np.mgrid[j1:j2, i1:i2]
-        ypts_ff, xpts_ff = np.mgrid[j1_ff:j2_ff, i1_ff:i2_ff]
-
-        psf_image = self.psf_library.evaluate(x=xpts_ff, y=ypts_ff, flux=total_flux, x_0=xpos_in_fullframe,
-                                              y_0=ypos_in_fullframe)
-        return psf_image
-
-    def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, coord_sys='full_frame'):
+    def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, coord_sys='full_frame',
+                                ignore_detector=False):
         """Calculate the coordinates in the aperture coordinate system
         where the stamp image wil be placed based on the location of the
         stamp image in the aperture and the size of the stamp image.
@@ -2089,6 +2106,12 @@ class Catalog_seed():
             Options are 'full_frame' for full frame coordinates, or
             'aperture' for aperture coordinates (including any expansion
             for grism source image)
+
+        ignore_detector : bool
+            If True, the returned coordinates can have values outside the
+            size of the subarray/detector (i.e. coords can be negative or
+            larger than full frame). If False, coordinates are constrained
+            to be on the detector.
 
         Returns
         -------
@@ -2128,9 +2151,12 @@ class Catalog_seed():
             out_dims_y = self.output_dims[0]
 
         stamp_y_dim, stamp_x_dim = stamp_dims
+
         (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos,
                                                                stamp_y_dim, stamp_x_dim,
-                                                               out_dims_y, out_dims_x)
+                                                               out_dims_y, out_dims_x,
+                                                               ignore_detector=ignore_detector)
+
         print('stamp coordinates in {}:'.format(coord_sys))
         print(i1, i2, j1, j2, k1, k2, l1, l2)
         y_points, x_points = np.mgrid[j1:j2, i1:i2]
@@ -2190,7 +2216,8 @@ class Catalog_seed():
         y_max = np.int(y_center) + y_half_width + 1
         return x_min, x_max, y_min, y_max
 
-    def cropped_coords(self, x_det, y_det, psfxdim, psfydim, aperturexdim, apertureydim):
+    def cropped_coords(self, x_det, y_det, psfxdim, psfydim, aperturexdim, apertureydim,
+                       ignore_detector=False):
         """
         Given the location of a source on the detector along with the size of
         the PSF/stamp image for that object, calcuate the limits of the detector
@@ -2219,6 +2246,12 @@ class Catalog_seed():
 
         apertureydim : int
             Number of rows in the final seed image
+
+        ignore_detector: bool
+            If True, the returned coordinates can have values outside the
+            size of the subarray/detector (i.e. coords can be negative or
+            larger than full frame). If False, coordinates are constrained
+            to be on the detector.
 
         Returns:
         --------
@@ -2262,12 +2295,21 @@ class Catalog_seed():
         nxshift = np.int(psfxdim) // 2
         nyshift = np.int(psfydim) // 2
 
-        # nx = int(xoff)
-        # ny = int(yoff)
-        i1 = max(nx - nxshift, 0)
-        i2 = min(nx + 1 + nxshift, np.int(aperturexdim))
-        j1 = max(ny - nyshift, 0)
-        j2 = min(ny + 1 + nyshift, np.int(apertureydim))
+        if not ignore_detector:
+            # Adjust coordinates so that nothing extends beyond the edge
+            # of the detector
+            i1 = max(nx - nxshift, 0)
+            i2 = min(nx + 1 + nxshift, np.int(aperturexdim))
+            j1 = max(ny - nyshift, 0)
+            j2 = min(ny + 1 + nyshift, np.int(apertureydim))
+        else:
+            # Return coords that can be negative or beyond the edge of the
+            # detector
+            i1 = nx - nxshift
+            i2 = nx + 1 + nxshift
+            j1 = ny - nyshift
+            j2 = ny + 1 + nyshift
+
         k1 = nxshift - (nx - i1)
         k2 = nxshift + (i2 - nx)
         l1 = nyshift - (ny - j1)
@@ -2278,20 +2320,22 @@ class Catalog_seed():
         # in the source image where it will be placed
         # This is used only for segmap now that epsf is
         # implemented.
-        if l2 > psfydim:
-            l2 = psfydim
-            j2 = j1 + (l2 - l1)
+        if not ignore_detector:
+            if l2 > psfydim:
+                l2 = psfydim
+                j2 = j1 + (l2 - l1)
 
-        if k2 > psfxdim:
-            k2 = psfxdim
-            i2 = i1 + (k2 - k1)
+            if k2 > psfxdim:
+                k2 = psfxdim
+                i2 = i1 + (k2 - k1)
 
         # At this point coordinates are in the final output array coordinate system, so there
         # should be no negative values, nor values larger than the output array size
-        if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
+        if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0 and not ignore_detector:
             raise ValueError(("WARNING: Coordinates of overlap between detector aperture"
                               "and PSF/stamp image are < 0."))
-        if j2 > (apertureydim + 1) or i2 > (aperturexdim + 1) or l2 > (psfxdim + 1) or k2 > (psfydim + 1):
+        if j2 > (apertureydim + 1) or i2 > (aperturexdim + 1) or l2 > (psfxdim + 1) or k2 > (psfydim + 1) \
+           and not ignore_detector:
             raise ValueError(("WARNING: Coordinates of overlap between detector aperture:"
                               "and PSF/stamp are larger than the dimensions of the image."))
         return (i1, i2, j1, j2, k1, k2, l1, l2)
