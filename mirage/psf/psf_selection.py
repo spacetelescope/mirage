@@ -90,6 +90,44 @@ def get_library_file(instrument, detector, filt, pupil, fov_pix, oversample, num
         return lib_file
 
 
+def get_library_file_new(instrument, detector, filt, pupil, wfe, wfe_group, library_path):
+    """
+    """
+    psf_files = glob(os.path.join(library_path, '*wfegroup0.fits'))
+
+    # Create a dictionary of header information for all PSF library files
+    psf_table = {}
+    matches = []
+    for filename in psf_files:
+        header = fits.getheader(filename)
+        file_inst = header['INSTRUME'].lower()
+        file_det = header['DETECTOR'].upper()
+        file_filt = header['FILTER'].upper()
+        #file_pupil = header['PUPIL'].upper()
+        file_pupil = 'CLEAR'
+        print('PUPIL VALUE SET TO CLEAR WHILE AWAITING KEYWORD')
+        opd = header['PUPILOPD']
+        if 'requirements' in opd:
+            file_wfe = 'requirements'
+        elif 'predicted' in opd:
+            file_wfe = 'predicted'
+        #file_wfe_grp = header['']
+        file_wfe_grp = 0
+        print('WFE REALIZATION SET TO ZERO WHILE WAITING FOR KEYWORD')
+        match = (file_inst == instrument and file_det == detector and file_filt == filt and
+                 file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
+        print(filename, file_inst, file_det, file_filt, file_pupil, file_wfe, file_wfe_grp)
+        if match:
+            matches.append(filename)
+        psf_table[filename] = [file_inst, file_det, file_filt, file_pupil, file_wfe, file_wfe_grp, match]
+
+    # Find files matching the requested inputs
+    if len(matches) == 1:
+        return matches[0]
+    elif len(matches) == 0:
+        raise ValueError("No PSF library file found matching requested parameters.")
+    elif len(matches) > 1:
+        raise ValueError("More than one PSF library file matches requested parameters: {}".format(matches))
 
 
 

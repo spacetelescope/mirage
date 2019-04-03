@@ -1089,6 +1089,27 @@ class Catalog_seed():
 
                 # Convolve with instrument PSF if requested
                 if self.params['simSignals']['PSFConvolveExtended']:
+                    stamp_dims = stamp.shape
+                    # If the stamp image is smaller than the PSF in either
+                    # dimension, embed the stamp in an array that matches
+                    # the psf size. This is so the upcoming convolution will
+                    # produce an output that includes the wings of the PSF
+                    psf_shape = eval_psf.shape
+                    if ((stamp_dims[0] < psf_shape[0]) or (stamp_dims[1] < psf_shape[1])):
+                        print('Enlarging extended stamp to be the same size or larger than the psf shape of {}'.format(psf_shape))
+                        stamp = self.enlarge_stamp(stamp, psf_shape)
+                        stamp_dims = stamp.shape
+                        print('New stamp dimensions are: {}'.format(stamp_dims))
+
+                        # Scale the galaxy such that the total signal is higher than requested
+                        # by a factor equal to the summed signal in the PSF. For webbpsf derived
+                        # PSFs, this is often just under 1.0 (probably because of chopped off PSF
+                        # wings.) Scale up the stamp by this amount. That way when you convolve
+                        # with the PSF that has a total signal of just under 1.0, the result will
+                        # be properly scaled.
+                        stamp /= np.sum(eval_psf)
+
+
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
@@ -1120,12 +1141,6 @@ class Catalog_seed():
                     print('Enlarging galaxy stamp to be the same size or larger than the psf')
                     stamp = self.enlarge_stamp(stamp, psf_shape)
                     galdims = stamp.shape
-
-
-
-
-
-
 
                 # Convolve the galaxy with the instrument PSF
                 stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
@@ -3022,6 +3037,10 @@ class Catalog_seed():
             #                           xposang*np.pi/180., entry['counts_per_frame_e'])
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['counts_per_frame_e'])
+
+
+            print('total galaxy signal after creation:', np.sum(stamp))
+            print('should be able to remove normalization below')
             # Nornalize the stamp image to be used such that it
             # has the requested total signal
             stamp /= np.sum(stamp)
@@ -3646,6 +3665,7 @@ class Catalog_seed():
                 print('cropped stamp shape: ', stamp[l1:l2, k1:k2].shape)
 
                 # FOR TESTING!
+                print('remove orig_stamp lines before merging')
                 orig_stamp = copy.deepcopy(stamp)
 
 
