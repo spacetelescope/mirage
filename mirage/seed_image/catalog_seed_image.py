@@ -1101,15 +1101,6 @@ class Catalog_seed():
                         stamp_dims = stamp.shape
                         print('New stamp dimensions are: {}'.format(stamp_dims))
 
-                        # Scale the galaxy such that the total signal is higher than requested
-                        # by a factor equal to the summed signal in the PSF. For webbpsf derived
-                        # PSFs, this is often just under 1.0 (probably because of chopped off PSF
-                        # wings.) Scale up the stamp by this amount. That way when you convolve
-                        # with the PSF that has a total signal of just under 1.0, the result will
-                        # be properly scaled.
-                        stamp /= np.sum(eval_psf)
-
-
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
@@ -3627,20 +3618,6 @@ class Catalog_seed():
 
                 print('PSF total counts after creation: {}'.format(np.sum(psf_image)))
                 print('PSF size: {}'.format(psf_image.shape))
-
-
-                # Scale the galaxy such that the total signal is higher than requested
-                # by a factor equal to the summed signal in the PSF. For webbpsf derived
-                # PSFs, this is often just under 1.0 (probably because of chopped off PSF
-                # wings.) Scale up the stamp by this amount. That way when you convolve
-                # with the PSF that has a total signal of just under 1.0, the result will
-                # be properly scaled.
-                stamp /= np.sum(psf_image)
-
-                print('stamp total signal after scaling up by extra factor of {}: {}'.format(np.sum(psf_image), np.sum(stamp)))
-
-
-                #psf_image /= np.sum(psf_image)
 
                 #xappsf, yappsf, xptspsf, yptspsf, (i1psf, i2psf), (j1psf, j2psf), (k1psf, k2psf), \
                 #    (l1psf, l2psf) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],

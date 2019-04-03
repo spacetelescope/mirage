@@ -111,9 +111,12 @@ def get_library_file_new(instrument, detector, filt, pupil, wfe, wfe_group, libr
             file_wfe = 'requirements'
         elif 'predicted' in opd:
             file_wfe = 'predicted'
-        #file_wfe_grp = header['']
-        file_wfe_grp = 0
-        print('WFE REALIZATION SET TO ZERO WHILE WAITING FOR KEYWORD')
+
+        if 'slice' in opd:
+            file_wfe_grp = np.int(opd.split(' ')[-1])
+        else:
+            file_wfe_grp = 0
+
         match = (file_inst == instrument and file_det == detector and file_filt == filt and
                  file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
         print(filename, file_inst, file_det, file_filt, file_pupil, file_wfe, file_wfe_grp)
