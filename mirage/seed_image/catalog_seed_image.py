@@ -1886,6 +1886,11 @@ class Catalog_seed():
                 k2 = psfdims[1]
                 i2 = i1 + (k2 - k1)
 
+
+            print('IJKL:')
+            print(i1, i2, j1, j2, k1, k2, l1, l2)
+
+
             # At this point coordinates are in the final output array coordinate system, so there
             # should be no negative values, nor values larger than the output array size
             if j1 < 0 or i1 < 0 or l1 < 0 or k1 < 0:
