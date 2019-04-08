@@ -1,3 +1,5 @@
+.. _dark_prep:
+
 Preparation of the Dark Current Exposure
 ========================================
 

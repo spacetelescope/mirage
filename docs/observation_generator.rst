@@ -1,3 +1,5 @@
+.. _obs_generator:
+
 Generate Observation
 ====================
 

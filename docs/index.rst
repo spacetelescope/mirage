@@ -15,6 +15,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    catalogs.rst
    catalog_creation.rst
 
+   three_steps.rst
    seed_images.rst
    dark_preparation.rst
    observation_generator.rst
@@ -41,12 +42,14 @@ The software is designed such that a single yaml file can be used as input. This
 
 For software developement and testing, users may wish to simulate all data from a given JWST proposal. In order to do this, Mirage requires one yaml file for each exposure/detector combination. To facilitate this, the Mirage package includes ancillary convenience functions that allow the user to translate an Astronomer's Proposal Tool (`APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_) proposal into a series of input yaml files. These tools are described in detail on the :ref:`Simulating Observations from an APT File <from_apt>` page.
 
+Basic Workflow
+--------------
 
 The basic order of steps necessary to produce simulated data with Mirage is:
 
 1. Create the appropriate :ref:`Source Catalogs <catalogs>`. Mirage contains :ref:`tools to aid in the creation of source catalogs <catalog_generation>`.
-2. Create the needed :ref:`yaml files <>` to descirbe the observations. An easy way to do this is to start with an APT proposal and use Mirage's :ref:`yaml file generator <from_apt>` tool.
-3. Run the appropriate module. Most often this will be the imaging simulator or the :ref:`wfss simulator <wfss_data>`. To produce only noiseless, background-free countrate images of the scene, the :ref:`catalog generator module <seed_images>` can be used.
+2. Create the needed :ref:`yaml files <example_yaml>` to descirbe the observations. An easy way to do this is to start with an APT proposal and use Mirage's :ref:`yaml file generator <from_apt>` tool.
+3. Run the appropriate module. Most often this will be the imaging simulator **add link to imaging notebook** or the :ref:`wfss simulator <wfss_data>`. **change link to wfss notebook** To produce only noiseless, background-free countrate images of the scene, the :ref:`seed image generator module <seed_images>` can be used.
 
 See the :ref:`Examples <examples>` page for basic examples of each of these situations. There are also several notebooks in the Mirage repository showing more in-depth examples of these steps. These include the:
 
