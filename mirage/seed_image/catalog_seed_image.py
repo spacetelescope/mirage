@@ -1830,6 +1830,10 @@ class Catalog_seed():
         return filtered_indexes, filtered_sources
 
     def makePointSourceImage(self, pointSources):
+
+        print(pointSources)
+        stop
+
         dims = np.array(self.nominal_dims)
 
         # Create the empty image
@@ -1941,14 +1945,6 @@ class Catalog_seed():
             (l1, l2) = self.create_psf_stamp_coords(x_location, y_location, (self.psf_library_y_dim,
                                                     self.psf_library_x_dim), psf_x_loc, psf_y_loc, coord_sys='full_frame',
                                                     ignore_detector=ignore_detector)
-
-        #print('trying out call to updated cropped_coords below!!')
-        #print('the call above is the previous one that worked except for subarrays')
-        #xcenter, ycenter, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
-        #    (l1, l2) = self.create_psf_stamp_coords_updated(x_location, y_location, self.output_dims,
-        #                                                    self.psf_library_x_dim//2, self.psf_library_y_dim//2,
-        #                                                    (self.psf_library_y_dim, self.psf_library_x_dim),
-        #                                                    ignore_detector=ignore_detector)
 
         flux_scaling_factor = self.psf_library.oversampling**2
 
