@@ -1830,10 +1830,6 @@ class Catalog_seed():
         return filtered_indexes, filtered_sources
 
     def makePointSourceImage(self, pointSources):
-
-        print(pointSources)
-        stop
-
         dims = np.array(self.nominal_dims)
 
         # Create the empty image
@@ -1883,7 +1879,6 @@ class Catalog_seed():
                 print('psf_dimensions:', scaled_psf.shape)
                 print(np.max(psfimage[j1:j2, i1:i2]))
                 psfimage[j1:j2, i1:i2] += scaled_psf[l1:l2, k1:k2]
-                stop
                 print(np.max(psfimage[j1:j2, i1:i2]))
 
 
@@ -2937,36 +2932,108 @@ class Catalog_seed():
 
             # print('Stamp total counts after creation: {}'.format(np.sum(stamp)))
 
+            #xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
+            #    (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+            #                                            (galdims[1], galdims[0]), coord_sys='aperture')
+
+
+
+
+            # maybe we need a third option for coord_sys that doesn't add any offsets
+            # to the input x and y positions. go through the code to see if this is the case
+
+
+
+
+
+
+            ###############CAN WE JUST DO THIS??????
+
+
+
+            psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'])
+            print('Galaxies: Evaluated PSF with which to convolve:', psf_image.shape)
+
+
+            print('GALAXY STAMP SHAPE: ', galdims)
+            print('PSF SHAPE: ', psf_image.shape)
+
+
+            # PSF may not be centered in array now if part of the array falls
+            # off of the aperture
+            stamp_x_loc = self.psf_library_x_dim // 2 - min_x
+            stamp_y_loc = self.psf_library_y_dim // 2 - min_y
+            updated_psf_dimensions = psf_image.shape
+
+            print('UPDATED PSF SHAPE: ', updated_psf_dimensions)
+
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
                 (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
-                                                        (galdims[1], galdims[0]), coord_sys='aperture')
+                                                        updated_psf_dimensions,
+                                                        stamp_x_loc, stamp_y_loc,
+                                                        coord_sys='aperture')
 
-            xff, yff, xpts_ff, ypts_ff, (i1ff, i2ff), (j1ff, j2ff), (k1ff, k2ff), \
-                (l1ff, l2ff) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
-                                                            (galdims[1], galdims[0]), coord_sys='full_frame')
+            print('GALAXY IJKL: ', i1, i2, j1, j2, k1, k2, l1, l2)
 
-            # Force the PSF to be centered in its array, except for the
-            # subpixel location, and force its array to be the same size
-            # as or smaller than the cropped stamp image of the galaxy
-            cropped_y_dim, cropped_x_dim = (l2 - l1, k2 - k1)
-            xmin, xmax, ymin, ymax = self.ensure_odd_lengths(cropped_x_dim, cropped_y_dim, xff, yff)
-            ypts_psf, xpts_psf = np.mgrid[ymin:ymax, xmin:xmax]
+            ##################CAN WE JUST DO THIS??????
 
-            # Get the PSF
-            flux_scaling_factor = self.psf_library.oversampling**2
-            psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=flux_scaling_factor,
-                                                  x_0=xff, y_0=yff)
 
-            xappsf, yappsf, xptspsf, yptspsf, (i1psf, i2psf), (j1psf, j2psf), (k1psf, k2psf), \
-                (l1psf, l2psf) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
-                                                              psf_image.shape, coord_sys='aperture')
+
+
+            ###########  PREVIOUS VERSION #############
+
+            #xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
+            #    (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+            #                                            galdims, stamp_x_loc, stamp_y_loc,
+            #                                            coord_sys='aperture')
+            #print('Galaxies: ijkl from aperture call to coords:', i1, i2, j1, j2, k1, k2, l1, l2)
+
+
+            #xff, yff, xpts_ff, ypts_ff, (i1ff, i2ff), (j1ff, j2ff), (k1ff, k2ff), \
+            #    (l1ff, l2ff) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+            #                                                galdims, stamp_x_loc, stamp_y_loc,
+            #                                                coord_sys='full_frame')
+            #print('Galaxies: ijkl from fullframe call to coords:', i1, i2, j1, j2, k1, k2, l1, l2)
+
+            ## Force the PSF to be centered in its array, except for the
+            ## subpixel location, and force its array to be the same size
+            ## as or smaller than the cropped stamp image of the galaxy
+            #cropped_y_dim, cropped_x_dim = (l2 - l1, k2 - k1)
+            #xmin, xmax, ymin, ymax = self.ensure_odd_lengths(cropped_x_dim, cropped_y_dim, xff, yff)
+            #ypts_psf, xpts_psf = np.mgrid[ymin:ymax, xmin:xmax]
+
+            ## Get the PSF
+            #flux_scaling_factor = self.psf_library.oversampling**2
+            #psf_image = self.psf_library.evaluate(x=xpts_psf, y=ypts_psf, flux=flux_scaling_factor,
+            #                                      x_0=xff, y_0=yff)
+
+            #xappsf, yappsf, xptspsf, yptspsf, (i1psf, i2psf), (j1psf, j2psf), (k1psf, k2psf), \
+            #    (l1psf, l2psf) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+            #                                                  psf_image.shape, coord_sys='aperture')
+
+            ###########  PREVIOUS VERSION #############
+
+
+
 
             # hh0 = fits.PrimaryHDU(psf_image)
             # hhl = fits.HDUList([hh0])
             # hhl.writeto('psf_to_convolve.fits', overwrite=True)
 
             # Convolve the galaxy with the instrument PSF
-            stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
+
+            ########## PREVIOUS VERSION ################
+            #stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image, mode='same')
+            ########## PREVIOUS VERSION ################
+
+            stamp = s1.fftconvolve(stamp[l1:l2, k1:k2], psf_image[j1:j2, i1:i2], mode='same')
+            print('GALAXY STAMP IMAGE DIMENSIONS: ', stamp.shape)
+
+
+
+
+
+
 
             # print('Stamp total counts after convolution: {}'.format(np.sum(stamp)))
             # print('Requested signal: {}'.format(entry['counts_per_frame_e']))
