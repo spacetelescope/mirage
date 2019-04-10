@@ -153,12 +153,10 @@ class Catalog_seed():
 
         self.psf_library = get_gridded_psf_library(self.params['Inst']['instrument'], self.detector,
                                                    psf_filter, psf_pupil,
-                                                   self.params['simSignals']['psf_size'],
-                                                   self.params['simSignals']['psf_oversample'],
-                                                   self.params['simSignals']['psfs_per_grid'],
                                                    self.params['simSignals']['psfwfe'],
                                                    self.params['simSignals']['psfwfegroup'],
                                                    self.params['simSignals']['psfpath'])
+
         self.psf_library_y_dim, self.psf_library_x_dim = self.psf_library.data.shape[-2:]
         self.psf_library_x_dim = np.int(self.psf_library_x_dim / self.psf_library.oversampling)
         self.psf_library_y_dim = np.int(self.psf_library_y_dim / self.psf_library.oversampling)
