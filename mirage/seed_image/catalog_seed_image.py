@@ -1929,8 +1929,8 @@ class Catalog_seed():
         # full frame of the detector
         xcenter, ycenter, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
             (l1, l2) = self.create_psf_stamp_coords(x_location, y_location, (self.psf_library_y_dim,
-                                                    self.psf_library_x_dim), psf_x_loc, psf_y_loc, coord_sys='full_frame',
-                                                    ignore_detector=ignore_detector)
+                                                    self.psf_library_x_dim), psf_x_loc, psf_y_loc,
+                                                    coord_sys='full_frame', ignore_detector=ignore_detector)
 
         # PSFs in GriddedPSFModel by default have a total signal equal
         # to the square of the oversampling factor. They must be scaled
@@ -1941,8 +1941,8 @@ class Catalog_seed():
                                         x_0=xcenter, y_0=ycenter)
         return psf, k1, l1
 
-    def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y, coord_sys='full_frame',
-                                ignore_detector=False):
+    def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y,
+                                coord_sys='full_frame', ignore_detector=False):
         """Calculate the coordinates in the aperture coordinate system
         where the stamp image wil be placed based on the location of the
         stamp image in the aperture and the size of the stamp image.
@@ -2017,8 +2017,8 @@ class Catalog_seed():
         # Get coordinates that describe the overlap between the stamp
         # and the aperture
         (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, (out_dims_x, out_dims_y),
-                                                                       stamp_x, stamp_y, stamp_dims,
-                                                                       ignore_detector=ignore_detector)
+                                                               stamp_x, stamp_y, stamp_dims,
+                                                               ignore_detector=ignore_detector)
         y_points, x_points = np.mgrid[j1:j2, i1:i2]
         return xpos, ypos, x_points, y_points, (i1, i2), (j1, j2), (k1, k2), (l1, l2)
 
