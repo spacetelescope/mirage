@@ -2753,6 +2753,8 @@ class Catalog_seed():
             Declination value in DD:MM:SS
         """
         if self.coord_transform is not None:
+            pixelx += self.subarray_bounds[0]
+            pixely += self.subarray_bounds[1]
             loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
             # Use SIAF to do the calculations if the distortion reffile is
