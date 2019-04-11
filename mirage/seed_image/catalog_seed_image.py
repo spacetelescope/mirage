@@ -2064,6 +2064,11 @@ class Catalog_seed():
         if self.coord_transform is not None:
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
+            print('\nUSING DISTORTION REFFILE TO TRANSLATE. PIXEL X, Y: ', pixelx, pixely)
+            #print('subarray bounds are: ', self.subarray_bounds)
+            #print('X, Y minus SUBARRAY BOUNDS: ', pixelx - self.subarray_bounds[0], pixely - self.subarray_bounds[1])
+            #pixelx -= self.subarray_bounds[0]
+            #pixely -= self.subarray_bounds[1]
         else:
             # print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
