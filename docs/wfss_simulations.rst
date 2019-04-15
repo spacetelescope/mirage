@@ -48,7 +48,7 @@ Yaml file plus SED file
 In order to create simulated data with more realistic spectra, users can provide an optional hdf5 <add link here> file that contains spectra for some or all of the targets listed in the source catalogs. The spectra in this file can have any shape, including emission and absorption features. The spectrum for each source is contained in a "dataset", which is read in as a python dictionary containing "wavelengths" and "fluxes" keys. The values associated with each of these fields is a list of floating point numbers. Units can be specified by adding a string as a dataset attribute. If no units are provided, Mirage assumes that wavelengths are in units of microns, and flux densisites are in units of F_lambda (erg/sec/cm^2/A).
 
 WFSS Example
-++++++++++++
+------------
 
 Here we show a simplified example for creating WFSS data beginning from an APT file. The WFSS notebook **(ADD LINK)** provides more in-depth examples.
 
