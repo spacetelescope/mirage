@@ -1,0 +1,15 @@
+# position_RA_Dec
+# abmag
+# velocity_RA_Dec
+# 
+index object x_or_RA y_or_Dec x_or_RA_velocity y_or_Dec_velocity nircam_f480m_magnitude
+1 pointSource 80.0 -69.8 0.432 0.875 19.0
+2 pointSource 80.0 -69.8 0.432 0.875 19.0
+3 pointSource 80.0 -69.8 0.432 0.875 19.0
+4 pointSource 80.0 -69.8 0.432 0.875 19.0
+5 pointSource 80.0 -69.8 0.432 0.875 19.0
+6 pointSource 80.0 -69.8 0.432 0.875 19.0
+7 pointSource 80.0 -69.8 0.432 0.875 19.0
+8 pointSource 80.0 -69.8 0.432 0.875 19.0
+9 pointSource 80.0 -69.8 0.432 0.875 19.0
+10 pointSource 80.0 -69.8 0.432 0.875 19.0

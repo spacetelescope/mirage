@@ -19,7 +19,7 @@ import math
 import yaml
 import time
 import pkg_resources
-from asdf import AsdfFile
+import asdf
 import scipy.signal as s1
 import numpy as np
 from photutils import detect_sources
@@ -41,7 +41,7 @@ MIRAGE_VERSION = version.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         'niriss': ["imaging", "ami", "pom"],
+         'niriss': ["imaging", "ami", "pom", "wfss"],
          'fgs': ["imaging"]}
 TRACKING_LIST = ['sidereal', 'non-sidereal']
 inst_abbrev = {'nircam': 'NRC',
@@ -53,7 +53,15 @@ WFEGROUP_OPTIONS = np.arange(5)
 
 
 class Catalog_seed():
-    def __init__(self):
+    def __init__(self, offline=False):
+        """Instantiate the Catalog_seed class
+
+        Parameters
+        ----------
+        offline : bool
+            If True, the check for the existence of the MIRAGE_DATA
+            directory is skipped. This is primarily for Travis testing
+        """
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -62,15 +70,7 @@ class Catalog_seed():
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
-        datadir = os.environ.get(self.env_var)
-
-        if datadir is None:
-            raise ValueError(("WARNING: {} environment variable is not set."
-                              "This must be set to the base directory"
-                              "containing the darks, cosmic ray, PSF, etc"
-                              "input files needed for the simulation."
-                              "These files must be downloaded separately"
-                              "from the Mirage package.".format(self.env_var)))
+        datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
         # if a grism signal rate image is requested, expand
         # the width and height of the signal rate image by this
@@ -78,6 +78,7 @@ class Catalog_seed():
         # track sources that are outside the requested subarray
         # in order to calculate contamination.
         self.grism_direct_factor = np.sqrt(2.)
+        print('change me for niriss')
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -86,12 +87,12 @@ class Catalog_seed():
         # and those of the expanded array. These are needed
         # mostly for WFSS observations, where the nominal output
         # array will not sit centered in the expanded output image.
-        self.coord_adjust = {'x':1., 'xoffset':0, 'y':1., 'yoffset':0}
+        self.coord_adjust = {'x': 1., 'xoffset': 0, 'y': 1., 'yoffset': 0}
 
         # NIRCam rough noise values. Used to make educated guesses when
         # creating segmentation maps
-        self.single_ron = 6. # e-/read
-        self.grism_background = 0.25 # e-/sec
+        self.single_ron = 6.  # e-/read
+        self.grism_background = 0.25  # e-/sec
 
         # keep track of the maximum index number of sources
         # in the various catalogs. We don't want to end up
@@ -124,10 +125,15 @@ class Catalog_seed():
         self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],
                                                           self.coord_adjust['x']])).astype(np.int)
 
+        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+        print('output dimensions are: {}'.format(self.output_dims))
+        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+
         # calculate the exposure time of a single frame, based on the size of the subarray
-        #self.calcFrameTime()
-        self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'], self.params['Readout']['array_name'],
-                                         self.nominal_dims[0], self.nominal_dims[1], self.params['Readout']['namp'])
+        self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'],
+                                               self.params['Readout']['array_name'],
+                                               self.nominal_dims[0], self.nominal_dims[1],
+                                               self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
 
         # Read in the pixel area map, which will be needed for certain
@@ -170,8 +176,9 @@ class Catalog_seed():
         # For seed images to be dispersed in WFSS mode,
         # embed the seed image in a full frame array. The disperser
         # tool does not work on subarrays
-        if ((self.params['Inst']['mode'] in ['wfss','ts_wfss']) & \
-            ('FULL' not in self.params['Readout']['array_name'])):
+        aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
+        if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+           (aperture_suffix not in ['FULL', 'CEN'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
 
         # Save the combined static + moving targets ramp
@@ -183,7 +190,7 @@ class Catalog_seed():
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
-    def extract_full_from_pom(self,seedimage,seed_segmap):
+    def extract_full_from_pom(self, seedimage, seed_segmap):
         """ Given the seed image and segmentation images for the NIRISS POM field of view,
         extract the central 2048x2048 pixel area where the detector sits.  The routine is only
         called when the mode is "pom".  The mode is set to "imaging" in these routine, as after
@@ -205,8 +212,10 @@ class Catalog_seed():
         """
         # For the NIRISS POM mode, extact the central 2048x2048 pixels for the
         # ramp simulation.  Set the mode back to "imaging".
-        newseedimage = np.copy(seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-        newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+        newseedimage = np.copy(seedimage[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,
+                                         self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
+        newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,
+                                             self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
         self.params['Inst']['mode'] = "imaging"
         return newseedimage, newseed_segmap
 
@@ -252,6 +261,25 @@ class Catalog_seed():
         except:
             raise IOError('WARNING: unable to read in {}'.format(fname))
 
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
+            # If the simulation is for WFSS or POM data, make sure the
+            # reference pixels around the PAM are also set to
+            # non-zero, otherwise you will get a 4 pixel wide picture frame of 0's
+            # in the expanded seed image
+            bottom = pam[4, :]
+            top = pam[2043, :]
+            left = pam[:, 4]
+            right = pam[:, 2043]
+            for i in range(4):
+                pam[i, :] = bottom
+                pam[i+2044, :] = top
+                pam[:, i] = left
+                pam[:, i+2044] = right
+            pam[0:4, 0:4] = pam[4, 4]
+            pam[2044:, 0:4] = pam[2043, 4]
+            pam[0:4, 2044:] = pam[4, 2043]
+            pam[2044:, 2044:] = pam[2043, 2043]
+
         # Crop to expected subarray
         try:
             pam = pam[self.subarray_bounds[1]:self.subarray_bounds[3]+1,
@@ -262,7 +290,7 @@ class Catalog_seed():
         # If we are making a grism direct image, we need to embed the true pixel area
         # map in an array of the appropriate dimension, where any pixels outside the
         # actual aperture are set to 1.0
-        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             mapshape = pam.shape
             #cannot use this: g, yd, xd = signalramp.shape
             #need to update dimensions: self.pam = np.ones((yd, xd))
@@ -356,7 +384,7 @@ class Catalog_seed():
         kw['filter'] = self.params['Readout'][usefilt]
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
-        kw['PHOTPLAM'] = self.pivot * 1.e4 # put into angstroms
+        kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
         kw['NOMXDIM'] = self.nominal_dims[1]
         kw['NOMYDIM'] = self.nominal_dims[0]
         kw['NOMXSTRT'] = np.int(self.coord_adjust['xoffset'] + 1)
@@ -585,9 +613,10 @@ class Catalog_seed():
         # modeled is wfss
 
         dtor = math.radians(1.)
+        instrument = self.params['Inst']['instrument']
 
         # Normal imaging with grism image requested
-        if self.params['Output']['grism_source_image']:
+        if instrument.lower() == 'nircam' and self.params['Output']['grism_source_image']:
             self.coord_adjust['x'] = self.grism_direct_factor
             self.coord_adjust['y'] = self.grism_direct_factor
             self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
@@ -597,11 +626,13 @@ class Catalog_seed():
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
 
-        if self.params['Inst']['mode'] in ["pom"]:
-            # change the values for the NIRISS/POM mode.  Add 137 pixels extra space around the main image area, full frame.
-            self.output_dims = [2322,2322]
+        if instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image']):
+            # change the values for the NIRISS POM and WFSS modes.  Add 137
+            # pixels extra space around the main image area, full frame.
+            self.output_dims = [2322, 2322]
             self.coord_adjust['x'] = 2322./2048.
             self.coord_adjust['y'] = 2322./2048.
+            self.grism_direct_factor = 2322./2048.
             self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
                                                   (self.subarray_bounds[2] -
                                                    self.subarray_bounds[0] + 1) / 2.)
@@ -1340,7 +1371,7 @@ class Catalog_seed():
 
     def addedSignals(self):
         # Generate a signal rate image from input sources
-        if (self.params['Output']['grism_source_image'] == False) and (not self.params['Inst']['mode'] in ["pom"]):
+        if (self.params['Output']['grism_source_image'] == False) and (not self.params['Inst']['mode'] in ["pom", "wfss"]):
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
@@ -1352,18 +1383,18 @@ class Catalog_seed():
         # yd, xd = signalimage.shape
         arrayshape = signalimage.shape
 
-        #MASK IMAGE
-        #Create a mask so that we don't add signal to masked pixels
-        #Initially this includes only the reference pixels
-        #Keep the mask image equal to the true subarray size, since this
-        #won't be used to make a requested grism source image
+        # MASK IMAGE
+        # Create a mask so that we don't add signal to masked pixels
+        # Initially this includes only the reference pixels
+        # Keep the mask image equal to the true subarray size, since this
+        # won't be used to make a requested grism source image
         maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
         maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
 
-        #crop the mask to match the requested output array
+        # crop the mask to match the requested output array
         if "FULL" not in self.params['Readout']['array_name']:
-            maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1, self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
-
+            maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                                  self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
 
         # POINT SOURCES
         # Read in the list of point sources to add
@@ -1593,7 +1624,7 @@ class Catalog_seed():
         maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
         # Expand the limits if a grism direct image is being made
-        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
+        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -1779,7 +1810,7 @@ class Catalog_seed():
         seg.ydim = newdimsy
         seg.initialize_map()
 
-        #Loop over the entries in the point source list
+        # Loop over the entries in the point source list
         interval = self.params['simSignals']['psfpixfrac']
         numperpix = int(1./interval)
         for entry in pointSources:
@@ -1788,7 +1819,7 @@ class Catalog_seed():
             ypos = entry['pixely'] + deltay
 
             # desired counts per second in the point source
-            counts = entry['countrate_e/s'] # / self.frametime
+            counts = entry['countrate_e/s']  # / self.frametime
 
             # find sub-pixel offsets in position from the center of the pixel
             xoff = math.floor(xpos)
@@ -1799,8 +1830,18 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-            a_in = interval * int(numperpix*xfract + 0.5) - 0.5
-            b_in = interval * int(numperpix*yfract + 0.5) - 0.5
+            a_in = interval * int(numperpix*xfract + 0.5)
+            b_in = interval * int(numperpix*yfract + 0.5)
+            if a_in > 0.5:
+                a_in -= 1
+                xpos += 1
+                xoff = math.floor(xpos)
+                xfract = abs(xpos-xoff)
+            if b_in > 0.5:
+                b_in -= 1
+                ypos += 1
+                yoff = math.floor(ypos)
+                yfract = abs(ypos-yoff)
 
             astr = "{0:.{1}f}".format(a_in, 2)
             bstr = "{0:.{1}f}".format(b_in, 2)
@@ -1835,9 +1876,18 @@ class Catalog_seed():
 
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
-            nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
-            nyshift = nyshift[0]
-            nxshift = nxshift[0]
+            #nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
+            #nyshift = nyshift[0]
+            #nxshift = nxshift[0]
+            psfshape = webbpsfimage.shape
+            if ((psfshape[0] % 2 == 0) | (psfshape[1] % 2 == 0)):
+                print(('WARNING: PSF file contains an even number of rows and/or columns. '
+                       'Odd numbers are recommended. Mirage assumes the PSF is centered in '
+                       'the array. For an even number of rows or columns, Mirage assumes the '
+                       'PSF is centered on the pixel to the left and/or below the center of '
+                       'the array. If this is not true, there will be source placement errors.'))
+            nyshift = psfshape[0] // 2
+            nxshift = psfshape[1] // 2
 
             psfdims = webbpsfimage.shape
             nx = int(xoff)
@@ -1875,7 +1925,7 @@ class Catalog_seed():
                 psfimage[j1:j2, i1:i2] = psfimage[j1:j2, i1:i2] + webbpsfimage[l1:l2, k1:k2] * counts
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                     noiseval += self.grism_background
                 seg.add_object_noise(webbpsfimage[l1:l2, k1:k2] * counts, j1, i1, entry['index'], noiseval)
             except:
@@ -2011,19 +2061,19 @@ class Catalog_seed():
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
         # values hh:mm:ss
-        if alpha1 < 0.:
-            alpha1 = alpha1 + 360.
+        if ((alpha1 < 0) or (alpha1 >= 360.)):
+            alpha1 = alpha1 % 360
         if delta1 < 0.:
             sign = "-"
             d1 = abs(delta1)
         else:
-            sign = " + "
+            sign = "+"
             d1 = delta1
         decd = int(d1)
         value = 60. * (d1 - float(decd))
         decm = int(value)
         decs = 60. * (value - decm)
-        a1 = alpha1/15.0
+        a1 = alpha1 / 15.0
         radeg = int(a1)
         value = 60. * (a1 - radeg)
         ramin = int(value)
@@ -2032,13 +2082,6 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
-        # The following fixes a format issue; it is not clear why the signa
-        # can have spaces around it in view of the above format string, but
-        # that is what happens.
-        alpha2 = alpha2.replace("0+0",'+')
-        delta2 = alpha2.replace("0+0",'+')
-        alpha2 = alpha2.replace("0-0",'-')
-        delta2 = alpha2.replace("0-0",'-')
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
@@ -2133,10 +2176,10 @@ class Catalog_seed():
         if self.coord_transform is not None:
             loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
-            # Use SIAF to do the calucations if the distortion reffile is not present.
-            # In this case, add 1 to the input pixel values since SIAF works in a 1-indexed
-            # coordinate system.
-            loc_v2s, loc_v3s = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
+            # Use SIAF to do the calculations if the distortion reffile is
+            # not present. In this case, add 1 to the input pixel values
+            # since SIAF works in a 1-indexed coordinate system.
+            loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
 
         ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
 
@@ -2206,7 +2249,7 @@ class Catalog_seed():
         nx = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
 
         #Expand the limits if a grism direct image is being made
-        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
+        if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor - 1.))
             miny -= extrapixy
             maxy += extrapixy
@@ -2278,8 +2321,7 @@ class Catalog_seed():
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
-        print(("Number of galaxies found within the requested aperture: {}"
-               .format(self.n_galaxies)))
+        print(("Number of galaxies found within the requested aperture: {}".format(self.n_galaxies)))
 
         if self.n_galaxies == 0:
             if self.n_pointsources == 0:
@@ -2397,7 +2439,7 @@ class Catalog_seed():
         # expand if a grism source image is being made
         xfact = 1
         yfact = 1
-        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             # xfact = self.grism_direct_factor
             # yfact = self.grism_direct_factor
             # elif
@@ -2417,7 +2459,7 @@ class Catalog_seed():
         # Adjust the coordinate system of the galaxy list if working with a grism direct image output
         deltax = 0
         deltay = 0
-        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom"]):
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             deltax = np.int((dims[1] - origxd) / 2)
             deltay = np.int((dims[0] - origyd) / 2)
 
@@ -2592,7 +2634,7 @@ class Catalog_seed():
                 maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
 
                 # Expand the limits if a grism direct image is being made
-                if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom"]):
+                if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
                     extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
                     miny -= extrapixy
                     maxy += extrapixy
@@ -2725,7 +2767,7 @@ class Catalog_seed():
             yoff = math.floor(ypos)
 
             # desired counts per second in the source
-            counts = entry['countrate_e/s'] # / self.frametime
+            counts = entry['countrate_e/s']  # / self.frametime
 
             # Extract the appropriate subarray from the image if necessary
             # Assume that the brightest pixel corresponds to the peak of the source
@@ -2769,7 +2811,7 @@ class Catalog_seed():
             extimage[j1:j2, i1:i2] = extimage[j1:j2, i1:i2] + stamp[l1:l2, k1:k2] * counts
             # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
             noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-            if self.params['Inst']['mode'].lower() in ['wfss','ts_wfss']:
+            if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                 noiseval += self.grism_background
 
             #segmentation.add_object_noise(stamp[l1:l2, k1:k2]*counts, j1, i1, entry['index'], noiseval)
@@ -3030,6 +3072,7 @@ class Catalog_seed():
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
+
                 # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF
                 # files are in a separate directory and have the altered file names
                 # compared to imaging.  Hence one can point to the same base
@@ -3359,7 +3402,7 @@ class Catalog_seed():
         """
         coord_transform = None
         if self.runStep['astrometric']:
-            with AsdfFile.open(self.params['Reffiles']['astrometric']) as dist_file:
+            with asdf.open(self.params['Reffiles']['astrometric']) as dist_file:
                 coord_transform = dist_file.tree['model']
         # else:
         #    coord_transform = self.simple_coord_transform()

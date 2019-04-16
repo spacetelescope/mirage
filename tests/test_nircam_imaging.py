@@ -22,6 +22,6 @@ os.environ['TEST_NIRCAM_DATA'] = os.path.join(os.path.dirname(__file__), 'test_d
 
 
 def test_nircam_imaging():
-    m = im.ImgSim()
+    m = im.ImgSim(offline=True)
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRCam/nircam_imaging_example.yaml')
     m.create()
