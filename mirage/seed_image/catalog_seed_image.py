@@ -36,6 +36,9 @@ from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 from ..utils.constants import grism_factor
+from mirage import version
+
+MIRAGE_VERSION = version.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -378,10 +381,33 @@ class Catalog_seed():
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
         kw['NOMXDIM'] = self.nominal_dims[1]
         kw['NOMYDIM'] = self.nominal_dims[0]
-        kw['NOMXSTRT'] = self.coord_adjust['xoffset'] + 1
-        kw['NOMXEND'] = self.nominal_dims[1] + self.coord_adjust['xoffset']
-        kw['NOMYSTRT'] = self.coord_adjust['yoffset'] + 1
-        kw['NOMYEND'] = self.nominal_dims[0] + self.coord_adjust['yoffset']
+        kw['NOMXSTRT'] = np.int(self.coord_adjust['xoffset'] + 1)
+        kw['NOMXEND'] = np.int(self.nominal_dims[1] + self.coord_adjust['xoffset'])
+        kw['NOMYSTRT'] = np.int(self.coord_adjust['yoffset'] + 1)
+        kw['NOMYEND'] = np.int(self.nominal_dims[0] + self.coord_adjust['yoffset'])
+
+        # Files/inputs used during seed image production
+        kw['YAMLFILE'] = self.paramfile
+        kw['GAINFILE'] = self.params['Reffiles']['gain']
+        kw['DISTORTN'] = self.params['Reffiles']['astrometric']
+        kw['IPC'] = self.params['Reffiles']['ipc']
+        kw['PIXARMAP'] = self.params['Reffiles']['pixelAreaMap']
+        kw['CROSSTLK'] = self.params['Reffiles']['crosstalk']
+        kw['FLUX_CAL'] = self.params['Reffiles']['flux_cal']
+        kw['FTHRUPUT'] = self.params['Reffiles']['filter_throughput']
+        kw['PTSRCCAT'] = self.params['simSignals']['pointsource']
+        kw['GALAXCAT'] = self.params['simSignals']['galaxyListFile']
+        kw['EXTNDCAT'] = self.params['simSignals']['extended']
+        kw['MTPTSCAT'] = self.params['simSignals']['movingTargetList']
+        kw['MTSERSIC'] = self.params['simSignals']['movingTargetSersic']
+        kw['MTEXTEND'] = self.params['simSignals']['movingTargetExtended']
+        kw['NONSDRAL'] = self.params['simSignals']['movingTargetToTrack']
+        kw['BKGDRATE'] = self.params['simSignals']['bkgdrate']
+        kw['TRACKING'] = self.params['Telescope']['tracking']
+        kw['POISSON'] = self.params['simSignals']['poissonseed']
+        kw['PSFWFE'] = self.params['simSignals']['psfwfe']
+        kw['PSFWFGRP'] = self.params['simSignals']['psfwfegroup']
+        kw['MRGEVRSN'] = MIRAGE_VERSION
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
@@ -1755,8 +1781,18 @@ class Catalog_seed():
             # Now we need to determine the proper PSF
             # file to read in from the library
             # This depends on the sub-pixel offsets above
-            a_in = interval * int(numperpix*xfract + 0.5) - 0.5
-            b_in = interval * int(numperpix*yfract + 0.5) - 0.5
+            a_in = interval * int(numperpix*xfract + 0.5)
+            b_in = interval * int(numperpix*yfract + 0.5)
+            if a_in > 0.5:
+                a_in -= 1
+                xpos += 1
+                xoff = math.floor(xpos)
+                xfract = abs(xpos-xoff)
+            if b_in > 0.5:
+                b_in -= 1
+                ypos += 1
+                yoff = math.floor(ypos)
+                yfract = abs(ypos-yoff)
 
             astr = "{0:.{1}f}".format(a_in, 2)
             bstr = "{0:.{1}f}".format(b_in, 2)
@@ -1791,9 +1827,18 @@ class Catalog_seed():
 
             # Extract the appropriate subarray from the PSF image if necessary
             # Assume that the brightest pixel corresponds to the peak of the psf
-            nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
-            nyshift = nyshift[0]
-            nxshift = nxshift[0]
+            #nyshift, nxshift = np.where(webbpsfimage == np.max(webbpsfimage))
+            #nyshift = nyshift[0]
+            #nxshift = nxshift[0]
+            psfshape = webbpsfimage.shape
+            if ((psfshape[0] % 2 == 0) | (psfshape[1] % 2 == 0)):
+                print(('WARNING: PSF file contains an even number of rows and/or columns. '
+                       'Odd numbers are recommended. Mirage assumes the PSF is centered in '
+                       'the array. For an even number of rows or columns, Mirage assumes the '
+                       'PSF is centered on the pixel to the left and/or below the center of '
+                       'the array. If this is not true, there will be source placement errors.'))
+            nyshift = psfshape[0] // 2
+            nxshift = psfshape[1] // 2
 
             psfdims = webbpsfimage.shape
             nx = int(xoff)
@@ -2981,6 +3026,7 @@ class Catalog_seed():
 
                 self.params['simSignals']['psfpath'] = os.path.join(self.params['simSignals']['psfpath'], pathaddition)
                 self.psfname = os.path.join(self.params['simSignals']['psfpath'], psfname)
+
                 # In the NIRISS AMI mode case, replace NIS by NIS_NRM as the PSF
                 # files are in a separate directory and have the altered file names
                 # compared to imaging.  Hence one can point to the same base
