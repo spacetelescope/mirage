@@ -1,0 +1,6 @@
+#abmag
+#
+#
+#
+index  x_or_RA y_or_Dec radius ellipticity pos_angle sersic_index niriss_f090w_magnitude niriss_f150w_magnitude niriss_f200w_magnitude nircam_f480m_magnitude
+8  12.202144142       12.1996128     0.4344592336539811 0.6969737389030511 119.05137499895564 3.889595862177258 20.0 19.0 18.0 17.0

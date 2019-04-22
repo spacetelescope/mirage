@@ -36,8 +36,12 @@ from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
-# from .psf_generator import PSF
 from ..psf.psf_selection import get_gridded_psf_library
+from ..utils.constants import grism_factor
+from mirage import version
+
+MIRAGE_VERSION = version.__version__
+
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
@@ -74,14 +78,6 @@ class Catalog_seed():
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
-        # if a grism signal rate image is requested, expand
-        # the width and height of the signal rate image by this
-        # factor, so that the grism simulation software can
-        # track sources that are outside the requested subarray
-        # in order to calculate contamination.
-        self.grism_direct_factor = np.sqrt(2.)
-        print('change me for niriss')
-
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -114,6 +110,7 @@ class Catalog_seed():
         self.check_params()
         self.params = utils.get_subarray_info(self.params, self.subdict)
         self.coord_transform = self.read_distortion_reffile()
+        self.grism_direct_factor = grism_factor(self.params['Inst']['instrument'].lower())
 
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
@@ -427,10 +424,33 @@ class Catalog_seed():
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
         kw['NOMXDIM'] = self.nominal_dims[1]
         kw['NOMYDIM'] = self.nominal_dims[0]
-        kw['NOMXSTRT'] = self.coord_adjust['xoffset'] + 1
-        kw['NOMXEND'] = self.nominal_dims[1] + self.coord_adjust['xoffset']
-        kw['NOMYSTRT'] = self.coord_adjust['yoffset'] + 1
-        kw['NOMYEND'] = self.nominal_dims[0] + self.coord_adjust['yoffset']
+        kw['NOMXSTRT'] = np.int(self.coord_adjust['xoffset'] + 1)
+        kw['NOMXEND'] = np.int(self.nominal_dims[1] + self.coord_adjust['xoffset'])
+        kw['NOMYSTRT'] = np.int(self.coord_adjust['yoffset'] + 1)
+        kw['NOMYEND'] = np.int(self.nominal_dims[0] + self.coord_adjust['yoffset'])
+
+        # Files/inputs used during seed image production
+        kw['YAMLFILE'] = self.paramfile
+        kw['GAINFILE'] = self.params['Reffiles']['gain']
+        kw['DISTORTN'] = self.params['Reffiles']['astrometric']
+        kw['IPC'] = self.params['Reffiles']['ipc']
+        kw['PIXARMAP'] = self.params['Reffiles']['pixelAreaMap']
+        kw['CROSSTLK'] = self.params['Reffiles']['crosstalk']
+        kw['FLUX_CAL'] = self.params['Reffiles']['flux_cal']
+        kw['FTHRUPUT'] = self.params['Reffiles']['filter_throughput']
+        kw['PTSRCCAT'] = self.params['simSignals']['pointsource']
+        kw['GALAXCAT'] = self.params['simSignals']['galaxyListFile']
+        kw['EXTNDCAT'] = self.params['simSignals']['extended']
+        kw['MTPTSCAT'] = self.params['simSignals']['movingTargetList']
+        kw['MTSERSIC'] = self.params['simSignals']['movingTargetSersic']
+        kw['MTEXTEND'] = self.params['simSignals']['movingTargetExtended']
+        kw['NONSDRAL'] = self.params['simSignals']['movingTargetToTrack']
+        kw['BKGDRATE'] = self.params['simSignals']['bkgdrate']
+        kw['TRACKING'] = self.params['Telescope']['tracking']
+        kw['POISSON'] = self.params['simSignals']['poissonseed']
+        kw['PSFWFE'] = self.params['simSignals']['psfwfe']
+        kw['PSFWFGRP'] = self.params['simSignals']['psfwfegroup']
+        kw['MRGEVRSN'] = MIRAGE_VERSION
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
@@ -490,37 +510,6 @@ class Catalog_seed():
                     fpath = os.path.join(self.modpath, 'config', cfile)
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
-    def mag_to_countrate(self, magsys, mag, photfnu=None, photflam=None):
-        # Convert object magnitude to counts/sec
-        #
-        # For NIRISS AMI mode, the count rate values calculated need to be
-        # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
-        # throughput of the NRM, while the 0.84 value is the throughput of the
-        # imaging CLEARP element that is in place in the pupil wheel for the
-        # normal imaging observations.
-        if self.params['Inst']['mode'] in ['ami']:
-            count_scale = 0.15 / 0.84
-        else:
-            count_scale = 1.
-        if magsys.lower() == 'abmag':
-            try:
-                return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
-            except:
-                raise ValueError(("AB mag to countrate conversion failed."
-                                  "magnitude = {}, photfnu = {}".format(mag, photfnu)))
-        if magsys.lower() == 'vegamag':
-            try:
-                return count_scale * (10**((self.vegazeropoint - mag) / 2.5))
-            except:
-                raise ValueError(("Vega mag to countrate conversion failed."
-                                  "magnitude = {}".format(mag)))
-        if magsys.lower() == 'stmag':
-            try:
-                return count_scale * (10**((mag + 21.099934378) / -2.5) / photflam)
-            except:
-                raise ValueError(("ST mag to countrate conversion failed."
-                                  "magnitude = {}, photflam = {}".format(mag, photflam)))
 
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
@@ -633,27 +622,14 @@ class Catalog_seed():
         instrument = self.params['Inst']['instrument']
 
         # Normal imaging with grism image requested
-        if instrument.lower() == 'nircam' and self.params['Output']['grism_source_image']:
+        if (instrument.lower() == 'nircam' and self.params['Output']['grism_source_image']) or \
+           (instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image'])):
             self.coord_adjust['x'] = self.grism_direct_factor
             self.coord_adjust['y'] = self.grism_direct_factor
             self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
                                                   (self.subarray_bounds[2] -
                                                    self.subarray_bounds[0] + 1) / 2.)
             self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
-                                                  (self.subarray_bounds[3] -
-                                                   self.subarray_bounds[1] + 1) / 2.)
-
-        if instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image']):
-            # change the values for the NIRISS POM and WFSS modes.  Add 137
-            # pixels extra space around the main image area, full frame.
-            self.output_dims = [2322, 2322]
-            self.coord_adjust['x'] = 2322./2048.
-            self.coord_adjust['y'] = 2322./2048.
-            self.grism_direct_factor = 2322./2048.
-            self.coord_adjust['xoffset'] = np.int((self.coord_adjust['x'] - 1.) *
-                                                  (self.subarray_bounds[2] -
-                                                   self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.coord_adjust['y'] - 1.) *
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
 
@@ -1727,8 +1703,9 @@ class Catalog_seed():
                 entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
                 # Calculate the countrate for the source
-                countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
-                                                  photflam=self.photflam)
+                countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                                                         photfnu=self.photfnu, photflam=self.photflam,
+                                                         vegamag_zeropoint=self.vegazeropoint)
                 framecounts = countrate * self.frametime
 
                 # add the countrate and the counts per frame to pointSourceList
@@ -2563,7 +2540,9 @@ class Catalog_seed():
                 entry.append(mag)
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                rate = self.mag_to_countrate(magsystem, mag, photfnu=self.photfnu, photflam=self.photflam)
+                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsystem, mag,
+                                                    photfnu=self.photfnu, photflam=self.photflam,
+                                                    vegamag_zeropoint=self.vegazeropoint)
                 framecounts = rate * self.frametime
 
                 # add the countrate and the counts per frame to pointSourceList
@@ -2948,8 +2927,9 @@ class Catalog_seed():
                     # If a magnitude is given then adjust the countrate to match it
                     if mag is not None:
                         # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                        countrate = self.mag_to_countrate(magsys, mag, photfnu=self.photfnu,
-                                                          photflam=self.photflam)
+                        countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                                                         photfnu=self.photfnu, photflam=self.photflam,
+                                                         vegamag_zeropoint=self.vegazeropoint)
                         framecounts = countrate * self.frametime
                         magwrite = mag
 
