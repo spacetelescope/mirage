@@ -12,3 +12,6 @@ instrument_abbreviations = {'nircam': 'NRC',
                             'niriss': 'NIS',
                             'nirspec': 'NRS',
                             'miri': 'MIR'}
+
+NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
+NIRISS_PUPIL_WHEEL_FILTERS = ['F090W', 'F115W', 'F158M', 'F140M', 'F150W', 'F200W']

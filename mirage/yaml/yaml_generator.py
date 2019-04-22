@@ -736,21 +736,21 @@ class SimInput:
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
-                psfpath = os.path.join(self.datadir, 'niriss/webbpsf_library')
+                psfpath = os.path.join(self.datadir, 'niriss/gridded_psf_library')
             elif instrument.lower() == 'fgs':
                 readout_pattern_file = 'guider_readout_pattern.txt'
                 subarray_def_file = 'guider_subarrays.list'
                 crosstalk_file = 'guider_xtalk_zeros.txt'
                 filtpupilcombo_file = 'guider_filter_dummy.list'
                 flux_cal_file = 'guider_zeropoints.list'
-                psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
+                psfpath = os.path.join(self.datadir, 'fgs/gridded_psf_library')
             elif instrument.lower() == 'nircam':
                 readout_pattern_file = 'nircam_read_pattern_definitions.list'
                 subarray_def_file = 'NIRCam_subarray_definitions.list'
                 crosstalk_file = 'xtalk20150303g0.errorcut.txt'
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
                 flux_cal_file = 'NIRCam_zeropoints.list'
-                psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
+                psfpath = os.path.join(self.datadir, 'nircam/gridded_psf_library')
             else:
                 readout_pattern_file = 'N/A'
                 subarray_def_file = 'N/A'
@@ -1038,7 +1038,7 @@ class SimInput:
 
         for instrument in 'nircam niriss fgs'.split():
             self.configfiles[instrument] = {}
-            self.psfpath[instrument] = os.path.join(self.datadir, instrument, 'webbpsf_library')
+            self.psfpath[instrument] = os.path.join(self.datadir, instrument, 'gridded_psf_library')
             self.psfbasename[instrument] = instrument
             self.reference_file_dir[instrument] = os.path.join(self.datadir, instrument, 'reference_files')
 
@@ -1543,7 +1543,7 @@ class SimInput:
         parser.add_argument("--use_linearized_darks", help='True/False', action='store_true')
         parser.add_argument("--simdata_output_dir", help='Output directory for simulated exposure files', default='./')
         parser.add_argument("--psfpath", help='Directory containing PSF library',
-                            default=os.path.join(self.datadir,'webbpsf_library'))
+                            default=os.path.join(self.datadir, 'gridded_psf_library'))
         parser.add_argument("--psfbasename", help="Basename of the files in the PSF library", default='nircam')
         parser.add_argument("--psfpixfrac", help="Subpixel centering resolution of files in PSF library", default=0.25)
         parser.add_argument("--psfwfe", help="Wavefront error value to use for PSFs", default='predicted')
