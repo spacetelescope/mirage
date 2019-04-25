@@ -6,8 +6,6 @@ Mirage's Three Stages
 Mirage can be broadly divided into three stages. Mirage first creates an idealized, noiseless image of the astronomical scene. We refer to this as the "seed image". It then reorganizes an existing dark current exposure to match the characteristics of the specified simulation. The seed image and the dark current exposure are then combined.
 
 
-INSERT SIMPLE FLOW CHART HERE?
-
 .. image:: images/addition_flowchart.png
     :width: 600
     :alt: Basic flow chart of Mirage operations

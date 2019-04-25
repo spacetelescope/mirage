@@ -3,7 +3,7 @@
 Creation of Seed Images
 =======================
 
-A "seed image" is a noiseless image that contains signal only from simulated astronomical sources, created during the first stage of Mirage. In addition to containing no noise, there are no cosmic rays nor dark current or background signal. The seed image can be used as a "truth image" for the purposes of quality checks on the final output data.
+A "seed image" is a noiseless image that contains signal only from simulated astronomical sources, created during the first stage of Mirage. In addition to containing no noise, there are no cosmic rays nor dark current. The seed image can be used as a "truth image" for the purposes of quality checks on the final output data.
 
 Mirage generates seed images in one of two ways:
 

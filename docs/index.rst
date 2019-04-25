@@ -12,6 +12,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
 
    overview.rst
    install.rst
+   reference_files.rst
    catalogs.rst
    catalog_creation.rst
    three_steps.rst

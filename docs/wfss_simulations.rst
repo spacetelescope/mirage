@@ -3,7 +3,7 @@
 Simulating WFSS data with Mirage
 ================================
 
-Mirage can be used to simulate Wide Field Slitless Spectroscopy (WFSS) mode data for NIRCam and NIRISS, using the wfss_simulator.py module. To produce these simulations, Mirage constructs one or more imaging mode :ref:`seed images <seed_images>`, along with an associated segmentation map. These seed images and segmentation map are then passed to the disperser software, which is in the NIRCAM_Gsim<ADD LINK HERE> package. The disperser then takes the seed images, along with an optional input file containing object spectra, and disperses the signal across the detector in the same manner as the NIRCam and NIRISS grisms.<ADD LINK TO GRISM PAGES>
+Mirage can be used to simulate Wide Field Slitless Spectroscopy (WFSS) mode data for NIRCam and NIRISS, using the wfss_simulator.py module. To produce these simulations, Mirage constructs one or more imaging mode :ref:`seed images <seed_images>`, along with an associated segmentation map. These seed images and segmentation map are then passed to the disperser software, which is in the `NIRCAM_Gsim <https://github.com/npirzkal/NIRCAM_Gsim>`_ package. The disperser then takes the seed images, along with an optional input file containing object spectra, and disperses the signal across the detector in the same manner as the `NIRCam <https://jwst-docs.stsci.edu/display/JTI/NIRCam+Grisms>`_ and `NIRISS grisms <https://jwst-docs.stsci.edu/display/JTI/NIRISS+Wide+Field+Slitless+Spectroscopy>`_.
 
 This mode generally uses more input compared to the creation of imaging mode data, as spectral information on the input sources may be provided. There are two methods that spectral information
 

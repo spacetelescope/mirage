@@ -14,9 +14,9 @@ The first task performed in the observation generator is to translate the seed i
 Add Cosmic Rays
 ---------------
 
-Cosmic rays are then added to the seed exposure. Cosmic ray details are controlled through the entries in the `cosmicRay` section of the input yaml file. The user must provide a pointer to the location of the cosmic ray library.
+Cosmic rays are then added to the seed exposure. Cosmic ray details are controlled through the entries in the `cosmicRay` section of the input yaml file. The user must provide a pointer to the location of the cosmic ray library. The cosmic ray libraries that are included in *Mirage's* :ref:`reference files <>` are based on the cosmic ray library created by Massimo Robberto, which is detailed in his `2009 technical report <https://jwst.stsci.edu/files/live/sites/jwst/files/home/instrumentation/technical%20documents/JWST-STScI-001928.pdf>`_.
 
-Three separate cosmic ray libraries are provided in the collection of reference files supporting `mirage`. These libraries are accessed using the `cosmicRay:library` yaml file entry. The three options are **SUNMIN**, **SUNMAX**, and **FLARE**. Each library has an associated cosmic ray rate, shown below. Users can modify these rates through the multiplicative factor specified in the `cosmicRay:scale` entry.
+Three separate cosmic ray libraries are provided in the reference file collection. These libraries are accessed using the :ref:`cosmicRay:library <cr_library>` yaml file entry. The three options are **SUNMIN**, **SUNMAX**, and **FLARE**. Each library has an associated cosmic ray rate, shown below. Users can modify these rates through the multiplicative factor specified in the `cosmicRay:scale` entry.
 
 Default cosmic ray rates (cosmic rays / pixel / second):
 
@@ -54,14 +54,13 @@ Interpixel capacitance (IPC) effects are added to the seed exposure at this poin
 This is the inverse of the kernel that can be used by the JWST calibration pipeline to remove IPC effects, like that shown below. Therefore, `Mirage` has an option to accept a pipeline-formatted kernel that will then be inverted before being used to add IPC effects. It is also possible to use a file with a separate 3x3 kernel for each pixel. In this case the total kernel will have a shape of 2048 x 2048 x 3 x 3.
 
 
-**ADD CORRECT VALUES IN HERE**
-+--------+--------+-----------+
-| -0.0002 | -0.0052 | -0.0002 |
-+--------+--------+-----------+
-| -0.0052 | 0.9792 | -0.0052  |
-+--------+--------+-----------+
-| -0.0002 | -0.0052 | -0.0002 |
-+--------+--------+-----------+
++--------+--------+---------+
+| -0.0002| -0.0052| -0.0002 |
++--------+--------+---------+
+| -0.0052| 1.0214 | -0.0052 |
++--------+--------+---------+
+| -0.0002| -0.0052| -0.0002 |
++--------+--------+---------+
 
 The latest IPC kernels for all instruments and detectors are provided in the reference files assocaited with `Mirage`.
 
@@ -74,7 +73,7 @@ At this point, the seed exposure is added to the dark current exposure from the 
 Crosstalk
 ---------
 
-Crosstalk effects can also be added to the observation. Crosstalk in this case is defined as the unintentional mirroring of a fraction of the measured signal across amplifiers. Bright sources located in one quadrant of a detector can create dimmed copies of themselves in the other three quadrants (Rest, 2015). Crosstalk is added to the observation using an input file containing crosstalk coefficients. These coefficients control the magnitude and sign of the crosstalk signal between each combination of amplifiers. Currently, only the NIRCam detectors have non-zero crosstalk coefficients in the collection of `mirage` reference files.
+Crosstalk effects can also be added to the observation. Crosstalk in this case is defined as the unintentional mirroring of a fraction of the measured signal across amplifiers. Bright sources located in one quadrant of a detector can create dimmed copies of themselves in the other three quadrants. Crosstalk on the NIRCam detectors has been quantified by Armin Rest. Results are detailed in his `2015 technical report <http://www.stsci.edu/files/live/sites/www/files/home/jwst/documentation/technical-documents/_documents/JWST-STScI-004361.pdf>`_. Crosstalk is added to the observation using an input file containing crosstalk coefficients. These coefficients control the magnitude and sign of the crosstalk signal between each combination of amplifiers. Currently, only the NIRCam detectors have non-zero crosstalk coefficients in the collection of *Mirage* :ref:`reference files <reference_files>`.
 
 (Optionally) Return from Linearized to Raw State
 ------------------------------------------------

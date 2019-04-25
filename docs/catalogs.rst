@@ -33,17 +33,22 @@ The type of source catalog(s) you need depends on the scene you are simulating. 
 
 Common formatting details
 -------------------------
-Mirage scans the top 4 lines of each catalog for certain phrases that can be used to characterize the inputs. These phrases are used to specify the units of locations or velocities, as well as the magnitude system to use. Multiple phrases can be used in a single catalog, but only one phrase per line is allowed.
+Mirage scans the top 4 lines of each catalog for certain phrases that can be used to characterize the inputs. These phrases are used to specify the units of source locations or velocities, as well as the magnitude system to use. Multiple phrases can be used in a single catalog, but only one phrase per line is allowed. Examples are shown in the catalogs below.
 
 The locations of sources can be specified in RA, Dec or in (x,y) pixel locations on the detector. If you wish to provide positions in units of (x, y) detector pixels, then the string ‘position_pixels’ must be added after the # in one of the top 4 lines of the file.
 
 .. tip::
-     Note that RA and Dec values can be given in decimal degrees, or in more conventional string formats::
 
-	    03:32:21.273  -27:50:23.983
-	    03h32m21.273s -27d50m23.983s
+    RA and Dec values can be given in decimal degrees, colon-separated values (HH:MM:SS and DD:MM:SS), or in more conventional string formats, **but all sources in a given catalog must have the same format**:
 
-Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system by specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**.
+    53.08864      -27.83999
+
+    03:32:21.273  -27:50:23.983
+
+    03h32m21.273s -27d50m23.983s
+
+
+Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system by specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**. **All sources in a given catalog must be in the same magnitude system.**
 
 For moving targets (both those that are moving across the field of view, as well as non-sidereal targets), the default unit for velocity is arcseconds per hour. If you wish to instead use pixels per hour, then **velocity_pixels** must be added to one of the 4 top lines of the catalog.
 
@@ -63,9 +68,9 @@ An example point source catalog is shown below with the positions given in RA an
 	# abmag
 	#
 	# Magnitudes are converted from input flux densities.
-	x_or_RA          y_or_Dec      magnitude
-	53.0886395   -27.8399952         20.0
-	53.0985009   -27.8398137         19.2
+	x_or_RA          y_or_Dec      nircam_f200w_magnitude
+	53.0886395   -27.8399952              20.0
+	53.0985009   -27.8398137              19.2
 
 Mirage looks for the exact column names shown above when reading point source catalogs. Changing these column names will cause the simulator to fail when attempting to read in the file.
 
@@ -92,9 +97,9 @@ The simulator software looks for the exact column names shown below when reading
 	# abmag
 	#
 	# Magnitudes are converted from input flux densities.
-	x_or_RA         y_or_Dec     radius    ellipticity    pos_angle       sersic_index      magnitude
-	53.05           -27.83        0.17        0.46         104.35              3.3             18.06
-	53.10           -27.83        0.73        0.01         195.50              2.7             16.86
+	x_or_RA         y_or_Dec     radius    ellipticity    pos_angle       sersic_index      niriss_f200w_magnitude
+	53.05           -27.83        0.17        0.46         104.35              3.3                 18.06
+	53.10           -27.83        0.73        0.01         195.50              2.7                 16.86
 
 .. _extended:
 
@@ -120,8 +125,8 @@ Each row of this catalog contains the name of a FITS file containing the image t
 	#
 	#
 	#
-	x_or_RA        y_or_Dec       pos_angle      magnitude       filename
-	359.65          0.0006           20            16.000     ring_nebula.fits
+	x_or_RA        y_or_Dec       pos_angle      nircam_f200w_magnitude       filename
+	359.65          0.0006           20                 16.000             ring_nebula.fits
 
 
 .. _nonsidereal:
@@ -147,8 +152,8 @@ This catalog is used when creating non-sidereal simulated exposures. In this cas
 	# x_or_RA_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# if the units are pixels per hour, include 'velocity pixels' in line 2 above.
-	object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     magnitude
-	pointSource  53.101      -27.801       2103840.              0.0                17.
+	object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_magnitude
+	pointSource  53.101      -27.801       2103840.              0.0                       17.
 
 .. _moving_point_source:
 
@@ -174,8 +179,8 @@ Below is an example catalog:
 	# strictly correct because in reality distortion will cause object's
 	# velocities to vary in pixels/hour. Velocities in arcsec/hour will be
 	# constant.
-	x_or_RA    y_or_Dec   magnitude  x_or_RA_velocity   y_or_Dec_velocity
-	53.0985    -27.8015       14           180                 180
+	x_or_RA    y_or_Dec   nircam_f200w_magnitude  x_or_RA_velocity   y_or_Dec_velocity
+	53.0985    -27.8015       14                        180                 180
 
 .. _moving_sersic:
 
@@ -200,8 +205,8 @@ This option may be useful for simulating moving moons around a primary target th
 	#
 	# pos_angle is the position angle of the semimajor axis, in degrees.
 	# 0 causes the semi-major axis to be horizontal.
-	x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  magnitude  x_or_RA_velocity  y_or_Dec_velocity
-	354.765   0.00064    1.0       0.25         20          2.0        16.000         -0.5              -0.02
+	x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  nircam_f200w_magnitude  x_or_RA_velocity  y_or_Dec_velocity
+	354.765   0.00064    1.0       0.25         20          2.0            16.000                  -0.5              -0.02
 
 
 .. _moving_extended:
@@ -226,5 +231,5 @@ Similar to the catalog of static extended targets, this catalog contains a fits 
 	# strictly correct because in reality distortion will cause object's
 	# velocities to vary in pixels/sec. Velocities in arcsec/hour will be
 	# constant.
-	filename            x_or_RA    y_or_Dec   magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity
-	ring_nebula.fits    0.007       0.003       12.0        0.0             -0.5               -0.02
+	filename            x_or_RA    y_or_Dec   nircam_f200w_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity
+	ring_nebula.fits    0.007       0.003             12.0               0.0             -0.5               -0.02

@@ -5,9 +5,11 @@ Simulating Observations from an APT File
 
 The easiest way to simulate a large amount of obsrvtions using Mirage is to begin with the `APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ file of a JWST proposal. Mirage contains functions that can (for imaging and WFSS modes) create the collection of yaml files necessary to simulate all of the observations contained in the APT file.
 
+Examples of this functionality are shown in the `notebooks <https://github.com/spacetelescope/mirage/tree/master/examples>`_ in the *Mirage* repository. Below are step-by-step instructions explaining how to create *Mirage* input yaml files from an APT file.
+
 Export XML and Pointing files from APT
 -------------------------------------
-More specifically, open the proposal within APT and under the File menu, choose Export, and select the xml and pointing files. Only one file at a time can be exported, so the process must be repeated for each.
+Open the proposal within APT and under the File menu, choose Export, and select the xml and pointing files. Only one file at a time can be exported, so the process must be repeated for each.
 
 .. _additional_yaml_generator_inputs:
 
@@ -19,7 +21,7 @@ In addition to the xml and pointing files, there are several user-inputs needed 
 Source catalogs
 +++++++++++++++
 
-The user must specify source catalogs for each instrument and observation. This is done using a nested dictionary following the form:
+The user must specify source catalogs for each instrument and observation. This is done using a nested dictionary following the form shown below. Note that currently this format is used for point source catalogs only. Other types of catalogs are limited to a single entry.
 
 ::
 

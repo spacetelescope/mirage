@@ -22,6 +22,8 @@ Inst secton
 
 This section of the input yaml file contains information about the instrument being simulated.
 
+.. _instrument_param:
+
 instrument
 ++++++++++
 
@@ -81,8 +83,8 @@ The name of the pupil wheel element to use for the simulated data. Some filters 
 
 .. _reffiles_section:
 
-Reffiles
---------
+Reffiles section
+----------------
 
 This section of the input file lists the various reference files needed for the various steps of the simulator to run.
 
@@ -117,50 +119,48 @@ Using this input rather than the uncalibrated dark above can save significant co
 badpixmask
 ++++++++++
 
-If a linearized dark current file is to be used and a linearized output file is requested, this optional bad pixel mask can be used to populate the data quality array in the output simulated data file. The file must be in the format for JWST bad pixel masks that is used by the JWST calibration pipeline.
-
-**ADD LINK HERE TO FILE FORMAT**
+If a linearized dark current file is to be used and a linearized output file is requested, this optional bad pixel mask can be used to populate the data quality array in the output simulated data file. The file must be in the `format for JWST bad pixel masks <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html>`_ that is used by the JWST calibration pipeline.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of bad pixel masks that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of bad pixel masks that can be used.
 
 superbias
 +++++++++
 
-The superbias reference file for the detector of the simulation. This file must match the format of the JWST pipeline superbias reference file. **ADD LINK HERE** If the input dark current integration is a raw file then this superbias file is used to subtract the superbias from the dark. If the input dark is already linearized, this superbias file is not used.
+The superbias reference file for the detector of the simulation. This file must match the `format of the JWST pipeline superbias reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html>`_. If the input dark current integration is a raw file then this superbias file is used to subtract the superbias from the dark. If the input dark is already linearized, this superbias file is not used.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of superbias files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of superbias files that can be used.
 
 linearity
 +++++++++
 
-Name of the reference file containing the linearity correction coefficients. This file must be in the format expected by the JWST calibration pipeline. ** ADD LINK HERE** If the input dark current integration is raw, the coefficients contained in this file are used to linearize the dark current after subtracting the superbias and reference pixel signal. These coefficients are also used to "unlinearize" the final simulated exposure if a raw simulated observation is requested.
+Name of the reference file containing the linearity correction coefficients. This file must be in the `format expected by the JWST calibration pipeline <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html>`_. If the input dark current integration is raw, the coefficients contained in this file are used to linearize the dark current after subtracting the superbias and reference pixel signal. These coefficients are also used to "unlinearize" the final simulated exposure if a raw simulated observation is requested.
 
 In addition, the coefficients in this file are used to linearize the values in the saturation reference file, such that saturated signals in the linear simulated exposure can be found.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of linearity coefficient files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of linearity coefficient files that can be used.
 
 .. _saturation:
 
 saturation
 ++++++++++
 
-Name of the reference file containing a map of the saturation signal level for all pixels. If the input dark current integration is raw, this file is used by the calibration pipeline to flag saturated pixels in the dark current integration prior to linearizing.
+Name of the reference file containing a map of the saturation signal level for all pixels. If the input dark current integration is raw, this file is used by the calibration pipeline to flag saturated pixels in the dark current integration prior to linearizing. The `format of this file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html>`_ must match that used in the saturation flagging step of the JWST calibration pipeline.
 
 This saturation map, after being linearized, is also used to search for saturated signal values in the combined dark current/simulated source exposure prior to unlinearizing.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of saturation map files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of saturation map files that can be used.
 
 gain
 ++++
 
-Name of the file containing the gain map appropriate for the detector being used. The gain is used to translate the cosmic rays, which are in units of electrons, to units of ADU prior to adding them to the simulated data.
+Name of the file containing the gain map appropriate for the detector being used. The gain is used to translate the cosmic rays, which are in units of electrons, to units of ADU prior to adding them to the simulated data. The `format of the gain file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_ must match that used by the JWST calibration pipeline.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of gain map files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of gain map files that can be used.
 
 pixelflat
 +++++++++
@@ -177,18 +177,18 @@ Name of the illumination flat to use. Once the simulated integration is created,
 astrometric
 +++++++++++
 
-Name of the astrometric distortion reference file to use for including the effects of distortion in the simulated data.  This file is used to translate input source locations between RA and Dec coordinates and pixel x and y coordinates, and vice versa. This file must be in asdf format and match that expected by the calibration pipeline. **ADD LINK HERE**
+Name of the astrometric distortion reference file to use for including the effects of distortion in the simulated data.  This file is used to translate input source locations between RA and Dec coordinates and pixel x and y coordinates, and vice versa. This file must be in `asdf format and match that expected by the calibration pipeline <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reference-file>`_.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of distortion reference files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of distortion reference files that can be used.
 
 ipc
 +++
 
-File containing the interpixel capacitance (IPC) kernel to apply to the simulated data in order to introduce IPC effects. After all simulated objects have been added to a count rate image, the image is convolved with the IPC kernel. The IPC file must be a fits file with the IPC kernel located in the first (rather than 0th) extension. Typical JWST IPC reference file kernels are a 3x3 array, but Mirage supports kernels of any odd-numbered size, as well as 4-dimensional kernels, where there is a separate 2-dimensional kernel for each pixel. In order to introduce, rather than remove, IPC effects, the kernel must be normalized and have a value in the central pixel which is less than 1.0. This is the inverse of the kernel used in the JWST calibration pipeline IPC removal step, where the central pixel has a value greater than 1.0, and negative values in surrounding pixels. For the simulator, the user can specify a calibration pipeline-formatted kernel file, and then set the **invertIPC** flag below to True, in which case the kernel will be inverted before using.
+File containing the interpixel capacitance (IPC) kernel to apply to the simulated data in order to introduce IPC effects. After all simulated objects have been added to a count rate image, the image is convolved with the IPC kernel. The IPC file must be a fits file with the IPC kernel located in the first (rather than 0th) extension. Typical JWST IPC reference file kernels are a 3x3 array, but Mirage supports kernels of any odd-numbered size, as well as 4-dimensional kernels, where there is a separate 2-dimensional kernel for each pixel. In order to introduce, rather than remove, IPC effects, the kernel must be normalized and have a value in the central pixel which is less than 1.0. This is the inverse of the kernel used in the JWST calibration pipeline IPC removal step, where the central pixel has a value greater than 1.0, and negative values in surrounding pixels. For the simulator, the user can specify a `JWST calibration pipeline-formatted kernel file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html>`_, and then set the **invertIPC** flag below to True, in which case the kernel will be inverted before using.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of IPC kernel files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of IPC kernel files that can be used.
 
 invertIPC
 +++++++++
@@ -199,25 +199,25 @@ If set to True, the IPC kernel supplied through the ipc entry is inverted before
 pixelAreaMap
 ++++++++++++
 
-Fits file containing the pixel area map for the detector to be simulated. If provided, the pixel area map is multiplied into the seed image at a point when the seed image contains only extended sources. Point sources do not have the pixel area map applied to them. **DESCRIBE IN MORE DETAIL WHAT'S GOING ON** The pixel area map file must be in the format of the JWST pixel area map reference file. **ADD LINK HERE**
+Fits file containing the pixel area map for the detector to be simulated. If provided, the pixel area map is multiplied into the seed image at a point when the seed image contains only extended sources. Point sources have the pixel area map applied to them at the time the PSF libraries were created via `webbpsf <https://webbpsf.readthedocs.io/en/stable/>`_. The pixel area map file must be in the format of the `JWST pixel area map reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/photom/reference_files.html#area-reference-file>`_.
 
 .. hint::
-	The collection of reference files associated with Mirage contains a library of pixel area map files that can be used.
+	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of pixel area map files that can be used.
 
 subarray_defs
 +++++++++++++
 
-Name of a whitespace-delimited ascii file that lists all of the possible supported subarray apertures. This file is provided with the MIRAGE repository, in the config subdirectory.
+Name of a whitespace-delimited ascii file that lists all of the possible supported subarray apertures. This file is provided with the MIRAGE repository, in the `config <https://github.com/spacetelescope/mirage/tree/master/mirage/config>`_ subdirectory.
 
 .. hint::
 	To use the subarray definition files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
 
-For each subarray, the file must list the full aperture name (e.g. NRCA1_FULL) as well as the corresponding name used in proposal planning (e.g. FULL), **??as well as the detector on which that subarray is used, and the necessary filter for the subarray (for the special GRISM entries).??**  and the number of amplifiers used in the readout.
+For each subarray, the file must list the full aperture name (e.g. NRCA1_FULL) as well as the corresponding name used in proposal planning (e.g. FULL), as well as the number of amplifiers used to read out each aperture.
 
 readpattdefs
 ++++++++++++
 
-Ascii file which gives the definitions of the possible readout patterns for the instrument. For each readout pattern, the number of frames averaged to create each group (nframe) and the number of frames skipped beteren each group (nskip) must be specified, as well as the maximum number of allowed groups. For a given readout pattern the simulator will search the entries in this file in order to determine the proper nframe and nskip values to use. The current lists of acceptable NIRCam and NIRISS readout patterns are given on the NIRCam  and NIRISS  detector readouts webpages. These files for all instruments are provided with the MIRAGE repository, in the config subdirectory.
+Ascii file which gives the definitions of the possible readout patterns for the instrument. For each readout pattern, the number of frames averaged to create each group (nframe) and the number of frames skipped beteren each group (nskip) must be specified, as well as the maximum number of allowed groups. For a given readout pattern the simulator will search the entries in this file in order to determine the proper nframe and nskip values to use. The current lists of acceptable NIRCam and NIRISS readout patterns are given on the NIRCam  and NIRISS  detector readouts webpages. These files for all instruments are provided with the MIRAGE repository, in the `config <https://github.com/spacetelescope/mirage/tree/master/mirage/config>`_ subdirectory.
 
 .. hint::
 	To use the readout pattern definition files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
@@ -225,7 +225,7 @@ Ascii file which gives the definitions of the possible readout patterns for the 
 crosstalk
 +++++++++
 
-Ascii file containing crosstalk coefficients. Crosstalk is only applied to data read out through more than one amplifer. The file contains one row for each detector. Each row contains all of the coefficients necessary to fully describe crosstalk. This file is contained in the MIRAGE repository, in the **config** subdirectory.
+Ascii file containing crosstalk coefficients. Crosstalk is only applied to data read out through more than one amplifer. The file contains one row for each detector. Each row contains all of the coefficients necessary to fully describe crosstalk. This file is contained in the MIRAGE repository, in the `config <https://github.com/spacetelescope/mirage/tree/master/mirage/config>`_ subdirectory.
 
 .. hint::
 	To use the crosstalk coefficient files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
@@ -233,7 +233,7 @@ Ascii file containing crosstalk coefficients. Crosstalk is only applied to data 
 filtpupilcombo
 ++++++++++++++
 
-Name of an ascii file containing a list of the filter and pupil wheel elements in place when requesting simulated data for a given filter. This information is used to apply the appropriate conversion between magnitudes and counts when reading in source catalogs. This flux calibration is also added to the header of the seed image, as it is used when seed images are dispersed during the simulation of WFSS data. This file is present in the config subdirectory of the MIRAGE repository.
+Name of an ascii file containing a list of the filter and pupil wheel elements in place when requesting simulated data for a given filter. This information is used to apply the appropriate conversion between magnitudes and counts when reading in source catalogs. This flux calibration is also added to the header of the seed image, as it is used when seed images are dispersed during the simulation of WFSS data. This file is present in the `config <https://github.com/spacetelescope/mirage/tree/master/mirage/config>`_ subdirectory of the MIRAGE repository.
 
 .. hint::
 	To use the filter and pupil wheel definition files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
@@ -241,15 +241,15 @@ Name of an ascii file containing a list of the filter and pupil wheel elements i
 flux_cal
 ++++++++
 
-Ascii file that lists flux conversion factors and the pivot wavelength associated with each filter. Conversion factors include ABMAG, STMAG, and VEGAMAG to counts per second, as well as FLAM (erg s^(-1) 〖cm〗^(-2) Å^(-1)) and FNU (erg s^(-1) 〖cm〗^(-2) 〖Hz〗^(-1)) to counts per second. This file is used when producing seed images to be fed into the grism disperser code, as well as for translating catalog sources from magnitudes to counts per second. This file is provided with the MIRAGE repository, in the config subdirectory.
+Ascii file that lists flux conversion factors and the pivot wavelength associated with each filter. Conversion factors include ABMAG, STMAG, and VEGAMAG to counts per second, as well as FLAM (erg s :sup:`-1` cm :sup:`-2` Å :sup:`-1` and FNU (erg s :sup:`-1` cm :sup:`-2` Hz :sup:`-1` to counts per second. This file is used when producing seed images to be fed into the grism disperser code, as well as for translating catalog sources from magnitudes to counts per second. This file is provided with the MIRAGE repository, in the `config <https://github.com/spacetelescope/mirage/tree/master/mirage/config>`_ subdirectory.
 
 .. hint::
 	To use the flux calibration files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
 
 .. _nonlin_section:
 
-Nonlin
-------
+Nonlin section
+--------------
 
 The following input fields describe how non-linearity is treated in the input and simulated data.
 
@@ -275,15 +275,17 @@ If set to False, the simulator assumes that the non-linearity correction functio
 
 .. _cosmicray_section:
 
-cosmicRay
----------
+cosmicRay section
+-----------------
 
 Input parameters in this section describe how cosmic rays are added to the simulated data.
 
 path
 ++++
 
-Path of the location of the cosmic ray library to use. The code was developed around the cosmic ray library produced by Robberto (`2009 <https://jwst.stsci.edu/files/live/sites/jwst/files/home/instrumentation/technical%20documents/JWST-STScI-001928.pdf>`_). This library is included in the collection of `reference files <>`_ associated with Mirage. After extracting the library from the tar file, set this path to point to the top level directory of the cosmic ray library.
+Path of the location of the cosmic ray library to use. The code was developed around the cosmic ray library produced by Robberto (`2009 <https://jwst.stsci.edu/files/live/sites/jwst/files/home/instrumentation/technical%20documents/JWST-STScI-001928.pdf>`_). This library is included in the collection of `reference files <reference_files>`_ associated with Mirage. After extracting the library from the tar file, set this path to point to the top level directory of the cosmic ray library.
+
+.. _cr_library:
 
 library
 +++++++
@@ -298,7 +300,7 @@ Scaling factor to apply to the cosmic ray rate. For example, to simulate cosmic 
 suffix
 ++++++
 
-Filename suffix of the cosmic ray library files. The code was developed around files with the suffix of ‘IPC_NIRCam_XX’ where XX is the detector (e.g. B5) for NIRCam, ‘IPC_NIRISS_NIS’ for NIRISS, and ‘IPC_FGS_GUIDERy’ where y is 1 or 2, for FGS. These cosmic ray files are included in Mirage's `reference file collection <>`_. This field will be automatically populated with the correct suffix when creating yaml files using the :ref:`yaml generator <yaml_generator>`.
+Filename suffix of the cosmic ray library files. The code was developed around files with the suffix of ‘IPC_NIRCam_XX’ where XX is the detector (e.g. B5) for NIRCam, ‘IPC_NIRISS_NIS’ for NIRISS, and ‘IPC_FGS_GUIDERy’ where y is 1 or 2, for FGS. These cosmic ray files are included in Mirage's `reference file collection <reference_files>`_. This field will be automatically populated with the correct suffix when creating yaml files using the :ref:`yaml generator <yaml_generator>`.
 
 seed
 ++++
@@ -307,8 +309,8 @@ Random number generator seed to use when selecting cosmic rays to add.
 
 .. _simsignals_section:
 
-simSignals
-----------
+simSignals section
+------------------
 
 This section of the input file describes how sources and other signals are added to the simulated data.
 
@@ -322,7 +324,7 @@ Name of an ascii catalog file listing point sources to add to the simulated imag
 psfpath
 +++++++
 
-Path name to the PSF library to be used for adding point sources to the data. The code was developed around a PSF library constructed using WebbPSF (Perrin, 2014). This PSF library is included in the collection of Mirage `reference files <>`_ . Once that package is downloaded and the data files extracted from the tar file, set this field to point to the top-level directory of the PSF library.
+Path name to the PSF library to be used for adding point sources to the data. The code was developed around a PSF library constructed using WebbPSF (Perrin, 2014). This PSF library is included in the collection of Mirage `reference files <reference_files>`_ . Once that package is downloaded and the data files extracted from the tar file, set this field to point to the top-level directory of the PSF library.
 
 psfbasename
 +++++++++++
@@ -332,12 +334,12 @@ Basename of the files in the PSF library. When using the default libraries that 
 psfpixfrac
 ++++++++++
 
-It is assumed that the PSF library contains a grid of PSFs centered at various sub-pixel locations. This parameter specifies the resolution of this grid. For example, if the library contains PSFs centered at every 0.25 pixels across a pixel in x and y, then this field should be set to 0.25. In the current collection of Mirage `reference files <>`_ the PSF library for NIRCam uses a resolution of 0.25, while those for NIRISS and FGS have a resolution of 0.1 pixels.
+It is assumed that the PSF library contains a grid of PSFs centered at various sub-pixel locations. This parameter specifies the resolution of this grid. For example, if the library contains PSFs centered at every 0.25 pixels across a pixel in x and y, then this field should be set to 0.25. In the current collection of Mirage `reference files <reference_files>`_ the PSF library for NIRCam uses a resolution of 0.25, while those for NIRISS and FGS have a resolution of 0.1 pixels.
 
 psfwfe
 ++++++
 
-PSF wavefront error value to use when choosing PSF files from the PSF library. The current PSF libraries distributed with the Mirage `reference files <>`_ have two options for wavefront error: “predicted” and “requirements”. These two values represent the predicted in-flight wavefront errors, and the maximum allowed wavefront errors, respectively.
+PSF wavefront error value to use when choosing PSF files from the PSF library. The current PSF libraries distributed with the Mirage `reference files <reference_files>`_ have two options for wavefront error: “predicted” and “requirements”. These two values represent the predicted in-flight wavefront errors, and the maximum allowed wavefront errors, respectively.
 
 psfwfegroup
 +++++++++++
@@ -437,8 +439,8 @@ Random number generator seed used for Poisson simulation
 
 .. _telescope_section:
 
-Telescope
----------
+Telescope section
+-----------------
 
 Inputs in this section of the yaml file describe the telescope pointing to use for the simulation.
 
@@ -459,8 +461,8 @@ Rotation of the y-axis in degrees East of North. Currently this rotation is defi
 
 .. _newramp_section:
 
-newRamp
--------
+newRamp section
+---------------
 
 This section of the input file lists JWST calibration pipeline-style configuration files that may be needed when preparing the simulated data. Copies of all of these configuration files are included in the ‘config’ subdirectory of the MIRAGE repository. Therefore, unless you wish to use your own set of configuration files, you can set these fields all to 'config'. This is the default behavior when creating yaml files via the :ref:`yaml generator <yaml_generator>`.
 
@@ -499,8 +501,8 @@ Name of the JWST calibration pipeline configuration file to be used in the linea
 
 .. _output_section:
 
-Output
-------
+Output section
+--------------
 
 This section of the yaml file contains information about the output file, such as filename and location. In addition, this section contains a large number of fields that describe how this particular exposure fits within an observing program/proposal. This information is not used during the creation of the simulated data, but is placed in the header of the output file in order to be consistent with the contents of real JWST data files. In addition, `level 3 of the JWST calibration pipeline <https://jwst-pipeline.readthedocs.io/en/stable/jwst/pipeline/description.html#pipelines>`_, which is used to combine multiple exposures into mosaic images, does require some of this information. The easiest way to correctly populate this information in the simulator yaml files is to :ref:`create the yaml files from an APT file via yaml_generator.py<from_apt>`, in which case the fields are all populated automatically.
 
