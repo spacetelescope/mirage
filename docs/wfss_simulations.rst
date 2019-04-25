@@ -16,7 +16,7 @@ yaml file: must specify wfss mode and grism_source_image = True. The appropriate
 Inputs
 ------
 
-There are three types of inputs that can be used to create WFSS data. The first is the same :ref:`yaml parameter file <input_yaml_file_parameters>` that is used when creating imaging mode data. Along with the yaml files, the appropriate :ref:`ascii source catalogs <catalogs>` must be provided. The third input, which is optional, is an hdf5<ADD LINK HERE> file that contains the spectra for some or all of the targets that are in the source catalogs. Below we describe how to use these inputs to create WFSS data.
+There are three types of inputs that can be used to create WFSS data. The first is the same :ref:`yaml parameter file <example_yaml>` that is used when creating imaging mode data. Along with the yaml files, the appropriate :ref:`ascii source catalogs <catalogs>` must be provided. The third input, which is optional, is an hdf5<ADD LINK HERE> file that contains the spectra for some or all of the targets that are in the source catalogs. Below we describe how to use these inputs to create WFSS data.
 
 Note that when using yaml files as inputs, at least one of these files must have the **mode**<add link> set to "wfss", **grism_source_image** <add link> set to True, and a grism placed in the appropriate **filter** or **pupil** entry. This will be done for the appropriate files during the yaml generation process if :ref:`generating yaml files from an APT proposal <from_apt>`.
 
@@ -26,7 +26,7 @@ Note that when using yaml files as inputs, at least one of these files must have
 Single yaml file
 ++++++++++++++++
 
-In the simplest case a single :ref:`yaml parameter file <input_yaml_file_parameters>` is provided to the WFSS simulator module, along with a source catalog containing target magnitudes in a single filter. In this case, Mirage converts the provided magnitude values to flux densities, and the disperser assumes a flat continuum spanning the entire wavelength range of interest.
+In the simplest case a single :ref:`yaml parameter file <example_yaml>` is provided to the WFSS simulator module, along with a source catalog containing target magnitudes in a single filter. In this case, Mirage converts the provided magnitude values to flux densities, and the disperser assumes a flat continuum spanning the entire wavelength range of interest.
 
 If the source catalog contains magnitudes in multiple filters, Mirage will, for each source, linearly interpolate the source magnitudes in order to construct a continuum spectrum. If the provided magnitudes do not cover the entire wavelength range necessary for the dispersion, then Mirage will optionally extrapolate the continuum spectrum to cover the full wavelength range. (FOR THIS TO WORK YOU NEED TO CALL CATALOGS_TO_HDF5. INTEGRATE THIS WITH WFSS_SIMULATOR SO THAT IT IS INVISIBLE TO THE USER)
 

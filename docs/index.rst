@@ -20,7 +20,6 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    dark_preparation.rst
    observation_generator.rst
    yaml_generator.rst
-   input_yaml_parameters.rst
    example_yaml.rst
    wfss_simulations.rst
    quickstart.ipynb

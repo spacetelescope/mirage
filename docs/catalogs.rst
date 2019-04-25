@@ -7,7 +7,7 @@ Mirage accepts 7 different types of source catalogs, all of which can be generat
 
 1. :ref:`Point sources <point_source>`
 2. :ref:`Galaxies (2d Sersic profiles) <galaxies>`
-3. :ref:`Extended targets <extended>`
+3. :ref:`Extended targets <extended_obj>`
 4. :ref:`Non-sidereal source <nonsidereal>`
 5. :ref:`Moving point sources <moving_point_source>`
 6. :ref:`Moving Sersic sources <moving_sersic>`
@@ -101,7 +101,7 @@ The simulator software looks for the exact column names shown below when reading
 	53.05           -27.83        0.17        0.46         104.35              3.3                 18.06
 	53.10           -27.83        0.73        0.01         195.50              2.7                 16.86
 
-.. _extended:
+.. _extended_obj:
 
 Extended Objects
 ----------------

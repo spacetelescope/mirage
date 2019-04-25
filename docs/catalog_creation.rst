@@ -91,7 +91,7 @@ Create_catalogs - create catalogs using online astronomical databases
 
 The functions in this module use `astroquery <https://astroquery.readthedocs.io/en/latest/>`_ to search astronomical databases and retrieve source lists for a given pointing. In this way, a user can quickly generate reasonably realistic catalogs of point sources and galaxies for a given pointing.
 
-The **get_all_catalogs** function takes the RA and Dec of a particular pointing along with the width in arcseconds of the area for which to produce the catalog, and queries multiple databases to produce a point source catalog. An example call to create a 120 x 120 arcsecond catalog is shown below. The resulting point source catalog can then be placed in the :ref:`pointSource <ptsrc>` entry of the :ref:`yaml input file <example_yaml>`. Note that an email address is required input for the Besancon model query.
+The **get_all_catalogs** function takes the RA and Dec of a particular pointing along with the width in arcseconds of the area for which to produce the catalog, and queries multiple databases to produce a point source catalog. An example call to create a 120 x 120 arcsecond catalog is shown below. The resulting point source catalog can then be placed in the :ref:`pointSource <pointsource>` entry of the :ref:`yaml input file <example_yaml>`. Note that an email address is required input for the Besancon model query.
 
 ::
 
