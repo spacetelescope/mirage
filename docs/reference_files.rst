@@ -9,10 +9,12 @@ In order to produce data that is as realistic as possible, Mirage is accompanied
 
 ::
 
-    from mirage.reference_files import reffiles
-    reffiles.download_reffiles(download_path, instrument='all', psf_version='gridded', dark_type='linearized')
+    from mirage.reference_files import downloader
+    downloader.download_reffiles(download_path, instrument='all', psf_version='subpixel', dark_type='linearized')
 
 The ``instrument`` keyword controls which subset of reference files are downloaded. You can give it the name of a single instrument, a string containing a comma-separated list of instruments, or ``all``, which will download reference files for NIRCam, NIRISS, and FGS.
+
+The ``psf_version`` keyword controls the PSF libraries that are downloaded. The current version of *Mirage* uses libraries composed of many PSFs at various sub-pixel locations. These libraries do not include the effects of distortion. Future PSF libraries used by *Mirage* will be composed of sub-sampled PSFs at various locations across the detector, and will include distortion. In order to download the current PSF libraries, the ``psf_version`` keyword should be set to ``subpixel``, or omitted, in which case the script will default to retrieving the current libraries.
 
 .. The ``psf_version`` keyword controls the PSF libraries that are downloaded. Older versions of *Mirage* used libraries composed of many PSFs at various sub-pixel locations. These libraries did not include the effects of distortion. The current PSF libraries used by *Mirage* are composed of sub-sampled PSFs at various locations across the detector, and do include distortion. In order to download the current PSF libraries, the ``psf_version`` keyword should be set to ``gridded``, or omitted, in which case the script will default to retrieving the current libraries.
 

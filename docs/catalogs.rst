@@ -3,7 +3,7 @@
 Source Catalog File Formats
 ===========================
 
-Mirage accepts 7 different types of source catalogs, all of which can be generated using `Mirage's` :ref:`catalog generation <catalog_generation>` functionality. These include:
+Mirage accepts 7 different types of ascii source catalogs, all of which can be generated using `Mirage's` :ref:`catalog generation <catalog_generation>` functionality. These include:
 
 1. :ref:`Point sources <point_source>`
 2. :ref:`Galaxies (2d Sersic profiles) <galaxies>`
@@ -12,6 +12,9 @@ Mirage accepts 7 different types of source catalogs, all of which can be generat
 5. :ref:`Moving point sources <moving_point_source>`
 6. :ref:`Moving Sersic sources <moving_sersic>`
 7. :ref:`Moving extended sources <moving_extended>`
+
+.. tip::
+    For information on the optional hdf5 catalog that can be used when simulating WFSS data, see the :ref:`WFSS simulation page<wfss_data>`.
 
 The type of source catalog(s) you need depends on the scene you are simulating. The table below shows the possible catalogs for sidereal and non-sidereal observations. For sidereal observations, the point source, galaxy, and extended source catalogs can be used to create static sources in the scene. The three types of moving target catalogs can be used to create sources that trail across the field of view during the observation. For non-sidereal observations, the non-sidereal source catalog is used to create a static source in the scene. This is the non-sidereal target which JWST is tracking. The other types of catalogs can then all be used to create trailed sources. In this case, the inverse of the non-sidereal source's velocity is applied to all targets in the other catalogs. In this way, Mirage will create trailed background stars and galaxies, as well as trailed non-sidereal targets that have velocities other than that of the main target.
 

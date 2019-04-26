@@ -747,6 +747,8 @@ Zodiacal light
 
 *simSignals:zodiacal*
 
+This keyword has been depricated in favor of obtaining the zodiacal light from the `JWST backgrounds package <https://github.com/spacetelescope/jwst_backgrounds>`_.
+
 Name of a file containing a 2 dimensional count rate image of zodiacal light. This file is read in, scaled by the :ref:`zodiscale <zodiscale>` value, and added to the seed image. Leave as None to skip this step. The behaviors of this step and the scattered step below are very basic, and identical. There are no requirements on what the count rate images in these files must look like.
 
 .. tip::
@@ -769,6 +771,8 @@ Scattered light image
 +++++++++++++++++++++
 
 *simSignals:scattered*
+
+This keyword is currently not supported.
 
 Scattered light count rate image file. This file is assumed to contain a 2-dimensional array of signals in units of ADU per second. The file is read in, scaled by the :ref:`scatteredscale <scatteredscale>` value, and added to the seed image. Leave as None to skip this step.
 
@@ -1007,10 +1011,11 @@ True/False.  If True, intermediate products are saved to disk. These products ar
 +------------+-----------------------------------------+----------------------------------------------------+
 
 
-.. _grism_source_image:
 
 Grism output image
 ++++++++++++++++++
+
+.. _grism_source_image:
 
 *Output:grism_source_image*
 
