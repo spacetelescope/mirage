@@ -4,3 +4,4 @@ numpy>=1.16
 pip==18.1
 setuptools==40.9.0
 sphinx>=2.0.1
+stsci_rtd_theme==0.0.2

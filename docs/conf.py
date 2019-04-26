@@ -41,10 +41,14 @@ release = version.__version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx_automodapi.automodapi',
+    'sphinx_automodapi.automodsumm',
     'sphinx.ext.autodoc',
     'sphinx.ext.imgmath',
     'nbsphinx',
-    'napoleon'
+    'napoleon',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.viewcode'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
