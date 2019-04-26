@@ -2,5 +2,5 @@ ipykernel==5.1.0
 nbsphinx==0.4.1
 numpy>=1.16
 pip==18.1
-setuptools==40.8.0
+setuptools==40.9.0
 sphinx>=2.0.1
