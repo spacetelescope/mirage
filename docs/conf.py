@@ -26,10 +26,11 @@ copyright = '2018, STScI'
 author = 'STScI (Hilbert, Volk, Chambers, Sahlmann et al.)'
 
 # The short X.Y version
-version_parts = version.__version__.split('.')
+full_version = version.__version__
+version_parts = full_version.split('.')
 version = "{}.{}".format(version_parts[0], version_parts[1])
 # The full version, including alpha/beta/rc tags
-release = version.__version__
+release = full_version
 
 # -- General configuration ---------------------------------------------------
 
