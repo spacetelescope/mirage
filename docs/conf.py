@@ -26,10 +26,11 @@ copyright = '2018, STScI'
 author = 'STScI (Hilbert, Volk, Chambers, Sahlmann et al.)'
 
 # The short X.Y version
-version_parts = version.__version__.split('.')
+full_version = version.__version__
+version_parts = full_version.split('.')
 version = "{}.{}".format(version_parts[0], version_parts[1])
 # The full version, including alpha/beta/rc tags
-release = version.__version__
+release = full_version
 
 # -- General configuration ---------------------------------------------------
 
@@ -41,10 +42,14 @@ release = version.__version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx_automodapi.automodapi',
+    'sphinx_automodapi.automodsumm',
     'sphinx.ext.autodoc',
     'sphinx.ext.imgmath',
     'nbsphinx',
-    'napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.viewcode'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -94,6 +99,7 @@ html_theme = "stsci_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_theme_path = [stsci_rtd_theme.get_html_theme_path()]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
