@@ -46,7 +46,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  astrometric_: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
 	  ipc_: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
 	  invertIPC_: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
-	  occult_: None                                    #Occulting spots correction image
+	  occult_: None              #Occulting spots correction image
 	  pixelAreaMap_: $MIRAGE_DATA/nircam/reference_files/pam/NIRCam_B5_PAM_imaging.fits #Pixel area map for the detector. Used to introduce distortion into the output ramp.
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
@@ -61,10 +61,10 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  robberto_:  False      #Use Massimo Robberto type non-linearity coefficients
 
 	cosmicRay_:
-	  path_: $MIRAGE_DATA/nircam/cosmic_ray_library/     #Path to CR library
+	  path_: $MIRAGE_DATA/nircam/cosmic_ray_library/    #Path to CR library
 	  library_: SUNMIN    								#Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)
 	  scale_: 1.5     									#Cosmic ray rate scaling factor
-	  suffix_: IPC_NIRCam_B5    							#Suffix of library file names
+	  suffix_: IPC_NIRCam_B5    					    #Suffix of library file names
 	  seed_: 2956411739      							#Seed for random number generator
 
 	simSignals_:
@@ -107,38 +107,38 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 
 	Output_:
 	  file_: jw42424024002_0112o_NRCB5_uncal.fits   # Output filename
-	  directory_: ./   							   # Directory in which to place output files
-	  datatype_: linear,raw 						   # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
-	  format_: DMS          						   # Output file format Options: DMS, SSR(not yet implemented)
-	  save_intermediates_: False   				   # Save intermediate products separately (point source image, etc)
-	  grism_source_image_: False   				   # Create an image to be dispersed?
-	  unsigned_: True   							   # Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
-	  dmsOrient_: True    						   # Output in DMS orientation (vs. fitswriter orientation).
-	  program_number_: 42424    					   # Program Number
+	  directory_: ./                                # Directory in which to place output files
+	  datatype_: linear,raw                         # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
+	  format_: DMS                                  # Output file format Options: DMS, SSR(not yet implemented)
+	  save_intermediates_: False                    # Save intermediate products separately (point source image, etc)
+	  grism_source_image_: False                    # Create an image to be dispersed?
+	  unsigned_: True                               # Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
+	  dmsOrient_: True                              # Output in DMS orientation (vs. fitswriter orientation).
+	  program_number_: 42424                        # Program Number
 	  title_: Supernovae and Black Holes Near Hyperspatial Bypasses   #Program title
-	  PI_Name_: Doug Adams  						   # Proposal PI Name
-	  Proposal_category_: GO  					   # Proposal category
-	  Science_category_: Cosmology  				   # Science category
-	  observation_number_: '002'    				   # Observation Number
-	  observation_label_: Obs2    				   # User-generated observation Label
-	  visit_number_: '024'    					   # Visit Number
-	  visit_group_: '01'    						   # Visit Group
-	  visit_id_: '42424024002'    				   # Visit ID
-	  sequence_id_: '2'    						   # Sequence ID
-	  activity_id_: '2o'    						   # Activity ID. Increment with each exposure.
-	  exposure_number_: '00001'    				   # Exposure Number
-	  obs_id_: 'V42424024002P000000000112o'   	   # Observation ID number
-	  date_obs_: '2019-10-15'  					   # Date of observation
-	  time_obs_: '06:29:11.852'  				   # Time of observation
-	  obs_template_: 'NIRCam Imaging'  			   # Observation template
-	  primary_dither_type_: NONE  				   # Primary dither pattern name
-	  total_primary_dither_positions_: 1  		   # Total number of primary dither positions
-	  primary_dither_position_: 1  				   # Primary dither position number
+	  PI_Name_: Doug Adams                          # Proposal PI Name
+	  Proposal_category_: GO                        # Proposal category
+	  Science_category_: Cosmology                  # Science category
+	  observation_number_: '002'                    # Observation Number
+	  observation_label_: Obs2                      # User-generated observation Label
+	  visit_number_: '024'                          # Visit Number
+	  visit_group_: '01'                            # Visit Group
+	  visit_id_: '42424024002'                      # Visit ID
+	  sequence_id_: '2'                             # Sequence ID
+	  activity_id_: '2o'                            # Activity ID. Increment with each exposure.
+	  exposure_number_: '00001'                     # Exposure Number
+	  obs_id_: 'V42424024002P000000000112o'         # Observation ID number
+	  date_obs_: '2019-10-15'                       # Date of observation
+	  time_obs_: '06:29:11.852'                     # Time of observation
+	  obs_template_: 'NIRCam Imaging'               # Observation template
+	  primary_dither_type_: NONE                    # Primary dither pattern name
+	  total_primary_dither_positions_: 1            # Total number of primary dither positions
+	  primary_dither_position_: 1                   # Primary dither position number
 	  subpix_dither_type_: 2-POINT-MEDIUM-WITH-NIRISS  #Subpixel dither pattern name
-	  total_subpix_dither_positions_: 2  		   # Total number of subpixel dither positions
-	  subpix_dither_position_: 2  				   # Subpixel dither position number
-	  xoffset_: 344.284  						   # Dither pointing offset in x (arcsec)
-	  yoffset_: 466.768  						   # Dither pointing offset in y (arcsec)
+	  total_subpix_dither_positions_: 2             # Total number of subpixel dither positions
+	  subpix_dither_position_: 2                    # Subpixel dither position number
+	  xoffset_: 344.284                             # Dither pointing offset in x (arcsec)
+	  yoffset_: 466.768                             # Dither pointing offset in y (arcsec)
 
 
 .. _inst:
