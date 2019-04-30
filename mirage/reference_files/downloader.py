@@ -1,4 +1,4 @@
-#! /usr/bin /env python
+#! /usr/bin/env python
 
 """Download the reference files needed to run Mirage. Extract and unzip
 files, and place into the proper directory. Inform the user how to set
