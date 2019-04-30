@@ -21,8 +21,6 @@ NIRCAM_CR_LIBRARY_URL = [('https://stsci.box.com/shared/static/4cw7wmsqw9qhdozl4
 NIRISS_CR_LIBRARY_URL = [('https://stsci.box.com/shared/static/uxyb08cjkf1i7yd4fhryrhi6dr4da9pg.gz', 'mirage_niriss_cr_library.tar.gz')]
 FGS_CR_LIBRARY_URL = [('https://stsci.box.com/shared/static/d5oswszqbwt6i027g6ue3usi47dmyign.gz', 'mirage_fgs_cr_library.tar.gz')]
 
-
-
 NIRCAM_INDIVIDUAL_PSF_URLS = [('https://stsci.box.com/shared/static/4rw5p9dd8ofa13pnmgfgz1svr8qustcv.gz', 'nircam_a1_subpix_grid_webbpsf_library.tar.gz'),
                               ('https://stsci.box.com/shared/static/ngx0mfo6pppe9zbrvzh28n90fe6v4d6i.gz', 'nircam_a2_subpix_grid_webbpsf_library.tar.gz'),
                               ('https://stsci.box.com/shared/static/nc2tt2w4cbylwy0ny7bxme37xtnd26cm.gz', 'nircam_a3_subpix_grid_webbpsf_library.tar.gz'),
@@ -197,12 +195,6 @@ NIRISS_LINEARIZED_DARK_URLS = [('https://stsci.box.com/shared/static/0lb7f57m9ia
                                ('https://stsci.box.com/shared/static/o52djwdwksvnjkl7xt0ndlnjpfa6tlms.gz', 'Linearized_Dark_and_SBRefpix_NISNIRISSDARK-172500017_20_496_SE_2017-09-07T07h09m22_dms_uncal_linear_dark_prep_object.fits.gz'),
                                ('https://stsci.box.com/shared/static/857olzwa1e51b05uz2bx6c13hzsufilz.gz', 'Linearized_Dark_and_SBRefpix_NISNIRISSDARK-172500017_21_496_SE_2017-09-07T07h29m52_dms_uncal_linear_dark_prep_object.fits.gz'),
                                ('https://stsci.box.com/shared/static/isnevg8m2j58qrb72u19pp43k5rpksy1.gz', 'Linearized_Dark_and_SBRefpix_NISNIRISSDARK-172500017_22_496_SE_2017-09-07T07h50m32_dms_uncal_linear_dark_prep_object.fits.gz')]
-
-# For testing
-print('URL list shortened for testing')
-NIRISS_RAW_DARK_URLS = [('https://stsci.box.com/shared/static/1pr9cfwx2d8r6iju9afmhsylowtwq3x4.gz', 'NISNIRISSDARK-153451235_11_496_SE_2015-12-11T16h05m20_dms_uncal.fits.gz')]
-NIRISS_LINEARIZED_DARK_URLS = [('https://stsci.box.com/shared/static/0lb7f57m9iakhiuc6p22kc3okgtcj10q.gz', 'Linearized_Dark_and_SBRefpix_NISNIRISSDARK-153451235_17_496_SE_2015-12-11T17h59m52_dms_uncal_linear_dark_prep_object.fits.gz')]
-
 
 FGS_RAW_DARK_URLS = [('https://stsci.box.com/shared/static/2nhm4pajg1d3b3vmj8p5wtsevxq41qsj.gz', '29722_1x88_FGSF03512-D-NR-G2-5339214947_1_498_SE_2015-12-05T22h27m19_dms_uncal.fits.gz'),
                      ('https://stsci.box.com/shared/static/yq0pvyur651h8v1fz9t5wronvtbhv76b.gz', '29782_1x88_FGSF03872-PAR-5340074326_1_498_SE_2015-12-06T12h22m47_dms_uncal.fits.gz'),

@@ -2840,7 +2840,7 @@ class Catalog_seed():
         # Load the yaml file
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.load(infile, Loader=yaml.FullLoader)
         except (ScannerError, FileNotFoundError, IOError) as e:
             print(e)
 

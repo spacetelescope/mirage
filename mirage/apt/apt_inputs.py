@@ -124,7 +124,7 @@ class AptInput:
 
         """
         with open(self.observation_list_file, 'r') as infile:
-            self.obstab = yaml.load(infile)
+            self.obstab = yaml.load(infile, Loader=yaml.FullLoader)
 
         OBSERVATION_LIST_FIELDS = 'Date PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \

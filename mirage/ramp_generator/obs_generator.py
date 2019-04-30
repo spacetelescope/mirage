@@ -2282,7 +2282,7 @@ class Observation():
         """Read in the yaml parameter file (main input to Mirage)."""
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.load(infile, Loader=yaml.FullLoader)
         except FileNotFoundError as e:
             print("WARNING: unable to open {}".format(self.paramfile))
 

@@ -311,7 +311,7 @@ class WFSSSim():
         wfss_files_found = 0
         for i, pfile in enumerate(self.paramfiles):
             with open(pfile, 'r') as infile:
-                params = yaml.load(infile)
+                params = yaml.load(infile, Loader=yaml.FullLoader)
 
             cats = [params['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
             cats = [e for e in cats if e.lower() != 'none']
