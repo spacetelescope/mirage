@@ -8,6 +8,7 @@ cosmic rays.
 '''
 
 import argparse
+import datetime
 import sys
 import glob
 import os
@@ -1832,6 +1833,7 @@ class Catalog_seed():
         seg.initialize_map()
 
         # Loop over the entries in the point source list
+        i = 0
         for entry in pointSources:
 
             scaled_psf, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'])
@@ -1866,6 +1868,10 @@ class Catalog_seed():
                 # in the webbpsf stamp, then the area to be pulled from
                 # the stamp may shift off of the detector.
                 pass
+
+            if np.mod(i, 100) == 0:
+                print('{}: Working on source {}'.format(str(datetime.datetime.now()), i))
+            i += 1
 
         return psfimage, seg.segmap
 
