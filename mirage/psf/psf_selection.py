@@ -103,14 +103,21 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
     for filename in psf_files:
         header = fits.getheader(filename)
         file_inst = header['INSTRUME'].upper()
-        file_det = header['DETECTOR'].upper()
+        try:
+            file_det = header['DETECTOR'].upper()
+        except KeyError:
+            file_det = header['DET_NAME'].upper()
         file_filt = header['FILTER'].upper()
-        #file_pupil = header['PUPIL'].upper()
-        if file_inst.upper() == 'NIRCAM':
-            file_pupil = 'CLEAR'
-        elif file_inst.upper() == 'NIRISS':
-            file_pupil = 'CLEARP'
-        print('PUPIL VALUE SET TO CLEAR WHILE AWAITING KEYWORD')
+
+        try:
+            file_pupil = header['PUPIL_MASK'].upper()
+        except KeyError:
+            # If no pupil mask value is present, then assume the CLEAR is
+            # being used
+            if file_inst.upper() == 'NIRCAM':
+                file_pupil = 'CLEAR'
+            elif file_inst.upper() == 'NIRISS':
+                file_pupil = 'CLEARP'
 
         # NIRISS has many filters in the pupil wheel. Webbpsf does
         # not make a distinction, but Mirage does. Adjust the info
@@ -125,16 +132,13 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
                                   'in the pupil wheel.'))
             file_pupil = save_filt
 
-        opd = header['PUPILOPD']
+        opd = header['OPD_FILE']
         if 'requirements' in opd:
             file_wfe = 'requirements'
         elif 'predicted' in opd:
             file_wfe = 'predicted'
 
-        if 'slice' in opd:
-            file_wfe_grp = np.int(opd.split(' ')[-1])
-        else:
-            file_wfe_grp = 0
+        file_wfe_grp = header['OPDSLICE']
 
         match = (file_inst == instrument and file_det == detector and file_filt == filt and
                  file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
@@ -150,3 +154,25 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
         raise ValueError("No PSF library file found matching requested parameters.")
     elif len(matches) > 1:
         raise ValueError("More than one PSF library file matches requested parameters: {}".format(matches))
+
+
+def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, wavefront_error_group,
+                  library_path):
+    """Locate the file containing PSF wing image and read them in. The
+    idea is that there will only be one file for a given detector/filter/
+    pupil/WFE/realization combination. This file will contain a PSF
+    sampled at detector resolution and covering some large area in pixels.
+    Later, when making the seed image, the appropriate subarray will be
+    pulled out of this array for each input source depending on its
+    magnitude.
+    """
+    # Find the file containing the PSF wings
+    wings_file = get_library_file(instrument, detector, filtername, pupilname,
+                                  wavefront_error, wavefront_error_group, library_path)
+    print("PSF wings will be from: {}".format(os.path.basename(wings_file)))
+    with fits.open(wings_file) as hdulist:
+        psf_wing = hdulist['DET_SAMP'].data
+    # Crop the outer row and column in order to remove any potential edge
+    # effects leftover from creation
+    psf_wing = psf_wing[1:-1, 1:-1]
+    return psf_wing

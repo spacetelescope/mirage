@@ -37,7 +37,7 @@ from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
-from ..psf.psf_selection import get_gridded_psf_library
+from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor
 from mirage import version
 
@@ -155,9 +155,49 @@ class Catalog_seed():
                                                    self.params['simSignals']['psfwfegroup'],
                                                    self.params['simSignals']['psfpath'])
 
-        self.psf_library_y_dim, self.psf_library_x_dim = self.psf_library.data.shape[-2:]
-        self.psf_library_x_dim = np.int(self.psf_library_x_dim / self.psf_library.oversampling)
-        self.psf_library_y_dim = np.int(self.psf_library_y_dim / self.psf_library.oversampling)
+        # Set the psf core dimensions to actually be 2 rows and columns
+        # less than the dimensions in the library file. This is because
+        # we will later evaluate the library using these core dimensions.
+        # If we were to evaluate a library that is 51x51 pixels using a
+        # 51x51 pixel grid, then if the source is centered close to the
+        # edge of the central pixel, you can end up with an zeroed out
+        # edge row or column in the evaluated array. So we do this to be
+        # sure that we are evaluating the library with a slightly smaller
+        # array than the array in the library.
+        self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library.data.shape[-2:]
+        self.psf_library_core_x_dim = np.int(self.psf_library_core_x_dim / self.psf_library.oversampling) - \
+            self.params['simSignals']['gridded_psf_library_row_padding']
+        self.psf_library_core_y_dim = np.int(self.psf_library_core_y_dim / self.psf_library.oversampling) - \
+            self.params['simSignals']['gridded_psf_library_row_padding']
+
+        self.psf_wings = get_psf_wings(self.params['Inst']['instrument'], self.detector,
+                                       psf_filter, psf_pupil,
+                                       self.params['simSignals']['psfwfe'],
+                                       self.params['simSignals']['psfwfegroup'],
+                                       os.path.join(self.params['simSignals']['psfpath'], 'psf_wings'))
+
+        # Read in the file that defines PSF array sizes based on magnitude
+        self.psf_wing_sizes = ascii.read(self.params['simSignals']['psf_wing_threshold_file'])
+        max_wing_size = self.psf_wings.shape[0]
+        too_large = np.where(np.array(self.psf_wing_sizes['number_of_pixels']) > max_wing_size)[0]
+        if len(too_large) > 0:
+            print(('Some PSF sizes in {} are larger than the PSF library file dimensions. '
+                   'Resetting these values in the table to be equal to the PSF dimensions'
+                   .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
+            self.psf_wing_sizes['number_of_pixels'][too_large] = max_wing_size
+
+        #self.max_psf_wing_size = np.max(self.psf_wing_sizes['number_of_pixels'])
+
+        #if self.params['simSignals']['add_psf_wings']:
+        #    self.psf_wings = self.get_psf_wings()
+            # self.psf_library_y_dim, self.psf_library_x_dim = ???
+        #else:
+        #    self.psf_wings = {}
+            # self.psf_library_y_dim, self.psf_library_x_dim = psf_core_y_dim, psf_core_x_dim
+
+        # self.psf_library_y_dim, self.psf_library_x_dim = self.psf_library.data.shape[-2:]
+        # self.psf_library_x_dim = np.int(self.psf_library_x_dim / self.psf_library.oversampling)
+        # self.psf_library_y_dim = np.int(self.psf_library_y_dim / self.psf_library.oversampling)
 
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
@@ -208,6 +248,19 @@ class Catalog_seed():
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
+
+    def get_psf_wings(self):
+        """Locate and read in images of the PSF wings to optionally be
+        added to the gridded PSF core. This function creates self.psf_wings
+        which is a dictionary of {max_count_rate: psf_wing_image}
+        """
+        if self.params['simSignals']['add_psf_wings']:
+            # Locate fits files containing the PSF wing images. Assume they
+            # are in the same directory as the PSF libraries
+            something
+        else:
+            self.psf_wings = {}
+
 
     def extract_full_from_pom(self, seedimage, seed_segmap):
         """ Given the seed image and segmentation images for the NIRISS POM field of view,
@@ -277,6 +330,8 @@ class Catalog_seed():
             Header from 0th extension of data file
         """
         data, header = fits.getdata(filename, header=True)
+        if len(data.shape) != 2:
+            data, header = fits.getdata(filename, 1)
         return data, header
 
     def prepare_PAM(self):
@@ -482,14 +537,16 @@ class Catalog_seed():
                                 'flux_cal', 'readpattdefs', 'filter_throughput'],
                     'simSignals':['pointsource', 'psfpath', 'galaxyListFile', 'extended',
                                   'movingTargetList', 'movingTargetSersic',
-                                  'movingTargetExtended', 'movingTargetToTrack'],
+                                  'movingTargetExtended', 'movingTargetToTrack',
+                                  'psf_wing_threshold_file'],
                     'Output':['file', 'directory']}
 
         all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
                                        'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
                                        'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
                                        'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-filter_throughput': 'placeholder.txt'},
+                                       'Reffiles-filter_throughput': 'placeholder.txt',
+                                       'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt'},
                             'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
                                        'Reffiles-flux_cal': 'niriss_zeropoints.list',
                                        'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
@@ -928,6 +985,7 @@ class Catalog_seed():
         numresets = self.params['Readout']['resets_bet_ints']
 
         frames_per_group = numframes + numskips
+        frames_per_integration = numgroups * frames_per_group
         total_frames = numgroups * frames_per_group
         # If only one integration per exposure, then total_frames
         # above is correct. For >1 integration, we need to add the reset
@@ -941,6 +999,10 @@ class Catalog_seed():
             total_frames += (numresets * (numints - 1))
 
         frameexptimes = self.frametime * np.arange(-1, total_frames)
+        print('frames_per_group: ', frames_per_group)
+        print('one int, total_frames: ', frames_per_integration)
+        print('all ints, total_frames is: ', total_frames)
+        print('frameexptimes is: ', frameexptimes)
 
         # output image dimensions
         dims = self.nominal_dims
@@ -948,7 +1010,8 @@ class Catalog_seed():
         newdimsy = np.int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
-        mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
+        #mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
+        mt_integration = np.zeros((numints, frames_per_integration, newdimsy, newdimsx))
 
         # Corresponding (2D) segmentation map
         moving_segmap = segmap.SegMap()
@@ -997,6 +1060,19 @@ class Catalog_seed():
                 x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                 y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
 
+            # Get countrate and PSF size info
+            if entry[mag_column] is not None:
+                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'],
+                                                    magsys, entry[mag_column],
+                                                    photfnu=self.photfnu,
+                                                    photflam=self.photflam)
+            else:
+                rate = 1.0
+
+            psf_x_dim = self.find_psf_size(rate)
+            psf_dimensions = (psf_x_dim, psf_x_dim)
+            #psf_dimensions = (self.psf_library_x_dim, self.psf_library_y_dim)
+
             # If we have a point source, we can easily determine whether
             # it completely misses the detector, since we know the size
             # of the stamp already. For galaxies and extended sources,
@@ -1004,28 +1080,24 @@ class Catalog_seed():
             # the stamp lands on the detector.
             status = 'on'
             if input_type == 'pointSource':
-                psf_dimensions = (self.psf_library_x_dim, self.psf_library_y_dim)
+
                 status = self.on_detector(x_frames, y_frames, psf_dimensions,
                                           (newdimsx, newdimsy))
             if status == 'off':
                 continue
 
             # Create the PSF
-            eval_psf, minx, miny = self.create_psf_stamp(pixelx, pixely, ignore_detector=True)
-
-            if entry[mag_column] is not None:
-                rate = self.mag_to_countrate(magsys, entry[mag_column],
-                                             photfnu=self.photfnu,
-                                             photflam=self.photflam)
-            else:
-                rate = 1.0
+            eval_psf, minx, miny = self.create_psf_stamp(pixelx, pixely, psf_x_dim, psf_x_dim,
+                                                         ignore_detector=True)
 
             if input_type == 'pointSource':
                 stamp = eval_psf
                 stamp *= rate
+                print('Point source size: ', stamp.shape)
 
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
+                print('Extended source size: ', stamp.shape)
                 print('Extended source rotations turned off while evaluating rotate bug')
                 #stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
 
@@ -1095,8 +1167,10 @@ class Catalog_seed():
             # before this point in order to get the timing and positions
             # correct.
             for integ in range(numints):
-                framestart = integ * total_frames + integ
-                frameend = framestart + total_frames + 1
+                #framestart = integ * total_frames + integ
+                #frameend = framestart + total_frames + 1
+                framestart = integ * frames_per_integration + integ
+                frameend = framestart + frames_per_integration + 1
 
                 # Now check to see if the stamp image overlaps the output
                 # aperture for this integration only. Above we removed sources
@@ -1104,6 +1178,15 @@ class Catalog_seed():
                 # of sources that overlap the detector in some integrations,
                 # but not this particular integration
                 status = 'on'
+                print('')
+                print('Going into on_detector: ')
+                print(x_frames)
+                print(y_frames)
+                print(framestart, frameend)
+                print(x_frames[framestart:frameend])
+                print(y_frames[framestart:frameend])
+                print(stamp.shape)
+                print(newdimsx, newdimsy)
                 status = self.on_detector(x_frames[framestart:frameend],
                                           y_frames[framestart:frameend],
                                           stamp.shape, (newdimsx, newdimsy))
@@ -1583,17 +1666,20 @@ class Catalog_seed():
         else:
             numstr = 'zero'
         # psflibfiles = glob.glob(self.params['simSignals']['psfpath'] + '*')
-        psflibfiles = glob.glob(os.path.join(self.params['simSignals']['psfpath'], '*.fits'))
+        # psflibfiles = glob.glob(os.path.join(self.params['simSignals']['psfpath'], '*.fits'))
 
         # If a PSF library is specified, then just get the dimensions from one of the files
         if self.params['simSignals']['psfpath'] is not None:
             #h = fits.open(psflibfiles[0])
             #edgex = h[0].header['NAXIS1'] / 2 - 1
             #edgey = h[0].header['NAXIS2'] / 2 - 1
-            edgex = self.psf_library_x_dim // 2
-            edgey = self.psf_library_y_dim // 2
-            self.psfhalfwidth = np.array([edgex, edgey])
+            #edgex = self.psf_library_x_dim // 2
+            #edgey = self.psf_library_y_dim // 2
+            #edgex = np.int(self.max_psf_wing_size // 2)
+            #edgey = np.int(self.max_psf_wing_size // 2)
+            #self.psfhalfwidth = np.array([edgex, edgey])
             #h.close()
+            pass
         else:
             # if no PSF library is specified, then webbpsf will be creating the PSF on the
             # fly. In this case, we assume webbpsf's default output size of 301x301 pixels?
@@ -1616,6 +1702,9 @@ class Catalog_seed():
                 print("Point list input positions assumed to be in units of RA and Dec.")
         except:
             raise NameError("WARNING: Unable to open the point source list file {}".format(filename))
+
+        # Create table of point source countrate versus psf size
+        self.translate_psf_table(magsys)
 
         # File to save adjusted point source locations
         psfile = self.params['Output']['file'][0:-5] + '_pointsources.list'
@@ -1653,10 +1742,10 @@ class Catalog_seed():
 
         # Now, expand the dimensions again to include point
         # sources that fall only partially on the subarray
-        miny -= edgey
-        maxy += edgey
-        minx -= edgex
-        maxx += edgex
+        #miny -= edgey
+        #maxy += edgey
+        #minx -= edgex
+        #maxx += edgex
 
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
@@ -1675,6 +1764,7 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(lines, filename)
 
+        print('Filtering point sources to keep only those on the detector')
         start_time = time.time()
         times = []
         time_reported = False
@@ -1696,17 +1786,28 @@ class Catalog_seed():
                                                                           values['y_or_Dec'],
                                                                           pixelflag, 4096)
 
-            # Get the input magnitude of the point source
+            # Get the input magnitude and countrate of the point source
             mag = float(values[mag_column])
+            countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                                                     photfnu=self.photfnu, photflam=self.photflam,
+                                                     vegamag_zeropoint=self.vegazeropoint)
 
-            if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
+            psf_len = self.find_psf_size(countrate)
+            edgex = np.int(psf_len // 2)
+            edgey = np.int(psf_len // 2)
+
+            if pixely > (miny-edgey) and pixely < (maxy+edgey) and pixelx > (minx-edgex) and pixelx < (maxx+edgex):
                 # set up an entry for the output table
                 entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
                 # Calculate the countrate for the source
-                countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
-                                                         photfnu=self.photfnu, photflam=self.photflam,
-                                                         vegamag_zeropoint=self.vegazeropoint)
+                #print('countrate calculation for source {}:'.format(index))
+                #print('inputs:')
+                #print(magsys, mag)
+                #countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                #                                         photfnu=self.photfnu, photflam=self.photflam,
+                #                                         vegamag_zeropoint=self.vegazeropoint)
+                #print('outputs: ', countrate)
                 framecounts = countrate * self.frametime
 
                 # add the countrate and the counts per frame to pointSourceList
@@ -1736,6 +1837,58 @@ class Catalog_seed():
             #    sys.exit()
 
         return pointSourceList
+
+    def translate_psf_table(self, magnitude_system):
+        """Given a magnitude system, translate the table of PSF sizes
+        versus magnitudes into PSF sizes versus countrates
+
+        Parameters
+        ----------
+        magnitude_system : str
+            Magnitude system of the sources: 'abmag', 'stmag', 'vegamag'
+        """
+        magnitudes = self.psf_wing_sizes[magnitude_system].data
+
+        # Place table in order of ascending magnitudes
+        sort = np.argsort(magnitudes)
+        for colname in self.psf_wing_sizes.colnames:
+            self.psf_wing_sizes[colname] = self.psf_wing_sizes[colname][sort]
+        magnitudes = self.psf_wing_sizes[magnitude_system].data
+
+        # Calculate corresponding countrates
+        countrates = utils.magnitude_to_countrate(self.params['Inst']['mode'], magnitude_system,
+                                                  magnitudes, photfnu=self.photfnu,
+                                                  photflam=self.photflam,
+                                                  vegamag_zeropoint=self.vegazeropoint)
+        self.psf_wing_sizes['countrate'] = countrates
+        print(magnitude_system)
+        print(self.psf_wing_sizes)
+
+    def find_psf_size(self, countrate):
+        """Determine the dimentions of the PSF to use based on an object's
+        countrate.
+
+        Parameters
+        ----------
+        countrate : float
+            Source countrate
+
+        Returns
+        -------
+        xdim : int
+            Size of PSF in pixels in the x direction
+
+        ydim : int
+            Size of PSF in pixels in the y direction
+        """
+        brighter = np.where(countrate >= self.psf_wing_sizes['countrate'])[0]
+        if len(brighter) == 0:
+            # Dimmest bin == size of pf library
+            dimension = self.psf_library_core_x_dim
+            #dim = np.max(self.psf_wing_sizes['number_of_pixels'])
+        else:
+            dimension = self.psf_wing_sizes['number_of_pixels'][brighter[0]]
+        return dimension
 
     def remove_outside_fov_sources(self, index, source, pixflag, delta_pixels):
         """Filter out entries in the source catalog that are located well outside the field of
@@ -1833,16 +1986,22 @@ class Catalog_seed():
         seg.initialize_map()
 
         # Loop over the entries in the point source list
-        i = 0
-        for entry in pointSources:
+        for i, entry in enumerate(pointSources):
 
-            scaled_psf, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'])
+            # Find the PSF size to use based on the countrate
+            psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
+
+            # Assume same PSF size in x and y
+            psf_y_dim = psf_x_dim
+
+            scaled_psf, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
+                                                             psf_x_dim, psf_y_dim)
             scaled_psf *= entry['countrate_e/s']
 
             # PSF may not be centered in array now if part of the array falls
             # off of the aperture
-            stamp_x_loc = self.psf_library_x_dim // 2 - min_x
-            stamp_y_loc = self.psf_library_y_dim // 2 - min_y
+            stamp_x_loc = psf_x_dim // 2 - min_x
+            stamp_y_loc = psf_y_dim // 2 - min_y
             updated_psf_dimensions = scaled_psf.shape
 
             # Get the coordinates that describe the overlap between the
@@ -1869,13 +2028,12 @@ class Catalog_seed():
                 # the stamp may shift off of the detector.
                 pass
 
-            if np.mod(i, 100) == 0:
+            if ((len(pointSources) > 100) and (np.mod(i, 100))) == 0:
                 print('{}: Working on source {}'.format(str(datetime.datetime.now()), i))
-            i += 1
 
         return psfimage, seg.segmap
 
-    def create_psf_stamp(self, x_location, y_location, ignore_detector=False):
+    def create_psf_stamp(self, x_location, y_location, psf_dim_x, psf_dim_y, ignore_detector=False):
         """From the gridded PSF model, location within the aperture, and
         dimensions of the stamp image (either the library PSF image, or
         the galaxy/extended stamp image with which the PSF will be
@@ -1905,24 +2063,138 @@ class Catalog_seed():
             be close to 1.0 (not exactly 1.0 due to asymmetries and distortion)
         """
         # PSF will always be centered in this initial call
-        psf_x_loc = self.psf_library_x_dim // 2
-        psf_y_loc = self.psf_library_y_dim // 2
+        #psf_x_loc = self.psf_library_x_dim // 2
+        #psf_y_loc = self.psf_library_y_dim // 2
+        psf_x_loc = psf_dim_x // 2
+        psf_y_loc = psf_dim_y // 2
+
+        # Translation needed to go from PSF core (self.psf_library)
+        # coordinate system to the PSF wing coordinate system (i.e.
+        # center the PSF core in the wing image)
+        psf_wing_half_width_x = np.int(psf_dim_x // 2)
+        psf_wing_half_width_y = np.int(psf_dim_y // 2)
+        psf_core_half_width_x = np.int(self.psf_library_core_x_dim // 2)
+        psf_core_half_width_y = np.int(self.psf_library_core_y_dim // 2)
+        delta_core_to_wing_x = psf_wing_half_width_x - psf_core_half_width_x
+        delta_core_to_wing_y = psf_wing_half_width_y - psf_core_half_width_y
+
+        # Get the psf wings array - first the nominal size
+        # Later we may crop if the source is only partially on the detector
+        full_wing_y_dim, full_wing_x_dim = self.psf_wings.shape
+        offset_x = np.int((full_wing_x_dim - psf_dim_x) / 2)
+        offset_y = np.int((full_wing_y_dim - psf_dim_y) / 2)
+
+        full_psf = copy.deepcopy(self.psf_wings[offset_y:offset_y+psf_dim_y, offset_x:offset_x+psf_dim_x])
+
+        #print('full sized psf created with dimensions: ', full_psf.shape)
 
         # Get coordinates describing overlap between PSF image and the
         # full frame of the detector
+        # Step 1
         xcenter, ycenter, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
-            (l1, l2) = self.create_psf_stamp_coords(x_location, y_location, (self.psf_library_y_dim,
-                                                    self.psf_library_x_dim), psf_x_loc, psf_y_loc,
+            (l1, l2) = self.create_psf_stamp_coords(x_location, y_location, (psf_dim_y,
+                                                    psf_dim_x), psf_x_loc, psf_y_loc,
                                                     coord_sys='full_frame', ignore_detector=ignore_detector)
 
-        # PSFs in GriddedPSFModel by default have a total signal equal
-        # to the square of the oversampling factor. They must be scaled
-        # down by that factor to be equivalent to the webbpsf output,
-        # where the summed signal is close to 1.0
-        flux_scaling_factor = self.psf_library.oversampling**2
-        psf = self.psf_library.evaluate(x=xpts, y=ypts, flux=flux_scaling_factor,
-                                        x_0=xcenter, y_0=ycenter)
-        return psf, k1, l1
+        print('coordinates of full psf on detector: ')
+        print('inputs:')
+        print(x_location, y_location, (psf_dim_y, psf_dim_x), psf_x_loc, psf_y_loc)
+        print('results: ')
+        print(xcenter, ycenter, i1, i2, j1, j2, k1, k2, l1, l2)
+
+
+        # Step 2
+        #if ((i1 (or k1?) > (psf_wing_half_width + psf_core_half_width)) or (i2 (or k1?) < )):
+        #    do not evaluate model
+        # If the core of the psf lands at least partially on the detector
+        # then we need to evaluate the psf library
+        if ((k1 < (psf_wing_half_width_x + psf_core_half_width_x)) and
+            (k2 > (psf_wing_half_width_x - psf_core_half_width_x)) and
+            (l1 < (psf_wing_half_width_y + psf_core_half_width_y)) and
+            (l2 > (psf_wing_half_width_y - psf_core_half_width_y))):
+
+
+
+            #print('kl: ', k1, k2, l1, l2, psf_wing_half_width_x, psf_core_half_width_x)
+
+
+
+            # Step 3
+            # Get coordinates decribing overlap between the evaluated psf
+            # core and the full frame of the detector. We really only need
+            # the xpts_core and ypts_core from this in order to know how
+            # to evaluate the library
+            #psf_core_dims = np.array(self.psf_library.data.shape[-2:]) / self.psf_library.oversampling
+            #psf_core_x_loc = psf_core_dims[1] // 2
+            #psf_core_y_loc = psf_core_dims[0] // 2
+            psf_core_dims = (self.psf_library_core_y_dim, self.psf_library_core_x_dim)
+            xc_core, yc_core, xpts_core, ypts_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), \
+                (l1c, l2c) = self.create_psf_stamp_coords(x_location, y_location, psf_core_dims,
+                                                          psf_core_half_width_x, psf_core_half_width_y,
+                                                          coord_sys='full_frame', ignore_detector=ignore_detector)
+
+
+            print('coordinates for core: ')
+            print('inputs:')
+            print(x_location, y_location, psf_core_dims, psf_core_half_width_x, psf_core_half_width_y)
+            print('results:')
+            print(np.min(xpts_core), np.max(xpts_core))
+            print(xc_core, yc_core, i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c)
+            print(xpts_core.shape, np.min(xpts_core), np.max(xpts_core))
+            print('')
+
+
+
+            # PSFs in GriddedPSFModel by default have a total signal equal
+            # to the square of the oversampling factor. They must be scaled
+            # down by that factor to be equivalent to the webbpsf output,
+            # where the summed signal is close to 1.0
+            flux_scaling_factor = self.psf_library.oversampling**2
+            #psf = self.psf_library.evaluate(x=xpts, y=ypts, flux=flux_scaling_factor,
+            #                                x_0=xcenter, y_0=ycenter)
+            # Step 4
+            print(np.min(xpts_core), np.max(xpts_core), xc_core, yc_core)
+            psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
+                                            x_0=xc_core, y_0=yc_core)
+            print('left edge signal:', psf[25, 0])
+            #print('total signal in psf core: ', np.sum(psf))
+
+            # Step 5
+            wing_start_x = k1c + delta_core_to_wing_x
+            wing_end_x = k2c + delta_core_to_wing_x
+            wing_start_y = l1c + delta_core_to_wing_y
+            wing_end_y = l2c + delta_core_to_wing_y
+
+            print('evaluated psf shape: ', psf.shape)
+            print(wing_start_x, wing_end_x, wing_start_y, wing_end_y)
+            print(delta_core_to_wing_x, delta_core_to_wing_y)
+            print(k1c, k2c, l1c, l2c)
+
+            hhh0 = fits.PrimaryHDU(psf)
+            hhh1 = fits.ImageHDU(full_psf)
+            hhhl = fits.HDUList([hhh0, hhh1])
+            hhhl.writeto('evaluated_psf_{}_{}.fits'.format(x_location, y_location), overwrite=True)
+
+
+            print('wings: ')
+            print(full_psf[25+delta_core_to_wing_y:28+delta_core_to_wing_x, delta_core_to_wing_x])
+
+
+            #print('total signal in original wing psf:', np.sum(full_psf))
+            full_psf[wing_start_y:wing_end_y, wing_start_x:wing_end_x] = psf
+            #print('total signal in wing psf with new core inserted:', np.sum(full_psf))
+
+            print('psf core: ')
+            print(psf[25:28, 0])
+            print('modified wings: ')
+            print(full_psf[25+delta_core_to_wing_y:28+delta_core_to_wing_x, delta_core_to_wing_x])
+
+
+
+
+        #print('kl outside if: ', k1, k2, l1, l2, psf_wing_half_width_x, psf_core_half_width_x)
+
+        return full_psf, k1, l1
 
     def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y,
                                 coord_sys='full_frame', ignore_detector=False):
@@ -2002,7 +2274,13 @@ class Catalog_seed():
         (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, (out_dims_x, out_dims_y),
                                                                stamp_x, stamp_y, stamp_dims,
                                                                ignore_detector=ignore_detector)
-        y_points, x_points = np.mgrid[j1:j2, i1:i2]
+        try:
+            y_points, x_points = np.mgrid[j1:j2, i1:i2]
+        except:
+            print(j1, j2, i1, i2)
+            print(aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y, coord_sys, ignore_detector)
+            print(xpos, ypos, (out_dims_x, out_dims_y), stamp_x, stamp_y, stamp_dims)
+            stop
         return xpos, ypos, x_points, y_points, (i1, i2), (j1, j2), (k1, k2), (l1, l2)
 
     def ensure_odd_lengths(self, x_dim, y_dim, x_center, y_center):
@@ -2744,8 +3022,15 @@ class Catalog_seed():
             # the psf size. This is so the upcoming convolution will
             # produce an output that includes the wings of the PSF
             galdims = stamp.shape
+
+            # *******OR SHOULD WE ALWAYS CONVOLVE WITH A LARGER PSF? IF PSF IS SMALL,
+            # THIS WILL ARTIFICIALLY PUSH SIGNAL TOWARDS THE CORE OF THE GALAXY, I THINK.
+            #psf_dimensions = self.find_psf_size(entry['countrate_e/s'])
+            #psf_shape = np.array([psf_dimensions, psf_dimensions])
+
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
-            psf_shape = np.array(psf_dimensions / self.psf_library.oversampling).astype(np.int)
+            psf_shape = np.array((psf_dimensions / self.psf_library.oversampling) -
+                                 self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 # print('Enlarging galaxy stamp to be the same size or larger than the psf')
                 stamp = self.enlarge_stamp(stamp, psf_shape)
@@ -2753,7 +3038,7 @@ class Catalog_seed():
 
             # Get the PSF which will be convolved with the galaxy profile
             psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                            ignore_detector=True)
+                                                            psf_shape[1], psf_shape[0], ignore_detector=True)
 
             # Calculate the coordinates describing the overlap between
             # the PSF image and the galaxy image
@@ -3039,13 +3324,15 @@ class Catalog_seed():
                 # the psf size. This is so the upcoming convolution will
                 # produce an output that includes the wings of the PSF
                 psf_dimensions = np.array(self.psf_library.data.shape[-2:])
-                psf_shape = np.array(psf_dimensions / self.psf_library.oversampling).astype(np.int)
+                psf_shape = np.array((psf_dimensions / self.psf_library.oversampling) -
+                                     self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
                 if ((stamp_dims[0] < psf_shape[0]) or (stamp_dims[1] < psf_shape[1])):
                     stamp = self.enlarge_stamp(stamp, psf_shape)
                     stamp_dims = stamp.shape
 
                 # Create the PSF
-                psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'], ignore_detector=True)
+                psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
+                                                                psf_shape[1], psf_shape[0], ignore_detector=True)
 
                 # Calculate the coordinates describing the overlap
                 # between the extended image and the PSF image
