@@ -1167,8 +1167,6 @@ class Catalog_seed():
             # before this point in order to get the timing and positions
             # correct.
             for integ in range(numints):
-                #framestart = integ * total_frames + integ
-                #frameend = framestart + total_frames + 1
                 framestart = integ * frames_per_integration + integ
                 frameend = framestart + frames_per_integration + 1
 
@@ -1178,15 +1176,6 @@ class Catalog_seed():
                 # of sources that overlap the detector in some integrations,
                 # but not this particular integration
                 status = 'on'
-                print('')
-                print('Going into on_detector: ')
-                print(x_frames)
-                print(y_frames)
-                print(framestart, frameend)
-                print(x_frames[framestart:frameend])
-                print(y_frames[framestart:frameend])
-                print(stamp.shape)
-                print(newdimsx, newdimsy)
                 status = self.on_detector(x_frames[framestart:frameend],
                                           y_frames[framestart:frameend],
                                           stamp.shape, (newdimsx, newdimsy))
@@ -2063,8 +2052,6 @@ class Catalog_seed():
             be close to 1.0 (not exactly 1.0 due to asymmetries and distortion)
         """
         # PSF will always be centered in this initial call
-        #psf_x_loc = self.psf_library_x_dim // 2
-        #psf_y_loc = self.psf_library_y_dim // 2
         psf_x_loc = psf_dim_x // 2
         psf_y_loc = psf_dim_y // 2
 
@@ -2085,8 +2072,8 @@ class Catalog_seed():
         offset_y = np.int((full_wing_y_dim - psf_dim_y) / 2)
 
         full_psf = copy.deepcopy(self.psf_wings[offset_y:offset_y+psf_dim_y, offset_x:offset_x+psf_dim_x])
-
-        #print('full sized psf created with dimensions: ', full_psf.shape)
+        print('full_psf initial dimensions: ', full_psf.shape)
+        print(offset_y, psf_dim_y, offset_x, psf_dim_x)
 
         # Get coordinates describing overlap between PSF image and the
         # full frame of the detector
@@ -2102,10 +2089,7 @@ class Catalog_seed():
         print('results: ')
         print(xcenter, ycenter, i1, i2, j1, j2, k1, k2, l1, l2)
 
-
         # Step 2
-        #if ((i1 (or k1?) > (psf_wing_half_width + psf_core_half_width)) or (i2 (or k1?) < )):
-        #    do not evaluate model
         # If the core of the psf lands at least partially on the detector
         # then we need to evaluate the psf library
         if ((k1 < (psf_wing_half_width_x + psf_core_half_width_x)) and
@@ -2113,25 +2097,17 @@ class Catalog_seed():
             (l1 < (psf_wing_half_width_y + psf_core_half_width_y)) and
             (l2 > (psf_wing_half_width_y - psf_core_half_width_y))):
 
-
-
-            #print('kl: ', k1, k2, l1, l2, psf_wing_half_width_x, psf_core_half_width_x)
-
-
-
             # Step 3
             # Get coordinates decribing overlap between the evaluated psf
             # core and the full frame of the detector. We really only need
             # the xpts_core and ypts_core from this in order to know how
             # to evaluate the library
-            #psf_core_dims = np.array(self.psf_library.data.shape[-2:]) / self.psf_library.oversampling
-            #psf_core_x_loc = psf_core_dims[1] // 2
-            #psf_core_y_loc = psf_core_dims[0] // 2
             psf_core_dims = (self.psf_library_core_y_dim, self.psf_library_core_x_dim)
             xc_core, yc_core, xpts_core, ypts_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), \
                 (l1c, l2c) = self.create_psf_stamp_coords(x_location, y_location, psf_core_dims,
                                                           psf_core_half_width_x, psf_core_half_width_y,
                                                           coord_sys='full_frame', ignore_detector=ignore_detector)
+
 
 
             print('coordinates for core: ')
@@ -2145,25 +2121,25 @@ class Catalog_seed():
 
 
 
+
+
+
             # PSFs in GriddedPSFModel by default have a total signal equal
             # to the square of the oversampling factor. They must be scaled
             # down by that factor to be equivalent to the webbpsf output,
             # where the summed signal is close to 1.0
             flux_scaling_factor = self.psf_library.oversampling**2
-            #psf = self.psf_library.evaluate(x=xpts, y=ypts, flux=flux_scaling_factor,
-            #                                x_0=xcenter, y_0=ycenter)
+
             # Step 4
-            print(np.min(xpts_core), np.max(xpts_core), xc_core, yc_core)
             psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
                                             x_0=xc_core, y_0=yc_core)
-            print('left edge signal:', psf[25, 0])
-            #print('total signal in psf core: ', np.sum(psf))
 
             # Step 5
             wing_start_x = k1c + delta_core_to_wing_x
             wing_end_x = k2c + delta_core_to_wing_x
             wing_start_y = l1c + delta_core_to_wing_y
             wing_end_y = l2c + delta_core_to_wing_y
+
 
             print('evaluated psf shape: ', psf.shape)
             print(wing_start_x, wing_end_x, wing_start_y, wing_end_y)
@@ -2175,24 +2151,11 @@ class Catalog_seed():
             hhhl = fits.HDUList([hhh0, hhh1])
             hhhl.writeto('evaluated_psf_{}_{}.fits'.format(x_location, y_location), overwrite=True)
 
-
-            print('wings: ')
-            print(full_psf[25+delta_core_to_wing_y:28+delta_core_to_wing_x, delta_core_to_wing_x])
-
-
-            #print('total signal in original wing psf:', np.sum(full_psf))
             full_psf[wing_start_y:wing_end_y, wing_start_x:wing_end_x] = psf
-            #print('total signal in wing psf with new core inserted:', np.sum(full_psf))
 
-            print('psf core: ')
-            print(psf[25:28, 0])
-            print('modified wings: ')
-            print(full_psf[25+delta_core_to_wing_y:28+delta_core_to_wing_x, delta_core_to_wing_x])
-
-
-
-
-        #print('kl outside if: ', k1, k2, l1, l2, psf_wing_half_width_x, psf_core_half_width_x)
+        # Whether or not the core is on the detector, crop the PSF
+        # to the proper shape based on how much is on the detector
+        full_psf = full_psf[l1:l2, k1:k2]
 
         return full_psf, k1, l1
 
