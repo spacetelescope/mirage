@@ -56,7 +56,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     return library
 
 
-def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_path):
+def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_path, wings=False):
     """Given an instrument and filter name along with the path of
     the PSF library, find the appropriate library file to load.
 
@@ -140,8 +140,12 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
 
         file_wfe_grp = header['OPDSLICE']
 
-        match = (file_inst == instrument and file_det == detector and file_filt == filt and
-                 file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
+        if not wings:
+            match = (file_inst == instrument and file_det == detector and file_filt == filt and
+                     file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
+        else:
+            match = (file_inst == instrument and file_det == detector and file_filt == filt and
+                     file_pupil == pupil and file_wfe == wfe)
 
         if match:
             matches.append(filename)
@@ -168,7 +172,7 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
     """
     # Find the file containing the PSF wings
     wings_file = get_library_file(instrument, detector, filtername, pupilname,
-                                  wavefront_error, wavefront_error_group, library_path)
+                                  wavefront_error, wavefront_error_group, library_path, wings=True)
     print("PSF wings will be from: {}".format(os.path.basename(wings_file)))
     with fits.open(wings_file) as hdulist:
         psf_wing = hdulist['DET_SAMP'].data
