@@ -186,19 +186,6 @@ class Catalog_seed():
                    .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
             self.psf_wing_sizes['number_of_pixels'][too_large] = max_wing_size
 
-        #self.max_psf_wing_size = np.max(self.psf_wing_sizes['number_of_pixels'])
-
-        #if self.params['simSignals']['add_psf_wings']:
-        #    self.psf_wings = self.get_psf_wings()
-            # self.psf_library_y_dim, self.psf_library_x_dim = ???
-        #else:
-        #    self.psf_wings = {}
-            # self.psf_library_y_dim, self.psf_library_x_dim = psf_core_y_dim, psf_core_x_dim
-
-        # self.psf_library_y_dim, self.psf_library_x_dim = self.psf_library.data.shape[-2:]
-        # self.psf_library_x_dim = np.int(self.psf_library_x_dim / self.psf_library.oversampling)
-        # self.psf_library_y_dim = np.int(self.psf_library_y_dim / self.psf_library.oversampling)
-
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             print('Creating signal rate image of synthetic inputs.')
@@ -1074,8 +1061,8 @@ class Catalog_seed():
                 continue
 
             # Create the PSF
-            eval_psf, minx, miny = self.create_psf_stamp(pixelx, pixely, psf_x_dim, psf_x_dim,
-                                                         ignore_detector=True)
+            eval_psf, minx, miny, wings_added = self.create_psf_stamp(pixelx, pixely, psf_x_dim, psf_x_dim,
+                                                                      ignore_detector=True)
 
             if input_type == 'pointSource':
                 stamp = eval_psf
@@ -1954,8 +1941,8 @@ class Catalog_seed():
             # Assume same PSF size in x and y
             psf_y_dim = psf_x_dim
 
-            scaled_psf, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                             psf_x_dim, psf_y_dim)
+            scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
+                                                                          psf_x_dim, psf_y_dim)
             scaled_psf *= entry['countrate_e/s']
 
             # PSF may not be centered in array now if part of the array falls
@@ -1968,8 +1955,12 @@ class Catalog_seed():
             # of the pixel), then we shift the wing->core offset by 1.
             # We also need to shift the location of the wing array on the
             # detector by 1
-            x_delta = int(np.modf(entry['pixelx'])[0] > 0.5)
-            y_delta = int(np.modf(entry['pixely'])[0] > 0.5)
+            if wings_added:
+                x_delta = int(np.modf(entry['pixelx'])[0] > 0.5)
+                y_delta = int(np.modf(entry['pixely'])[0] > 0.5)
+            else:
+                x_delta = 0
+                y_delta = 0
 
             # Get the coordinates that describe the overlap between the
             # PSF image and the output aperture
@@ -2053,6 +2044,8 @@ class Catalog_seed():
         # If no wings are to be added, then we can skip all the wing-
         # and pixel phase-related work below.
         if ((self.params['simSignals']['add_psf_wings'] is False) or (delta_core_to_wing_x <= 0)):
+            add_wings = False
+
             # Get coordinates decribing overlap between the evaluated psf
             # core and the full frame of the detector. We really only need
             # the xpts_core and ypts_core from this in order to know how
@@ -2062,13 +2055,8 @@ class Catalog_seed():
             xc_core, yc_core, xpts_core, ypts_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), \
                 (l1c, l2c) = self.create_psf_stamp_coords(x_location, y_location, psf_core_dims,
                                                           psf_core_half_width_x, psf_core_half_width_y,
-                                                          coord_sys='full_frame', ignore_detector=ignore_detector)
-
-
-            print(x_location, y_location, psf_core_dims, psf_core_half_width_x, psf_core_half_width_y)
-            print(xc_core, yc_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), (l1c, l2c))
-            print(np.min(xpts_core), np.max(xpts_core), np.min(ypts_core), np.max(ypts_core))
-
+                                                          coord_sys='full_frame',
+                                                          ignore_detector=ignore_detector)
 
             # PSFs in GriddedPSFModel by default have a total signal equal
             # to the square of the oversampling factor. They must be scaled
@@ -2083,6 +2071,7 @@ class Catalog_seed():
             l1 = l1c
 
         else:
+            add_wings = True
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
             # We also need to shift the location of the wing array on the
@@ -2158,7 +2147,7 @@ class Catalog_seed():
             # to the proper shape based on how much is on the detector
             full_psf = full_psf[l1:l2, k1:k2]
 
-        return full_psf, k1, l1
+        return full_psf, k1, l1, add_wings
 
     def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y,
                                 coord_sys='full_frame', ignore_detector=False):
@@ -2996,15 +2985,19 @@ class Catalog_seed():
                 galdims = stamp.shape
 
             # Get the PSF which will be convolved with the galaxy profile
-            psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                            psf_shape[1], psf_shape[0], ignore_detector=True)
+            psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
+                                                                         psf_shape[1], psf_shape[0], ignore_detector=True)
 
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
             # We also need to shift the location of the wing array on the
             # detector by 1
-            x_delta = int(np.modf(entry['pixelx'])[0] > 0.5)
-            y_delta = int(np.modf(entry['pixely'])[0] > 0.5)
+            if wings_added:
+                x_delta = int(np.modf(entry['pixelx'])[0] > 0.5)
+                y_delta = int(np.modf(entry['pixely'])[0] > 0.5)
+            else:
+                x_delta = 0
+                y_delta = 0
 
             # Calculate the coordinates describing the overlap between
             # the PSF image and the galaxy image
@@ -3297,15 +3290,19 @@ class Catalog_seed():
                     stamp_dims = stamp.shape
 
                 # Create the PSF
-                psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                                psf_shape[1], psf_shape[0], ignore_detector=True)
+                psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
+                                                                             psf_shape[1], psf_shape[0], ignore_detector=True)
 
                 # If the source subpixel location is beyond 0.5 (i.e. the edge
                 # of the pixel), then we shift the wing->core offset by 1.
                 # We also need to shift the location of the wing array on the
                 # detector by 1
-                x_delta = int(np.modf(entry['pixelx'])[0] > 0.5)
-                y_delta = int(np.modf(entry['pixely'])[0] > 0.5)
+                if wings_added:
+                    x_delta = int(np.modf(entry['pixelx'])[0] > 0.5)
+                    y_delta = int(np.modf(entry['pixely'])[0] > 0.5)
+                else:
+                    x_delta = 0
+                    y_delta = 0
 
                 # Calculate the coordinates describing the overlap
                 # between the extended image and the PSF image
