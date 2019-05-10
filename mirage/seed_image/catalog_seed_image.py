@@ -2064,6 +2064,12 @@ class Catalog_seed():
                                                           psf_core_half_width_x, psf_core_half_width_y,
                                                           coord_sys='full_frame', ignore_detector=ignore_detector)
 
+
+            print(x_location, y_location, psf_core_dims, psf_core_half_width_x, psf_core_half_width_y)
+            print(xc_core, yc_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), (l1c, l2c))
+            print(np.min(xpts_core), np.max(xpts_core), np.min(ypts_core), np.max(ypts_core))
+
+
             # PSFs in GriddedPSFModel by default have a total signal equal
             # to the square of the oversampling factor. They must be scaled
             # down by that factor to be equivalent to the webbpsf output,
