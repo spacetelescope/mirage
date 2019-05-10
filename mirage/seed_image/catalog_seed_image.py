@@ -249,19 +249,6 @@ class Catalog_seed():
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
-    def get_psf_wings(self):
-        """Locate and read in images of the PSF wings to optionally be
-        added to the gridded PSF core. This function creates self.psf_wings
-        which is a dictionary of {max_count_rate: psf_wing_image}
-        """
-        if self.params['simSignals']['add_psf_wings']:
-            # Locate fits files containing the PSF wing images. Assume they
-            # are in the same directory as the PSF libraries
-            something
-        else:
-            self.psf_wings = {}
-
-
     def extract_full_from_pom(self, seedimage, seed_segmap):
         """ Given the seed image and segmentation images for the NIRISS POM field of view,
         extract the central 2048x2048 pixel area where the detector sits.  The routine is only
@@ -1993,10 +1980,21 @@ class Catalog_seed():
             stamp_y_loc = psf_y_dim // 2 - min_y
             updated_psf_dimensions = scaled_psf.shape
 
+            # If the source subpixel location is beyond 0.5 (i.e. the edge
+            # of the pixel), then we shift the wing->core offset by 1.
+            # We also need to shift the location of the wing array on the
+            # detector by 1
+            x_delta = 0
+            y_delta = 0
+            if np.modf(entry['pixelx'])[0] > 0.5:
+                x_delta = 1
+            if np.modf(entry['pixely'])[0] > 0.5:
+                y_delta = 1
+
             # Get the coordinates that describe the overlap between the
             # PSF image and the output aperture
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
-                (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+                (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                         updated_psf_dimensions,
                                                         stamp_x_loc, stamp_y_loc,
                                                         coord_sys='aperture')
@@ -2039,6 +2037,12 @@ class Catalog_seed():
             Y-coordinate of the PSF in the coordinate system of the
             aperture being simulated.
 
+        psf_dim_x : int
+            Number of columns of the array containing the PSF
+
+        psf_dim_y : int
+            Number of rows of the array containing the PSF
+
         ignore_detector : bool
             If True, the returned coordinates can have values outside the
             size of the subarray/detector (i.e. coords can be negative or
@@ -2051,7 +2055,7 @@ class Catalog_seed():
             2D array containing the normalized PSF image. Total signal should
             be close to 1.0 (not exactly 1.0 due to asymmetries and distortion)
         """
-        # PSF will always be centered in this initial call
+        # PSF will always be centered
         psf_x_loc = psf_dim_x // 2
         psf_y_loc = psf_dim_y // 2
 
@@ -2065,6 +2069,23 @@ class Catalog_seed():
         delta_core_to_wing_x = psf_wing_half_width_x - psf_core_half_width_x
         delta_core_to_wing_y = psf_wing_half_width_y - psf_core_half_width_y
 
+        # If the source subpixel location is beyond 0.5 (i.e. the edge
+        # of the pixel), then we shift the wing->core offset by 1.
+        # We also need to shift the location of the wing array on the
+        # detector by 1
+        x_location_delta = 0
+        y_location_delta = 0
+        if np.modf(x_location)[0] > 0.5:
+            delta_core_to_wing_x -= 1
+            x_location_delta = 1
+        if np.modf(y_location)[0] > 0.5:
+            delta_core_to_wing_y -= 1
+            y_location_delta = 1
+
+        # offset_x, and y below will not change because that is
+        # the offset between the full wing array and the user-specified
+        # wing array size
+
         # Get the psf wings array - first the nominal size
         # Later we may crop if the source is only partially on the detector
         full_wing_y_dim, full_wing_x_dim = self.psf_wings.shape
@@ -2072,22 +2093,23 @@ class Catalog_seed():
         offset_y = np.int((full_wing_y_dim - psf_dim_y) / 2)
 
         full_psf = copy.deepcopy(self.psf_wings[offset_y:offset_y+psf_dim_y, offset_x:offset_x+psf_dim_x])
-        print('full_psf initial dimensions: ', full_psf.shape)
-        print(offset_y, psf_dim_y, offset_x, psf_dim_x)
+        #print('full_psf initial dimensions: ', full_psf.shape)
+        #print(offset_y, psf_dim_y, offset_x, psf_dim_x)
 
         # Get coordinates describing overlap between PSF image and the
         # full frame of the detector
         # Step 1
         xcenter, ycenter, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
-            (l1, l2) = self.create_psf_stamp_coords(x_location, y_location, (psf_dim_y,
-                                                    psf_dim_x), psf_x_loc, psf_y_loc,
+            (l1, l2) = self.create_psf_stamp_coords(x_location+x_location_delta, y_location+y_location_delta,
+                                                    (psf_dim_y, psf_dim_x), psf_x_loc, psf_y_loc,
                                                     coord_sys='full_frame', ignore_detector=ignore_detector)
 
-        print('coordinates of full psf on detector: ')
-        print('inputs:')
-        print(x_location, y_location, (psf_dim_y, psf_dim_x), psf_x_loc, psf_y_loc)
-        print('results: ')
-        print(xcenter, ycenter, i1, i2, j1, j2, k1, k2, l1, l2)
+        #print('coordinates of full psf on detector: ')
+        #print('inputs:')
+        #print(x_location, y_location, (psf_dim_y, psf_dim_x), psf_x_loc, psf_y_loc)
+        #print(full_psf.shape)
+        #print('results: ')
+        #print(xcenter, ycenter, i1, i2, j1, j2, k1, k2, l1, l2)
 
         # Step 2
         # If the core of the psf lands at least partially on the detector
@@ -2102,6 +2124,7 @@ class Catalog_seed():
             # core and the full frame of the detector. We really only need
             # the xpts_core and ypts_core from this in order to know how
             # to evaluate the library
+            # Note that we don't care about the pixel phase here.
             psf_core_dims = (self.psf_library_core_y_dim, self.psf_library_core_x_dim)
             xc_core, yc_core, xpts_core, ypts_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), \
                 (l1c, l2c) = self.create_psf_stamp_coords(x_location, y_location, psf_core_dims,
@@ -2110,19 +2133,14 @@ class Catalog_seed():
 
 
 
-            print('coordinates for core: ')
-            print('inputs:')
-            print(x_location, y_location, psf_core_dims, psf_core_half_width_x, psf_core_half_width_y)
-            print('results:')
-            print(np.min(xpts_core), np.max(xpts_core))
-            print(xc_core, yc_core, i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c)
-            print(xpts_core.shape, np.min(xpts_core), np.max(xpts_core))
-            print('')
-
-
-
-
-
+            #print('coordinates for core: ')
+            #print('inputs:')
+            #print(x_location, y_location, psf_core_dims, psf_core_half_width_x, psf_core_half_width_y)
+            #print('results:')
+            #print(np.min(xpts_core), np.max(xpts_core))
+            #print(xc_core, yc_core, i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c)
+            #print(xpts_core.shape, np.min(xpts_core), np.max(xpts_core))
+            #print('')
 
             # PSFs in GriddedPSFModel by default have a total signal equal
             # to the square of the oversampling factor. They must be scaled
@@ -2141,17 +2159,21 @@ class Catalog_seed():
             wing_end_y = l2c + delta_core_to_wing_y
 
 
-            print('evaluated psf shape: ', psf.shape)
-            print(wing_start_x, wing_end_x, wing_start_y, wing_end_y)
-            print(delta_core_to_wing_x, delta_core_to_wing_y)
-            print(k1c, k2c, l1c, l2c)
+            #print('evaluated psf shape: ', psf.shape)
+            #print(wing_start_x, wing_end_x, wing_start_y, wing_end_y)
+            #print(delta_core_to_wing_x, delta_core_to_wing_y)
+            #print(k1c, k2c, l1c, l2c)
 
-            hhh0 = fits.PrimaryHDU(psf)
-            hhh1 = fits.ImageHDU(full_psf)
-            hhhl = fits.HDUList([hhh0, hhh1])
-            hhhl.writeto('evaluated_psf_{}_{}.fits'.format(x_location, y_location), overwrite=True)
 
+            #test_psf = copy.deepcopy(full_psf)
             full_psf[wing_start_y:wing_end_y, wing_start_x:wing_end_x] = psf
+
+            #hhh0 = fits.PrimaryHDU(psf)
+            #hhh1 = fits.ImageHDU(test_psf)
+            #hhh2 = fits.ImageHDU(full_psf)
+            #hhhl = fits.HDUList([hhh0, hhh1, hhh2])
+            #hhhl.writeto('evaluated_psf_{}_{}.fits'.format(x_location, y_location), overwrite=True)
+
 
         # Whether or not the core is on the detector, crop the PSF
         # to the proper shape based on how much is on the detector
@@ -2237,13 +2259,8 @@ class Catalog_seed():
         (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, (out_dims_x, out_dims_y),
                                                                stamp_x, stamp_y, stamp_dims,
                                                                ignore_detector=ignore_detector)
-        try:
-            y_points, x_points = np.mgrid[j1:j2, i1:i2]
-        except:
-            print(j1, j2, i1, i2)
-            print(aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y, coord_sys, ignore_detector)
-            print(xpos, ypos, (out_dims_x, out_dims_y), stamp_x, stamp_y, stamp_dims)
-            stop
+        y_points, x_points = np.mgrid[j1:j2, i1:i2]
+
         return xpos, ypos, x_points, y_points, (i1, i2), (j1, j2), (k1, k2), (l1, l2)
 
     def ensure_odd_lengths(self, x_dim, y_dim, x_center, y_center):
@@ -3003,10 +3020,21 @@ class Catalog_seed():
             psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                             psf_shape[1], psf_shape[0], ignore_detector=True)
 
+            # If the source subpixel location is beyond 0.5 (i.e. the edge
+            # of the pixel), then we shift the wing->core offset by 1.
+            # We also need to shift the location of the wing array on the
+            # detector by 1
+            x_delta = 0
+            y_delta = 0
+            if np.modf(entry['pixelx'])[0] > 0.5:
+                x_delta = 1
+            if np.modf(entry['pixely'])[0] > 0.5:
+                y_delta = 1
+
             # Calculate the coordinates describing the overlap between
             # the PSF image and the galaxy image
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
-                (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+                (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                         galdims, galdims[1] // 2, galdims[0] // 2,
                                                         coord_sys='aperture')
 
@@ -3297,10 +3325,21 @@ class Catalog_seed():
                 psf_image, min_x, min_y = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                 psf_shape[1], psf_shape[0], ignore_detector=True)
 
+                # If the source subpixel location is beyond 0.5 (i.e. the edge
+                # of the pixel), then we shift the wing->core offset by 1.
+                # We also need to shift the location of the wing array on the
+                # detector by 1
+                x_delta = 0
+                y_delta = 0
+                if np.modf(entry['pixelx'])[0] > 0.5:
+                    x_delta = 1
+                if np.modf(entry['pixely'])[0] > 0.5:
+                    y_delta = 1
+
                 # Calculate the coordinates describing the overlap
                 # between the extended image and the PSF image
                 xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
-                    (l1, l2) = self.create_psf_stamp_coords(entry['pixelx'], entry['pixely'],
+                    (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                             stamp_dims, stamp_dims[1] // 2, stamp_dims[0] // 2,
                                                             coord_sys='aperture')
 

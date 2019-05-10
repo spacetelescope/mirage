@@ -175,8 +175,14 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
                                   wavefront_error, wavefront_error_group, library_path, wings=True)
     print("PSF wings will be from: {}".format(os.path.basename(wings_file)))
     with fits.open(wings_file) as hdulist:
-        psf_wing = hdulist['DET_SAMP'].data
+        psf_wing = hdulist['DET_DIST'].data
     # Crop the outer row and column in order to remove any potential edge
     # effects leftover from creation
     psf_wing = psf_wing[1:-1, 1:-1]
+
+    for shape in psf_wing.shape:
+        if shape % 2 == 0:
+            print(("WARNING: PSF wing file contains an even number of rows or columns. "
+                   "These must be even."))
+            raise ValueError
     return psf_wing
