@@ -11,6 +11,57 @@ from webbpsf.utils import to_griddedpsfmodel
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
 
 
+def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
+                               wavefront_error_type, wavefront_error_group, file_path,
+                               extname='PRIMARY'):
+    """Examine the header of the gridded PSF model file to confirm that
+    the properties of the data match those expected.
+
+    Parameters
+    ----------
+
+
+    Returns
+    -------
+    full_filename : str
+        Full path and filename if the file properties are as expected.
+        None if the properties do not match.
+    """
+    full_filename = os.path.join(file_path, filename)
+    with fits.open(full_filename) as hdulist:
+        header = hdulist[extname].header
+
+    inst = header['INSTRUME']
+    try:
+        det = header['DETECTOR']
+    except KeyError:
+        det = header['DET_NAME']
+    filt = header['FILTER']
+    try:
+        pupil = header['PUPIL']
+    except KeyError:
+        # If no pupil mask value is present, then assume the CLEAR is
+        # being used
+        if instrument.upper() == 'NIRCAM':
+            pupil = 'CLEAR'
+        elif instrument.upper() == 'NIRISS':
+            pupil = 'CLEARP'
+
+    opd_file = header['OPD_FILE']
+    if 'predicted' in opd_file:
+        wfe_type = 'predicted'
+    elif 'requirements' in opd_file:
+        wfe_type = 'requirements'
+    realization = header['OPDSLICE']
+
+    if inst.lower() == instrument.lower() and det.lower() == detector.lower() and \
+       filt.lower() == filtername.lower() and pupil.lower() == pupilname.lower() and \
+       wfe_type == wavefront_error_type.lower() and realization == wavefront_error_group:
+        return full_filename
+    else:
+        return None
+
+
 def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefront_error,
                             wavefront_error_group, library_path):
     """Find the filename for the appropriate gridded PSF library and
@@ -30,7 +81,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     pupilname : str
         Name of pupil wheel element used for PSF library creation
 
-    wavefront_errpr : str
+    wavefront_error : str
         Wavefront error. Can be 'predicted' or 'requirements'
 
     wavefront_error__group : int
@@ -45,8 +96,33 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         Object containing PSF library
 
     """
-    library_file = get_library_file(instrument, detector, filtername, pupilname,
-                                    wavefront_error, wavefront_error_group, library_path)
+    # First, as a way to save time, let's assume a file naming convention
+    # and search for the appropriate file that way. If we find a match,
+    # confirm the properties of the file via the header. This way we don't
+    # need to open and examine every file in the gridded library, which
+    # saves at least a handful of seconds.
+    default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
+                                                                                        detector.lower(),
+                                                                                        filtername.lower(),
+                                                                                        pupilname.lower(),
+                                                                                        wavefront_error.lower(),
+                                                                                        wavefront_error_group)
+    default_matches = glob(os.path.join(library_path, default_file_pattern))
+
+    library_file = None
+    if len(default_matches) == 1:
+        library_file = confirm_gridded_properties(default_matches[0], instrument, detector, filtername,
+                                                  pupilname, wavefront_error, wavefront_error_group,
+                                                  library_path)
+
+    # If the above search found no matching files, or multiple matching
+    # files (based only on filename), or if the matching file's gridded
+    # PSF model properties don't match what's expected, then resort to
+    # opening and examining all files in the library.
+    if library_file is None:
+        library_file = get_library_file(instrument, detector, filtername, pupilname,
+                                        wavefront_error, wavefront_error_group, library_path)
+
     print("PSFs will be generated using: {}".format(os.path.basename(library_file)))
 
     try:
@@ -170,9 +246,34 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
     pulled out of this array for each input source depending on its
     magnitude.
     """
-    # Find the file containing the PSF wings
-    wings_file = get_library_file(instrument, detector, filtername, pupilname,
-                                  wavefront_error, wavefront_error_group, library_path, wings=True)
+    # First, as a way to save time, let's assume a file naming convention
+    # and search for the appropriate file that way. If we find a match,
+    # confirm the properties of the file via the header. This way we don't
+    # need to open and examine every file in the gridded library, which
+    # saves at least a handful of seconds.
+    default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_{}_realization{}.fits'.format(instrument.lower(),
+                                                                                  detector.lower(),
+                                                                                  filtername.lower(),
+                                                                                  pupilname.lower(),
+                                                                                  wavefront_error.lower(),
+                                                                                  wavefront_error_group)
+    default_matches = glob(os.path.join(library_path, default_file_pattern))
+
+    wings_file = None
+    if len(default_matches) == 1:
+        wings_file = confirm_gridded_properties(default_matches[0], instrument, detector, filtername,
+                                                pupilname, wavefront_error, wavefront_error_group,
+                                                library_path, extname='DET_DIST')
+
+    # If the above search found no matching files, or multiple matching
+    # files (based only on filename), or if the matching file's gridded
+    # PSF model properties don't match what's expected, then resort to
+    # opening and examining all files in the library.
+    if wings_file is None:
+        # Find the file containing the PSF wings
+        wings_file = get_library_file(instrument, detector, filtername, pupilname,
+                                      wavefront_error, wavefront_error_group, library_path, wings=True)
+
     print("PSF wings will be from: {}".format(os.path.basename(wings_file)))
     with fits.open(wings_file) as hdulist:
         psf_wing = hdulist['DET_DIST'].data
