@@ -1,5 +1,33 @@
 #! /usr/bin/env python
 
+"""This module contains code to locate the appropriate PSF library files
+to use for a given simulation. It supports the selection of one PSF
+"core" file, which is assumed to contain a 3D array of PSFs that is read
+into a ``griddedPSFmodel`` instance, as well as a single PSF "wings" file,
+which contains a single PSF instance.
+
+For both of these files, once they are identified, they are read in via
+the appropriate mechanisms for the data they contain, and the resulting
+object is returned.
+
+Author
+------
+
+    - Bryan Hilbert
+
+Use
+---
+
+    This module can be imported and called as such:
+    ::
+        from mirage.psf import psf_selction
+        library = psf_selection.get_gridded_psf_library('nircam', 'nrcb1',
+                                                        'f200w', 'clear',
+                                                        'predicted', 0,
+                                                        '/path/to/library/')
+"""
+
+
 from copy import copy
 from glob import glob
 import os
@@ -19,7 +47,32 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
 
     Parameters
     ----------
+    filename : str
+        Base name of the PSF library file to be checked
 
+    instrument : str
+        Name of instrument the PSFs are from
+
+    detector : str
+        Name of the detector within ```instrument```
+
+    filtername : str
+        Name of filter used for PSF library creation
+
+    pupilname : str
+        Name of pupil wheel element used for PSF library creation
+
+    wavefront_error_type : str
+        Wavefront error. Can be 'predicted' or 'requirements'
+
+    wavefront_error_group : int
+        Wavefront error realization group. Must be an integer from 0 - 9.
+
+    file_path : str
+        Path pointing to the location of the PSF library
+
+    extname : str
+        Name of the extension within ``filename`` to check
 
     Returns
     -------
@@ -29,7 +82,7 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
     """
     full_filename = os.path.join(file_path, filename)
     with fits.open(full_filename) as hdulist:
-        header = hdulist[extname].header
+        header = hdulist[extname.upper()].header
 
     inst = header['INSTRUME']
     try:
@@ -84,7 +137,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     wavefront_error : str
         Wavefront error. Can be 'predicted' or 'requirements'
 
-    wavefront_error__group : int
+    wavefront_error_group : int
         Wavefront error realization group. Must be an integer from 0 - 9.
 
     library_path : str
@@ -161,7 +214,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
 
     Returns
     --------
-    lib_file : str
+    matches : str
         Name of the PSF library file for the instrument and filtername
     """
     psf_files = glob(os.path.join(library_path, '*.fits'))
@@ -245,6 +298,36 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
     Later, when making the seed image, the appropriate subarray will be
     pulled out of this array for each input source depending on its
     magnitude.
+
+    Parameters
+    ----------
+    instrument : str
+        Name of instrument the PSFs are from
+
+    detector : str
+        Name of the detector within ```instrument```
+
+    filtername : str
+        Name of filter used for PSF library creation
+
+    pupilname : str
+        Name of pupil wheel element used for PSF library creation
+
+    wavefront_error : str
+        Wavefront error. Can be 'predicted' or 'requirements'
+
+    wavefront_error_group : int
+        Wavefront error realization group. Must be an integer from 0 - 9.
+
+    library_path : str
+        Path pointing to the location of the PSF library
+
+    Returns
+    -------
+    psf_wings : numpy.ndarray
+        Array containing the PSF wing data. Note that the outermost row
+        and column are not returned, in order to avoid edge effects
+
     """
     # First, as a way to save time, let's assume a file naming convention
     # and search for the appropriate file that way. If we find a match,
