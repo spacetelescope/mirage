@@ -1990,7 +1990,8 @@ class Catalog_seed():
                                                         filter_name)
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
-            specific_mag_col = "fgs_magnitude"
+            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
+            filter_name = 'none'
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
