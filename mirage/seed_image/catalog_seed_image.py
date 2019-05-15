@@ -38,7 +38,7 @@ from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
-from ..utils.constants import grism_factor
+from ..utils.constants import grism_factor, TSO_MODES
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -219,6 +219,12 @@ class Catalog_seed():
                 self.seedimage = self.combineSimulatedDataSources('ramp', self.seedimage, trailed_ramp)
             self.seed_segmap += trailed_segmap
 
+        # TSO and Grism TSO mode here
+        if self.params['Inst']['mode'] in TSO_MODES:
+            tso_seed, tso_segmap = self.create_tso_seed()
+            self.seedimage += tso_seed
+            self.seed_segmap += tso_segmap
+
         # For seed images to be dispersed in WFSS mode,
         # embed the seed image in a full frame array. The disperser
         # tool does not work on subarrays
@@ -235,6 +241,48 @@ class Catalog_seed():
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
+
+    def create_tso_seed(self):
+        """Create a seed image for time series or grism time series
+        sources. Just like for moving targets, the seed image will
+        be 4D
+
+        Returns
+        -------
+        seed : numpy.ndarray
+            4D array seed image.
+
+        segmap : numpy.ndarray
+            Segmentation map (2d?)
+        """
+        # Read in the TSO catalog. This is only for TSO mode, not
+        # grism TSO, which will need a different catalog format.
+        if self.params['Inst']['mode'].lower() == 'tso':
+            tso_cat = self.readPointSourceFile(self.params['simSignals']['tso_catalog'])
+
+            # Create lists of seed images and segmentation maps for all
+            # TSO objects
+            tso_seeds = []
+            tso_segs = []
+            tso_lightcurves = []
+            for source in tso_cat:
+                seed, seg = self.make_point_source_image(tso_cat[source])
+                tso_seeds.append(seed)
+                tso_segs.append(seg)
+                lightcurve = read_lightcurve(source['lightcurve_file'], source['index'])
+                tso_lightcurves.append(lightcurve)
+
+            # Add the TSO sources to the seed image and segmentation map
+            seed, segmap = add_tso_sources(self.seedimage, self.seed_segmap, tso_seeds, tso_segs,
+                                           lightcurve_list, self.frametime, samples_per_frametime)
+
+            print("Set these as the outputs of the call to add_tso_sources once testing is complete")
+            self.seedimage = seed
+            self.seed_segmap = segmap
+        else:
+            print('Grism TSO not yet supported!')
+            # Catalog will be different format here
+            # Different lightcurves for different filters/wavelengths?
 
     def extract_full_from_pom(self, seedimage, seed_segmap):
         """ Given the seed image and segmentation images for the NIRISS POM field of view,

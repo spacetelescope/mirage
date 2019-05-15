@@ -104,6 +104,73 @@ def open(filename):
     return contents
 
 
+def open_tso(filename):
+    """Read in an hdf5 file containing TSO data
+
+    Parameters
+    ----------
+    filename : str
+        Name of file to be opened
+
+    Returns
+    -------
+    contents : dict
+        Dictionary containing the contents of the file
+        Dictionary format:
+        keys are the index numbers of the sources corresponding to the segmentation map
+        Each value is a dictionary containing keys 'times' and 'fluxes'.
+        'times' is an astropy.units Quantity composed of a list of time values
+        and a time unit
+        'fluxes' is an astropy.units Quantity composed of a list of flux values with flux unit
+    """
+    contents = {}
+    with h5py.File(filename, 'r') as file_obj:
+        no_time_units = False
+        no_flux_units = False
+        for key in file_obj.keys():
+            dataset = file_obj[key]
+            try:
+                time_units_string = dataset.attrs['time_units']
+            except KeyError:
+                time_units_string = 'second'
+                no_time_units = True
+            try:
+                flux_units_string = dataset.attrs['flux_units']
+            except KeyError:
+                flux_units_string = 'normalized'
+                no_flux_units = True
+
+            # Catch common errors
+            if time_units_string.lower() in ['seconds', 'minutes', 'hours', 'days']:
+                time_units_string = time_units_string[0:-1]
+
+            # Convert the unit strings into astropy.units Unit object
+            time_units = string_to_units(time_units_string)
+            flux_units = string_to_units(flux_units_string)
+
+            # Get the data
+            times = dataset[0] * time_units
+            fluxes = dataset[1] * flux_units
+
+            # Convert times to seconds and flux values to f_lambda in cgs
+            if time_units != u.second:
+                if time_units.is_equivalent(u.second):
+                    times = times.to(u.second)
+                else:
+                    raise ValueError("Time units of {} in dataset {} are not compatible with seconds."
+                                     .format(time_units, key))
+            if flux_units != u.pct:
+                raise ValueError("Flux units are assumed to be normalized. But units in dataset {} are {}."
+                                 .format(key, flux_units))
+
+            contents[int(key)] = {'times': times, 'fluxes': fluxes}
+    if no_time_units:
+        print("{}: No time units provided. Assuming SECONDS.".format(filename))
+    if no_flux_units:
+        print("{}: No flux density units provided. Assuming light curve is normalized.".format(filename))
+    return contents
+
+
 def save(contents, filename, wavelength_unit='', flux_unit=''):
     """Save a dictionary into an hdf5 file
 
@@ -147,6 +214,53 @@ def save(contents, filename, wavelength_unit='', flux_unit=''):
             # Set dataset units. Not currently inspected by mirage.
             if wavelength_units != '':
                 dset.attrs[u'wavelength_units'] = wavelength_units
+            if flux_units != '':
+                dset.attrs[u'flux_units'] = flux_units
+
+
+def save_tso(contents, filename, time_unit='', flux_unit=''):
+    """Save a dictionary of TSO data into an hdf5 file
+
+    Paramters
+    ---------
+    contents : dict
+        Dictionary of data. Dictionary format:
+        keys are the index numbers of the sources corresponding to the segmentation map
+        Each value is a dictionary containing keys 'times' and 'fluxes'.
+        'times' is an astropy.units Quantity composed of a list oftime values
+        and time units
+        'fluxes' is an astropy.units Quantity composed of a list of flux values with flux units
+
+    filename : str
+        Name of hdf5 file to produce
+    """
+    with h5py.File(filename, "w") as file_obj:
+        for key in contents.keys():
+            flux = contents[key]['fluxes']
+            time = contents[key]['times']
+
+            # If units are astropy.units Units objects, change to strings
+            # If wavelengths are not a Quantity, fall back onto wavelength_unit
+            # and flux_unit
+            if isinstance(time, u.quantity.Quantity):
+                time_units = units_to_string(time.unit)
+                time_values = time.value
+            else:
+                time_units = time_unit
+                time_values = time
+            if isinstance(flux, u.quantity.Quantity):
+                flux_units = units_to_string(flux.unit)
+                flux_values = flux.value
+            else:
+                flux_units = flux_unit
+                flux_values = flux
+
+            dset = file_obj.create_dataset(str(key), data=[time_values, flux_values], dtype='f',
+                                           compression="gzip", compression_opts=9)
+
+            # Set dataset units. Not currently inspected by mirage.
+            if time_units != '':
+                dset.attrs[u'time_units'] = time_units
             if flux_units != '':
                 dset.attrs[u'flux_units'] = flux_units
 

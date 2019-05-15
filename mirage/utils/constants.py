@@ -26,6 +26,8 @@ FNU_MKS_UNITS = u.watt / u.m**2 / u.Hz
 CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
                         'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
 
+TSO_MODES = ['tso', 'ts_wfss']
+
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when
