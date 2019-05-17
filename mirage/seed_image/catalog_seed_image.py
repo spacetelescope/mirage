@@ -34,6 +34,7 @@ import pysiaf
 
 from . import moving_targets
 from . import segmentation_map as segmap
+from mirage.seed_image import tso
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
@@ -136,6 +137,9 @@ class Catalog_seed():
                                                self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
 
+        # Get information on the number of frames
+        self.get_frame_count_info()
+
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
         self.prepare_PAM()
@@ -221,9 +225,7 @@ class Catalog_seed():
 
         # TSO and Grism TSO mode here
         if self.params['Inst']['mode'] in TSO_MODES:
-            tso_seed, tso_segmap = self.create_tso_seed()
-            self.seedimage += tso_seed
-            self.seed_segmap += tso_segmap
+            self.create_tso_seed()
 
         # For seed images to be dispersed in WFSS mode,
         # embed the seed image in a full frame array. The disperser
@@ -257,8 +259,8 @@ class Catalog_seed():
         """
         # Read in the TSO catalog. This is only for TSO mode, not
         # grism TSO, which will need a different catalog format.
-        if self.params['Inst']['mode'].lower() == 'tso':
-            tso_cat = self.readPointSourceFile(self.params['simSignals']['tso_catalog'])
+        if self.params['Inst']['mode'].lower() == 'ts_imaging':
+            tso_cat = self.getPointSourceList(self.params['simSignals']['tso_catalog'], source_type='ts_imaging')
 
             # Create lists of seed images and segmentation maps for all
             # TSO objects
@@ -266,15 +268,25 @@ class Catalog_seed():
             tso_segs = []
             tso_lightcurves = []
             for source in tso_cat:
-                seed, seg = self.make_point_source_image(tso_cat[source])
+
+                # Place row in an empty table
+                t = tso_cat[:0].copy()
+                t.add_row(source)
+
+                # Create the seed image contribution from each source
+                seed, seg = self.make_point_source_image(t)
                 tso_seeds.append(seed)
                 tso_segs.append(seg)
-                lightcurve = read_lightcurve(source['lightcurve_file'], source['index'])
+
+                lightcurve = tso.read_lightcurve(source['lightcurve_file'], source['index'])
                 tso_lightcurves.append(lightcurve)
 
             # Add the TSO sources to the seed image and segmentation map
-            seed, segmap = add_tso_sources(self.seedimage, self.seed_segmap, tso_seeds, tso_segs,
-                                           lightcurve_list, self.frametime, samples_per_frametime)
+            seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap, tso_seeds, tso_segs,
+                                               tso_lightcurves, self.frametime, self.total_frames,
+                                               self.frames_per_integration, self.params['Readout']['nint'],
+                                               self.params['Readout']['resets_bet_ints'],
+                                               samples_per_frametime=5)
 
             print("Set these as the outputs of the call to add_tso_sources once testing is complete")
             self.seedimage = seed
@@ -283,6 +295,26 @@ class Catalog_seed():
             print('Grism TSO not yet supported!')
             # Catalog will be different format here
             # Different lightcurves for different filters/wavelengths?
+
+    def get_frame_count_info(self):
+        """Calculate information on the number of frames per group and
+        per integration
+        """
+        numints = self.params['Readout']['nint']
+        numgroups = self.params['Readout']['ngroup']
+        numframes = self.params['Readout']['nframe']
+        numskips = self.params['Readout']['nskip']
+        numresets = self.params['Readout']['resets_bet_ints']
+
+        self.frames_per_group = numframes + numskips
+        self.frames_per_integration = numgroups * self.frames_per_group
+        self.total_frames = numgroups * self.frames_per_group
+
+        if numints > 1:
+            # Frames for all integrations
+            self.total_frames *= numints
+            # Add the resets for all but the first and last integrations
+            self.total_frames += (numresets * (numints - 1))
 
     def extract_full_from_pom(self, seedimage, seed_segmap):
         """ Given the seed image and segmentation images for the NIRISS POM field of view,
@@ -1666,11 +1698,29 @@ class Catalog_seed():
 
     #    return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
 
-    def getPointSourceList(self, filename):
-        # read in the list of point sources to add, and adjust the
-        # provided positions for astrometric distortion
+    def getPointSourceList(self, filename, source_type='pointsources'):
+        """Read in the list of point sources to add, calculate positions
+        on the detector, filter out sources outside the detector, and
+        calculate countrates corresponding to the given magnitudes
 
-        # find the array sizes of the PSF files in the library. Assume they are all the same.
+        Parameters
+        ----------
+        filename : str
+            Name of catalog file to examine
+
+        source_type : str
+            Flag specifying exactly what type of catalog is being read.
+            This is because there are small differences between catalog
+            types. Options are ``pointsources`` which is the default,
+            ``ts_imaging`` for time series, and ``ts_grism`` for grism
+            time series.
+
+        Returns
+        -------
+        pointSourceList : astropy.table.Table
+            Table containing source information
+        """
+        # Find the array sizes of the PSF files in the library. Assume they are all the same.
         # We want the distance from the PSF peak to the edge, assuming the peak is centered
         if self.params['simSignals']['psfwfe'] != 0:
             numstr = str(self.params['simSignals']['psfwfe'])
@@ -1702,8 +1752,8 @@ class Catalog_seed():
 
         pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees',
                                        'Dec_degrees', 'magnitude', 'countrate_e/s',
-                                       'counts_per_frame_e'),
-                                dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
+                                       'counts_per_frame_e', 'lightcurve_file'),
+                                dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f', 'S50'))
 
         try:
             lines, pixelflag, magsys = self.readPointSourceFile(filename)
@@ -1718,7 +1768,7 @@ class Catalog_seed():
         self.translate_psf_table(magsys)
 
         # File to save adjusted point source locations
-        psfile = self.params['Output']['file'][0:-5] + '_pointsources.list'
+        psfile = self.params['Output']['file'][0:-5] + '_{}.list'.format(source_type)
         pslist = open(psfile, 'w')
 
         # If the input catalog has an index column
@@ -1758,7 +1808,7 @@ class Catalog_seed():
                       (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny)))
         pslist.write('#\n')
         pslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
-                      "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
+                      "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame    TSO_lightcurve_catalog\n"))
 
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
@@ -1812,11 +1862,19 @@ class Catalog_seed():
                 entry.append(countrate)
                 entry.append(framecounts)
 
+                # Add the TSO catalog name if present
+                if source_type == 'ts_imaging':
+                    tso_catalog = values['lightcurve_file']
+                else:
+                    tso_catalog = 'None'
+                entry.append(tso_catalog)
+
                 # add the good point source, including location and counts, to the pointSourceList
                 pointSourceList.add_row(entry)
 
                 # write out positions, distances, and counts to the output file
-                pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts))
+                pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e  %s\n" %
+                             (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts, tso_catalog))
 
         self.n_pointsources = len(pointSourceList)
         print("Number of point sources found within the requested aperture: {}".format(self.n_pointsources))

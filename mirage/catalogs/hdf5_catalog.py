@@ -152,7 +152,7 @@ def open_tso(filename):
             times = dataset[0] * time_units
             fluxes = dataset[1] * flux_units
 
-            # Convert times to seconds and flux values to f_lambda in cgs
+            # Convert times to seconds
             if time_units != u.second:
                 if time_units.is_equivalent(u.second):
                     times = times.to(u.second)
