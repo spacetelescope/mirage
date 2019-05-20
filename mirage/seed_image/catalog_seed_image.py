@@ -140,6 +140,19 @@ class Catalog_seed():
         # Get information on the number of frames
         self.get_frame_count_info()
 
+        # If the total number of frames/pixels is larger than the file
+        # size cap can handle, then we need to break the exposure up
+        # into multiple chunks
+        #memory = self.estimate_memory()
+        #split_seed = False
+        #if memory > self.params['Output']['max_memory'] * 2048 * 2048:
+        if 1>0:
+            split_seed = True
+            #integration_segment_indexes = self.calculate_frame_splits()
+            integration_segment_indexes = [0, 10, 20, 30]
+            self.total_seed_segments = len(integration_segment_indexes) - 1
+            print('\n********************\nNeed integration split indexes from a new function\n****************\n')
+
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
         self.prepare_PAM()
@@ -225,7 +238,7 @@ class Catalog_seed():
 
         # TSO and Grism TSO mode here
         if self.params['Inst']['mode'] in TSO_MODES:
-            self.create_tso_seed()
+            self.create_tso_seed(split_seed=split_seed, integration_splits=integration_segment_indexes)
 
         # For seed images to be dispersed in WFSS mode,
         # embed the seed image in a full frame array. The disperser
@@ -244,7 +257,7 @@ class Catalog_seed():
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
-    def create_tso_seed(self):
+    def create_tso_seed(self, split_seed=False, integration_splits=-1):
         """Create a seed image for time series or grism time series
         sources. Just like for moving targets, the seed image will
         be 4D
@@ -281,12 +294,73 @@ class Catalog_seed():
                 lightcurve = tso.read_lightcurve(source['lightcurve_file'], source['index'])
                 tso_lightcurves.append(lightcurve)
 
-            # Add the TSO sources to the seed image and segmentation map
-            seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap, tso_seeds, tso_segs,
-                                               tso_lightcurves, self.frametime, self.total_frames,
-                                               self.frames_per_integration, self.params['Readout']['nint'],
-                                               self.params['Readout']['resets_bet_ints'],
-                                               samples_per_frametime=5)
+
+            print('SPLIT_SEED:', split_seed)
+            if not split_seed:
+
+                # Add the TSO sources to the seed image and segmentation map
+                seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap, tso_seeds, tso_segs,
+                                                   tso_lightcurves, self.frametime, self.total_frames,
+                                                   self.total_frames, self.frames_per_integration,
+                                                   self.params['Readout']['nint'],
+                                                   self.params['Readout']['resets_bet_ints'],
+                                                   samples_per_frametime=5)
+            else:
+                print('integration_splits', integration_splits)
+                i = 1
+                for int_start in integration_splits[:-1]:
+                    int_end = integration_splits[i]
+                    frame_start = int_start * (self.frames_per_integration + 1)
+                    time_start = frame_start * self.frametime
+                    frame_end = int_end * (self.frames_per_integration + 1) - 2
+                    time_end = frame_end * self.frametime
+                    total_frames = frame_end - frame_start + 1
+                    total_ints = int_end - int_start
+
+
+
+                    print('Int information:')
+                    print(i, int_start, int_end, frame_start, frame_end, time_start, time_end, total_frames, total_ints)
+
+
+                    seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap,
+                                                                           tso_seeds, tso_segs,
+                                                                           tso_lightcurves, self.frametime,
+                                                                           total_frames, self.total_frames,
+                                                                           self.frames_per_integration,
+                                                                           total_ints,
+                                                                           self.params['Readout']['resets_bet_ints'],
+                                                                           starting_time=time_start,
+                                                                           starting_frame=frame_start,
+                                                                           samples_per_frametime=5)
+
+                    # For seed images to be dispersed in WFSS mode,
+                    # embed the seed image in a full frame array. The disperser
+                    # tool does not work on subarrays
+                    aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
+                    if aperture_suffix not in ['FULL', 'CEN']:
+                        seed, segmap = self.pad_wfss_subarray(seed, segmap)
+
+                    self.segment_number = i
+
+
+
+                    print(']\nSeed shape: ', seed.shape)
+
+
+
+                    # Save the seed image segment to a file
+                    self.saveSeedImage(seed_img=seed, seed_seg=segmap)
+
+
+                    # Save the segment of the seed image to a fits file
+                    #seed_segment_file = self.params['Output']['file'].replace('.fits', '_seed_image_segment{}.fits'.format(i-1))
+                    #h0 = fits.PrimaryHDU(seed)
+                    #h1 = fits.ImageHDU(segmap)
+                    #hlist = fits.HDUList([h0, h1])
+                    #hlist.writeto(seed_segment_file, overwrite=True)
+
+                    i += 1
 
             print("Set these as the outputs of the call to add_tso_sources once testing is complete")
             self.seedimage = seed
@@ -313,7 +387,7 @@ class Catalog_seed():
         if numints > 1:
             # Frames for all integrations
             self.total_frames *= numints
-            # Add the resets for all but the first and last integrations
+            # Add the resets for all but the first integration
             self.total_frames += (numresets * (numints - 1))
 
     def extract_full_from_pom(self, seedimage, seed_segmap):
@@ -490,9 +564,16 @@ class Catalog_seed():
             raise ValueError("Seed image is not 2D or 4D. It should be.")
         return padded_seed, padded_seg
 
-    def saveSeedImage(self):
+    def saveSeedImage(self, seed_img=None, seed_seg=None):
         # Create the grism direct image or ramp to be saved
-        arrayshape = self.seedimage.shape
+
+        # If no data are provided, use the class variables
+        if seed_img is None:
+            seed_img = self.seedimage
+        if seed_seg is None:
+            seed_seg = self.seed_segmap
+
+        arrayshape = seed_img.shape
         if len(arrayshape) == 2:
             units = 'ADU/sec'
             yd, xd = arrayshape
@@ -522,7 +603,13 @@ class Catalog_seed():
         else:
             usefilt = 'filter'
 
-        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] + '_seed_image.fits')
+        if self.total_seed_segments == 1:
+            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
+                                          '_seed_image.fits')
+        else:
+            seg_string = str(self.segment_number).zfill(3)
+            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
+                                          '_seg{}_seed_image.fits'.format(seg_string))
 
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
@@ -562,6 +649,12 @@ class Catalog_seed():
         kw['PSFWFGRP'] = self.params['simSignals']['psfwfegroup']
         kw['MRGEVRSN'] = MIRAGE_VERSION
 
+        # Observations with high data volumes (e.g. moving targets, TSO)
+        # can be split into multiple "segments" in order to cap the
+        # maximum file size
+        kw['EXSEGTOT'] = self.total_seed_segments
+        kw['EXSEGNUM'] = self.segment_number
+
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
         if self.params['Inst']['mode'] in ['wfss', 'ts_wfss']:
@@ -574,7 +667,7 @@ class Catalog_seed():
 
         kw['GRISMPAD'] = self.grism_direct_factor
         self.seedinfo = kw
-        self.saveSingleFits(self.seedimage, self.seed_file, key_dict=kw, image2=self.seed_segmap, image2type='SEGMAP')
+        self.saveSingleFits(seed_img, self.seed_file, key_dict=kw, image2=seed_seg, image2type='SEGMAP')
         print("Seed image and segmentation map saved as {}".format(self.seed_file))
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")

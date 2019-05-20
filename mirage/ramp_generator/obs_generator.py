@@ -1603,10 +1603,9 @@ class Observation():
 
         # If a ramp is given, create a -1st frame that is all zeros
         # so that we can create deltaframes for all frames later
-        # This should be the case only for data containing
+        # This should be the case only for TSO observations or
         # moving targets.
         if ndim == 3:
-            print('Moving target data shape', data.shape, yd, xd)
             data = np.vstack((np.zeros((1, yd, xd)), data))
 
         outramp = np.zeros((self.params['Readout']['ngroup'], yd, xd), dtype=np.float)
