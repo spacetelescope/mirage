@@ -1,3 +1,10 @@
+""" Generate "PSF Library" files to run with MIRAGE.
+
+Authors
+-------
+    - Shannon Osborne
+"""
+
 import itertools
 import os
 
@@ -20,7 +27,7 @@ class CreatePSFLibrary:
 
     def __init__(self, instrument, filters="all", detectors="all", num_psfs=16, psf_location=(1023, 1023),
                  add_distortion=True, fov_pixels=101, oversample=5, opd_type="requirements", opd_number=0,
-                 save=True, fileloc=None, filename=None, overwrite=True,
+                 save=True, fileloc=None, filename=None, overwrite=True, ote=None, header_addons=None,
                  **kwargs):
         """
         Description
@@ -38,64 +45,72 @@ class CreatePSFLibrary:
             only run 1 instrument at a time. This class is only set up for NIRCam,
             NIRISS, and FGS.
 
-        filters : str or list
+        filters : str or list, optional
             Which filter(s) you want to create a library for.
             Can be a string of 1 filter name, a list of filter names (as strings), or
             the default "all" will run through all the filters for that instrument.
             Spelling/capitalization must match what WebbPSF expects. See also special
             case for NIRCam. Default is "all".
 
-        detectors : str or list
+        detectors : str or list, optional
             Which detector(s) you want to create a library for.
             Can be a string of 1 detector name, a list of detector names (as strings), or
             the default "all" will run through all the detectors for that instrument.
             Spelling/capitalization must match what WebbPSF expects. See also special
             case for NIRCam. Default is "all".
 
-        num_psfs : int
+        num_psfs : int, optional
             The total number of fiducial PSFs to be created and saved in the files. This
             must be a square number. Default is 16. E.g. num_psfs = 16 will create a 4x4
             grid of fiducial PSFs.
 
-        psf_location : tuple
+        psf_location : tuple, optional
             If num_psfs = 1, then this is used to set the (y,x) location of that PSF.
             Default is (1023,1023).
 
-        add_distortion : bool
+        add_distortion : bool, optional
             If True, the PSF will have distortions applied: the geometric distortion from
             the detectors (using data from SIAF) and the rotation of the detectors with
             respect to the focal plane. Default is True.
 
-        fov_pixels : int
+        fov_pixels : int, optional
             The field of view in undersampled detector pixels used by WebbPSF when
             creating the PSFs. Default is 101 pixels.
 
-        oversample : int
+        oversample : int, optional
             The oversampling factor used by WebbPSF when creating the PSFs. Default is 5.
 
-        opd_type : str
+        opd_type : str, optional
             The type of OPD map you would like to use to create the PSFs. Options are
             "predicted" or "requirements" where the predicted map is of the expected
             WFE and the requirements map is slightly more conservative (has slightly
             larger WFE). Default is "requirements".
 
-        opd_number : int
+        opd_number : int, optional
             The realization of the OPD map pulled from the OPD file. Options are an
             integer from 0 to 9, one for each of the 10 Monte Carlo realizations of
             the telescope included in the OPD map file. Default is 0.
 
-        save : bool
+        save : bool, optional
             True/False boolean if you want to save your file
 
-        fileloc : str
+        fileloc : str, optional
             Where to save your file if "save" keyword is set to True. Default of None
             will save in the current directory
 
-        filename : str
+        filename : str, optional
             The name to save your current file under if "save" keyword is set to True.
             Default of None will save it in the form: "{instr}_{filt}_fovp{}_samp{}_npsf{}.fits"
 
-        overwrite : bool
+        ote: webbpsf.opds.OTE_Linear_Model_WSS, optional
+            The OPD map to use to generate all PSFs, in the form of a
+            OTE_Linear_Model_WSS object. If provided, overrides the ``opd_type`` and
+            ``opd_number`` options.
+
+        header_addons: astropy.io.fits.header.Header, optional
+            Additional header entries to include in PSF library header
+
+        overwrite : bool, optional
             True/False boolean to overwrite the output file if it already exists. Default
             is True.
 
@@ -154,9 +169,13 @@ class CreatePSFLibrary:
         # Set PSF attributes
         self.add_distortion = add_distortion
         self.fov_pixels = fov_pixels
+
+
+        
         self.oversample = oversample
         self.opd_type = opd_type
         self.opd_number = opd_number
+        self.ote = ote
         self._kwargs = kwargs
 
         # Set saving attributes
@@ -164,6 +183,7 @@ class CreatePSFLibrary:
         self.overwrite = overwrite
         self.fileloc = fileloc
         self.filename = filename
+        self.header_addons = header_addons
 
     @staticmethod
     def _raise_value_error(msg_type, det, filt):
@@ -258,6 +278,35 @@ class CreatePSFLibrary:
 
         return ij_list, loc_list, location_list
 
+    def _set_opd(self):
+        """Define the telescope's OPD, either grabbing the requested
+        FITS file (requirements or predicted) or loading an OPD as a
+        OTE_Linear_Model_WSS instance.
+
+        For now, sets one OPD for all files being created.
+        """
+        if self.ote is None:
+            # Set OPD Map (pull most recent version with self.webb.opd_list call) - always predicted then requirements
+            if self.opd_type.lower() == "requirements":
+                opd = self.webb.opd_list[1]
+            elif self.opd_type.lower() == "predicted":
+                opd = self.webb.opd_list[0]
+
+            self.opd_name = opd
+            self.opd_realization = self.opd_number
+
+            self.webb.pupilopd = (opd, self.opd_number)
+
+        elif not isinstance(self.ote, webbpsf.opds.OTE_Linear_Model_WSS):
+            raise TypeError('Must provide pupil OPD as an OTE_Linear_Model_WSS object,'
+                            'not {}'.format(type(self.ote)))
+
+        else:
+            self.webb.pupil = self.ote  # Also defines self.webb.pupilopd
+
+            self.opd_name = "Modified OPD"
+            self.opd_realization = "N/A"
+
     def create_files(self):
         """
         For a given instrument, the output file (1 per filter) will contain a 5D array
@@ -271,6 +320,9 @@ class CreatePSFLibrary:
 
         """
 
+        # Set the pupil OPD based on the input
+        self._set_opd()
+
         # Set extension to read based on distortion choice
         if self.add_distortion:
             ext = "OVERDIST"
@@ -282,13 +334,6 @@ class CreatePSFLibrary:
 
         # Set output mode
         self.webb.options['output_mode'] = 'Oversampled Image'
-
-        # Set OPD Map
-        if self.opd_type.lower() == "requirements":
-            opd = self.webb.opd_list[1]
-        elif self.opd_type.lower() == "predicted":
-            opd = self.webb.opd_list[0]
-        self.webb.pupilopd = (opd, self.opd_number)
 
         # For every filter
         final_list = []
@@ -326,8 +371,8 @@ class CreatePSFLibrary:
 
             header["INSTRUME"] = (self.instr, "Instrument")
             header["FILTER"] = (filt, "Filter name")
-            header["PUPILOPD"] = (self.webb.pupilopd[0], "Pupil OPD source name")
-            header["OPD_REAL"] = (self.webb.pupilopd[1], "Pupil OPD source realization from file")
+            header["PUPILOPD"] = (self.opd_name, "Pupil OPD source name")
+            header["OPD_REAL"] = (self.opd_realization, "Pupil OPD source realization from file")
 
             for i, det in enumerate(det_list):
                 header["DETNAME{}".format(i)] = (det, "The #{} detector included in this file".format(i))
@@ -389,6 +434,11 @@ class CreatePSFLibrary:
             header["VERSION"] = (psf[ext].header["VERSION"], "WebbPSF software version")
             header["DATAVERS"] = (psf[ext].header["DATAVERS"], "WebbPSF reference data files version ")
 
+            # Include any header add-ons from the user, if applicable
+            if self.header_addons is not None:
+                # Append new keywords on to the existing header
+                header += self.header_addons
+
             # Add descriptor for how the file was made
             # the output file (1 per filter) will contain a 5D array with axes[SCA, j, i, y, x]
             header["COMMENT"] = "For a given instrument, the output file (1 per filter) will contain "
@@ -401,10 +451,20 @@ class CreatePSFLibrary:
             # Add header labels
             header.insert("INSTRUME", ('', ''))
             header.insert("INSTRUME", ('COMMENT', '/ PSF Library Information'))
+
             header.insert("NORMALIZ", ('', ''))
             header.insert("NORMALIZ", ('COMMENT', '/ WebbPSF Creation Information'))
-            header.insert("DATAVERS", ('COMMENT', '/ File Description'), after=True)
-            header.insert("DATAVERS", ('', ''), after=True)
+
+            if self.header_addons is None:
+                header.insert("DATAVERS", ('COMMENT', '/ File Description'), after=True)
+                header.insert("DATAVERS", ('', ''), after=True)
+            else:
+                header.insert("DATAVERS", ('COMMENT', '/ User-Supplied Information'), after=True)
+                header.insert("DATAVERS", ('', ''), after=True)
+
+                last_added_keyword = list(self.header_addons.keys())[-1]
+                header.insert(last_added_keyword, ('COMMENT', '/ File Description'), after=True)
+                header.insert(last_added_keyword, ('', ''), after=True)
 
             # Combine the header and data
             hdu = fits.HDUList([fits.PrimaryHDU(psf_arr, header=header)])
