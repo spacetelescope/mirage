@@ -1,12 +1,15 @@
-""" Generate "PSF Library" files to run with MIRAGE.
+""" Generate "PSF Library" files to run with MIRaGe.
 
 Authors
 -------
     - Shannon Osborne
+    - Lauren Chambers
 """
 
+import glob
 import itertools
 import os
+import time
 
 import astropy.convolution
 from astropy.io import fits
@@ -169,9 +172,6 @@ class CreatePSFLibrary:
         # Set PSF attributes
         self.add_distortion = add_distortion
         self.fov_pixels = fov_pixels
-
-
-        
         self.oversample = oversample
         self.opd_type = opd_type
         self.opd_number = opd_number
@@ -490,3 +490,64 @@ class CreatePSFLibrary:
             final_list.append(hdu)
 
         return final_list
+
+
+def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
+                          detectors='all', fov_pixels=1024):
+    """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
+    mirror state. Saves each PSF library as a FITS file named in the following format:
+        nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
+
+    Parameters
+    ----------
+    ote : webbpsf.opds.OTE_Linear_Model_WSS object
+        WebbPSF OTE object describing perturbed OTE state with tip and tilt removed
+    segment_tilts : numpy.ndarray
+        List of X and Y tilts for each mirror segment, in microradians
+    out_dir : str
+        Directory in which to save FITS files
+    filters : str or list, optional
+        Which filters to generate PSF libraries for. Default is ['F212N', 'F480M']
+        (the two filters used for most commissioning activities).
+    detectors : str or list, optional
+        Which detectors to generate PSF libraries for. Default is 'all'.
+    fov_pixels : int, optional
+        Size of the PSF to generate, in pixels. Default is 1024.
+    """
+    for i in range(18):
+        start_time = time.time()
+
+        # Restrict the pupil to the current segment
+        i_segment = i + 1
+        segname = webbpsf.webbpsf_core.segname(i_segment)
+        print('GENERATING SEGMENT {} DATA'.format(segname))
+        print('------------------------------')
+
+        pupil = webbpsf.webbpsf_core.one_segment_pupil(i_segment)
+        ote.amplitude = pupil[0].data
+
+        # Add header keywords about segment
+        hdr = fits.Header()
+        hdr['SEGID'] = (i_segment, 'ID of the mirror segment')
+        hdr['SEGNAME'] = (segname, 'Name of the mirror segment')
+        hdr['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in microns')
+        hdr['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in microns')
+
+        # Generate the library file(s)
+        c = CreatePSFLibrary('NIRCam', filters=filters, detectors=detectors,
+                             fov_pixels=fov_pixels, oversample=1, num_psfs=1,
+                             fileloc=out_dir, ote=ote, overwrite=False,
+                             header_addons=hdr)
+        c.create_files()
+
+        # Update file names to include segment number
+        created_files = glob.glob(os.path.join(out_dir, 'nircam_*_samp1_npsf1.fits'))
+        for f in created_files:
+            old_name = os.path.basename(f)
+            old_root = old_name.split('.fits')[0]
+            new_path = os.path.join(out_dir, old_root + '_seg{:02d}.fits'.format(i_segment))
+            os.rename(f, new_path)
+
+        print('Completed segment {}'.format(i + 1))
+        print('Elapsed time:', time.time() - start_time)
+        print()
