@@ -131,7 +131,6 @@ class SimInput:
         parameter_defaults : dict
             Default values of parameters like roll angle (PAV3) to pass on to observation list
             generator
-
         """
         self.info = {}
         self.input_xml = input_xml
@@ -174,7 +173,6 @@ class SimInput:
         self.path_defs()
 
         if (input_xml is not None) and (catalogs is not None):
-
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
@@ -318,9 +316,6 @@ class SimInput:
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
-
-            # Add source catalogs
-            # self.add_catalogs()
 
         elif self.table_file is not None:
             print('Reading table file: {}'.format(self.table_file))

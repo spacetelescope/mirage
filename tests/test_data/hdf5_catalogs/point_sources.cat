@@ -1,0 +1,7 @@
+# position_RA_Dec
+# abmag
+#
+#
+index   x_or_RA      y_or_Dec    niriss_f090w_magnitude niriss_f150w_magnitude niriss_f200w_magnitude nircam_f480m_magnitude  nircam_f444w_magnitude
+3     12.200144142  12.1996128            14.0                  14.5                     15.0         18.1   15.6
+4     12.198338444  12.1996128            14.0                  13.0                     12.5         16.5   15.2

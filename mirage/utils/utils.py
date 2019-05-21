@@ -283,6 +283,70 @@ def get_subarray_info(params, subarray_table):
     return params
 
 
+def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam=None,
+                           vegamag_zeropoint=None):
+    """Convert a given source magnitude into count rate
+
+    Parameters
+    ----------
+    observation_mode : str
+        e.g. 'imaging', 'wfss'
+
+    magsys : str
+        Magnitude system of the input magnitudes. Allowed values are:
+        'abmag', 'stmag', 'vegamag'
+
+    mag : float or list
+        Magnitude value(s) to transform
+
+    photfnu : float
+        Photfnu value that relates count rate and flux density. Only used
+        in ABMAG conversions
+
+    photflam : float
+        Photflam value that relates count rate and flux density. Only used
+        in STMAG conversions
+
+    vegamag_zeropoint : float
+        Filter offset in the VEGAMAG (or A0V mag) system. Only used in
+        VEGAMAG conversions.
+
+
+    Returns
+    -------
+    count_rate : float or list
+        Count rate (e/s) corresponding to the input magnutude(s)
+
+    """
+    # For NIRISS AMI mode, the count rate values calculated need to be
+    # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
+    # throughput of the NRM, while the 0.84 value is the throughput of the
+    # imaging CLEARP element that is in place in the pupil wheel for the
+    # normal imaging observations.
+    if observation_mode in ['ami', 'AMI']:
+        count_scale = 0.15 / 0.84
+    else:
+        count_scale = 1.
+    if magsys.lower() == 'abmag':
+        try:
+            return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
+        except:
+            raise ValueError(("AB mag to countrate conversion failed."
+                              "magnitude = {}, photfnu = {}".format(mag, photfnu)))
+    if magsys.lower() == 'vegamag':
+        try:
+            return count_scale * (10**((vegamag_zeropoint - mag) / 2.5))
+        except:
+            raise ValueError(("Vega mag to countrate conversion failed."
+                              "magnitude = {}".format(mag)))
+    if magsys.lower() == 'stmag':
+        try:
+            return count_scale * (10**((mag + 21.099934378) / -2.5) / photflam)
+        except:
+            raise ValueError(("ST mag to countrate conversion failed."
+                              "magnitude = {}, photflam = {}".format(mag, photflam)))
+
+
 def parse_RA_Dec(ra_string, dec_string):
     """Convert input RA and Dec strings to floats
 

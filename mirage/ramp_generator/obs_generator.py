@@ -44,10 +44,13 @@ from astropy.time import Time, TimeDelta
 from . import unlinearize
 from ..utils import read_fits, utils, siaf_interface
 from ..utils import set_telescope_pointing_separated as stp
+from mirage import version
+
+MIRAGE_VERSION = version.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
-         "niriss": ["imaging", "ami", "pom"],
+         "niriss": ["imaging", "ami", "pom", "wfss"],
          "fgs": ["imaging"]}
 
 
@@ -361,6 +364,62 @@ class Observation():
                         temp[middle_j:middle_j + ny, middle_i:middle_i + nx]
                     output_data[integration, group, yoff:yoff + ny, xoff:xoff + nx] += part
         return output_data
+
+    def add_mirage_info(self):
+        """Place Mirage-related information in a FITS hdulist so that it can
+        be saved with the output data
+
+        Returns
+        -------
+        hdulist : astroy.io.fits.HDUList
+            HDU List containing Mirage-related info in the primary header
+        """
+        hdulist = fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU()])
+        hdulist[0].header['MRGEVRSN'] = (MIRAGE_VERSION, 'Mirage version used')
+        hdulist[0].header['YAMLFILE'] = (self.paramfile, 'Mirage input yaml file')
+        hdulist[0].header['GAINFILE'] = (self.params['Reffiles']['gain'], 'Gain file used by Mirage')
+        hdulist[0].header['DISTORTN'] = (self.params['Reffiles']['astrometric'],
+                                         'Distortion reffile used by Mirage')
+        hdulist[0].header['IPC'] = (self.params['Reffiles']['ipc'], 'IPC kernel used by Mirage')
+        hdulist[0].header['PIXARMAP'] = (self.params['Reffiles']['pixelAreaMap'],
+                                         'Pixel area map used by Mirage')
+        hdulist[0].header['CROSSTLK'] = (self.params['Reffiles']['crosstalk'],
+                                         'Crosstalk file used by Mirage')
+        hdulist[0].header['FLUX_CAL'] = (self.params['Reffiles']['flux_cal'],
+                                         'Flux calibration file used by Mirage')
+        hdulist[0].header['FTHRUPUT'] = (self.params['Reffiles']['filter_throughput'],
+                                         'Filter throughput file used by Mirage')
+        hdulist[0].header['PTSRCCAT'] = (self.params['simSignals']['pointsource'],
+                                         'Point source catalog used by Mirage')
+        hdulist[0].header['GALAXCAT'] = (self.params['simSignals']['galaxyListFile'],
+                                         'Galaxy source catalog used by Mirage')
+        hdulist[0].header['EXTNDCAT'] = (self.params['simSignals']['extended'],
+                                         'Extended source catalog used by Mirage')
+        hdulist[0].header['MTPTSCAT'] = (self.params['simSignals']['movingTargetList'],
+                                         'Moving point source catalog used by Mirage')
+        hdulist[0].header['MTSERSIC'] = (self.params['simSignals']['movingTargetSersic'],
+                                         'Moving Sersic catalog used by Mirage')
+        hdulist[0].header['MTEXTEND'] = (self.params['simSignals']['movingTargetExtended'],
+                                         'Moving extended target catalog used by Mirage')
+        hdulist[0].header['NONSDRAL'] = (self.params['simSignals']['movingTargetToTrack'],
+                                         'Non-Sidereal catalog used by Mirage')
+        hdulist[0].header['BKGDRATE'] = (self.params['simSignals']['bkgdrate'],
+                                         'Background rate used by Mirage')
+        hdulist[0].header['TRACKING'] = (self.params['Telescope']['tracking'],
+                                         'Telescope tracking type for Mirage')
+        hdulist[0].header['POISSON'] = (self.params['simSignals']['poissonseed'],
+                                        'Random num generator seed for Poisson noise in Mirage')
+        hdulist[0].header['PSFWFE'] = (self.params['simSignals']['psfwfe'],
+                                       'WebbPSF Wavefront error used by Mirage')
+        hdulist[0].header['PSFWFGRP'] = (self.params['simSignals']['psfwfegroup'],
+                                         'WebbPSF wavefront error group used by Mirage')
+        hdulist[0].header['CRLIB'] = (self.params['cosmicRay']['library'],
+                                      'Cosmic ray library used by Mirage')
+        hdulist[0].header['CRSCALE'] = (self.params['cosmicRay']['scale'],
+                                        'Cosmic ray rate scaling factor used by Mirage')
+        hdulist[0].header['CRSEED'] = (self.params['cosmicRay']['seed'],
+                                       'Random number generator seed for cosmic rays in Mirage')
+        return hdulist
 
     def add_pam(self, signalramp):
         """ Apply Pixel Area Map to exposure
@@ -956,6 +1015,9 @@ class Observation():
 
         # Calculate the rate of cosmic ray hits expected per frame
         self.get_cr_rate()
+
+        # Multiply by the frametime to get probability per pixel per frame
+        self.crrate = self.crrate * self.frametime
 
         # Read in saturation file
         if self.params['Reffiles']['saturation'] is not None:
@@ -1793,7 +1855,6 @@ class Observation():
         if "FLARES" in self.params["cosmicRay"]["library"]:
             self.crrate = 0.10546
 
-        self.crrate = self.crrate/self.frametime
         if self.crrate > 0.:
             print("Base cosmic ray probability per pixel per second: {}".format(self.crrate))
 
@@ -1916,17 +1977,18 @@ class Observation():
             newkernel = np.copy(kern)
             newkernel[:, :, ys:ye, xs:xe] = realout1
 
-        # Save the inverted kernel for future simulator runs
-        h0 = fits.PrimaryHDU()
-        h1 = fits.ImageHDU(newkernel)
-        h1.header["DETECTOR"] = self.detector
-        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
-        hlist = fits.HDUList([h0, h1])
-        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
-        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
-        hlist.writeto(outname, overwrite=True)
-        print(("Inverted IPC kernel saved to {} for future simulator "
-               "runs.".format(outname)))
+        if self.params['Output']['save_intermediates']:
+            # Save the inverted kernel for future simulator runs
+            h0 = fits.PrimaryHDU()
+            h1 = fits.ImageHDU(newkernel)
+            h1.header["DETECTOR"] = self.detector
+            h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+            hlist = fits.HDUList([h0, h1])
+            indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+            outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+            hlist.writeto(outname, overwrite=True)
+            print(("Inverted IPC kernel saved to {} for future simulator "
+                   "runs.".format(outname)))
         return newkernel
 
     def mask_refpix(self, ramp, zero):
@@ -2392,6 +2454,8 @@ class Observation():
         -------
         None
         """
+        extra_fits_hdulist = self.add_mirage_info()
+
         if mod == '1b':
             from jwst.datamodels import Level1bModel as DataModel
         elif mod == 'ramp':
@@ -2399,7 +2463,7 @@ class Observation():
         else:
             raise ValueError(("Model type to use for saving output is "
                               "not recognized. Must be either '1b' or 'ramp'."))
-        outModel = DataModel()
+        outModel = DataModel(extra_fits_hdulist)
 
         # make sure the ramp to be saved has the right number of dimensions
         imshape = ramp.shape
@@ -2433,7 +2497,8 @@ class Observation():
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                               "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE"},
+                   "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
+                              "wfss": "NIS_WFSS"},
                    "fgs": {"imaging": "FGS_IMAGE"}}
 
         try:
@@ -2685,8 +2750,12 @@ class Observation():
         # gets reset to -1, which screws up saturation flagging
         # I think the answer is to save as uint16...
 
+        # Create HDU List of Mirage-centric info
+        extra_fits_hdulist = self.add_mirage_info()
+        extra_header0 = extra_fits_hdulist[0].header
+
         if mod == 'ramp':
-            ex0 = fits.PrimaryHDU()
+            ex0 = fits.PrimaryHDU(header=extra_header0)
             ex1 = fits.ImageHDU(ramp.astype(np.float32), name='SCI')
             ex2 = fits.ImageHDU(pixel_dq.astype(np.uint32), name='PIXELDQ')
             ex3 = fits.ImageHDU(group_dq.astype(np.uint8), name='GROUPDQ')
@@ -2697,7 +2766,7 @@ class Observation():
             groupextnum = 6
 
         elif mod == '1b':
-            ex0 = fits.PrimaryHDU()
+            ex0 = fits.PrimaryHDU(header=extra_header0)
             ex1 = fits.ImageHDU(ramp.astype(np.uint16), name='SCI')
             ex2 = fits.ImageHDU(zeroframe.astype(np.uint16), name='ZEROFRAME')
             ex3 = fits.BinTableHDU(name='GROUP')

@@ -13,6 +13,9 @@ superbias, etc are still present.
 linearized, but are still in ramp format, where multiple non-destructive
 reads of the detector are present.
 
+## Documentation
+
+The [main documentation for Mirage](https://mirage-data-simulator.readthedocs.io/en/latest/) is located on ReadTheDocs.
 
 ## Installation
 
@@ -27,7 +30,7 @@ pip install .
 
 ## Dependencies
 
-``pip`` should install all required dependencies, but if desired, the list of packages required for MIRaGE can 
+``pip`` should install all required dependencies, but if desired, the list of packages required for MIRaGE can
 be viewed in the ``install_requires`` part of this repository's [setup.py file](setup.py).
 
 ### Optional dependencies
@@ -263,7 +266,7 @@ Users and contributors to the `mirage` repository should adhere to the [Code of 
 
 ## Questions
 
-Any questions about the `mirage` project or its software can be directed to `hilbert@stsci.edu`.
+For any questions about the `mirage` project or its software or documentation, please [open an Issue](https://github.com/spacetelescope/mirage/issues).
 
 
 ## Current Development Team
