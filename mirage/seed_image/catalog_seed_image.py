@@ -2010,9 +2010,9 @@ class Catalog_seed():
         # can have spaces around it in view of the above format string, but
         # that is what happens.
         alpha2 = alpha2.replace("0+0",'+')
-        delta2 = alpha2.replace("0+0",'+')
+        delta2 = delta2.replace("0+0",'+')
         alpha2 = alpha2.replace("0-0",'-')
-        delta2 = alpha2.replace("0-0",'-')
+        delta2 = delta2.replace("0-0",'-')
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):

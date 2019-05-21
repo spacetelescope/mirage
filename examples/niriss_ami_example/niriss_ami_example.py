@@ -11,15 +11,16 @@ from mirage import imaging_simulator
 home_dir = os.environ['HOME']
 
 ami_example_dir = os.path.dirname(__file__)
+print(ami_example_dir,"===================")
 
-xml_name = os.path.join(ami_example_dir, 'input_files/793.xml')
-pointing_name = os.path.join(ami_example_dir, 'input_files/793.pointing')
+xml_name = os.path.join(ami_example_dir, 'input_files/793_mirage_example.xml')
+pointing_name = os.path.join(ami_example_dir, 'input_files/793_mirage_example.pointing')
 
-output_directory = os.path.join(home_dir, 'ami_mirage_simulation')
+output_directory = os.path.join(home_dir, 'ami_mirage_simulation_example')
 simdata_output_directory = output_directory
 
-# AB Dor is in field 19 in Kevin's targets.xlsx file
-catalogues = {'niriss': os.path.join(ami_example_dir, 'stars_field19_combined_allfilters.list')}
+# AB Dor is in field 19 and HD37093 is in field 20 in Kevin's targets.xlsx file
+catalogues = {'niriss': os.path.join(ami_example_dir, 'stars_field19_20_combined_allfilters.list')}
 parameter_defaults = {'PAV3': 275., 'DATE': '2020-09-20'}
 
 observation_file = os.path.join(output_directory, '793_observation_list.yaml')
@@ -35,7 +36,7 @@ if 1:
     yam.datatype = datatype
     yam.create_inputs()
 
-    1/0
+    #1/0
 
 yaml_files = glob.glob(os.path.join(output_directory, 'jw*.yaml'))
 
@@ -52,4 +53,5 @@ for file in yaml_files:
     t1 = imaging_simulator.ImgSim()
     t1.paramfile = str(modified_file)
     t1.create()
-    1/0
+    #1/0
+
