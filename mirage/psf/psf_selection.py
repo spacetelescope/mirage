@@ -186,6 +186,56 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     return library
 
 
+def get_gridded_segment_psf_library_list(instrument, detector, filtername,
+                                         library_path, pupilname="CLEAR"):
+    """Find the filenames for the appropriate gridded segment PSF libraries and
+    read them into griddedPSFModel objects
+
+    Parameters
+    ----------
+    instrument : str
+        Name of instrument the PSFs are from
+
+    detector : str
+        Name of the detector within ```instrument```
+
+    filtername : str
+        Name of filter used for PSF library creation
+
+    library_path : str
+        Path pointing to the location of the PSF library
+
+    pupilname : str, optional
+        Name of pupil wheel element used for PSF library creation. Default is "CLEAR".
+
+    Returns:
+    --------
+    libraries : list of photutils.griddedPSFModel
+        List of object containing segment PSF libraries
+
+    """
+    library_list = get_segment_library_list(instrument, detector, filtername, library_path, pupil=pupilname)
+
+    print("Segment PSFs will be generated using:")
+    for filename in library_list:
+        print(os.path.basename(filename))
+
+    libraries = []
+    for filename in library_list:
+        with fits.open(filename) as hdulist:
+            hdr = hdulist[0].header
+            d = hdulist[0].data
+
+        data = d[0][0]
+        phdu = fits.PrimaryHDU(data, header=hdr)
+        hdulist = fits.HDUList(phdu)
+
+        lib_model = to_griddedpsfmodel(hdulist)
+        libraries.append(lib_model)
+
+    return libraries
+
+
 def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                      library_path, wings=False, segment_id=None):
     """Given an instrument and filter name along with the path of

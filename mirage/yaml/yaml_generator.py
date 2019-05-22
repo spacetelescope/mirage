@@ -164,6 +164,7 @@ class SimInput:
         self.tracking = 'sidereal'
         self.psf_paths = None
         self.expand_catalog_for_segments = False
+        self.add_psf_wings = True
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
@@ -1475,7 +1476,7 @@ class SimInput:
                      .format(PointSourceCatalog)))
             f.write('  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.\n')
             f.write('  psf_wing_threshold_file: {}   # File defining PSF sizes versus magnitude\n'.format(input['psf_wing_threshold_file']))
-            f.write('  add_psf_wings: True  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n')
+            f.write('  add_psf_wings: {}  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n'.format(self.add_psf_wings))
             f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
             f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
             f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
@@ -1501,7 +1502,6 @@ class SimInput:
             f.write(('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during '
                      'observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to '
                      '"moving_target" \n'.format(MovingTargetToTrack)))
-            f.write('  psf_wing_threshold_file: {}   # File containing\n'.format(input['psf_wing_threshold_file']))
             f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
             f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
             f.write('  scattered:  None                          #Scattered light count rate image file\n')
