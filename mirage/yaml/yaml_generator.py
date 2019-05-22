@@ -424,7 +424,8 @@ class SimInput:
         yamls = []
         # for i in range(len(detector_labels)):
         for i, instrument in enumerate(self.info['Instrument']):
-            if instrument.lower() not in 'fgs nircam niriss'.split():
+            instrument = instrument.lower()
+            if instrument not in 'fgs nircam niriss'.split():
                 # do not write files for MIRI and NIRSpec
                 continue
             file_dict = {}
@@ -448,11 +449,12 @@ class SimInput:
             file_dict['primary_dither_num'] = np.int(primary_dither)
             subpix_dither = (tot_dith-1) % subpixtot
             file_dict['subpix_dither_num'] = subpix_dither + 1
-            file_dict['subarray_def_file'] = self.global_subarray_definition_files[self.info['Instrument'][i].lower()]
-            file_dict['readpatt_def_file'] = self.global_readout_pattern_files[self.info['Instrument'][i].lower()]
-            file_dict['crosstalk_file'] = self.global_crosstalk_files[self.info['Instrument'][i].lower()]
-            file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[self.info['Instrument'][i].lower()]
-            file_dict['flux_cal_file'] = self.global_flux_cal_files[self.info['Instrument'][i].lower()]
+            file_dict['subarray_def_file'] = self.global_subarray_definition_files[instrument]
+            file_dict['readpatt_def_file'] = self.global_readout_pattern_files[instrument]
+            file_dict['crosstalk_file'] = self.global_crosstalk_files[instrument]
+            file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
+            file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
+            file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
 
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
@@ -727,7 +729,10 @@ class SimInput:
         self.info['outputfits'] = fits_names
 
     def set_global_definitions(self):
-        """Store the subarray defnitions of all supported instruments."""
+        """Store the subarray definitions of all supported instruments."""
+        # TODO: Investigate how this could be combined with the creation of
+        #  self.configfiles in reffile_setup()
+
         self.global_subarray_definitions = {}
         self.global_readout_patterns = {}
         self.global_subarray_definition_files = {}
@@ -736,6 +741,7 @@ class SimInput:
         self.global_crosstalk_files = {}
         self.global_filtpupilcombo_files = {}
         self.global_flux_cal_files = {}
+        self.global_psf_wing_threshold_file = {}
         self.global_psfpath = {}
         # self.global_filter_throughput_files = {} ?
 
@@ -746,6 +752,7 @@ class SimInput:
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
+                psf_wing_threshold_file = 'niriss_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'niriss/gridded_psf_library')
             elif instrument.lower() == 'fgs':
                 readout_pattern_file = 'guider_readout_pattern.txt'
@@ -753,6 +760,7 @@ class SimInput:
                 crosstalk_file = 'guider_xtalk_zeros.txt'
                 filtpupilcombo_file = 'guider_filter_dummy.list'
                 flux_cal_file = 'guider_zeropoints.list'
+                psf_wing_threshold_file = 'fgs_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'fgs/gridded_psf_library')
             elif instrument.lower() == 'nircam':
                 readout_pattern_file = 'nircam_read_pattern_definitions.list'
@@ -760,6 +768,7 @@ class SimInput:
                 crosstalk_file = 'xtalk20150303g0.errorcut.txt'
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
                 flux_cal_file = 'NIRCam_zeropoints.list'
+                psf_wing_threshold_file = 'nircam_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'nircam/gridded_psf_library')
             else:
                 readout_pattern_file = 'N/A'
@@ -767,6 +776,7 @@ class SimInput:
                 crosstalk_file = 'N/A'
                 filtpupilcombo_file = 'N/A'
                 flux_cal_file = 'N/A'
+                psf_wing_threshold_file = 'N/A'
                 psfpath = 'N/A'
             if instrument in 'niriss fgs nircam'.split():
                 self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
@@ -776,6 +786,7 @@ class SimInput:
             self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
             self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
             self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
+            self.global_psf_wing_threshold_file[instrument] = os.path.join(self.modpath, 'config', psf_wing_threshold_file)
             self.global_psfpath[instrument] = psfpath
 
     def make_start_times(self):
@@ -1049,34 +1060,15 @@ class SimInput:
             self.psfbasename[instrument] = instrument
             self.reference_file_dir[instrument] = os.path.join(self.datadir, instrument, 'reference_files')
 
+            # Set instrument-specific file paths
             if instrument == 'nircam':
                 self.psfpixfrac[instrument] = 0.25
-                self.configfiles[instrument]['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
-                self.configfiles[instrument]['fluxcal'] = 'NIRCam_zeropoints.list'
-                self.configfiles[instrument]['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
-                self.configfiles[instrument]['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
-                self.configfiles[instrument]['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
             elif instrument == 'niriss':
                 self.psfpixfrac[instrument] = 0.1
-                self.configfiles[instrument]['subarray_def_file'] = 'niriss_subarrays.list'
-                self.configfiles[instrument]['fluxcal'] = 'niriss_zeropoints.list'
-                self.configfiles[instrument]['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
-                self.configfiles[instrument]['readpatt_def_file'] = 'niriss_readout_pattern.txt'
-                self.configfiles[instrument]['crosstalk'] = 'niriss_xtalk_zeros.txt'
             elif instrument == 'fgs':
                 self.psfpixfrac[instrument] = 0.1
-                self.configfiles[instrument]['subarray_def_file'] = 'guider_subarrays.list'
-                self.configfiles[instrument]['fluxcal'] = 'guider_zeropoints.list'
-                self.configfiles[instrument]['filtpupil_pairs'] = 'guider_filter_dummy.txt'
-                self.configfiles[instrument]['readpatt_def_file'] = 'guider_readout_pattern.txt'
-                self.configfiles[instrument]['crosstalk'] = 'guider_xtalk_zeros.txt'
 
-            # self.configfiles[instrument]['dq_init_config'] = 'dq_init.cfg'
-            # self.configfiles[instrument]['saturation_config'] = 'saturation.cfg'
-            # self.configfiles[instrument]['superbias_config'] = 'superbias.cfg'
-            # self.configfiles[instrument]['refpix_config'] = 'refpix.cfg'
-            # self.configfiles[instrument]['linearity_config'] = 'linearity.cfg'
-            # self.configfiles[instrument]['filter_throughput'] = 'placeholder.txt'
+            # Set global file paths
             self.configfiles[instrument]['dq_init_config'] = os.path.join(self.modpath, 'config', 'dq_init.cfg')
             self.configfiles[instrument]['saturation_config'] = os.path.join(self.modpath, 'config', 'saturation.cfg')
             self.configfiles[instrument]['superbias_config'] = os.path.join(self.modpath, 'config', 'superbias.cfg')
@@ -1259,7 +1251,8 @@ class SimInput:
             print('No PSF path provided. Using default path as PSF path for all yamls.')
             paths_out = []
             for instrument in self.info['Instrument']:
-                default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
+                default_path = self.global_psfpath[instrument.lower()]
+                # default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
                 paths_out.append(default_path)
             return paths_out
 
@@ -1377,12 +1370,12 @@ class SimInput:
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
-            config = self.global_subarray_definitions[instrument.lower()]
+            subarray_definitions = self.global_subarray_definitions[instrument.lower()]
 
 
-            if full_ap not in config['AperName']:
+            if full_ap not in subarray_definitions['AperName']:
                 full_ap_new = [apername for apername, name in
-                               np.array(config['AperName', 'Name']) if
+                               np.array(subarray_definitions['AperName', 'Name']) if
                                (full_ap in apername) or (full_ap in name)]
                 if len(full_ap_new) > 1 or len(full_ap_new) == 0:
                     raise ValueError('Cannot match {} with valid aperture name for observation {}.'
@@ -1505,6 +1498,7 @@ class SimInput:
             f.write(('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during '
                      'observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to '
                      '"moving_target" \n'.format(MovingTargetToTrack)))
+            f.write('  psf_wing_threshold_file: {}   # File containing\n'.format(input['psf_wing_threshold_file']))
             f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
             f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
             f.write('  scattered:  None                          #Scattered light count rate image file\n')
@@ -1517,6 +1511,7 @@ class SimInput:
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
             f.write('  expand_catalog_for_segments: {}                     # Expand catalog for 18 segments and use distinct PSFs\n'
                 .format(self.expand_catalog_for_segments))
+
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
