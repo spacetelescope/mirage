@@ -1473,6 +1473,9 @@ class SimInput:
 
             f.write(('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'
                      .format(PointSourceCatalog)))
+            f.write('  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.\n')
+            f.write('  psf_wing_threshold_file: {}   # File defining PSF sizes versus magnitude\n'.format(input['psf_wing_threshold_file']))
+            f.write('  add_psf_wings: True  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n')
             f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
             f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
             f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
