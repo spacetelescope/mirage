@@ -27,6 +27,7 @@ import sys
 import os
 import argparse
 from math import floor
+from glob import glob
 
 import yaml
 import pkg_resources
@@ -435,28 +436,52 @@ class DarkPrep():
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
 
-    def get_base_dark(self):
+    def file_splits(self):
+        """Check to see whether the final dark file will need to be
+        split into segments due to large file size
+        """
+        # Let's declare the equivalent of a 100 group full frame ramp
+        # as the upper limit for observation file size
+        pixel_limit = 2048 * 2048 * 100
+
+        xd = self.subarray_bounds[3] - self.subarray_bounds[1]
+        yd = self.subarray_bounds[2] - self.subarray_bounds[0]
+        pix_per_int = self.numgroups * yd * xd
+        observation = pix_per_int * self.numints
+
+        split = False
+        int_list = [0, self.numints]
+        if observation > pixel_limit:
+            split = True
+            ints_per_split = np.int(pixel_limit / pix_per_int)
+            #num_splits = self.numints / ints_per_split
+            int_list = np.arange(0, self.numints, ints_per_split)
+            if int_list[-1] != self.numints:
+                int_list = np.append(int_list, self.numints)
+        return split, int_list
+
+    def get_base_dark(self, input_file):
         """Read in the dark current ramp that will serve as the
         base for the simulated ramp"""
 
         # First make sure that the file exists
-        local = os.path.isfile(self.params['Reffiles']['dark'])
+        local = os.path.isfile(input_file)
         # Future improvement: download a missing dark file
         if not local:
             try:
                 print("Local copy of dark current file")
-                print("{} not found.".format(self.params['Reffiles']['dark']))
+                print("{} not found.".format(input_file))
                 print("Downloading.")
-                darkfile = os.path.split(self.params['Reffiles']['dark'])[1]
+                darkfile = os.path.split(input_file)[1]
                 hh = fits.open(os.path.join(self.dark_url, darkfile))
-                hh.writeto(self.params['Reffiles']['dark'])
+                hh.writeto(input_file)
             except Exception:
                 print("Local copy of dark current file")
-                print("{} not found.".format(self.params['Reffiles']['dark']))
+                print("{} not found.".format(input_file))
                 print("And unable to download. Quitting.")
 
         self.dark = read_fits.Read_fits()
-        self.dark.file = self.params['Reffiles']['dark']
+        self.dark.file = input_file
 
         # Depending on the method indicated in the input file
         # read in the dark using astropy or RampModel
@@ -503,6 +528,26 @@ class DarkPrep():
         self.instrument = self.dark.header['INSTRUME']
         self.fastaxis = self.dark.header['FASTAXIS']
         self.slowaxis = self.dark.header['SLOWAXIS']
+
+    def get_frame_count_info(self):
+        """Calculate information on the number of frames per group and
+        per integration
+        """
+        self.numints = self.params['Readout']['nint']
+        self.numgroups = self.params['Readout']['ngroup']
+        numframes = self.params['Readout']['nframe']
+        numskips = self.params['Readout']['nskip']
+        numresets = self.params['Readout']['resets_bet_ints']
+
+        self.frames_per_group = numframes + numskips
+        self.frames_per_integration = self.numgroups * self.frames_per_group
+        self.total_frames = self.numgroups * self.frames_per_group
+
+        if self.numints > 1:
+            # Frames for all integrations
+            self.total_frames *= self.numints
+            # Don't worry about counting reset frames between integrations
+            # We're not concerned with timing here.
 
     def integration_copy(self, req, darkint):
         """Use copies of integrations in the dark current input to
@@ -667,6 +712,24 @@ class DarkPrep():
         # Check input parameters for any bad values
         self.check_params()
 
+        # Find out how many groups/integrations we need
+        self.get_frame_count_info()
+
+        # If the simulation will have more than one integration, generate
+        # a list of dark current files that can be read in to provide
+        # more data
+        if self.numints > 1:
+            if self.runStep['linearized_darkfile']:
+                dark_dir = os.path.split(self.params['Reffiles']['linearized_darkfile'])[0]
+            else:
+                dark_dir = os.path.split(self.params['Reffiles']['dark'])[0]
+            dark_list = glob(os.path.join(dark_dir, '*.fits'))
+        else:
+            if self.runStep['linearized_darkfile']:
+                dark_list = [self.params['Reffiles']['linearized_darkfile']]
+            else:
+                dark_list = [self.params['Reffiles']['dark']]
+
         # Read in the subarray definition file
         self.subdict = utils.read_subarray_definition_file(self.params['Reffiles']['subarray_defs'])
         self.params = utils.get_subarray_info(self.params, self.subdict)
@@ -680,136 +743,245 @@ class DarkPrep():
                                                                        self.params['Readout']['array_name'],
                                                                        0.0, 0.0,
                                                                        self.params['Telescope']['rotation'])
-        # Read in the input dark current frame
-        if not self.runStep['linearized_darkfile']:
-            self.get_base_dark()
-            self.linDark = None
-        else:
-            self.read_linear_dark()
-            self.dark = self.linDark
 
-        # Make sure there is enough data (frames/groups)
-        # in the input integration to produce
-        # the proposed output integration
-        self.data_volume_check(self.dark)
+        # If there will be too many frames, then the file will need
+        # to be split into pieces to save memory
+        #split_seed = False
+        #if memory > self.params['Output']['max_memory'] * 2048 * 2048:
 
-        # Compare the requested number of integrations
-        # to the number of integrations in the input dark
-        print("Dark shape as read in: {}".format(self.dark.data.shape))
-        self.darkints()
-        print("Dark shape after copying integrations to match request: {}".format(self.dark.data.shape))
+        #split_seed, integration_segment_indexes = self.file_splits()
 
-        # Put the input dark (or linearized dark) into the
-        # requested readout pattern
-        self.dark, sbzeroframe = self.reorder_dark(self.dark)
-        print(('DARK has been reordered to {} to match the input readpattern of {}'
-               .format(self.dark.data.shape, self.dark.header['READPATT'])))
+        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(self.output_dims[1],
+                                                                                          self.output_dims[0],
+                                                                                          self.frames_per_integration,
+                                                                                          self.params['Readout']['nint'])
 
-        # If a raw dark was read in, create linearized version
-        # here using the SSB pipeline. Better to do this
-        # on the full dark before cropping, so that reference
-        # pixels can be used in the processing.
-        if ((self.params['Inst']['use_JWST_pipeline']) & (self.runStep['linearized_darkfile'] is False)):
 
-            # Linear ize the dark ramp via the SSB pipeline.
-            # Also save a diff image of the original dark minus
-            # the superbias and refpix subtracted dark, to use later.
+        #if 1>0:
+        #    split_seed = True
+        #    #integration_segment_indexes = self.calculate_frame_splits()
+        #    integration_segment_indexes = [0, 10, 20, 30]
+        #    #self.total_seed_segments = len(integration_segment_indexes) - 1
+        #    print('\n********************\nNeed integration split indexes from a new function\n****************\n')
+        #else:
+        #    split_seed = False
+        #    integration_segment_indexes = [0, self.numints]
+        print('Splits:')
+        print(split_seed)
+        print(integration_segment_indexes)
 
-            # In order to linearize the dark, the JWST pipeline must
-            # be present, and self.dark will have to be translated back
-            # into a RampModel instance
-            # print('Working on {}'.format(self.dark))
-            self.linDark = self.linearize_dark(self.dark)
-            print("Linearized dark shape: {}".format(self.linDark.data.shape))
-
-            if self.params['Readout']['readpatt'].upper() in ['RAPID', 'NISRAPID', 'FGSRAPID']:
-                print(("Output is {}, grabbing zero frame from linearized dark"
-                       .format(self.params['Readout']['readpatt'].upper())))
-                self.zeroModel = read_fits.Read_fits()
-                self.zeroModel.data = self.linDark.data[:, 0, :, :]
-                self.zeroModel.sbAndRefpix = self.linDark.sbAndRefpix[:, 0, :, :]
-            elif ((self.params['Readout']['readpatt'].upper() not in ['RAPID', 'NISRAPID', 'FGSRAPID']) &
-                  (self.dark.zeroframe is not None)):
-                print("Now we need to linearize the zeroframe because the")
-                print("output readpattern is not RAPID, NISRAPID, or FGSRAPID")
-                # Now we need to linearize the zeroframe. Place it
-                # into a RampModel instance before running the
-                # pipeline steps
-                self.zeroModel = read_fits.Read_fits()
-                self.zeroModel.data = np.expand_dims(self.dark.zeroframe, axis=1)
-                self.zeroModel.header = self.linDark.header
-                self.zeroModel.header['NGROUPS'] = 1
-                self.zeroModel = self.linearize_dark(self.zeroModel)
-                # Return the zeroModel data to 3 dimensions
-                # integrations, y, x
-                self.zeroModel.data = self.zeroModel.data[:, 0, :, :]
-                self.zeroModel.sbAndRefpix = self.zeroModel.sbAndRefpix[:, 0, :, :]
-                # In this case the zeroframe has changed from what
-                # was read in. So let's remove the original zeroframe
-                # to avoid confusion
-                self.linDark.zeroframe = np.zeros(self.linDark.zeroframe.shape)
+        for seg_index, segment in enumerate(integration_segment_indexes[:-1]):
+            # Get the number of integrations being simulated
+            if split_seed:
+                number_of_ints = integration_segment_indexes[seg_index+1] - segment
             else:
-                self.zeroModel = None
+                number_of_ints = self.numints
 
-            # Now crop self.linDark, self.dark, and zeroModel
-            # to requested subarray
-            self.dark = self.crop_dark(self.dark)
-            self.linDark = self.crop_dark(self.linDark)
 
-            if self.zeroModel is not None:
-                self.zeroModel = self.crop_dark(self.zeroModel)
+            print('segment number: ', seg_index)
+            print('number of integrations:', number_of_ints)
+            print('split seed? ', split_seed)
 
-        elif self.runStep['linearized_darkfile']:
-            # If no pipeline is run
-            self.zeroModel = read_fits.Read_fits()
-            self.zeroModel.data = self.dark.zeroframe
-            self.zeroModel.sbAndRefpix = sbzeroframe
 
-            # Crop the linearized dark to the requested
-            # subarray size
-            # THIS WILL CROP self.dark AS WELL SINCE
-            # self.linDark IS JUST A REFERENCE IN THE NON
-            # PIPELINE CASE!!
-            self.linDark = self.crop_dark(self.linDark)
-            if self.zeroModel.data is not None:
-                self.zeroModel = self.crop_dark(self.zeroModel)
-        else:
-            raise NotImplementedError(("Mode not yet supported! Must use either: use_JWST_pipeline "
-                                       "= True and a raw or linearized dark or supply a linearized dark. "
-                                       "Cannot yet skip the pipeline and provide a raw dark."))
+            # Generate the list of dark current files to use
+            if number_of_ints == 1:
+                use_all_files = False
+                files_to_use = dark_list
+            elif number_of_ints > 1 and number_of_ints <= len(dark_list):
+                use_all_files = False
+                files_to_use = dark_list[np.random.choice(len(dark_list), number_of_ints, replace=False)]
+            else:
+                use_all_files = True
+                files_to_use = dark_list
 
-        # Save the linearized dark
-        # if self.params['Output']['save_intermediates']:
-        h0 = fits.PrimaryHDU()
-        h1 = fits.ImageHDU(self.linDark.data, name='SCI')
-        h2 = fits.ImageHDU(self.linDark.sbAndRefpix, name='SBANDREFPIX')
-        h3 = fits.ImageHDU(self.zeroModel.data, name='ZEROFRAME')
-        h4 = fits.ImageHDU(self.zeroModel.sbAndRefpix, name='ZEROSBANDREFPIX')
+            print('dark files to use:')
+            print(files_to_use)
 
-        # Populate basic info in the 0th extension header
-        nints, ngroups, yd, xd = self.linDark.data.shape
-        h0.header['READPATT'] = self.params['Readout']['readpatt'].upper()
-        h0.header['NINTS'] = nints
-        h0.header['NGROUPS'] = ngroups
-        h0.header['NFRAMES'] = self.params['Readout']['nframe']
-        h0.header['NSKIP'] = self.params['Readout']['nskip']
-        h0.header['DETECTOR'] = self.detector
-        h0.header['INSTRUME'] = self.instrument
-        h0.header['SLOWAXIS'] = self.slowaxis
-        h0.header['FASTAXIS'] = self.fastaxis
+            # Create a list describing which dark current file goes with
+            # which integration. Force the 0th element to be the first
+            # file in the list, to be assured that the final_dark variable
+            # is defined.
+            mapping = np.random.choice(len(files_to_use), size=number_of_ints)
+            print('mapping:', mapping)
+            mapping[0] = 0
+            print('mapping:', mapping)
 
-        # Add some basic Mirage-centric info
-        h0.header['MRGEVRSN'] = (MIRAGE_VERSION, 'Mirage version used')
-        h0.header['YAMLFILE'] = (self.paramfile, 'Mirage input yaml file')
+            # Loop over dark current files
+            for file_index, filename in enumerate(files_to_use):
 
-        hl = fits.HDUList([h0, h1, h2, h3, h4])
-        objname = self.basename + '_linear_dark_prep_object.fits'
-        objname = os.path.join(self.params['Output']['directory'], objname)
-        hl.writeto(objname, overwrite=True)
-        print(("Linearized dark frame plus superbias and reference"
-               "pixel signals, as well as zeroframe, saved to {}. "
-               "This can be used as input to the observation"
-               "generator.".format(objname)))
+                print('file number:', file_index)
+                if not use_all_files:
+                    frames = np.arange(len(files_to_use))
+                else:
+                    # In this case, we need to repeat at least some of
+                    # the dark ramps because the number of integrations
+                    # is larger than the number of dark current files
+                    frames = np.where(mapping == file_index)[0]
+
+                print('frames:', frames)
+                # If the random number picker didn't pick this file for
+                # any integrations, then skip reading it in.
+                if len(frames) == 0:
+                    continue
+
+                # Read in the input dark current frame
+                if not self.runStep['linearized_darkfile']:
+                    self.get_base_dark(filename)
+                    self.linDark = None
+                else:
+                    self.read_linear_dark(filename)
+                    self.dark = self.linDark
+
+                # Make sure there is enough data (frames/groups)
+                # in the input integration to produce
+                # the proposed output integration
+                self.data_volume_check(self.dark)
+
+                # Compare the requested number of integrations
+                # to the number of integrations in the input dark
+                #print("Dark shape as read in: {}".format(self.dark.data.shape))
+                #self.darkints()
+                #print("Dark shape after copying integrations to match request: {}".format(self.dark.data.shape))
+
+                # Put the input dark (or linearized dark) into the
+                # requested readout pattern
+                self.dark, sbzeroframe = self.reorder_dark(self.dark)
+                print(('DARK has been reordered to {} to match the input readpattern of {}'
+                       .format(self.dark.data.shape, self.dark.header['READPATT'])))
+
+                # If a raw dark was read in, create linearized version
+                # here using the SSB pipeline. Better to do this
+                # on the full dark before cropping, so that reference
+                # pixels can be used in the processing.
+                if ((self.params['Inst']['use_JWST_pipeline']) & (self.runStep['linearized_darkfile'] is False)):
+
+                    # Linear ize the dark ramp via the SSB pipeline.
+                    # Also save a diff image of the original dark minus
+                    # the superbias and refpix subtracted dark, to use later.
+
+                    # In order to linearize the dark, the JWST pipeline must
+                    # be present, and self.dark will have to be translated back
+                    # into a RampModel instance
+                    # print('Working on {}'.format(self.dark))
+                    self.linDark = self.linearize_dark(self.dark)
+                    print("Linearized dark shape: {}".format(self.linDark.data.shape))
+
+                    if self.params['Readout']['readpatt'].upper() in ['RAPID', 'NISRAPID', 'FGSRAPID']:
+                        print(("Output is {}, grabbing zero frame from linearized dark"
+                               .format(self.params['Readout']['readpatt'].upper())))
+                        self.zeroModel = read_fits.Read_fits()
+                        self.zeroModel.data = self.linDark.data[:, 0, :, :]
+                        self.zeroModel.sbAndRefpix = self.linDark.sbAndRefpix[:, 0, :, :]
+                    elif ((self.params['Readout']['readpatt'].upper() not in ['RAPID', 'NISRAPID', 'FGSRAPID']) &
+                          (self.dark.zeroframe is not None)):
+                        print("Now we need to linearize the zeroframe because the")
+                        print("output readpattern is not RAPID, NISRAPID, or FGSRAPID")
+                        # Now we need to linearize the zeroframe. Place it
+                        # into a RampModel instance before running the
+                        # pipeline steps
+                        self.zeroModel = read_fits.Read_fits()
+                        self.zeroModel.data = np.expand_dims(self.dark.zeroframe, axis=1)
+                        self.zeroModel.header = self.linDark.header
+                        self.zeroModel.header['NGROUPS'] = 1
+                        self.zeroModel = self.linearize_dark(self.zeroModel)
+                        # Return the zeroModel data to 3 dimensions
+                        # integrations, y, x
+                        self.zeroModel.data = self.zeroModel.data[:, 0, :, :]
+                        self.zeroModel.sbAndRefpix = self.zeroModel.sbAndRefpix[:, 0, :, :]
+                        # In this case the zeroframe has changed from what
+                        # was read in. So let's remove the original zeroframe
+                        # to avoid confusion
+                        self.linDark.zeroframe = np.zeros(self.linDark.zeroframe.shape)
+                    else:
+                        self.zeroModel = None
+
+                    # Now crop self.linDark, self.dark, and zeroModel
+                    # to requested subarray
+                    self.dark = self.crop_dark(self.dark)
+                    self.linDark = self.crop_dark(self.linDark)
+
+                    if self.zeroModel is not None:
+                        self.zeroModel = self.crop_dark(self.zeroModel)
+
+                elif self.runStep['linearized_darkfile']:
+                    # If no pipeline is run
+                    self.zeroModel = read_fits.Read_fits()
+                    self.zeroModel.data = self.dark.zeroframe
+                    self.zeroModel.sbAndRefpix = sbzeroframe
+
+                    # Crop the linearized dark to the requested
+                    # subarray size
+                    # THIS WILL CROP self.dark AS WELL SINCE
+                    # self.linDark IS JUST A REFERENCE IN THE NON
+                    # PIPELINE CASE!!
+                    self.linDark = self.crop_dark(self.linDark)
+                    if self.zeroModel.data is not None:
+                        self.zeroModel = self.crop_dark(self.zeroModel)
+                else:
+                    raise NotImplementedError(("Mode not yet supported! Must use either: use_JWST_pipeline "
+                                               "= True and a raw or linearized dark or supply a linearized dark. "
+                                               "Cannot yet skip the pipeline and provide a raw dark."))
+
+                if file_index == 0:
+                    print('self.linDark shape is {}. Expecting it to be 4D'.format(self.linDark.data.shape))
+                    junk, num_grps, ydim, xdim = self.linDark.data.shape
+                    final_dark = np.zeros((number_of_ints, num_grps, ydim, xdim))
+                    final_sbandrefpix = np.zeros((number_of_ints, num_grps, ydim, xdim))
+                    final_zerodata = np.zeros((number_of_ints, ydim, xdim))
+                    final_zero_sbandrefpix = np.zeros((number_of_ints, ydim, xdim))
+
+                if not use_all_files:
+                    print('Setting integration {} to use file {}'.format(file_index, os.path.split(filename)[1]))
+                    final_dark[file_index, :, :, :] = self.linDark.data
+                    final_sbandrefpix[file_index, :, :, :] = self.linDark.sbAndRefpix
+                    final_zerodata[file_index, :, :] = self.zeroModel.data
+                    final_zero_sbandrefpix[file_index, :, :] = self.zeroModel.sbAndRefpix
+                else:
+                    # In this case, we need to repeat at least some of
+                    # the dark ramps because the number of integrations
+                    # is larger than the number of dark current files
+                    #frames = np.where(mapping == file_index)[0]
+                    print('File number {} will be used for integrations {}'.format(file_index, frames))
+                    final_dark[frames, :, :, :] = self.linDark.data
+                    final_sbandrefpix[frames, :, :, :] = self.linDark.sbAndRefpix
+                    final_zerodata[frames, :, :] = self.zeroModel.data
+                    final_zero_sbandrefpix[frames, :, :] = self.zeroModel.sbAndRefpix
+
+            # Save the linearized dark
+            # if self.params['Output']['save_intermediates']:
+            h0 = fits.PrimaryHDU()
+            h1 = fits.ImageHDU(final_dark, name='SCI')
+            h2 = fits.ImageHDU(final_sbandrefpix, name='SBANDREFPIX')
+            h3 = fits.ImageHDU(final_zerodata, name='ZEROFRAME')
+            h4 = fits.ImageHDU(final_zero_sbandrefpix, name='ZEROSBANDREFPIX')
+
+            # Populate basic info in the 0th extension header
+            nints, ngroups, yd, xd = final_dark.shape
+            h0.header['READPATT'] = self.params['Readout']['readpatt'].upper()
+            h0.header['NINTS'] = nints
+            h0.header['NGROUPS'] = ngroups
+            h0.header['NFRAMES'] = self.params['Readout']['nframe']
+            h0.header['NSKIP'] = self.params['Readout']['nskip']
+            h0.header['DETECTOR'] = self.detector
+            h0.header['INSTRUME'] = self.instrument
+            h0.header['SLOWAXIS'] = self.slowaxis
+            h0.header['FASTAXIS'] = self.fastaxis
+
+            # Add some basic Mirage-centric info
+            h0.header['MRGEVRSN'] = (MIRAGE_VERSION, 'Mirage version used')
+            h0.header['YAMLFILE'] = (self.paramfile, 'Mirage input yaml file')
+
+            hl = fits.HDUList([h0, h1, h2, h3, h4])
+            if split_seed:
+                objname = self.basename + '_seg{}_linear_dark_prep_object.fits'.format(str(seg_index+1).zfill(3))
+            else:
+                objname = self.basename + '_linear_dark_prep_object.fits'
+            objname = os.path.join(self.params['Output']['directory'], objname)
+            hl.writeto(objname, overwrite=True)
+            print(("Linearized dark frame plus superbias and reference"
+                   "pixel signals, as well as zeroframe, saved to {}. "
+                   "This can be used as input to the observation"
+                   "generator.".format(objname)))
 
         # important variables
         # self.linDark
@@ -818,20 +990,21 @@ class DarkPrep():
         # information, for ease in connecting with next step of the
         # simulator
         self.prepDark = read_fits.Read_fits()
-        self.prepDark.data = self.linDark.data
-        self.prepDark.zeroframe = self.zeroModel.data
-        self.prepDark.sbAndRefpix = self.linDark.sbAndRefpix
-        self.prepDark.zero_sbAndRefpix = self.zeroModel.sbAndRefpix
+        self.prepDark.data = final_dark
+        self.prepDark.zeroframe = final_zerodata
+        self.prepDark.sbAndRefpix = final_zero_sbandrefpix
+        self.prepDark.zero_sbAndRefpix = final_zero_sbandrefpix
         self.prepDark.header = self.linDark.header
 
-    def read_linear_dark(self):
+    def read_linear_dark(self, input_file):
         """Read in the linearized version of the dark current ramp
         using the read_fits class"""
         try:
             print(('Reading in linearized dark current ramp from {}'
-                   .format(self.params['Reffiles']['linearized_darkfile'])))
+                   .format(input_file)))
             self.linDark = read_fits.Read_fits()
-            self.linDark.file = self.params['Reffiles']['linearized_darkfile']
+            #self.linDark.file = self.params['Reffiles']['linearized_darkfile']
+            self.linDark.file = input_file
             self.linDark.read_astropy()
         except:
             raise IOError('WARNING: Unable to read in linearized dark ramp.')

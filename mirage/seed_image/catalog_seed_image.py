@@ -40,6 +40,7 @@ from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
+from mirage.utils.file_splitting import find_file_splits
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -146,12 +147,17 @@ class Catalog_seed():
         #memory = self.estimate_memory()
         #split_seed = False
         #if memory > self.params['Output']['max_memory'] * 2048 * 2048:
-        if 1>0:
-            split_seed = True
-            #integration_segment_indexes = self.calculate_frame_splits()
-            integration_segment_indexes = [0, 10, 20, 30]
-            self.total_seed_segments = len(integration_segment_indexes) - 1
-            print('\n********************\nNeed integration split indexes from a new function\n****************\n')
+        #if 1>0:
+        #    split_seed = True
+        #    #integration_segment_indexes = self.calculate_frame_splits()
+        #    integration_segment_indexes = [0, 10, 20, 30]
+        #    self.total_seed_segments = len(integration_segment_indexes) - 1
+        #    print('\n********************\nNeed integration split indexes from a new function\n****************\n')
+
+        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(self.output_dims[1],
+                                                                                          self.output_dims[0],
+                                                                                          self.frames_per_integration,
+                                                                                          self.params['Readout']['nint'])
 
         # Read in the pixel area map, which will be needed for certain
         # sources in the seed image
@@ -257,6 +263,34 @@ class Catalog_seed():
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
+    def file_splits(self):
+        """Check to see whether the final dark file will need to be
+        split into segments due to large file size
+        """
+        # Let's declare the equivalent of a 100 group full frame ramp
+        # as the upper limit for observation file size
+        pixel_limit = 2048 * 2048 * 100
+
+        xd = self.subarray_bounds[3] - self.subarray_bounds[1]
+        yd = self.subarray_bounds[2] - self.subarray_bounds[0]
+        pix_per_int = self.numgroups * yd * xd
+        observation = pix_per_int * self.numints
+
+        split = False
+        int_list = [0, self.numints]
+        if observation > pixel_limit:
+            split = True
+            ints_per_split = np.int(pixel_limit / pix_per_int)
+            int_list = np.arange(0, self.numints, ints_per_split)
+            if int_list[-1] != self.numints:
+                int_list = np.append(int_list, self.numints)
+
+
+        This does not split within an integration if there are too many frames.
+        What do we do then? For TSO, need to keep track of the final group of each
+        chunk so that we can add that to the first group of the next chunk.
+        return split, int_list
+
     def create_tso_seed(self, split_seed=False, integration_splits=-1):
         """Create a seed image for time series or grism time series
         sources. Just like for moving targets, the seed image will
@@ -310,6 +344,43 @@ class Catalog_seed():
                 i = 1
                 for int_start in integration_splits[:-1]:
                     int_end = integration_splits[i]
+
+                    j = 1
+                    previous_frame = np.zeros(self.seedimage.shape)
+                    for initial_frame in frame_splits[:-1]:
+                        frame_start = int_start * (self.frames_per_integration + 1) + initial_frame
+                        frame_end = frame_start + frame_splits[j]
+                        time_start = frame_start * self.frametime
+                        time_end = frame_end * self.frametime
+                        total_frames = frame_end - frame_start + 1
+                        total_ints = int_end - int_start
+
+                        print('Int/frame information:')
+                        print(i, j, int_start, int_end, frame_start, frame_end, time_start, time_end, total_frames, total_ints)
+
+                        seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap,
+                                                                           tso_seeds, tso_segs,
+                                                                           tso_lightcurves, self.frametime,
+                                                                           total_frames, self.total_frames,
+                                                                           self.frames_per_integration,
+                                                                           total_ints,
+                                                                           self.params['Readout']['resets_bet_ints'],
+                                                                           starting_time=time_start,
+                                                                           starting_frame=frame_start,
+                                                                           samples_per_frametime=5)
+
+
+
+
+
+
+
+
+
+                        int-splits only below here
+
+
+
                     frame_start = int_start * (self.frames_per_integration + 1)
                     time_start = frame_start * self.frametime
                     frame_end = int_end * (self.frames_per_integration + 1) - 2
