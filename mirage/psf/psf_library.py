@@ -493,7 +493,7 @@ class CreatePSFLibrary:
 
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
-                          detectors='all', fov_pixels=1024):
+                          detectors='all', fov_pixels=1024, overwrite=False):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -502,17 +502,27 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     ----------
     ote : webbpsf.opds.OTE_Linear_Model_WSS object
         WebbPSF OTE object describing perturbed OTE state with tip and tilt removed
+
     segment_tilts : numpy.ndarray
         List of X and Y tilts for each mirror segment, in microradians
+
     out_dir : str
         Directory in which to save FITS files
+
     filters : str or list, optional
         Which filters to generate PSF libraries for. Default is ['F212N', 'F480M']
         (the two filters used for most commissioning activities).
+
     detectors : str or list, optional
         Which detectors to generate PSF libraries for. Default is 'all'.
+
     fov_pixels : int, optional
         Size of the PSF to generate, in pixels. Default is 1024.
+
+    overwrite : bool, optional
+            True/False boolean to overwrite the output file if it already
+            exists. Default is True.
+
     """
     for i in range(18):
         start_time = time.time()
@@ -536,7 +546,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         # Generate the library file(s)
         c = CreatePSFLibrary('NIRCam', filters=filters, detectors=detectors,
                              fov_pixels=fov_pixels, oversample=1, num_psfs=1,
-                             fileloc=out_dir, ote=ote, overwrite=False,
+                             fileloc=out_dir, ote=ote, overwrite=overwrite,
                              header_addons=hdr)
         c.create_files()
 
@@ -547,7 +557,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
             old_root = old_name.split('.fits')[0]
             new_path = os.path.join(out_dir, old_root + '_seg{:02d}.fits'.format(i_segment))
             os.rename(f, new_path)
+            print('  Renamed file:', new_path)
 
-        print('Completed segment {}'.format(i + 1))
         print('Elapsed time:', time.time() - start_time)
         print()

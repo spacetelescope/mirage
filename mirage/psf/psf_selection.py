@@ -34,6 +34,7 @@ import os
 
 from astropy.io import fits
 import numpy as np
+import pysiaf
 from webbpsf.utils import to_griddedpsfmodel
 
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
@@ -185,7 +186,8 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     return library
 
 
-def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_path, wings=False):
+def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
+                     library_path, wings=False, segment_id=None):
     """Given an instrument and filter name along with the path of
     the PSF library, find the appropriate library file to load.
 
@@ -206,16 +208,23 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
     wfe : str
         Wavefront error. Can be 'predicted' or 'requirements'
 
-     wfe_group : int
+    wfe_group : int
         Wavefront error realization group. Must be an integer from 0 - 9.
 
     library_path : str
         Path pointing to the location of the PSF library
 
+    wings : bool, optional
+        ?
+
+    segment_id : int or None, optional
+        If specified, returns a segment PSF library file and denotes the ID
+        of the mirror segment
+
     Returns
     --------
     matches : str
-        Name of the PSF library file for the instrument and filtername
+        Name of the PSF library file for the instrument and filter name
     """
     psf_files = glob(os.path.join(library_path, '*.fits'))
 
@@ -230,12 +239,22 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
     wfe = wfe.lower()
 
     for filename in psf_files:
+        # Open the file header
         header = fits.getheader(filename)
+
+        # Compare the header entries to the user input
         file_inst = header['INSTRUME'].upper()
-        try:
-            file_det = header['DETECTOR'].upper()
-        except KeyError:
-            file_det = header['DET_NAME'].upper()
+
+        if segment_id is None:
+            try:
+                file_det = header['DETECTOR'].upper()
+            except KeyError:
+                file_det = header['DET_NAME'].upper()
+            det_match = file_det == detector
+        else:
+            det_keys = [k for k in header.keys() if 'DETNAME' in k]
+            dets = [header[k] for k in det_keys]
+            det_match = detector in dets
         file_filt = header['FILTER'].upper()
 
         try:
@@ -248,7 +267,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
             elif file_inst.upper() == 'NIRISS':
                 file_pupil = 'CLEARP'
 
-        # NIRISS has many filters in the pupil wheel. Webbpsf does
+        # NIRISS has many filters in the pupil wheel. WebbPSF does
         # not make a distinction, but Mirage does. Adjust the info
         # to match Mirage's expectations
         if file_inst.upper() == 'NIRISS' and file_filt in NIRISS_PUPIL_WHEEL_FILTERS:
@@ -261,24 +280,34 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
                                   'in the pupil wheel.'))
             file_pupil = save_filt
 
-        opd = header['OPD_FILE']
-        if 'requirements' in opd:
-            file_wfe = 'requirements'
-        elif 'predicted' in opd:
-            file_wfe = 'predicted'
+        if segment_id is None:
+            opd = header['OPD_FILE']
+            if 'requirements' in opd:
+                file_wfe = 'requirements'
+            elif 'predicted' in opd:
+                file_wfe = 'predicted'
 
-        file_wfe_grp = header['OPDSLICE']
+            file_wfe_grp = header['OPDSLICE']
 
-        if not wings:
-            match = (file_inst == instrument and file_det == detector and file_filt == filt and
-                     file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
+        if segment_id is not None:
+            segment_id = int(segment_id)
+            file_segment_id = int(header['SEGID'])
+
+        # Evaluate if the file matches the given parameters
+        match = (file_inst == instrument
+                 and det_match
+                 and file_filt == filt
+                 and file_pupil == pupil)
+        if not wings and segment_id is None:
+            match = match and file_wfe_grp == wfe_group
+        if segment_id is not None:
+            match = match and file_segment_id == segment_id
         else:
-            match = (file_inst == instrument and file_det == detector and file_filt == filt and
-                     file_pupil == pupil and file_wfe == wfe)
+            match = match and file_wfe == wfe
 
+        # If so, add to the list of all matches
         if match:
             matches.append(filename)
-        # psf_table[filename] = [file_inst, file_det, file_filt, file_pupil, file_wfe, file_wfe_grp, match]
 
     # Find files matching the requested inputs
     if len(matches) == 1:
@@ -287,6 +316,53 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
         raise ValueError("No PSF library file found matching requested parameters.")
     elif len(matches) > 1:
         raise ValueError("More than one PSF library file matches requested parameters: {}".format(matches))
+
+
+def get_segment_library_list(instrument, detector, filt,
+                             library_path, pupil='CLEAR', wings=False):
+    """Given an instrument and filter name along with the path of
+    the PSF library, find the appropriate 18 segment PSF library files.
+
+    Parameters
+    -----------
+    instrument : str
+        Name of instrument the PSFs are from
+
+    detector : str
+        Name of the detector within ```instrument```
+
+    filt : str
+        Name of filter used for PSF library creation
+
+    library_path : str
+        Path pointing to the location of the PSF library
+
+    pupil : str, optional
+        Name of pupil wheel element used for PSF library creation. Default is
+        'CLEAR'.
+
+    wings : bool, optional
+        ?
+
+    segment_id : int or None, optional
+        If specified, returns a segment PSF library file and denotes the ID
+        of the mirror segment
+
+    Returns
+    --------
+    library_list : list
+        List of the names of the segment PSF library files for the instrument
+        and filter name
+    """
+    library_list = []
+    for seg_id in np.arange(1, 19):
+         segment_file = get_library_file(
+             instrument, detector, filt, pupil, '', '', library_path,
+             wings=wings, segment_id=seg_id
+         )
+         library_list.append(segment_file)
+
+    return library_list
 
 
 def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, wavefront_error_group,
@@ -370,3 +446,74 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
                    "These must be even."))
             raise ValueError
     return psf_wing
+
+
+def get_segment_offset(segment_number, detector, library_list):
+    """Convert vectors coordinates in the local segment control
+    coordinate system to NIRCam detector X and Y coordinates,
+    at least proportionally, in order to calculate the location
+    of the segment PSFs on the given detector.
+
+    Parameters
+    ----------
+    segment : int
+        Segment ID, i.e 3
+    detector : str
+        Name of NIRCam detector
+    library_list : list
+        List of the names of the segment PSF library files
+
+    Returns
+    -------
+    x_displacement
+        The shift of the segment PSF in NIRCam SW x pixels
+    y_displacement
+        The shift of the segment PSF in NIRCam SW y pixels
+    """
+
+    # Verify that the segment number in the header matches the index
+    seg_index = int(segment_number) - 1
+    header = fits.getheader(library_list[seg_index])
+
+    assert int(header['SEGID']) == int(segment_number), \
+        "Uh-oh. The segment ID of the library does not match the requested " \
+        "segment. The library_list was not assembled correctly."
+    xtilt = header['XTILT']
+    ytilt = header['YTILT']
+    segment = header['SEGNAME'][:2]
+
+    # These conversion factors were empirically calculated by measuring the
+    # relation between tilt and the pixel displacement
+    tilt_to_pixel_slope = 13.4
+    tilt_to_pixel_intercept = 0
+
+    control_xaxis_rotations = {
+        'A1': 180, 'A2': 120, 'A3': 60, 'A4': 0, 'A5': -60,
+        'A6': -120, 'B1': 0, 'C1': 60, 'B2': -60, 'C2': 0,
+        'B3': -120, 'C3': -60, 'B4': -180, 'C4': -120,
+        'B5': -240, 'C5': -180, 'B6': -300, 'C6': -240
+    }
+
+    x_rot = control_xaxis_rotations[segment]  # degrees
+    x_rot_rad = x_rot * np.pi / 180  # radians
+
+    # Note that y is defined as the x component and x is defined as the y component.
+    # This is because "xtilt" moves the PSF in the y direction, and vice versa.
+    tilt_onto_y = (xtilt * np.cos(x_rot_rad)) - (ytilt * np.sin(x_rot_rad))
+    tilt_onto_x = (xtilt * np.sin(x_rot_rad)) + (ytilt * np.cos(x_rot_rad))
+
+    # TODO: IS THE SLOPE DIFFERENT FOR LW DETECTORS????
+    x_displacement = -(tilt_onto_x * tilt_to_pixel_slope) + tilt_to_pixel_intercept  # pixels
+    y_displacement = -(tilt_onto_y * tilt_to_pixel_slope) + tilt_to_pixel_intercept  # pixels
+
+    # Get the appropriate pixel scale from pysiaf
+    siaf = pysiaf.Siaf('nircam')
+    aperture = siaf['NRC{}_FULL'.format(detector[-2:].upper())]
+    nircam_x_pixel_scale = aperture.XSciScale  # arcsec/pixel
+    nircam_y_pixel_scale = aperture.YSciScale  # arcsec/pixel
+
+    # Convert the pixel displacement into angle
+    x_arcsec = x_displacement * nircam_x_pixel_scale  # arcsec
+    y_arcsec = y_displacement * nircam_y_pixel_scale  # arcsec
+
+    return x_arcsec, y_arcsec
