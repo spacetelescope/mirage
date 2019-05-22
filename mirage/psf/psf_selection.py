@@ -319,7 +319,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
 
 def get_segment_library_list(instrument, detector, filt,
-                             library_path, pupil='CLEAR', wings=False):
+                             library_path, pupil='CLEAR'):
     """Given an instrument and filter name along with the path of
     the PSF library, find the appropriate 18 segment PSF library files.
 
@@ -341,9 +341,6 @@ def get_segment_library_list(instrument, detector, filt,
         Name of pupil wheel element used for PSF library creation. Default is
         'CLEAR'.
 
-    wings : bool, optional
-        ?
-
     segment_id : int or None, optional
         If specified, returns a segment PSF library file and denotes the ID
         of the mirror segment
@@ -357,8 +354,8 @@ def get_segment_library_list(instrument, detector, filt,
     library_list = []
     for seg_id in np.arange(1, 19):
          segment_file = get_library_file(
-             instrument, detector, filt, pupil, '', '', library_path,
-             wings=wings, segment_id=seg_id
+             instrument, detector, filt, pupil, '', 0, library_path,
+             segment_id=seg_id
          )
          library_list.append(segment_file)
 
