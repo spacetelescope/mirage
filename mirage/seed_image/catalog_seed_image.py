@@ -37,9 +37,9 @@ from . import segmentation_map as segmap
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
-from ..psf.psf_selection import (get_gridded_psf_library, get_psf_wings,
-                                 get_gridded_segment_psf_library_list,
-                                 get_segment_offset, get_segment_library_list)
+from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
+from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
+                                get_segment_offset, get_segment_library_list)
 from ..utils.constants import grism_factor
 from mirage import version
 
