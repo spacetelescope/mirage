@@ -127,7 +127,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         # Integrate the lightcurve for each frame
         for frame_number in np.arange(total_frames) + starting_frame:
             frame_index = frame_number - starting_frame
-            print("Loop 1, frame number and index: ", frame_number, frame_index)
+            #print("Loop 1, frame number and index: ", frame_number, frame_index)
             min_index = frame_number * (samples_per_frametime - 1)
             indexes = np.arange(min_index, min_index + samples_per_frametime)
 
@@ -143,21 +143,29 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
     # Translate the frame-by-frame seed into the final, cumulative seed
     # image. Rearrange into integrations, resetting the signal for each
     # new integration.
+    #print(number_of_ints, frames_per_integration, resets_bet_ints, starting_frame)
     integration_starts = np.arange(number_of_ints) * (frames_per_integration + resets_bet_ints) + starting_frame
     reset_frames = integration_starts[1:] - 1
-    print('integration_starts:', integration_starts)
-    print('reset frames:', reset_frames)
-    final_seed = np.zeros((number_of_ints, frames_per_integration, yd, xd))
+    #print('integration_starts:', integration_starts)
+    #print('reset frames:', reset_frames)
+    #final_seed = np.zeros((number_of_ints, frames_per_integration, yd, xd))
+    #print(number_of_ints, total_frames, len(reset_frames))
+    if total_frames-len(reset_frames) > frames_per_integration:
+        dimension = frames_per_integration
+    else:
+        dimension = total_frames-len(reset_frames)
+    final_seed = np.zeros((number_of_ints, dimension, yd, xd))
+    #print('final_seed shape: ', final_seed.shape)
     for frame in np.arange(total_frames) + starting_frame:
         int_number = np.where(frame >= integration_starts)[0][-1]
         rel_frame = frame - integration_starts[int_number]  # - starting_frame
-        print('frame, rel_frame, and int_number:', frame, rel_frame, int_number)
+        #print('frame, rel_frame, and int_number:', frame, rel_frame, int_number)
 
         if frame in integration_starts:
             final_seed[int_number, 0, :, :] = copy.deepcopy(frame_seed[frame-starting_frame, :, :]) + seed_image
-            print('final_seed[{}, 0, :, :] = frame_seed[{}, :, :]'.format(int_number, frame-starting_frame))
+            #print('final_seed[{}, 0, :, :] = frame_seed[{}, :, :]'.format(int_number, frame-starting_frame))
         elif frame not in reset_frames:
-            print('int: {}, rel_frame {}, frame-starting frame {}'.format(int_number, rel_frame, frame-starting_frame))
+            #print('int: {}, rel_frame {}, frame-starting frame {}'.format(int_number, rel_frame, frame-starting_frame))
             final_seed[int_number, rel_frame, :, :] = final_seed[int_number, rel_frame-1, :, :] + \
                 frame_seed[frame-starting_frame, :, :] + seed_image
 

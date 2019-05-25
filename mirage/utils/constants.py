@@ -30,7 +30,7 @@ TSO_MODES = ['ts_imaging', 'ts_wfss']
 
 # Upper limit to the size of a seed image or dark current array. Arrays
 # containing more pixels than this limit will be split into segment files.
-FILE_SPLITTING_LIMIT = 100. * 2048. * 2048
+FILE_SPLITTING_LIMIT = 38. * 2048. * 2048
 
 
 def grism_factor(instrument_name):

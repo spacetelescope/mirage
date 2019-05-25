@@ -9,7 +9,8 @@ import numpy as np
 from mirage.utils.constants import FILE_SPLITTING_LIMIT
 
 
-def find_file_splits(xdim, ydim, groups, integrations, pixel_limit=FILE_SPLITTING_LIMIT):
+def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
+                     pixel_limit=FILE_SPLITTING_LIMIT):
     """Determine the frame and/or integration numbers where a file
     should be split in order to keep the file size reasonable.
 
@@ -26,6 +27,10 @@ def find_file_splits(xdim, ydim, groups, integrations, pixel_limit=FILE_SPLITTIN
 
     integrations : int
         Number of integrations in exposure
+
+    frames_per_group : int
+        Number of frames (inculding skipped frames) per
+        group
 
     pixel_limit : int
         Proxy for file size limit. Number of pixel read outs to treat
@@ -50,26 +55,34 @@ def find_file_splits(xdim, ydim, groups, integrations, pixel_limit=FILE_SPLITTIN
 
     # Default = no splitting
     split = False
-    group_list = np.array([0, groups+1])
-    integration_list = np.array([0, integrations+1])
+    group_list = np.array([0, groups])
+    integration_list = np.array([0, integrations])
 
     # Check for splitting between groups first
     # i.e. splitting within an integration
     if pix_per_int > pixel_limit:
         split = True
         delta_group = np.int(pixel_limit / pix_per_group)
-        group_list = np.arange(0, groups, delta_group)
+        # If calculations are being done using frames rather than groups,
+        # make sure that we don't split in the middle of a group. Force
+        # the splits to be between groups.
+        if frames_per_group is not None:
+            if delta_group % frames_per_group != 0:
+                closest_multiple = delta_group // frames_per_group
+                delta_group = closest_multiple * frames_per_group
+
+        group_list = np.arange(0, groups, delta_group).astype(np.int)
         group_list = np.append(group_list, groups)
         print('Splitting within each integration:')
         print('group_list: ', group_list)
-        integration_list = np.arange(integrations + 1)
+        integration_list = np.arange(integrations + 1).astype(np.int)
         print('integration_list: ', integration_list)
     elif observation > pixel_limit:
         split = True
         print('Splitting by integration:')
         group_list = np.array([0, groups])
         delta_int = np.int(pixel_limit / pix_per_int)
-        integration_list = np.arange(0, integrations, delta_int)
+        integration_list = np.arange(0, integrations, delta_int).astype(np.int)
         integration_list = np.append(integration_list, integrations)
         print('group_list: ', group_list)
         print('integration_list: ', integration_list)

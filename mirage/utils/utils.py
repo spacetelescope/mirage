@@ -21,6 +21,7 @@ import copy
 import json
 import os
 import re
+import yaml
 
 from astropy.io import ascii as asc
 
@@ -241,6 +242,44 @@ def get_aperture_definition(aperture_name, instrument):
     return aperture_definition
 
 
+def get_frame_count_info(numints, numgroups, numframes, numskips, numresets):
+    """Calculate information on the number of frames per group and
+    per integration
+
+    Parameters
+    ----------
+    numints : int
+        Number of integraitons in the exposure
+
+    numgroups : int
+        Number of groups per integration
+
+    numframes : int
+        Number of frames averaged together to create a group
+
+    numskips : int
+        Number of skipped frames per group
+
+    numresets : int
+        Number of detector resets between integrations
+
+    Returns
+    -------
+    frames_per_group
+    """
+    frames_per_group = numframes + numskips
+    frames_per_integration = numgroups * frames_per_group
+    total_frames = numgroups * frames_per_group
+
+    if numints > 1:
+        # Frames for all integrations
+        total_frames *= numints
+        # Add the resets for all but the first integration
+        total_frames += (numresets * (numints - 1))
+
+    return frames_per_group, frames_per_integration, total_frames
+
+
 def get_subarray_info(params, subarray_table):
     """Find aperture-specific information from the subarray information config file
 
@@ -417,3 +456,39 @@ def read_subarray_definition_file(filename):
         raise RuntimeError(("Error: could not read in subarray definitions file: {}"
                             .format(filename)))
     return data
+
+
+def read_yaml(filename):
+    """Read the contents of a yaml file into a nested dictionary
+
+    Parameters
+    ----------
+    filename : str
+        Name of yaml file to be read in
+
+    Returns
+    -------
+    data : dict
+        Nested dictionary of file contents
+    """
+    try:
+        with open(filename, 'r') as f:
+            data = yaml.load(f, Loader=yaml.FullLoader)
+    except FileNotFoundError as e:
+            print(e)
+    return data
+
+
+def write_yaml(data, filename):
+    """Write a nested dictionary to a yaml file
+
+    Parameters
+    ----------
+    data : dict
+        Nested dictionary of paramters
+
+    filename : str
+        Output filename
+    """
+    with open(filename, 'w') as output:
+        yaml.dump(data, filename, default_flow_style=False)

@@ -35,6 +35,7 @@ import numpy as np
 from astropy.io import fits, ascii
 
 from ..utils import read_fits, utils, siaf_interface
+from mirage.utils.file_splitting import find_file_splits
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -750,11 +751,15 @@ class DarkPrep():
         #if memory > self.params['Output']['max_memory'] * 2048 * 2048:
 
         #split_seed, integration_segment_indexes = self.file_splits()
-
-        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(self.output_dims[1],
-                                                                                          self.output_dims[0],
-                                                                                          self.frames_per_integration,
+        xdim = self.subarray_bounds[2] - self.subarray_bounds[0]
+        ydim = self.subarray_bounds[3] - self.subarray_bounds[1]
+        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
+                                                                                          self.params['Readout']['ngroup'],
                                                                                           self.params['Readout']['nint'])
+        print('Splits:')
+        print(split_seed)
+        print(group_segment_indexes)
+        print(integration_segment_indexes)
 
 
         #if 1>0:
@@ -766,17 +771,21 @@ class DarkPrep():
         #else:
         #    split_seed = False
         #    integration_segment_indexes = [0, self.numints]
-        print('Splits:')
-        print(split_seed)
-        print(integration_segment_indexes)
 
+        # This currently pays attention only to splitting the file on integrations, and not
+        # within an integration. It seems like we can keep it this way as the dark data is
+        # reordered to the requested readout pattern before saving. It seems unlikely
+        # that observations will be taken that require splitting the file within integrations
+        # in that case. BUT at one point we do still have all the frames in memory
+        # (within data_volume_check). So at that point, a DEEP exposure with 20 groups
+        # will have 400 frames open. This is also an unlikely situation, but it could
+        # be a problem.
         for seg_index, segment in enumerate(integration_segment_indexes[:-1]):
             # Get the number of integrations being simulated
             if split_seed:
                 number_of_ints = integration_segment_indexes[seg_index+1] - segment
             else:
                 number_of_ints = self.numints
-
 
             print('segment number: ', seg_index)
             print('number of integrations:', number_of_ints)
@@ -802,7 +811,6 @@ class DarkPrep():
             # file in the list, to be assured that the final_dark variable
             # is defined.
             mapping = np.random.choice(len(files_to_use), size=number_of_ints)
-            print('mapping:', mapping)
             mapping[0] = 0
             print('mapping:', mapping)
 

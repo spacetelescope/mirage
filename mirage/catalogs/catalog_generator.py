@@ -476,6 +476,152 @@ class NonSiderealCatalog(MovingPointSourceCatalog):
         self.table = pad_table_comments(tab)
 
 
+class ImagingTSOCatalog(PointSourceCatalog):
+    def __init__(self, ra=[], dec=[], x=[], y=[], lightcurve_file=[]):
+        """Create instance of an imaging TSO catalog
+        """
+        # Add location information
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+
+        # Add TSO-specific information
+        self._lightcurve_file = lightcurve_file
+
+    def create_table(self):
+        """Create an astropy table containing the catalog
+        """
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units)
+
+        # Add the lightcurve filename column
+        lc_col = Column(self._lightcurve_file, name='lightcurve_file')
+        tab.add_column(lc_col, index=3)
+
+        # Make sure there are at least 4 comment lines at the top
+        self.table = pad_table_comments(tab)
+
+    @property
+    def lightcurve_file(self):
+        """Return lightcurve filenames"""
+        return self._lightcurve_file
+
+
+class GrismTSOCatalog(PointSourceCatalog):
+    def __init__(self, ra=[], dec=[], x=[], y=[], semimajor_axis=[], orbital_inclination=[],
+                 eccentricity=[], orbital_period=[], longitude_of_periastron=[], limb_dark_model=[],
+                 limb_dark_coeffs=[], time_units=[], start_time=[], end_time=[], inferior_conj=[],
+                 transmission_spectrum=[]):
+        """Create instance of a grism TSO catalog
+        """
+        # Add location information
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+
+        # Add TSO-specific information
+        self._semimajor_axis = semimajor_axis
+        self._orbital_inclination = orbital_inclination,
+        self._eccentricity = eccentricity
+        self._orb_period = orb_period
+        self._longitude_of_periastron = longitude_of_periastron
+        self._limb_dark_model = limb_dark_model
+        self._limb_dark_coeffs = limb_dark_coeffs
+        self._time_units = time_units
+        self._start_time = start_time
+        self._end_time = end_time
+        self._inferior_conj = inferior_conj
+        self._transmission_spectrum = transmission_spectrum
+
+    def create_table(self):
+        """Create an astropy table containing the catalog
+        """
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units)
+
+        # Add the lightcurve filename column
+        semimajor_col = Column(self._semimajor_axis, name='Semimajor_axis_in_stellar_radii')
+        tab.add_column(semimajor_col, index=3)
+
+        orb_inc_col = Column(self._orbital_inclination, name='Orbital_inclination_deg')
+        tab.add_column(orb_inc_col, index=4)
+
+        ecc_col = Column(self._eccentricity, name='Eccentricity')
+        tab.add_column(ecc_col, index=5)
+
+        pastron_col = Column(self._longitude_of_periastron, name='Longitude_of_periastron')
+        tab.add_column(pastron_col, index=6)
+
+        limb_model_col = Column(self._limb_dark_model, name='Limb_darkening_model')
+        tab.add_column(limb_model_col, index=7)
+
+        limb_coeff_col = Column(self._limb_dark_coeffs, name='Limb_darkening_coeffs')
+        tab.add_column(limb_coeff_col, index=8)
+
+        time_unit_col = Column(self._time_units, name='Time_units')
+        tab.add_column(time_unit_col, index=9)
+
+        start_col = Column(self._start_time, name='Start_time')
+        tab.add_column(start_col, index=10)
+
+        end_col = Column(self._end_time, name='End_time')
+        tab.add_column(end_col, index=11)
+
+        inf_conj_col = Column(self._inferior_conj, name='Inferior_conjunction')
+        tab.add_column(inf_conj_col, index=12)
+
+        orb_per_col = Column(self._orbital_period, name='Orbital_period')
+        tab.add_column(orb_per_col, index=13)
+
+        spec_col = Column(self._transmission_spectrum, name='Transmission_spectrum')
+        tab.add_column(spec_col, index=14)
+
+        # Make sure there are at least 4 comment lines at the top
+        self.table = pad_table_comments(tab)
+
+    @property
+    def semimajor_axis(self):
+        return self._semimajor_axis
+
+    @property
+    def orbital_inclination(self):
+        return self._orbital_inclination
+
+    @property
+    def eccentricity(self):
+        return self._eccentricity
+
+    @property
+    def longitude_of_periastron(self):
+        return self._longitude_of_periastron
+
+    @property
+    def limb_dark_model(self):
+        return self._limb_dark_model
+
+    @property
+    def limb_dark_coeffs(self):
+        return self._limb_dark_coeffs
+
+    @property
+    def time_units(self):
+        return self._time_units
+
+    @property
+    def start_time(self):
+        return self._start_time
+
+    @property
+    def end_time(self):
+        return self._end_time
+
+    @property
+    def inferior_conj(self):
+        return self._inferior_conj
+
+    @property
+    def orbital_period(self):
+        return self._orbital_period
+
+    @property
+    def transmission_spectrum(self):
+        return self._transmission_spectrum
+
+
 def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_units):
     """
     DO IT
