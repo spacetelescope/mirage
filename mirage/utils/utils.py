@@ -301,7 +301,7 @@ def get_subarray_info(params, subarray_table):
         mtch = params['Readout']['array_name'] == subarray_table['AperName']
         namps = subarray_table['num_amps'].data[mtch][0]
         if namps != 0:
-            params['Readout']['namp'] = namps
+            params['Readout']['namp'] = int(namps)
         else:
             if ((params['Readout']['namp'] == 1) or
                (params['Readout']['namp'] == 4)):
@@ -437,6 +437,42 @@ def parse_RA_Dec(ra_string, dec_string):
         raise ValueError("Error parsing RA, Dec strings: {} {}".format(ra_string, dec_string))
 
 
+def read_pattern_check(parameters):
+    # Check the readout pattern that's entered and set nframe and nskip
+    # accordingly
+    parameters['Readout']['readpatt'] = parameters['Readout']['readpatt'].upper()
+
+    # Read in readout pattern definition file
+    # and make sure the possible readout patterns are in upper case
+    readpatterns = asc.read(parameters['Reffiles']['readpattdefs'])
+    readpatterns['name'] = [s.upper() for s in readpatterns['name']]
+
+    # If the requested readout pattern is in the table of options,
+    # then adopt the appropriate nframe and nskip
+    if parameters['Readout']['readpatt'] in readpatterns['name']:
+        mtch = parameters['Readout']['readpatt'] == readpatterns['name']
+        parameters['Readout']['nframe'] = int(readpatterns['nframe'][mtch].data[0])
+        parameters['Readout']['nskip'] = int(readpatterns['nskip'][mtch].data[0])
+        print(('Requested readout pattern {} is valid. '
+               'Using the nframe = {} and nskip = {}'
+               .format(parameters['Readout']['readpatt'],
+                       parameters['Readout']['nframe'],
+                       parameters['Readout']['nskip'])))
+
+        print('in read_pattern_check, nframe and nskip are:')
+        print(parameters['Readout']['nframe'], parameters['Readout']['nskip'])
+        print(type(parameters['Readout']['nframe']), type(parameters['Readout']['nskip']))
+        print('maxiter', parameters['nonlin']['maxiter'], type(parameters['nonlin']['maxiter']))
+
+    else:
+        # If the read pattern is not present in the definition file
+        # then quit.
+        raise ValueError(("WARNING: the {} readout pattern is not defined in {}."
+                          .format(parameters['Readout']['readpatt'],
+                                  parameters['Reffiles']['readpattdefs'])))
+    return parameters
+
+
 def read_subarray_definition_file(filename):
     """Read in the file that contains a list of subarray names and related information
 
@@ -491,4 +527,4 @@ def write_yaml(data, filename):
         Output filename
     """
     with open(filename, 'w') as output:
-        yaml.dump(data, filename, default_flow_style=False)
+        yaml.dump(data, output, default_flow_style=False)

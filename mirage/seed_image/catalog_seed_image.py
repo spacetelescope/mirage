@@ -155,22 +155,31 @@ class Catalog_seed():
         #    print('\n********************\nNeed integration split indexes from a new function\n****************\n')
 
         frames_per_group = self.frames_per_integration / self.params['Readout']['ngroup']
-        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(self.output_dims[1],
-                                                                                          self.output_dims[0],
-                                                                                          self.frames_per_integration,
-                                                                                          self.params['Readout']['nint'],
-                                                                                          frames_per_group=frames_per_group)
-        self.total_seed_segments = (len(group_segment_indexes) - 1) * (len(integration_segment_indexes) - 1)
+        if self.params['Inst']['mode'] in ['ts_imaging']:
+            split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(self.output_dims[1],
+                                                                                              self.output_dims[0],
+                                                                                              self.frames_per_integration,
+                                                                                              self.params['Readout']['nint'],
+                                                                                              frames_per_group=frames_per_group)
+            self.total_seed_segments = (len(group_segment_indexes) - 1) * (len(integration_segment_indexes) - 1)
 
-        # If the file needs to be split, check to see what the splitting
-        # would be in the case of groups rather than frames. This will
-        # help align the split files between the seed image and the dark
-        # object later (which is split by groups).
-        if split_seed:
-            split_seed_g, group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.output_dims[1],
-                                                                                                self.output_dims[0],
-                                                                                                self.params['Readout']['ngroup'],
-                                                                                                self.params['Readout']['nint'])
+            # If the file needs to be split, check to see what the splitting
+            # would be in the case of groups rather than frames. This will
+            # help align the split files between the seed image and the dark
+            # object later (which is split by groups).
+            if split_seed:
+                split_seed_g, group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.output_dims[1],
+                                                                                                    self.output_dims[0],
+                                                                                                    self.params['Readout']['ngroup'],
+                                                                                                    self.params['Readout']['nint'])
+        else:
+            split_seed = False
+            group_segment_indexes = [0, self.params['Readout']['ngroup']]
+            integration_segment_indexes = [0, self.params['Readout']['nint']]
+            self.file_segment_indexes = copy.deepcopy(integration_segment_indexes)
+            self.total_seed_segments = 1
+            self.segment_number = 1
+            self.segment_part_number = 1
             #integration_segment_indexes_g = [0, 7, 14, 21, 28, 30]
             #use these values to determine the segment number to use in the output filename!!!
 

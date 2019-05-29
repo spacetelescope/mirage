@@ -51,7 +51,7 @@ import sys
 import argparse
 import yaml
 
-from astropy.io import fits
+from astropy.io import ascii, fits
 import astropy.units as u
 import batman
 import numpy as np
@@ -65,12 +65,13 @@ from mirage.dark import dark_prep
 from mirage.ramp_generator import obs_generator
 from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES
-from mirage.utils.utils import expand_environment_variable, read_yaml, write_yaml, get_frame_count_info, calc_frame_time
+from mirage.utils.file_splitting import find_file_splits
+from mirage.utils import utils
 from mirage.yaml import yaml_update
 
 
 class GrismTSO():
-    def __init__(self, paramfiles, SED_file=None, SED_normalizing_catalog_column=None,
+    def __init__(self, parameter_file, SED_file=None, SED_normalizing_catalog_column=None,
                  final_SED_file=None, SED_dict=None, save_dispersed_seed=True, source_stamps_file=None,
                  extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"],
                  create_continuum_seds=True):
@@ -87,18 +88,18 @@ class GrismTSO():
                               "from the Mirage package.".format(env_var)))
 
         # Set the user-input parameters
-        self.create_continuum_seds = create_continuum_seds
+        self.paramfile = parameter_file
         self.SED_file = SED_file
-        self.SED_dict = SED_dict
         self.SED_normalizing_catalog_column = SED_normalizing_catalog_column
         self.final_SED_file = final_SED_file
-        self.override_dark = override_dark
+        self.SED_dict = SED_dict
         self.save_dispersed_seed = save_dispersed_seed
         self.source_stamps_file = source_stamps_file
-        self.disp_seed_filename = disp_seed_filename
         self.extrapolate_SED = extrapolate_SED
-        self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
+        self.override_dark = override_dark
+        self.disp_seed_filename = disp_seed_filename
         self.orders = orders
+        self.create_continuum_seds = create_continuum_seds
 
         # Make sure the right combination of parameter files and SED file
         # are given
@@ -108,10 +109,10 @@ class GrismTSO():
         # from the input paramfiles. Adjust any imaging mode parameter
         # files to have the mode set to wfss. This will ensure the seed
         # images will be the proper (expanded) dimensions
-        self.paramfiles = self.find_param_info()
+        #self.paramfiles = self.find_param_info()
 
         # Make sure inputs are correct
-        self.check_inputs()
+        #self.check_inputs()
 
     def calculate_exposure_time(self):
         """Calculate the total exposure time of the observation being
@@ -123,18 +124,18 @@ class GrismTSO():
             Exposure time for the total exposuure, including reset frames,
             in seconds
         """
-        self.frametime = calc_frame_time(self.instrument, self.aperture, self.seed_dimensions[1],
-                                         self.seed_dimensions[0], self.namps)
+        self.frametime = utils.calc_frame_time(self.instrument, self.aperture, self.seed_dimensions[1],
+                                               self.seed_dimensions[0], self.namps)
         return self.frametime * self.total_frames
 
-    def create_seed(self):
+    def create(self):
         """MAIN FUNCTION"""
 
         # Get parameters necessary to create the TSO data
         orig_parameters = self.get_param_info()
-        subarray_definition_file = ...
-        subarray_table = read_subarray_definition_file(subarray_definition_file)
-        orig_parameters = get_subarray_info(orig_parameters, subarray_table)
+        subarray_table = utils.read_subarray_definition_file(orig_parameters['Reffiles']['subarray_defs'])
+        orig_parameters = utils.get_subarray_info(orig_parameters, subarray_table)
+        orig_parameters = utils.read_pattern_check(orig_parameters)
 
         # Determine file splitting information. First get some basic info
         # on the exposure
@@ -142,12 +143,13 @@ class GrismTSO():
         self.numgroups = orig_parameters['Readout']['ngroup']
         self.numframes = orig_parameters['Readout']['nframe']
         self.numskips = orig_parameters['Readout']['nskip']
+        self.namps = orig_parameters['Readout']['namp']
         self.numresets = orig_parameters['Readout']['resets_bet_ints']
-        self.frames_per_group, self.frames_per_int, self.total_frames = get_frame_count_info(self.numints,
-                                                                                             self.numgroups,
-                                                                                             self.numframes,
-                                                                                             self.numskips,
-                                                                                             self.numresets)
+        self.frames_per_group, self.frames_per_int, self.total_frames = utils.get_frame_count_info(self.numints,
+                                                                                                   self.numgroups,
+                                                                                                   self.numframes,
+                                                                                                   self.numskips,
+                                                                                                   self.numresets)
         # Make 2 copies of the input parameter file, separating the TSO
         # source from the other sources
         self.split_param_file(orig_parameters)
@@ -159,7 +161,7 @@ class GrismTSO():
 
         # Run the disperser on the background sources
         background_dispersed = self.run_disperser(background_direct.seed_file, orders=self.orders,
-                                                  create_continuum_seds=True)
+                                                  create_continuum_seds=True, finalize=True)
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -170,12 +172,17 @@ class GrismTSO():
         self.seed_dimensions = tso_direct.nominal_dims
 
         # Read in the transmission spectrum that goes with the TSO source
-        tso_params = read_yaml(self.tso_paramfile)
+        tso_params = utils.read_yaml(self.tso_paramfile)
         tso_catalog_file = tso_params['simSignals']['tso_grism_catalog']
+
+        print('TAO catalog file', tso_catalog_file)
+
+
         tso_catalog = ascii.read(tso_catalog_file)
         #self.check_tso_catalog_inputs(tso_catalog)
+
         transmission_file = tso_catalog['Transmission_spectrum'].data
-        transmission_spectrum = read_hdf5_or_ascii(transmission_file)
+        transmission_spectrum = ascii.read(transmission_file[0])
 
         # Calculate the total exposure time, including resets, to check
         # against the times provided in the catalog file.
@@ -186,22 +193,26 @@ class GrismTSO():
         tso_catalog = self.tso_catalog_check(tso_catalog, total_exposure_time)
 
         # Use batman to create lightcurves from the transmission spectrum
-        lightcurves, times = self.make_lightcurves(tso_catalog, self.frametime)
+        lightcurves, times = self.make_lightcurves(tso_catalog, self.frametime, transmission_spectrum)
 
         # Determine which frames of the exposure will take place with the unaltered stellar
         # spectrum. This will be all frames where the associated lightcurve is 1.0 everywhere.
         transit_frames, unaltered_frames = self.find_transit_frames(lightcurves)
 
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
-        grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders)
-        no_transit_signal = copy.deepcopy(grism_seed_object.final)
+        grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders, finalize=False)
+        for i, order in enumerate(self.orders):
+            if i == 0:
+                no_transit_signal = copy.deepcopy(grism_seed_object.this_one[order].simulated_image)
+            else:
+                no_transit_signal += grism_seed_object.this_one[order].simulated_image
 
         # Calculate file splitting info
         self.file_splitting()
 
         # Prepare for creating output files
         segment_file_dir = orig_parameters['Output']['directory']
-        if self.params['Readout']['pupil'][0].upper() == 'F':
+        if orig_parameters['Readout']['pupil'][0].upper() == 'F':
             usefilt = 'pupil'
         else:
             usefilt = 'filter'
@@ -213,10 +224,10 @@ class GrismTSO():
         # file.
         print('lightcurves shape:', lightcurves.shape)
 
-        move below into seed_builder function
+        print('move below into seed_builder function')
 
-        ints_per_segment = self.int_segment_indexes[:-1] - self.int_segment_indexes[1:]
-        groups_per_segment = self.grp_segment_indexes[:-1] - self.grp_segment_indexes[1:]
+        ints_per_segment = self.int_segment_indexes[1:] - self.int_segment_indexes[:-1]
+        groups_per_segment = self.grp_segment_indexes[1:] - self.grp_segment_indexes[:-1]
         print("Integration segment indexes: ", self.int_segment_indexes)
         print("ints_per_segment: ", ints_per_segment)
         print("Group segment indexes: ", self.grp_segment_indexes)
@@ -230,8 +241,8 @@ class GrismTSO():
                 print("Integrations: {}, Groups: {}".format(int_dim, grp_dim))
                 segment_seed = np.zeros((int_dim, grp_dim, self.seed_dimensions[0], self.seed_dimensions[1]))
 
-                we need to deal with reset frames here. previous_frame signal should reset to zero,
-                and no dispersion nor segment_seed population is necessary
+                #we need to deal with reset frames here. previous_frame signal should reset to zero,
+                #and no dispersion nor segment_seed population is necessary
 
 
                 for integ in np.arange(int_dim):
@@ -250,10 +261,10 @@ class GrismTSO():
                         # cached disperser with the appropriate lightcurve
                         elif total_frame_counter in transit_frames:
                             print("{} is during the transit".format(total_frame_counter))
-                            lightcurve = lightcurves[total_frame_counter, :]
-                            lc_interp = interp1d(times, lightcurve)
+                            frame_transmission = lightcurves[total_frame_counter, :]
+                            trans_interp = interp1d(transmission_spectrum['Wavelength'], frame_transmission)
                             for order in self.orders:
-                                grism_seed_object.this_one[order].disperse_all_from_cache(lc_interp)
+                                grism_seed_object.this_one[order].disperse_all_from_cache(trans_interp)
                             frame_only_signal = (background_dispersed.final + grism_seed_object.final) * self.frametime
 
                         # Now add the signal from this frame to that in the
@@ -281,7 +292,7 @@ class GrismTSO():
                 segment_file_name = '{}seg{}_part{}_seed_image.fits'.format(segment_file_base,
                                                                             str(segment_number).zfill(3),
                                                                             str(segment_part_number).zfill(3))
-                save the file here. Maybe need to move seed_catalog_images saveSeedImage into utils?
+                print('save the file here. Maybe need to move seed_catalog_images saveSeedImage into utils?')
 
 
 
@@ -298,13 +309,13 @@ class GrismTSO():
                                                                                                self.frames_per_int,
                                                                                                self.numints,
                                                                                                frames_per_group=frames_per_group)
-        self.total_seed_segments = (len(group_segment_indexes) - 1) * (len(integration_segment_indexes) - 1)
+        self.total_seed_segments = (len(self.grp_segment_indexes) - 1) * (len(self.int_segment_indexes) - 1)
 
         # If the file needs to be split, check to see what the splitting
         # would be in the case of groups rather than frames. This will
         # help align the split files between the seed image and the dark
         # object later (which is split by groups).
-        if split_seed:
+        if self.split_seed:
             split_seed_g, group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.seed_dimensions[1],
                                                                                                 self.seed_dimensions[0],
                                                                                                 self.numgroups,
@@ -336,19 +347,22 @@ class GrismTSO():
             Nested dictionary of parameters in the input yaml file
         """
         self.catalog_files = []
-        parameters = read_yaml(self.paramfile)
+        parameters = utils.read_yaml(self.paramfile)
 
         cats = [parameters['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
         cats = [e for e in cats if e.lower() != 'none']
         self.catalog_files.extend(cats)
 
         self.instrument = parameters['Inst']['instrument'].lower()
-        self.aperture = parameters['Inst']['array_name']
-        self.namps = parameters['Readout']['namp']
+        self.aperture = parameters['Readout']['array_name']
+        try:
+            self.namps = parameters['Readout']['namp']
+        except KeyError:
+            pass
         if self.instrument == 'niriss':
             self.module = None
         elif self.instrument == 'nircam':
-            self.module = parameters['Inst']['array_name'][3]
+            self.module = parameters['Readout']['array_name'][3]
         else:
             raise ValueError("ERROR: Grism TSO mode not supported for {}".format(self.instrument))
 
@@ -365,14 +379,14 @@ class GrismTSO():
         if self.instrument == 'niriss':
             self.crossing_filter = pupil_name.upper()
             self.dispersion_direction = filter_name[-1].upper()
-        elif slf.instrument == 'nircam':
+        elif self.instrument == 'nircam':
             self.crossing_filter = filter_name.upper()
             self.dispersion_direction = pupil_name[-1].upper()
         return parameters
 
 
     @staticmethod
-    def make_lightcurves(catalog, frame_time):
+    def make_lightcurves(catalog, frame_time, transmission_spec):
         """Given a transmission spectrum, create a series of lightcurves
         using ``batman``.
 
@@ -400,19 +414,19 @@ class GrismTSO():
         params.limb_dark = catalog['Limb_darkening_model']     # limb darkening model
 
         # Limb darkening coefficients [u1, u2, u3, u4]
-        params.u = [np.float(e) for e in catalog['Limb_darkening_coeffs'].split(',')]
+        params.u = [np.float(e) for e in catalog['Limb_darkening_coeffs'][0].split(',')]
 
         # Get the time units from the catalog
-        time_units = u.Unit(catalog['Time_units'])
-        start_time = catalog['Start_time'] * time_units
-        end_time = catalog['End_time'] * time_units
+        time_units = u.Unit(catalog['Time_units'][0])
+        start_time = catalog['Start_time'][0] * time_units
+        end_time = catalog['End_time'][0] * time_units
 
         # Convert times to units of seconds to make working
         # with frametimes later easier
         start_time = start_time.to(u.second).value
         end_time = end_time.to(u.second).value
-        params.t0 = catalog['Inferior_conjunction'].to(u.second).value  # time of inferior conjunction
-        params.per = catalog['Orbital_period'].to(u.second).value       # orbital period
+        params.t0 = (catalog['Time_of_inferior_conjunction'][0] * time_units).to(u.second).value  # time of inferior conjunction
+        params.per = (catalog['Orbital_period'][0] * time_units).to(u.second).value       # orbital period
 
         # The time resolution must be one frametime since we will need one
         # lightcurve for each frame later
@@ -421,8 +435,8 @@ class GrismTSO():
 
         # Step along the transmission spectrum in wavelength space and
         # calculate a lightcurve at each step
-        lightcurves = np.ones((len(time), len(transmissions)))
-        for i, radius in enumerate(transmission):
+        lightcurves = np.ones((len(time), len(transmission_spec['Transmission'])))
+        for i, radius in enumerate(transmission_spec['Transmission']):
             params.rp = radius                          # updates planet radius
             new_flux = model.light_curve(params)        # recalculates light curve
             lightcurves[:, i] = new_flux
@@ -435,7 +449,7 @@ class GrismTSO():
             raise ValueError(("ERROR: Orders to be dispersed must be either None or some combination "
                               "of '+1', '+2'"))
 
-    def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False):
+    def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False, finalize=False):
         """
         """
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
@@ -463,15 +477,30 @@ class GrismTSO():
             print('Background file is {}'.format(background_file))
         orders = self.orders
 
+
+        print(direct_file, self.crossing_filter, dmode, loc, self.instrument)
+        print(self.extrapolate_SED, self.SED_file, self.source_stamps_file)
+
+
         # Create dispersed seed image from the direct images
-        disp_seed = Grism_seed(direct_file, self.crossing_filter,
+        disp_seed = Grism_seed([direct_file], self.crossing_filter,
                                dmode, config_path=loc, instrument=self.instrument.upper(),
                                extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
                                SBE_save=self.source_stamps_file)
+        disp_seed.observation()#orders=orders)
         for order in orders:
-            disp_seed.this_one[order].dispere_all(cache=True)
-        #disp_seed.observation(orders=orders)
-        #disp_seed.finalize(Back=background_file)
+            disp_seed.this_one[order].disperse_all(cache=True)
+
+        print('DISPERSED SIZE: ', disp_seed.this_one[order].simulated_image.shape)
+
+
+        if finalize:
+            print('FINALIZING')
+            print(background_file)
+            with fits.open(os.path.join('/ifs/jwst/wit/mirage_data/nircam/GRISM_NIRCAM', background_file)) as h:
+                delme = h[0].data
+            print('background file size: ', delme.shape)
+            disp_seed.finalize(Back=background_file)
         return disp_seed
 
     def seed_builder(self, not_in_transit, in_transit):
@@ -503,8 +532,8 @@ class GrismTSO():
                 print("Integrations: {}, Groups: {}".format(int_dim, grp_dim))
                 segment_seed = np.zeros((int_dim, grp_dim, self.seed_dimensions[0], self.seed_dimensions[1]))
 
-                we need to deal with reset frames here. previous_frame signal should reset to zero,
-                and no dispersion nor segment_seed population is necessary
+                #we need to deal with reset frames here. previous_frame signal should reset to zero,
+                #and no dispersion nor segment_seed population is necessary
 
 
                 for integ in np.arange(int_dim):
@@ -554,7 +583,7 @@ class GrismTSO():
                 segment_file_name = '{}seg{}_part{}_seed_image.fits'.format(segment_file_base,
                                                                             str(segment_number).zfill(3),
                                                                             str(segment_part_number).zfill(3))
-                you have to save segment_seed here rather than returning it since you are in the loop
+                #you have to save segment_seed here rather than returning it since you are in the loop
 
     def split_param_file(self, params):
         """Create 2 copies of the input parameter file. One will contain
@@ -570,27 +599,30 @@ class GrismTSO():
         # Copy #1 - contains all source catalogs other than TSO sources
         # and be set to wfss mode.
         background_params = copy.deepcopy(params)
-        background_params['simSignals']['tso_grism_catalog'] = None
+        background_params['simSignals']['tso_grism_catalog'] = 'None'
         background_params['Inst']['mode'] = 'wfss'
+        background_params['Output']['file'] = params['Output']['file'].replace('.fits',
+                                                                               '_background_sources.fits')
         self.background_paramfile = self.paramfile.replace('.{}'.format(suffix),
                                                            '_background_sources.{}'.format(suffix))
-        write_yaml(background_params, self.background_paramfile)
+        utils.write_yaml(background_params, self.background_paramfile)
 
         # Copy #2 - contaings only the TSO grism source catalog,
         # is set to wfss mode, and has no background
         params['Inst']['mode'] = 'wfss'
         params['simSignals']['bkgdrate'] = 0.
-        params['simSignals']['zodiacal'] = None
-        params['simSignals']['scattered'] = None
+        params['simSignals']['zodiacal'] = 'None'
+        params['simSignals']['scattered'] = 'None'
         other_catalogs = ['pointsource', 'galaxyListFile', 'extended', 'tso_imaging_catalog',
                           'movingTargetList', 'movingTargetSersic', 'movingTargetExtended',
                           'movingTargetToTrack']
         for catalog in other_catalogs:
-            params['simSignals'][catalog] = None
+            params['simSignals'][catalog] = 'None'
+        params['Output']['file'] = params['Output']['file'].replace('.fits', '_tso_grism_sources.fits')
 
         self.tso_paramfile = self.paramfile.replace('.{}'.format(suffix),
                                                     '_tso_grism_sources.{}'.format(suffix))
-        write_yaml(params, self.tso_paramfile)
+        utils.write_yaml(params, self.tso_paramfile)
 
     @staticmethod
     def tso_catalog_check(catalog, exp_time):
@@ -598,14 +630,16 @@ class GrismTSO():
         used to calculate the lightcurves) are long enough to encompass the entire exposure.
         If not, extend the end time to the required time.
         """
-        time_unit_str = catalog['Time_units']
+
+        print(catalog['Time_units'][0])
+        time_unit_str = catalog['Time_units'][0]
 
         # Catch common unit errors
         if time_unit_str.lower() in ['seconds', 'minutes', 'hours', 'days']:
             time_unit_str = time_unit_str[0:-1]
-            catalog['Time_units'] = time_unit_str
+            catalog['Time_units'][0] = time_unit_str
         catalog_time_units = u.Unit(time_unit_str)
-        catalog_total_time = (tso_catalog['End_time'] - tso_catalog['Start_time']) * catalog_time_units
+        catalog_total_time = (catalog['End_time'][0] - catalog['Start_time'][0]) * catalog_time_units
 
         # Make sure the lightcurve time is at least as long as the exposure
         # time
@@ -613,15 +647,15 @@ class GrismTSO():
             print(('WARNING: Lightcurve duration specified in TSO catalog file is less than '
                    'the total duration of the exposure. Adding extra time to the end of the '
                    'lightcurve to match.'))
-            tso_catalog['End_time'] = tso_catalog['Start_time'] + total_exposure_time.to(catalog_time_units).value
+            catalog['End_time'][0] = catalog['Start_time'][0] + catalog_total_time.value#.to(catalog_time_units).value
 
         # Make sure the time of inferior conjunction is betwen
         # the starting and ending times
-        if ((catalog['Inferior_conjunction'] < catalog['Start_time']) or
-           (catalog['Inferior_conjunction'] > catalog['End_time'])):
+        if ((catalog['Time_of_inferior_conjunction'][0] < catalog['Start_time'][0]) or
+           (catalog['Time_of_inferior_conjunction'][0] > catalog['End_time'][0])):
             raise ValueError(("ERROR: the inferior conjucntion time in the TSO catalog is "
                               "outside the bounds of the starting and ending times."))
-        return tso_catalog
+        return catalog
 
 
 

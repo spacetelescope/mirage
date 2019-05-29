@@ -961,22 +961,32 @@ class Observation():
 
         # Get the input dark if a filename is supplied
         if self.linDark is None:
-            self.linDark = self.params['Reffiles']['linearized_darkfile']
+            # If no linearized dark is provided, assume the entry in the
+            # yaml file is the proper format
+            self.linDark = [self.params['Reffiles']['linearized_darkfile']]
             print('Reading in dark file: {}'.format(self.linDark))
-        if isinstance(self.linDark, str):
+            self.linear_dark = self.read_dark_file(self.linDark[0])
+        elif isinstance(self.linDark, str):
+            # If a single filename is given, read in the file
             print('Reading in dark file: {}'.format(self.linDark))
-            self.linDark = self.read_dark_file(self.linDark)
+            self.linDark = [self.linDark]
+            self.linear_dark = self.read_dark_file(self.linDark[0])
+        elif isinstance(self.linDark, list):
+            # Case where dark is split amongst multiple files due to high
+            # data volume
+            print('Dark file list: {}'.format(self.linDark))
+            self.linear_dark = self.read_dark_file(self.linDark[0])
+        else:
+            # Case where user has provided a catalogSeed object
+            self.linear_dark = copy.deepcopy(self.linDark)
+            self.linDark = [None]
 
         # Finally, collect information about the detector,
         # which will be needed for astrometry later
-        self.detector = self.linDark.header['DETECTOR']
-        self.instrument = self.linDark.header['INSTRUME']
-        self.fastaxis = self.linDark.header['FASTAXIS']
-        self.slowaxis = self.linDark.header['SLOWAXIS']
-
-        # Get the input seed image if a filename is supplied
-        if isinstance(self.seed, str):
-            self.seed, self.segmap, self.seedheader = self.read_seed(self.seed)
+        self.detector = self.linear_dark.header['DETECTOR']
+        self.instrument = self.linear_dark.header['INSTRUME']
+        self.fastaxis = self.linear_dark.header['FASTAXIS']
+        self.slowaxis = self.linear_dark.header['SLOWAXIS']
 
         # Some basic checks on the inputs to make sure
         # the script won't have to abort due to bad inputs
@@ -1009,7 +1019,8 @@ class Observation():
 
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
-        tmpy, tmpx = self.seed.shape[-2:]
+        #tmpy, tmpx = self.seed.shape[-2:]
+        tmpy, tmpx = self.linear_dark.shape[0, 0, :, :]
         self.frametime = utils.calc_frame_time(self.instrument, self.params['Readout']['array_name'],
                                                tmpx, tmpy, self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
@@ -1028,6 +1039,48 @@ class Observation():
             print('{} for all pixels.'.format(self.params['nonlin']['limit']))
             dy, dx = self.dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
+
+
+        # Organize seed image filenames if a list is given
+        if isinstance(self.seed, list):
+            self.seed.sort()
+
+
+
+
+        for i, linDark in enumerate(self.linDark):
+            if i > 0:
+                self.linear_dark = self.read_dark_file(self.linDark[i])
+
+            # Get the corresponding input seed image(s)
+            if isinstance(self.seed, str):
+                # If a single filename is supplied
+                self.seed_image, self.segmap, self.seedheader = self.read_seed(self.seed)
+                self.seed = [self.seed]
+            elif isinstance(self.seed, list):
+                # If the seed image is a list of files (due to high data
+                # volume)
+                self.seed.sort()
+                self.seed_image, self.segmap, self.seedheader = self.read_seed(self.seed[0])
+            else:
+                # self.seed is a catalogSeed object.
+                # In this case we assume that self.segmap and
+                # self.seedheader have also been provided as the
+                # appropriate objects, since they are saved in
+                # the same file as the seed image
+                self.seed_image = copy.deepcopy(self.seed)
+                self.seed = [None]
+
+
+            for j, seed in enumerate(self.seed):
+                if j > 0:
+                    self.seed_image, self.segmap, self.seedheader = self.read_seed(self.seed[j])
+
+
+
+
+
+
 
         # Translate to ramp if necessary,
         # Add poisson noise and cosmic rays
@@ -2384,7 +2437,7 @@ class Observation():
         or have a readout pattern that matches the output.
         """
         rapids = ["RAPID", "NISRAPID", "FGSRAPID"]
-        darkpatt = self.linDark.header['READPATT']
+        darkpatt = self.linear_dark.header['READPATT']
         if ((darkpatt != self.params['Readout']['readpatt']) &
            (darkpatt not in rapids)):
             raise ValueError(("WARNING: Unable to convert input dark with a "
