@@ -174,6 +174,7 @@ class WFSSSim():
                                extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
                                SBE_save=self.source_stamps_file)
         disp_seed.observation(orders=orders)
+        disp_seed.disperse(orders=orders)
         disp_seed.finalize(Back=background_file)
 
         # Get gain map
