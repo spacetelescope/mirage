@@ -33,6 +33,7 @@ from glob import glob
 import os
 
 from astropy.io import fits
+import numpy as np
 from webbpsf.utils import to_griddedpsfmodel
 
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
@@ -175,10 +176,16 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         library_file = get_library_file(instrument, detector, filtername, pupilname,
                                         wavefront_error, wavefront_error_group, library_path)
 
-    print("PSFs will be generated using: {}".format(os.path.basename(library_file)))
+    print("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
 
     try:
         library = to_griddedpsfmodel(library_file)
+    except KeyError:
+        # Handle input ITM images
+        itm_sim = fits.getval(library_file, 'ORIGIN')
+        if itm_sim:
+            library = _load_itm_library(library_file)
+
     except OSError:
         print("OSError: Unable to open {}.".format(library_file))
     return library
@@ -239,6 +246,9 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
         # Open the file header
         header = fits.getheader(filename)
 
+        # Determine if it is an ITM file
+        itm_sim = header['ORIGIN'] == 'ITM'
+
         # Compare the header entries to the user input
         file_inst = header['INSTRUME'].upper()
         file_det = header['DETECTOR'].upper()
@@ -267,7 +277,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                                   'in the pupil wheel.'))
             file_pupil = save_filt
 
-        if segment_id is None:
+        if segment_id is None and not itm_sim:
             opd = header['OPD_FILE']
             if 'requirements' in opd:
                 file_wfe = 'requirements'
@@ -285,11 +295,11 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                  and file_det == detector
                  and file_filt == filt
                  and file_pupil == pupil)
-        if not wings and segment_id is None:
+        if not wings and segment_id is None and not itm_sim:
             match = match and file_wfe_grp == wfe_group
         if segment_id is not None:
             match = match and file_segment_id == segment_id
-        else:
+        elif not itm_sim:
             match = match and file_wfe == wfe
 
         # If so, add to the list of all matches
@@ -386,3 +396,38 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
                    "These must be even."))
             raise ValueError
     return psf_wing
+
+
+def _load_itm_library(library_file):
+    """Load ITM FITS file
+
+    Parameters
+    ----------
+    library_path : str
+        Path pointing to the location of the PSF library
+
+    Returns
+    -------
+    library : photutils.griddedPSFModel
+        Object containing PSF library
+    """
+    data = fits.getdata(library_file)
+    hdr = fits.getheader(library_file)
+    if data.shape == (2048, 2048):
+        # TODO: Remove when Shannon adds her 3rd dimension check
+        # Add (empty) 3rd dimension to the data
+        data = np.array([data])
+
+        # Add PSF location and oversampling keywords
+        hdr['DET_YX0'] = ('(1023, 1023)', "The #0 PSF's (y,x) detector pixel position")
+        hdr['OVERSAMP'] = (1, 'Oversampling factor for FFTs in computation')
+
+        # Convert to HDUList and create library
+        phdu = fits.PrimaryHDU(data, hdr)
+        hdulist = fits.HDUList(phdu)
+        library = to_griddedpsfmodel(hdulist, ext=0)
+
+        return library
+    else:
+        raise ValueError('Expecting ITM data of size (2048, 2048), not {}'.format(data.shape))
+    

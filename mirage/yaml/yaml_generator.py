@@ -1262,7 +1262,7 @@ class SimInput:
             paths_out = [self.psf_paths] * len(self.info['act_id'])
             return paths_out
 
-        elif isinstance(self.psf_paths, list) and self.psf_paths != n_activities:
+        elif isinstance(self.psf_paths, list) and len(self.psf_paths) != n_activities:
             raise ValueError('Invalid PSF paths parameter provided. Please '
                              'provide the psf_paths in the form of a list of '
                              'strings with a length equal to the number of '
