@@ -247,7 +247,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
         header = fits.getheader(filename)
 
         # Determine if it is an ITM file
-        itm_sim = header['ORIGIN'] == 'ITM'
+        itm_sim = header.get('ORIGIN', '') == 'ITM'
 
         # Compare the header entries to the user input
         file_inst = header['INSTRUME'].upper()
@@ -430,4 +430,3 @@ def _load_itm_library(library_file):
         return library
     else:
         raise ValueError('Expecting ITM data of size (2048, 2048), not {}'.format(data.shape))
-    
