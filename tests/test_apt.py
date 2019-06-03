@@ -41,7 +41,7 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 # Determine if tests are being run on Travis
-ON_TRAVIS = os.path.expanduser('~') == '/Users/travis'
+ON_TRAVIS = os.path.expanduser('~') == '/home/travis'
 
 # @pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
