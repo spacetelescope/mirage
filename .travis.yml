@@ -31,6 +31,9 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
+    - conda env list
+    - source activate mirage
+    - conda list
     - conda env create -n mirage python=$PYTHON_VERSION
     - conda env update -n mirage -f=environment.yml
     - source activate mirage
