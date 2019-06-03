@@ -13,7 +13,6 @@ env:
         - PYTHON_VERSION=3.6
         - EVENT_TYPE='push pull_request'
         - MIRAGE_DATA='non_existing_path'
-        - TEST_COMMAND='pytest ./tests/'
 
 
 matrix:
@@ -32,11 +31,10 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
-    - conda env create -n mirage python=$PYTHON_VERSION -f=environment.yml
+    - conda env create -n mirage python=$PYTHON_VERSION
+    - conda env update -n mirage -f=environment.yml
     - source activate mirage
     - pip install -e .
-    - conda list
 
 script:
-    - conda info
-    - $TEST_COMMAND
+    - pytest ./tests/

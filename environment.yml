@@ -16,6 +16,7 @@ dependencies:
 - jwxml>=0.3.0
 - matplotlib>=3.0.0
 - notebook>=5.7.0
+- numpy>=1.14.3
 - photutils>=0.6
 - pip>=10.0.1
 - poppy>=0.7.0
@@ -27,4 +28,5 @@ dependencies:
 - webbpsf-data>=0.7.0
 - yaml>=0.1.7
 - pip:
+    - jwst-backgrounds>=1.1.1
     - pysiaf>=0.2.5
