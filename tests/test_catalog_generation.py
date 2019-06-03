@@ -140,13 +140,13 @@ def test_for_proposal():
                                                                              besancon_seed=2345,
                                                                              galaxy_seed=2346)
 
-    ptsrc_map = {'1': 'ptsrc_for_targets_with_large_separation_observations_1.cat',
-                 '2': 'ptsrc_for_targets_with_large_separation_observations_2.cat',
-                 '3': 'ptsrc_for_targets_with_large_separation_observations_3.cat'}
+    ptsrc_map = {'001': 'ptsrc_for_targets_with_large_separation_observations_001.cat',
+                 '002': 'ptsrc_for_targets_with_large_separation_observations_002.cat',
+                 '003': 'ptsrc_for_targets_with_large_separation_observations_003.cat'}
 
-    galaxy_map = {'1': 'galaxies_for_targets_with_large_separation_observations_1.cat',
-                  '2': 'galaxies_for_targets_with_large_separation_observations_2.cat',
-                  '3': 'galaxies_for_targets_with_large_separation_observations_3.cat'}
+    galaxy_map = {'001': 'galaxies_for_targets_with_large_separation_observations_001.cat',
+                  '002': 'galaxies_for_targets_with_large_separation_observations_002.cat',
+                  '003': 'galaxies_for_targets_with_large_separation_observations_003.cat'}
 
     ptsrc_name = []
     galaxy_name = []
@@ -156,8 +156,8 @@ def test_for_proposal():
 
     assert ptsrc_map == p_map
     assert galaxy_map == g_map
-    assert ptsrc_name == p_name
-    assert galaxy_name == g_name
+    assert sorted(ptsrc_name) == sorted(p_name)
+    assert sorted(galaxy_name) == sorted(g_name)
 
     truth_ptsrc = ['ptsrc_1.cat', 'ptsrc_2.cat', 'ptsrc_3.cat']
     truth_galaxy = ['galaxy_1.cat', 'galaxy_2.cat', 'galaxy_3.cat']
@@ -190,9 +190,9 @@ def test_for_proposal():
         os.remove(os.path.join(output_directory, del_galaxy))
         cwd = os.getcwd()
         try:
-            os.remove(ps.path.join(cwd, 'observation_list.yaml'))
-            os.remove(ps.path.join(cwd, 'expand_for_detectors.csv'))
-            os.remove(ps.path.join(cwd, 'Observation_table_for_targets_with_large_separation.csv'))
+            os.remove(os.path.join(cwd, 'observation_list.yaml'))
+            os.remove(os.path.join(cwd, 'expand_for_detectors.csv'))
+            os.remove(os.path.join(cwd, 'Observation_table_for_targets_with_large_separation.csv'))
         except:
             pass
 
@@ -214,7 +214,11 @@ def test_get_all_catalogs():
     # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
     # fail without there being a problem with Mirage.
     for col in cat.table.colnames:
-        assert all(cat.table[col].data == comparison_data[col].data)
+        try:
+            assert all(cat.table[col].data == comparison_data[col].data), \
+                "Retrieved catalog does not match expected."
+        except TypeError:
+            assert False, "Retrieved catalog does not match expected."
 
 
 def test_gaia_query():

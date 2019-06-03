@@ -12,7 +12,6 @@ env:
     global:
         - PYTHON_VERSION=3.6
         - EVENT_TYPE='push pull_request'
-        - MIRAGE_DATA='non_existing_path'
 
 matrix:
     include:
@@ -30,6 +29,7 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
+    - echo ~
     - conda env list
     - conda info
     - conda list
