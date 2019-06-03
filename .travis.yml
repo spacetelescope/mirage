@@ -17,10 +17,6 @@ env:
         - EVENT_TYPE='push pull_request'
         - MIRAGE_DATA='non_existing_path'
 
-    matrix:
-        - SCRIPT_CMD='pip install -e .'
-        - SCRIPT_CMD='pytest -s ./tests/'
-
 #matrix:
 #
 #    # Don't wait for allowed failures
@@ -50,8 +46,9 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
-    - conda env create --yes -n mirage_$TRAVIS_OS_NAME python=$PYTHON_VERSION -f=mirage_environment_$TRAVIS_OS_NAME.yml
+    - conda env create -n mirage_$TRAVIS_OS_NAME python=$PYTHON_VERSION -f=mirage_environment_$TRAVIS_OS_NAME.yml
     - source activate mirage_$TRAVIS_OS_NAME
+    - pip install -e .
 
 script:
-    - $SCRIPT_CMD
+    - pytest -s ./tests/
