@@ -154,8 +154,13 @@ class Observation():
         # Run one integration at a time
         # because each needs its own collection
         # of cosmic rays and poisson noise realization
-        nint = self.params['Readout']['nint']
-        ngroups = self.params['Readout']['ngroup']
+        if seeddim == 2:
+            nint = self.params['Readout']['nint']
+            ngroups = self.params['Readout']['ngroup']
+        elif seeddim == 4:
+            nint = seed.shape[0]
+            ngroups = seed.shape[1]
+
         sim_exposure = np.zeros((nint, ngroups, yd, xd))
         sim_zero = np.zeros((nint, yd, xd))
 
@@ -870,6 +875,67 @@ class Observation():
         else:
             return True
 
+    def combine_seeds(self, filenames):
+        """If the seed image is broken amongst a list of files, read
+        in those files and combine the data into a single seed image.
+
+        Parameters
+        ----------
+        filenames : list
+            List of files to be read in
+
+        Returns
+        -------
+        seed : numpy.ndarray
+
+        segmap : numpy.ndarray
+
+        header : dict
+        """
+        int_counter = 0
+        group_counter = 0
+
+        print("Reconstructing seed image")
+
+
+        for i, filename in enumerate(filenames):
+
+            print('File: ', filename)
+
+            # Read in the data from one file
+            seed_data, seg_data, header_data = self.read_seed(filename)
+            ints, groups, ydim, xdim = seed_data.shape
+
+            print('data shape: ', seed_data.shape)
+
+            if i == 0:
+                nints = header_data['SEGINT']
+                ngroups = header_data['SEGGROUP']
+                print('Final seed image shape: ', nints, ngroups, ydim, xdim)
+                seed = np.zeros((nints, ngroups, ydim, xdim))
+                segmap = seg_data
+
+            # Place the data in the reconstructed seed image array based
+            # on the integration and group counters
+
+            print('data placed into integration: ', int_counter, int_counter+ints)
+            print('                  groups: ', group_counter, group_counter+groups)
+
+
+            seed[int_counter:int_counter+ints, group_counter:group_counter+groups, :, :] = seed_data
+            group_counter += groups
+
+            # If the group counter reaches the number of groups expected
+            # in the seed image, then increment the integration counter
+            # and reset the group counter to zero so that the data from
+            # the next file will be placed at the beginning of the next
+            # integration
+            if group_counter == ngroups:
+                int_counter += 1
+                group_counter = 0
+
+        return seed, segmap, header_data
+
     def convert_mask(self, inmask, dq_table):
         """Convert a bad pixel mask to contain values used
         by the JWST pipeline
@@ -959,27 +1025,44 @@ class Observation():
         self.full_paths()
         self.file_check()
 
+
+        print('self.linDark:', self.linDark)
+
         # Get the input dark if a filename is supplied
         if self.linDark is None:
             # If no linearized dark is provided, assume the entry in the
             # yaml file is the proper format
             self.linDark = [self.params['Reffiles']['linearized_darkfile']]
-            print('Reading in dark file: {}'.format(self.linDark))
+            seed_dict = {self.linDark[0]: self.seed}
+            print('Reading in dark file from param file: {}'.format(self.linDark))
             self.linear_dark = self.read_dark_file(self.linDark[0])
         elif isinstance(self.linDark, str):
             # If a single filename is given, read in the file
             print('Reading in dark file: {}'.format(self.linDark))
             self.linDark = [self.linDark]
+            seed_dict = {self.linDark[0]: self.seed}
             self.linear_dark = self.read_dark_file(self.linDark[0])
         elif isinstance(self.linDark, list):
             # Case where dark is split amongst multiple files due to high
             # data volume
             print('Dark file list: {}'.format(self.linDark))
+            seed_dict = self.map_seeds_to_dark()
             self.linear_dark = self.read_dark_file(self.linDark[0])
         else:
             # Case where user has provided a catalogSeed object
+            print('Dark object provided')
             self.linear_dark = copy.deepcopy(self.linDark)
-            self.linDark = [None]
+            self.linDark = ['none']
+            seed_dict = {self.linDark[0]: self.seed}
+
+
+        try:
+            print('seed_dict:', seed_dict)
+        except:
+            pass
+        print('self.linear_dark sbAndRefpix shape: ', self.linear_dark.sbAndRefpix.shape)
+
+
 
         # Finally, collect information about the detector,
         # which will be needed for astrometry later
@@ -1005,22 +1088,10 @@ class Observation():
         # and to scale CRs to be in ADU
         self.read_gain_map()
 
-        # If seed image is in units of electrons/sec then divide
-        # by the gain to put in ADU/sec
-        if 'units' in self.seedheader.keys():
-            if self.seedheader['units'] in ["e-/sec", "e-"]:
-                print(("Seed image is in units of {}. Dividing by gain."
-                       .format(self.seedheader['units'])))
-                self.seed /= self.gainim
-        else:
-            raise ValueError(("'units' keyword not present in header of "
-                              "seed image. Unable to determine whether the "
-                              "seed image is in units of ADU or electrons."))
-
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
         #tmpy, tmpx = self.seed.shape[-2:]
-        tmpy, tmpx = self.linear_dark.shape[0, 0, :, :]
+        tmpy, tmpx = self.linear_dark.data.shape[-2:]
         self.frametime = utils.calc_frame_time(self.instrument, self.params['Readout']['array_name'],
                                                tmpx, tmpy, self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
@@ -1037,199 +1108,251 @@ class Observation():
         else:
             print('CAUTION: no saturation map provided. Using')
             print('{} for all pixels.'.format(self.params['nonlin']['limit']))
-            dy, dx = self.dark.data.shape[2:]
+            dy, dx = self.linear_dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
 
-
-        # Organize seed image filenames if a list is given
-        if isinstance(self.seed, list):
-            self.seed.sort()
-
-
-
-
-        for i, linDark in enumerate(self.linDark):
-            if i > 0:
-                self.linear_dark = self.read_dark_file(self.linDark[i])
-
-            # Get the corresponding input seed image(s)
-            if isinstance(self.seed, str):
-                # If a single filename is supplied
-                self.seed_image, self.segmap, self.seedheader = self.read_seed(self.seed)
-                self.seed = [self.seed]
-            elif isinstance(self.seed, list):
-                # If the seed image is a list of files (due to high data
-                # volume)
-                self.seed.sort()
-                self.seed_image, self.segmap, self.seedheader = self.read_seed(self.seed[0])
-            else:
-                # self.seed is a catalogSeed object.
-                # In this case we assume that self.segmap and
-                # self.seedheader have also been provided as the
-                # appropriate objects, since they are saved in
-                # the same file as the seed image
-                self.seed_image = copy.deepcopy(self.seed)
-                self.seed = [None]
-
-
-            for j, seed in enumerate(self.seed):
-                if j > 0:
-                    self.seed_image, self.segmap, self.seedheader = self.read_seed(self.seed[j])
-
-
-
-
-
-
-
-        # Translate to ramp if necessary,
-        # Add poisson noise and cosmic rays
-        # Rearrange into requested read pattern
-        # All done in one function to save memory
-        simexp, simzero = self.add_crs_and_noise(self.seed)
-
-        # Multiply flat fields
-        simexp = self.add_flatfield_effects(simexp)
-        simzero = self.add_flatfield_effects(np.expand_dims(simzero, axis=1))[:, 0, :, :]
-
-        # Mask any reference pixels
-        if self.params['Output']['grism_source_image'] is False:
-            simexp, simzero = self.mask_refpix(simexp, simzero)
-
-        # Add IPC effects
-        # (Dark current ramp already has IPC in it)
-        if self.runStep['ipc']:
-            simexp = self.add_ipc(simexp)
-            simzero = self.add_ipc(np.expand_dims(simzero, axis=1))[:, 0, :, :]
-
-        # Add the simulated source ramp to the dark ramp
-        lin_outramp, lin_zeroframe, lin_sbAndRefpix = self.add_synthetic_to_dark(simexp,
-                                                                                 self.linDark,
-                                                                                 syn_zeroframe=simzero)
-
-        # Add other detector effects (Crosstalk/PAM)
-        lin_outramp = self.add_detector_effects(lin_outramp)
-        lin_zeroframe = self.add_detector_effects(np.expand_dims(lin_zeroframe, axis=1))[:, 0, :, :]
 
         # Read in non-linearity correction coefficients. We need these
         # regardless of whether we are saving the linearized data or going
         # on to make raw data
         nonlincoeffs = self.get_nonlinearity_coeffs()
 
-        # We need to first subtract superbias and refpix signals from the
-        # original saturation limits, and then linearize them
-        # Refpix signals will vary from group to group, but only by a few
-        # ADU. So let's cheat and just use the refpix signals from group 0
+        # Read in superbias file if present
+        self.read_superbias_file()
 
-        # Create a linearized saturation map
-        limits = np.zeros_like(self.satmap) + 1.e6
 
-        if self.linDark.sbAndRefpix is not None:
-            lin_satmap = unlinearize.nonLinFunc(self.satmap - self.linDark.sbAndRefpix[0, 0, :, :],
-                                                nonlincoeffs, limits)
-        elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'])):
-            # If the superbias and reference pixel signal is not available
-            # but the superbias reference file is, then just use that.
-            self.read_superbias_file()
-            lin_satmap = unlinearize.nonLinFunc(self.satmap - self.superbias,
-                                                nonlincoeffs, limits)
 
-        elif ((self.linDark.sbAndRefpix is None) & (self.runStep['superbias'] is False)):
-            # If superbias and refpix signal is not available and
-            # the superbias reffile is also not available, fall back to
-            # a superbias value that is roughly correct. Error in this value
-            # will cause errors in saturation flagging for the highest signal
-            # pixels.
-            manual_sb = np.zeros_like(self.satmap) + 12000.
-            lin_satmap = unlinearize.nonLinFunc(self.satmap - manual_sb,
-                                                nonlincoeffs, limits)
 
-        # Save the ramp if requested. This is the linear ramp,
-        # ready to go into the Jump step of the pipeline
-        self.linear_output = None
-        if 'linear' in self.params['Output']['datatype'].lower():
-            # Output filename: append 'linear'
-            if 'uncal' in self.params['Output']['file']:
-                linearrampfile = self.params['Output']['file'].replace('uncal', 'linear')
+        for i, linDark in enumerate(self.linDark):
+            basename = self.params['Output']['file']
+
+            # Get the segment number of the file if present
+            seg_location = linDark.find('_seg')
+            if seg_location != -1:
+                seg_str = linDark[seg_location+4:seg_location+7]
             else:
-                linearrampfile = self.params['Output']['file'].replace('.fits', '_linear.fits')
-
-            # Full path of output file
-            linearrampfile = linearrampfile.split('/')[-1]
-            linearrampfile = os.path.join(self.params['Output']['directory'], linearrampfile)
-
-            # Saturation flagging - to create the pixeldq extension
-            # and make data ready for ramp fitting
-            # Since we subtracted the superbias and refpix signal from the
-            # saturation map prior to linearizing, we can now compare that map
-            # to lin_outramp, which also does not include superbias nor refpix
-            # signal, and is linear.
-            groupdq = self.flag_saturation(lin_outramp, lin_satmap)
-
-            # Create the error and groupdq extensions
-            err, pixeldq = self.create_other_extensions(copy.deepcopy(lin_outramp))
-
-            if self.params['Inst']['use_JWST_pipeline']:
-                self.save_DMS(lin_outramp, lin_zeroframe, linearrampfile, mod='ramp',
-                             err_ext=err, group_dq=groupdq, pixel_dq=pixeldq)
-            else:
-                self.save_fits(lin_outramp, lin_zeroframe, linearrampfile, mod='ramp',
-                              err_ext=err, group_dq=groupdq, pixel_dq=pixeldq)
-
-            stp.add_wcs(linearrampfile, roll=self.params['Telescope']['rotation'])
-            print("Final linearized exposure saved to:")
-            print("{}".format(linearrampfile))
-            self.linear_output = linearrampfile
-
-        # If the raw version is requested, we need to unlinearize
-        # the ramp
-        self.raw_output = None
-        if 'raw' in self.params['Output']['datatype'].lower():
-            if self.linDark.sbAndRefpix is not None:
-                if self.params['Output']['save_intermediates']:
-                    base_name = self.params['Output']['file'].split('/')[-1]
-                    ofile = os.path.join(self.params['Output']['directory'],
-                                         base_name[0:-5] + '_doNonLin_accuracy.fits')
-                    savefile = True
+                try:
+                    seg_location = seed_dict[linDark][0].find('_seg')
+                except AttributeError:
+                    seg_location = -1
+                if seg_location != -1:
+                    seg_str = seed_dict[linDark][0][seg_location+4:seg_location+7]
                 else:
-                    ofile = None
-                    savefile = False
+                    seg_str = ''
 
-                raw_outramp = unlinearize.unlinearize(lin_outramp, nonlincoeffs, self.satmap,
-                                                      lin_satmap,
-                                                      maxiter=self.params['nonlin']['maxiter'],
-                                                      accuracy=self.params['nonlin']['accuracy'],
-                                                      save_accuracy_map=savefile,
-                                                      accuracy_file=ofile)
-                raw_zeroframe = unlinearize.unlinearize(lin_zeroframe, nonlincoeffs, self.satmap,
-                                                        lin_satmap,
-                                                        maxiter=self.params['nonlin']['maxiter'],
-                                                        accuracy=self.params['nonlin']['accuracy'],
-                                                        save_accuracy_map=False)
+            if seg_str != '':
+                # Assume standard JWST filename format
+                try:
+                    parts = basename.split('_')
+                    basename = '{}_{}_{}-seg{}_{}_{}'.format(parts[0], parts[1], parts[2], seg_str,
+                                                             parts[3], parts[4])
+                except IndexError:
+                    # Non-standard filename format
+                    basename = basename.replace('.fits', '-seg{}.fits'.format(seg_str))
+            print('Basename is: {}'.format(basename))
 
-                # Add the superbias and reference pixel signal back in
-                raw_outramp = self.add_superbias_and_refpix(raw_outramp, lin_sbAndRefpix)
-                raw_zeroframe = self.add_superbias_and_refpix(raw_zeroframe, self.linDark.zero_sbAndRefpix)
 
-                # Make sure all signals are < 65535
-                raw_outramp[raw_outramp > 65535] = 65535
-                raw_zeroframe[raw_zeroframe > 65535] = 65535
 
-                # Save the raw ramp
-                base_name = self.params['Output']['file'].split('/')[-1]
-                rawrampfile = os.path.join(self.params['Output']['directory'], base_name)
+
+            if i > 0:
+                self.linear_dark = self.read_dark_file(self.linDark[i])
+
+            print('sbandrefpix shape: ', self.linear_dark.sbAndRefpix.shape)
+
+            seed_files = seed_dict[linDark]
+            print('\nSeed files:')
+            print(seed_files)
+            # Get the corresponding input seed image(s)
+            if isinstance(seed_files, str):
+                # If a single filename is suppliedself.read_seed(seed_files)
+                self.seed_image, self.segmap, self.seedheader = self.read_seed(seed_files)
+            elif isinstance(seed_files, list):
+                # If the seed image is a list of files (due to high data
+                # volume)
+                self.seed_image, self.segmap, self.seedheader = self.combine_seeds(seed_files)
+            else:
+                # self.seed is a catalogSeed object.
+                # In this case we assume that self.segmap and
+                # self.seedheader have also been provided as the
+                # appropriate objects, since they are saved in
+                # the same file as the seed image
+                self.seed_image = copy.deepcopy(seed_files)
+                #seed_files = [None]
+
+            print('\n')
+            print(self.seedheader)
+            print(self.seedheader['UNITS'])
+            print('\n')
+
+
+            # If seed image is in units of electrons/sec then divide
+            # by the gain to put in ADU/sec
+            if 'UNITS' in self.seedheader.keys():
+                if self.seedheader['UNITS'] in ["e-/sec", "e-"]:
+                    print(("Seed image is in units of {}. Dividing by gain."
+                           .format(self.seedheader['units'])))
+                    self.seed /= self.gainim
+            else:
+                raise ValueError(("'UNITS' keyword not present in header of "
+                                  "seed image. Unable to determine whether the "
+                                  "seed image is in units of ADU or electrons."))
+
+
+
+
+
+            # Translate to ramp if necessary,
+            # Add poisson noise and cosmic rays
+            # Rearrange into requested read pattern
+            # All done in one function to save memory
+            print('seed_image shape is: ', self.seed_image.shape)
+            simexp, simzero = self.add_crs_and_noise(self.seed_image)
+
+            # Multiply flat fields
+            simexp = self.add_flatfield_effects(simexp)
+            simzero = self.add_flatfield_effects(np.expand_dims(simzero, axis=1))[:, 0, :, :]
+
+            # Mask any reference pixels
+            if self.params['Output']['grism_source_image'] is False:
+                simexp, simzero = self.mask_refpix(simexp, simzero)
+
+            # Add IPC effects
+            # (Dark current ramp already has IPC in it)
+            if self.runStep['ipc']:
+                simexp = self.add_ipc(simexp)
+                simzero = self.add_ipc(np.expand_dims(simzero, axis=1))[:, 0, :, :]
+
+            # Add the simulated source ramp to the dark ramp
+
+            print('\nLinear dark zeroframe shape: ', self.linear_dark.zeroframe.shape)
+            print('\nSimulated zeroframe shape: ', simzero.shape)
+
+            lin_outramp, lin_zeroframe, lin_sbAndRefpix = self.add_synthetic_to_dark(simexp,
+                                                                                     self.linear_dark,
+                                                                                     syn_zeroframe=simzero)
+
+            # Add other detector effects (Crosstalk/PAM)
+            print('Adding crosstalk')
+            lin_outramp = self.add_detector_effects(lin_outramp)
+            lin_zeroframe = self.add_detector_effects(np.expand_dims(lin_zeroframe, axis=1))[:, 0, :, :]
+
+
+            # We need to first subtract superbias and refpix signals from the
+            # original saturation limits, and then linearize them
+            # Refpix signals will vary from group to group, but only by a few
+            # ADU. So let's cheat and just use the refpix signals from group 0
+
+            # Create a linearized saturation map
+            limits = np.zeros_like(self.satmap) + 1.e6
+
+            print('Unlinearizing saturation values')
+            if self.linear_dark.sbAndRefpix is not None:
+                lin_satmap = unlinearize.nonLinFunc(self.satmap - self.linear_dark.sbAndRefpix[0, 0, :, :],
+                                                    nonlincoeffs, limits)
+            elif ((self.linear_dark.sbAndRefpix is None) & (self.runStep['superbias'])):
+                # If the superbias and reference pixel signal is not available
+                # but the superbias reference file is, then just use that.
+                lin_satmap = unlinearize.nonLinFunc(self.satmap - self.superbias,
+                                                    nonlincoeffs, limits)
+
+            elif ((self.linear_dark.sbAndRefpix is None) & (self.runStep['superbias'] is False)):
+                # If superbias and refpix signal is not available and
+                # the superbias reffile is also not available, fall back to
+                # a superbias value that is roughly correct. Error in this value
+                # will cause errors in saturation flagging for the highest signal
+                # pixels.
+                manual_sb = np.zeros_like(self.satmap) + 12000.
+                lin_satmap = unlinearize.nonLinFunc(self.satmap - manual_sb,
+                                                    nonlincoeffs, limits)
+
+            # Save the ramp if requested. This is the linear ramp,
+            # ready to go into the Jump step of the pipeline
+            self.linear_output = None
+            if 'linear' in self.params['Output']['datatype'].lower():
+                # Output filename: append 'linear'
+                if 'uncal' in basename:
+                    linearrampfile = basename.replace('uncal', 'linear')
+                else:
+                    linearrampfile = basename.replace('.fits', '_linear.fits')
+
+                # Full path of output file
+                linearrampfile = linearrampfile.split('/')[-1]
+                linearrampfile = os.path.join(self.params['Output']['directory'], linearrampfile)
+
+                # Saturation flagging - to create the pixeldq extension
+                # and make data ready for ramp fitting
+                # Since we subtracted the superbias and refpix signal from the
+                # saturation map prior to linearizing, we can now compare that map
+                # to lin_outramp, which also does not include superbias nor refpix
+                # signal, and is linear.
+                groupdq = self.flag_saturation(lin_outramp, lin_satmap)
+
+                # Create the error and groupdq extensions
+                err, pixeldq = self.create_other_extensions(copy.deepcopy(lin_outramp))
+
                 if self.params['Inst']['use_JWST_pipeline']:
-                    self.save_DMS(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
+                    self.save_DMS(lin_outramp, lin_zeroframe, linearrampfile, mod='ramp',
+                                  err_ext=err, group_dq=groupdq, pixel_dq=pixeldq)
                 else:
-                    self.save_fits(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
-                stp.add_wcs(rawrampfile, roll=self.params['Telescope']['rotation'])
-                print("Final raw exposure saved to")
-                print("{}".format(rawrampfile))
-                self.raw_output = rawrampfile
-            else:
-                raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
-                                  "with the superbias and reference pixels is not present in "
-                                  "the dark current data object. Quitting."))
+                    self.save_fits(lin_outramp, lin_zeroframe, linearrampfile, mod='ramp',
+                                   err_ext=err, group_dq=groupdq, pixel_dq=pixeldq)
+
+                stp.add_wcs(linearrampfile, roll=self.params['Telescope']['rotation'])
+                print("Final linearized exposure saved to:")
+                print("{}".format(linearrampfile))
+                self.linear_output = linearrampfile
+
+            # If the raw version is requested, we need to unlinearize
+            # the ramp
+            self.raw_output = None
+            if 'raw' in self.params['Output']['datatype'].lower():
+                if self.linear_dark.sbAndRefpix is not None:
+                    if self.params['Output']['save_intermediates']:
+                        #base_name = self.params['Output']['file'].split('/')[-1]
+                        ofile = os.path.join(self.params['Output']['directory'],
+                                             basename[0:-5] + '_doNonLin_accuracy.fits')
+                        savefile = True
+                    else:
+                        ofile = None
+                        savefile = False
+
+                    print('Unlinearizing exposure.')
+                    raw_outramp = unlinearize.unlinearize(lin_outramp, nonlincoeffs, self.satmap,
+                                                          lin_satmap,
+                                                          maxiter=self.params['nonlin']['maxiter'],
+                                                          accuracy=self.params['nonlin']['accuracy'],
+                                                          save_accuracy_map=savefile,
+                                                          accuracy_file=ofile)
+                    raw_zeroframe = unlinearize.unlinearize(lin_zeroframe, nonlincoeffs, self.satmap,
+                                                            lin_satmap,
+                                                            maxiter=self.params['nonlin']['maxiter'],
+                                                            accuracy=self.params['nonlin']['accuracy'],
+                                                            save_accuracy_map=False)
+
+                    # Add the superbias and reference pixel signal back in
+                    print('Adding superbias and reference pixel signals.')
+                    raw_outramp = self.add_superbias_and_refpix(raw_outramp, lin_sbAndRefpix)
+                    raw_zeroframe = self.add_superbias_and_refpix(raw_zeroframe, self.linear_dark.zero_sbAndRefpix)
+
+                    # Make sure all signals are < 65535
+                    raw_outramp[raw_outramp > 65535] = 65535
+                    raw_zeroframe[raw_zeroframe > 65535] = 65535
+
+                    # Save the raw ramp
+                    #base_name = self.params['Output']['file'].split('/')[-1]
+                    rawrampfile = os.path.join(self.params['Output']['directory'], basename)
+                    if self.params['Inst']['use_JWST_pipeline']:
+                        self.save_DMS(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
+                    else:
+                        self.save_fits(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
+                    stp.add_wcs(rawrampfile, roll=self.params['Telescope']['rotation'])
+                    print("Final raw exposure saved to")
+                    print("{}".format(rawrampfile))
+                    self.raw_output = rawrampfile
+                else:
+                    raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
+                                      "with the superbias and reference pixels is not present in "
+                                      "the dark current data object. Quitting."))
 
         print("Observation generation complete.")
 
@@ -2044,6 +2167,27 @@ class Observation():
                    "runs.".format(outname)))
         return newkernel
 
+    def map_seeds_to_dark(self):
+        """
+        Create a mapping of which seed image filenames belong to each dark
+        file. This is needed primarily for cases where the dark and/or
+        seeds are split into multiple files due to data volume limitataions
+
+        Returns
+        -------
+        mapping : dict
+            Dictionary that gives the list of seed images associated with
+            each dark current file
+        """
+        self.seed.sort()
+        mapping = {}
+        for dark in self.linDark:
+            seg = dark.find('_seg')
+            seg_str = dark[seg+1:seg+7]
+            seeds = [name for name in self.seed if seg_str in name]
+            mapping[dark] = seeds
+        return mapping
+
     def mask_refpix(self, ramp, zero):
         """Make sure that reference pixels have no signal
         in the simulated source ramp
@@ -2357,7 +2501,7 @@ class Observation():
         else:
             print(('CAUTION: no saturation map provided. Using '
                    '{} for all pixels.'.format(self.params['nonlin']['limit'])))
-            dy, dx = self.dark.data.shape[2:]
+            dy, dx = self.linear_dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
 
     def read_seed(self, filename):

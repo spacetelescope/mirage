@@ -103,6 +103,7 @@ class Catalog_seed():
     def make_seed(self):
         """MAIN FUNCTION"""
         # Read in input parameters and quality check
+        self.seed_files = []
         self.readParameterFile()
         self.fullPaths()
         self.filecheck()
@@ -172,6 +173,18 @@ class Catalog_seed():
                                                                                                     self.output_dims[0],
                                                                                                     self.params['Readout']['ngroup'],
                                                                                                     self.params['Readout']['nint'])
+
+
+                print('\nOutputs:')
+                print(split_seed, group_segment_indexes, integration_segment_indexes)
+                print(self.total_seed_segments)
+                print(split_seed_g, group_segment_indexes_g, self.file_segment_indexes)
+                print('')
+
+
+
+
+
         else:
             split_seed = False
             group_segment_indexes = [0, self.params['Readout']['ngroup']]
@@ -305,7 +318,7 @@ class Catalog_seed():
         # Read in the TSO catalog. This is only for TSO mode, not
         # grism TSO, which will need a different catalog format.
         if self.params['Inst']['mode'].lower() == 'ts_imaging':
-            tso_cat = self.getPointSourceList(self.params['simSignals']['tso_catalog'], source_type='ts_imaging')
+            tso_cat = self.getPointSourceList(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
 
             # Create lists of seed images and segmentation maps for all
             # TSO objects
@@ -340,17 +353,15 @@ class Catalog_seed():
                                                    self.params['Readout']['resets_bet_ints'],
                                                    samples_per_frametime=5)
 
-                # For seed images to be dispersed in WFSS mode,
-                # embed the seed image in a full frame array. The disperser
-                # tool does not work on subarrays
-                # THIS SHOULD NOT BE NEEDED HERE SINCE THIS SECTION ONLY
-                # WORKS ON TSO IMAGING
-                #aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-                #if aperture_suffix not in ['FULL', 'CEN']:
-                #    seed, segmap = self.pad_wfss_subarray(seed, segmap)
-
                 self.segment_number = 1
                 self.segment_part_number = 1
+                self.segment_frames = self.seedimage.shape[1]
+                self.segment_ints = self.seedimage.shape[0]
+                self.segment_frame_start_number = 0
+                self.segment_int_start_number = 0
+                self.part_int_start_number = 0
+                self.part_frame_start_number = 0
+
 
                 #print(']\nSeed shape: ', seed.shape)
 
@@ -363,6 +374,13 @@ class Catalog_seed():
                 i = 1
                 previous_segment = 1
                 self.segment_part_number = 0
+                self.segment_ints = 0
+                self.segment_frames = 0
+                self.segment_frame_start_number = 0
+                self.segment_int_start_number = 0
+                self.part_int_start_number = 0
+                self.part_frame_start_number = 0
+                segment_starting_int_number = 0
                 for int_start in integration_splits[:-1]:
                     int_end = integration_splits[i]
 
@@ -468,9 +486,39 @@ class Catalog_seed():
                         if self.segment_number == previous_segment:
                             #self.segment_part_number = copy.deepcopy(previous_part_number) + 1
                             self.segment_part_number += 1
+                            self.segment_ints += seed.shape[0]
+                            self.segment_frames += seed.shape[1]
+                            #self.segment_frame_start_number =  # should not need to be changed
+                            #self.segment_int_start_number =   # should not need to be changed
+                            self.part_int_start_number = int_start - segment_starting_int_number
+                            self.part_frame_start_number = initial_frame
                         else:
+                            print("New Segment!")
                             self.segment_part_number = 1
                             previous_segment = copy.deepcopy(self.segment_number)
+                            self.segment_ints = copy.deepcopy(seed.shape[0])
+                            self.segment_frames = copy.deepcopy(seed.shape[1])
+                            self.segment_frame_start_number = initial_frame
+                            self.segment_int_start_number = int_start
+                            self.part_int_start_number = 0
+                            self.part_frame_start_number = 0
+                            segment_starting_int_number = copy.deepcopy(int_start)
+
+
+
+
+
+
+                        print("\n\nSegment Numbers:")
+                        print(int_start, initial_frame)
+                        print(total_frames)
+                        print(self.segment_number, self.segment_part_number)
+                        print(self.segment_ints, self.segment_frames)
+                        print(self.segment_int_start_number, self.segment_frame_start_number)
+                        print(self.part_int_start_number, self.part_frame_start_number)
+                        print('\n\n')
+
+
 
 
                         ##self.segment_number = i
@@ -710,16 +758,21 @@ class Catalog_seed():
         if len(arrayshape) == 2:
             units = 'ADU/sec'
             yd, xd = arrayshape
+            grps = 0
+            integ = 0
             tgroup = 0.
+            arraygroup = 0
+            arrayint = 0
             print('Seed image is 2D.')
         elif len(arrayshape) == 3:
             units = 'ADU'
-            g, yd, xd = arrayshape
+            grps, yd, xd = arrayshape
+            integ = 0
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print('Seed image is 3D.')
         elif len(arrayshape) == 4:
             units = 'ADU'
-            integ, g, yd, xd = arrayshape
+            integ, grps, yd, xd = arrayshape
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
             print('Seed image is 4D.')
 
@@ -727,9 +780,9 @@ class Catalog_seed():
         ycent_fov = yd / 2
 
         kw = {}
-        kw['xcenter'] = xcent_fov
-        kw['ycenter'] = ycent_fov
-        kw['units'] = units
+        kw['XCENTER'] = xcent_fov
+        kw['YCENTER'] = ycent_fov
+        kw['UNITS'] = units
         kw['TGROUP'] = tgroup
         if self.params['Readout']['pupil'][0].upper() == 'F':
             usefilt = 'pupil'
@@ -745,11 +798,13 @@ class Catalog_seed():
             self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
                                           '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
 
+        self.seed_files.append(self.seed_file)
+
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
         if self.params['Readout'][usefilt] == "NA":
             self.params['Readout'][usefilt] = "N/A"
-        kw['filter'] = self.params['Readout'][usefilt]
+        kw['FILTER'] = self.params['Readout'][usefilt]
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
@@ -789,6 +844,23 @@ class Catalog_seed():
         kw['EXSEGTOT'] = self.total_seed_segments
         kw['EXSEGNUM'] = self.segment_number
         kw['PART_NUM'] = self.segment_part_number
+
+        # Total number of integrations and groups in the current segment
+        # (combining all parts of the segment)
+        kw['SEGINT'] = self.segment_ints
+        kw['SEGGROUP'] = self.segment_frames
+
+        # Total number of integrations and groups in the exposure
+        kw['EXPINT'] = self.params['Readout']['nint']
+        kw['EXPGRP'] = self.params['Readout']['ngroup']
+
+        # Indexes of the ints and groups where the data in this file go
+        kw['SEGFRMST'] = self.segment_frame_start_number
+        kw['SEGFRMED'] = self.segment_frame_start_number + grps - 1
+        kw['SEGINTST'] = self.segment_int_start_number
+        kw['SEGINTED'] = self.segment_int_start_number + integ - 1
+        kw['PTINTSRT'] = self.part_int_start_number
+        kw['PTFRMSRT'] = self.part_frame_start_number
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor

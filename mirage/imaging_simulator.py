@@ -60,16 +60,23 @@ class ImgSim():
             d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfile
             d.prepare()
-            obs.linDark = d.prepDark
+
+            if len(d.dark_files) == 1:
+                obs.linDark = d.prepDark
+            else:
+                obs.linDark = d.dark_files
         else:
             self.read_dark_product(self.override_dark)
             obs.linDark = self.prepDark
 
         # Combine into final observation
-        obs.seed = cat.seedimage
-        obs.segmap = cat.seed_segmap
-        obs.seedheader = cat.seedinfo
         obs.paramfile = self.paramfile
+        if len(cat.seed_files) == 1:
+            obs.seed = cat.seedimage
+            obs.segmap = cat.seed_segmap
+            obs.seedheader = cat.seedinfo
+        else:
+            obs.seed = cat.seed_files
         obs.create()
 
         # Make useful information class attributes

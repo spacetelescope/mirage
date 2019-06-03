@@ -730,6 +730,7 @@ class DarkPrep():
                 dark_list = [self.params['Reffiles']['linearized_darkfile']]
             else:
                 dark_list = [self.params['Reffiles']['dark']]
+        dark_list = np.array(dark_list)
 
         # Read in the subarray definition file
         self.subdict = utils.read_subarray_definition_file(self.params['Reffiles']['subarray_defs'])
@@ -780,6 +781,7 @@ class DarkPrep():
         # (within data_volume_check). So at that point, a DEEP exposure with 20 groups
         # will have 400 frames open. This is also an unlikely situation, but it could
         # be a problem.
+        self.dark_files = []
         for seg_index, segment in enumerate(integration_segment_indexes[:-1]):
             # Get the number of integrations being simulated
             if split_seed:
@@ -798,7 +800,16 @@ class DarkPrep():
                 files_to_use = dark_list
             elif number_of_ints > 1 and number_of_ints <= len(dark_list):
                 use_all_files = False
-                files_to_use = dark_list[np.random.choice(len(dark_list), number_of_ints, replace=False)]
+                try:
+                    random_indices = np.random.choice(len(dark_list), number_of_ints, replace=False)
+                    files_to_use = dark_list[random_indices]
+                except TypeError:
+                    print(dark_list)
+                    print(number_of_ints)
+                    print(random_indices)
+                    print(type(random_indices))
+                    print(type(random_indices[0]))
+                    stop
             else:
                 use_all_files = True
                 files_to_use = dark_list
@@ -951,7 +962,12 @@ class DarkPrep():
                     #frames = np.where(mapping == file_index)[0]
                     print('File number {} will be used for integrations {}'.format(file_index, frames))
                     final_dark[frames, :, :, :] = self.linDark.data
-                    final_sbandrefpix[frames, :, :, :] = self.linDark.sbAndRefpix
+
+                    #final_sbandrefpix[frames, :, :, :] = self.linDark.sbAndRefpix
+                    for frame in frames:
+                        final_sbandrefpix[frame, :, :, :] = self.linDark.sbAndRefpix
+
+
                     final_zerodata[frames, :, :] = self.zeroModel.data
                     final_zero_sbandrefpix[frames, :, :] = self.zeroModel.sbAndRefpix
 
@@ -960,6 +976,7 @@ class DarkPrep():
             h0 = fits.PrimaryHDU()
             h1 = fits.ImageHDU(final_dark, name='SCI')
             h2 = fits.ImageHDU(final_sbandrefpix, name='SBANDREFPIX')
+            print('final size check: ', final_sbandrefpix.shape)
             h3 = fits.ImageHDU(final_zerodata, name='ZEROFRAME')
             h4 = fits.ImageHDU(final_zero_sbandrefpix, name='ZEROSBANDREFPIX')
 
@@ -990,6 +1007,7 @@ class DarkPrep():
                    "pixel signals, as well as zeroframe, saved to {}. "
                    "This can be used as input to the observation"
                    "generator.".format(objname)))
+            self.dark_files.append(objname)
 
         # important variables
         # self.linDark

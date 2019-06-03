@@ -175,7 +175,7 @@ class GrismTSO():
         tso_params = utils.read_yaml(self.tso_paramfile)
         tso_catalog_file = tso_params['simSignals']['tso_grism_catalog']
 
-        print('TAO catalog file', tso_catalog_file)
+        print('TSO catalog file', tso_catalog_file)
 
 
         tso_catalog = ascii.read(tso_catalog_file)
