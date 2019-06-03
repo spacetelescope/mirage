@@ -11,30 +11,15 @@ os:
 # Setting sudo to false opts in to Travis-CI container-based builds.
 sudo: false
 
-# The apt packages below are needed for sphinx builds, which can no longer
-# be installed with sudo apt-get.
-addons:
-    apt:
-        packages:
-            - graphviz
-            - texlive-latex-extra
-            - dvipng
-
 env:
     global:
-        - MAIN_CMD='python setup.py'
-        - CONDA_CHANNELS='http://ssb.stsci.edu/astroconda'
-        - CONDA_DEPENDENCIES='pytest sphinx'
-        - PIP_DEPENDENCIES=''
         - PYTHON_VERSION=3.6
-        - NUMPY_VERSION=stable
-        - ASTROPY_VERSION=stable
         - EVENT_TYPE='push pull_request'
         - MIRAGE_DATA='non_existing_path'
 
     matrix:
-        - SETUP_CMD='install'
-        - SETUP_CMD='test'
+        - SCRIPT_CMD='pip install -e .'
+        - SCRIPT_CMD='pytest -s ./tests/'
 
 #matrix:
 #
@@ -60,9 +45,13 @@ env:
 #               SETUP_CMD='mirage'
 #               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
 
-install:
+before_install:
     - git clone git://github.com/astropy/ci-helpers.git
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
+install:
+    - conda env create --yes -n mirage_$TRAVIS_OS_NAME python=$PYTHON_VERSION -f=mirage_environment_$TRAVIS_OS_NAME.yml
+    - source activate mirage_$TRAVIS_OS_NAME
+
 script:
-    - $MAIN_CMD $SETUP_CMD
+    - $SCRIPT_CMD
