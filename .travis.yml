@@ -5,9 +5,6 @@ language: c
 
 compiler: gcc
 
-os:
-    - linux
-
 # Setting sudo to false opts in to Travis-CI container-based builds.
 sudo: false
 
@@ -16,39 +13,30 @@ env:
         - PYTHON_VERSION=3.6
         - EVENT_TYPE='push pull_request'
         - MIRAGE_DATA='non_existing_path'
+        - TEST_COMMAND = 'pytest'
 
-#matrix:
-#
-#    # Don't wait for allowed failures
-#    fast_finish: true
-#
-#    include:
-#        # build sphinx documentation with warnings
-#        - os: linux
-#          env: SETUP_CMD='build_sphinx'
-#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
-#               PIP_DEPENDENCIES='sphinx_rtd_theme stsci_rtd_theme sphinx-automodapi'
-#
-#        # PEP8 check with flake8 (only once, i.e. "os: linux")
-#        - os: linux
-#          env: MAIN_CMD='flake8 --count'
-#               SETUP_CMD='mirage'
-#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
-#
-#    allow_failures:
-#        # PEP8 will fail for numerous reasons. Ignore it.
-#        - env: MAIN_CMD='flake8 --count'
-#               SETUP_CMD='mirage'
-#               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES
+
+matrix:
+    include:
+        # Run pytest suite
+        - name: test linux
+          os: linux
+
+        # Run pytest suite
+        - name: test osx
+          os: osx
+          osx_image: xcode10.2
 
 before_install:
     - git clone git://github.com/astropy/ci-helpers.git
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
-    - conda env create -n mirage_$TRAVIS_OS_NAME python=$PYTHON_VERSION -f=mirage_environment_$TRAVIS_OS_NAME.yml
+    - conda env create -n mirage_$TRAVIS_OS_NAME python=$PYTHON_VERSION -f=environment_$TRAVIS_OS_NAME.yml
     - source activate mirage_$TRAVIS_OS_NAME
     - pip install -e .
+    - conda list
 
 script:
-    - pytest -s ./tests/
+    - conda info
+    - $TEST_COMMAND
