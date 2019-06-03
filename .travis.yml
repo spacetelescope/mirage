@@ -30,7 +30,10 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
-    - conda config –set channel_priority strict # Hopefully make conda run faster
+    - conda env list
+    - conda info
+    - conda list
+    - conda config –-set channel_priority strict # Hopefully make conda run faster
     - conda create -n mirage python=$PYTHON_VERSION
     - conda env update -n mirage -f=environment.yml
     - source activate mirage
