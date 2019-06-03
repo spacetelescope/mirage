@@ -17,7 +17,7 @@ import astropy.units as u
 
 from mirage.catalogs import spectra_from_catalog as spec
 from mirage.catalogs import hdf5_catalog as hdf5
-from mirage.utils.constants import FLAMBDA_UNITS, FNU_UNITS
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS
 
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/hdf5_catalogs')
@@ -25,15 +25,15 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/hdf5_catalogs
 
 def test_get_filter_info():
     nrc = spec.get_filter_info(['nircam_f444w_magnitude'], 'abmag')
-    assert nrc == {'nircam_f444w_magnitude': (6.6928e-22 * FLAMBDA_UNITS, 4.3637e-31 * FNU_UNITS, 27.3004,
+    assert nrc == {'nircam_f444w_magnitude': (6.6928e-22 * FLAMBDA_CGS_UNITS, 4.3637e-31 * FNU_CGS_UNITS, 27.3004,
                                               4.4212 * u.micron)}
 
     nis = spec.get_filter_info(['niriss_f200w_magnitude'], 'vegamag')
-    assert nis == {'niriss_f200w_magnitude': (2.173398e-20 * FLAMBDA_UNITS, 2.879494e-31 * FNU_UNITS,
+    assert nis == {'niriss_f200w_magnitude': (2.173398e-20 * FLAMBDA_CGS_UNITS, 2.879494e-31 * FNU_CGS_UNITS,
                                               26.04898, 1.9930 * u.micron)}
 
     fgs = spec.get_filter_info(['fgs_magnitude'], 'stmag')
-    assert fgs == {'fgs_magnitude': (1.593395e-21 * FLAMBDA_UNITS, 3.324736e-32 * FNU_UNITS, 33.39426,
+    assert fgs == {'fgs_magnitude': (1.593395e-21 * FLAMBDA_CGS_UNITS, 3.324736e-32 * FNU_CGS_UNITS, 33.39426,
                                      2.5011 * u.micron)}
 
 

@@ -1,0 +1,30 @@
+channels:
+- http://ssb.stsci.edu/astroconda
+- http://ssb.stsci.edu/astroconda-dev
+- conda-forge
+- defaults
+dependencies:
+- asdf>=2.1.0.dev1+ga161518
+- astropy>=3.1.2
+- astroquery>=0.3.8
+- crds>=7.2.6.dev105+ga1c1767
+- gwcs>=0.10a.dev21+g75e92da
+- h5py>=2.8.0
+- ipython>=6.5.0
+- jupyter>=1.0.0
+- jwst>=0.12.0a.dev115+g9d5eb8c
+- jwxml>=0.3.0
+- matplotlib>=3.0.0
+- notebook>=5.7.0
+- photutils>=0.6
+- pip>=10.0.1
+- poppy>=0.7.0
+- pysynphot>=0.9.12
+- pytest>=3.8.1
+- python>=3.6,<3.7
+- scipy>=1.1.0
+- webbpsf>=0.8.0
+- webbpsf-data>=0.7.0
+- yaml>=0.1.7
+- pip:
+    - pysiaf>=0.2.5
