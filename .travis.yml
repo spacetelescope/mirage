@@ -33,11 +33,9 @@ install:
     - conda env list
     - conda info
     - conda list
-    - conda config –-set channel_priority strict # Hopefully make conda run faster
-    - conda create -n mirage python=$PYTHON_VERSION
-    - conda env update -n mirage -f=environment.yml
-    - source activate mirage
+    - conda env update -f=environment.yml
     - pip install -e .
+    - conda list
 
 script:
     - pytest ./tests/
