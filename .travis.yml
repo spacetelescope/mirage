@@ -29,13 +29,8 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
-    - echo ~
-    - conda env list
-    - conda info
-    - conda list
     - conda env update -f=environment.yml
     - pip install -e .
-    - conda list
 
 script:
     - pytest ./tests/

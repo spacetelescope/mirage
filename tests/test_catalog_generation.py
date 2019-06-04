@@ -108,6 +108,7 @@ def test_catalog_combination():
                        'nircam_f480m_magnitude', 'niriss_f200w_magnitude']
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_besancon_generation():
     """Test the creation of a catalog from a Besancon query
     """
@@ -118,6 +119,7 @@ def test_besancon_generation():
                                     'besancon_l_magnitude']
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_2mass_plus_besaoncon_convenience_function():
     """Test the convenience function that queries 2MASS and Besancon
     and combines the two catalogs
