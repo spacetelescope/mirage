@@ -846,7 +846,7 @@ class DarkPrep():
         """Read in the yaml parameter file"""
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except FileNotFoundError:
             print("WARNING: unable to open {}".format(self.paramfile))
 

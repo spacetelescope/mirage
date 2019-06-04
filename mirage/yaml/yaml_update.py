@@ -32,7 +32,7 @@ class YamlUpdate():
     def read_yaml(self,file):
         try:
             with open(file,'r') as f:
-                data = yaml.load(f)
+                data = yaml.safe_load(f)
         except:
             print("WARNING: unable to open {}".format(self.paramfile))
             sys.exit()
