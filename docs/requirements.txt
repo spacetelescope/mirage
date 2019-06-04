@@ -1,0 +1,9 @@
+ipykernel==5.1.0
+nbsphinx==0.4.1
+numpy>=1.16
+pip==18.1
+relic==1.1.2
+setuptools==40.9.0
+sphinx>=2.0.1
+sphinx-automodapi==0.10
+stsci_rtd_theme==0.0.2
