@@ -841,26 +841,27 @@ class Catalog_seed():
         # Observations with high data volumes (e.g. moving targets, TSO)
         # can be split into multiple "segments" in order to cap the
         # maximum file size
-        kw['EXSEGTOT'] = self.total_seed_segments
-        kw['EXSEGNUM'] = self.segment_number
-        kw['PART_NUM'] = self.segment_part_number
+        print('\n\n\nuncomment the lines below\n\n\n')
+        #kw['EXSEGTOT'] = self.total_seed_segments
+        #kw['EXSEGNUM'] = self.segment_number
+        #kw['PART_NUM'] = self.segment_part_number
 
         # Total number of integrations and groups in the current segment
         # (combining all parts of the segment)
-        kw['SEGINT'] = self.segment_ints
-        kw['SEGGROUP'] = self.segment_frames
+        #kw['SEGINT'] = self.segment_ints
+        #kw['SEGGROUP'] = self.segment_frames
 
         # Total number of integrations and groups in the exposure
-        kw['EXPINT'] = self.params['Readout']['nint']
-        kw['EXPGRP'] = self.params['Readout']['ngroup']
+        #kw['EXPINT'] = self.params['Readout']['nint']
+        #kw['EXPGRP'] = self.params['Readout']['ngroup']
 
         # Indexes of the ints and groups where the data in this file go
-        kw['SEGFRMST'] = self.segment_frame_start_number
-        kw['SEGFRMED'] = self.segment_frame_start_number + grps - 1
-        kw['SEGINTST'] = self.segment_int_start_number
-        kw['SEGINTED'] = self.segment_int_start_number + integ - 1
-        kw['PTINTSRT'] = self.part_int_start_number
-        kw['PTFRMSRT'] = self.part_frame_start_number
+        #kw['SEGFRMST'] = self.segment_frame_start_number
+        #kw['SEGFRMED'] = self.segment_frame_start_number + grps - 1
+        #kw['SEGINTST'] = self.segment_int_start_number
+        #kw['SEGINTED'] = self.segment_int_start_number + integ - 1
+        #kw['PTINTSRT'] = self.part_int_start_number
+        #kw['PTFRMSRT'] = self.part_frame_start_number
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor

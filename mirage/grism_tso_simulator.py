@@ -160,8 +160,9 @@ class GrismTSO():
         background_direct.make_seed()
 
         # Run the disperser on the background sources
+        print('\n\nDispersing background sources\n\n')
         background_dispersed = self.run_disperser(background_direct.seed_file, orders=self.orders,
-                                                  create_continuum_seds=True, finalize=True)
+                                                  create_continuum_seds=True, add_background=True)  # finalize=True)
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -200,12 +201,19 @@ class GrismTSO():
         transit_frames, unaltered_frames = self.find_transit_frames(lightcurves)
 
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
-        grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders, finalize=False)
-        for i, order in enumerate(self.orders):
-            if i == 0:
-                no_transit_signal = copy.deepcopy(grism_seed_object.this_one[order].simulated_image)
-            else:
-                no_transit_signal += grism_seed_object.this_one[order].simulated_image
+        print('\n\nDispersing TSO source\n\n')
+        grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders, add_background=False)  # finalize=False)
+
+
+        #for i, order in enumerate(self.orders):
+        #    if i == 0:
+        #        no_transit_signal = copy.deepcopy(grism_seed_object.this_one[order].simulated_image)
+        #    else:
+        #        no_transit_signal += grism_seed_object.this_one[order].simulated_image
+        no_transit_signal = grism_seed_object.final
+
+
+        print('Shape of no_transit_signal: {}'.format(no_transit_signal.shape))
 
         # Calculate file splitting info
         self.file_splitting()
@@ -272,6 +280,7 @@ class GrismTSO():
                         # cumulative signal
                         segment_seed[integ, frame, :, :] = previous_frame + frame_only_signal
                         previous_frame = copy.deepcopy(segment_seed[integ, frame, :, :])
+                        total_frame_counter += 1
 
                     # At the end of each integration, increment the
                     # total_frame_counter by the number of resets between
@@ -294,6 +303,11 @@ class GrismTSO():
                                                                             str(segment_part_number).zfill(3))
                 print('save the file here. Maybe need to move seed_catalog_images saveSeedImage into utils?')
 
+
+                # when saving here: segmentation map doesn't matter much since the seed is already dispersed
+                #
+                tso_seed_header = fits.getheader(tso_direct.seed_file)
+                self.save_seed(segment_seed, segmentation_map, tso_seed_header, orig_parameters)
 
 
 
@@ -449,7 +463,7 @@ class GrismTSO():
             raise ValueError(("ERROR: Orders to be dispersed must be either None or some combination "
                               "of '+1', '+2'"))
 
-    def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False, finalize=False):
+    def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False, add_background=True):  # , finalize=False):
         """
         """
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
@@ -494,14 +508,99 @@ class GrismTSO():
         print('DISPERSED SIZE: ', disp_seed.this_one[order].simulated_image.shape)
 
 
-        if finalize:
-            print('FINALIZING')
-            print(background_file)
-            with fits.open(os.path.join('/ifs/jwst/wit/mirage_data/nircam/GRISM_NIRCAM', background_file)) as h:
-                delme = h[0].data
-            print('background file size: ', delme.shape)
+        #if finalize:
+        if add_background:
+            #print('FINALIZING')
+            #print(background_file)
+            #with fits.open(os.path.join('/ifs/jwst/wit/mirage_data/nircam/GRISM_NIRCAM', background_file)) as h:
+            #    delme = h[0].data
+            #print('background file size: ', delme.shape)
             disp_seed.finalize(Back=background_file)
+        else:
+            disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
+
+    def save_seed(self, seed, segmentation_map, seed_header, params):
+        """
+        """
+        arrayshape = seed.shape
+        if len(arrayshape) == 4:
+            units = 'ADU'
+            integ, grps, yd, xd = arrayshape
+            tgroup = self.frametime * (params['Readout']['nframe'] + params['Readout']['nskip'])
+            print('Seed image is 4D.')
+        else:
+            raise ValueError('Only 4D seed images supported. This seed image is {}D'.format(len(arrayshape)))
+
+        xcent_fov = xd / 2
+        ycent_fov = yd / 2
+
+        seed_header['XCENTER'] = xcent_fov
+        seed_header['YCENTER'] = ycent_fov
+        seed_header['UNITS'] = units
+        seed_header['TGROUP'] = tgroup
+
+        if self.total_seed_segments == 1:
+            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
+                                          '_seed_image.fits')
+        else:
+            seg_string = str(self.segment_number).zfill(3)
+            part_string = str(self.segment_part_number).zfill(3)
+            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
+                                          '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+
+        self.seed_files.append(self.seed_file)
+
+        # These cannot come from the values in the direct seed image, since
+        # they are for the padded array.
+        seed_header['NOMXDIM'] = seed.shape[1]
+        seed_header['NOMYDIM'] = seed.shape[0]
+        seed_header['NOMXSTRT'] = 1
+        seed_header['NOMXEND'] = seed.shape[1]
+        seed_header['NOMYSTRT'] = 1
+        seed_header['NOMYEND'] = seed.shape[0]
+
+        # Observations with high data volumes (e.g. moving targets, TSO)
+        # can be split into multiple "segments" in order to cap the
+        # maximum file size
+        seed_header['EXSEGTOT'] = self.total_seed_segments
+        seed_header['EXSEGNUM'] = self.segment_number
+        seed_header['PART_NUM'] = self.segment_part_number
+
+        # Total number of integrations and groups in the current segment
+        # (combining all parts of the segment)
+        seed_header['SEGINT'] = self.segment_ints
+        seed_header['SEGGROUP'] = self.segment_frames
+
+        # Total number of integrations and groups in the exposure
+        seed_header['EXPINT'] = params['Readout']['nint']
+        seed_header['EXPGRP'] = params['Readout']['ngroup']
+
+        # Indexes of the ints and groups where the data in this file go
+        seed_header['SEGFRMST'] = self.segment_frame_start_number
+        seed_header['SEGFRMED'] = self.segment_frame_start_number + grps - 1
+        seed_header['SEGINTST'] = self.segment_int_start_number
+        seed_header['SEGINTED'] = self.segment_int_start_number + integ - 1
+        seed_header['PTINTSRT'] = self.part_int_start_number
+        seed_header['PTFRMSRT'] = self.part_frame_start_number
+
+        h0 = fits.PrimaryHDU()
+        h1 = fits.ImageHDU(seed, name='DATA')
+        h2 = fits.ImageHDU(segmentation_map)
+        h2.header['EXTNAME'] = 'SEGMAP'
+
+        # Put the keywords into the 0th and 1st extension headers
+        for key in seed_header:
+            h0.header[key] = seed_header[key]
+            h1.header[key] = seed_header[key]
+
+        hdulist = fits.HDUList([h0, h1, h2])
+        hdulist.writeto(name, overwrite=True)
+
+        print("Seed image and segmentation map saved as {}".format(self.seed_file))
+        print("Seed image, segmentation map, and metadata available as:")
+        print("self.seedimage, self.seed_segmap, self.seedinfo.")
+
 
     def seed_builder(self, not_in_transit, in_transit):
         """not_in_transit is a list of frame numbers
@@ -601,6 +700,7 @@ class GrismTSO():
         background_params = copy.deepcopy(params)
         background_params['simSignals']['tso_grism_catalog'] = 'None'
         background_params['Inst']['mode'] = 'wfss'
+        background_params['Output']['grism_source_image'] = True
         background_params['Output']['file'] = params['Output']['file'].replace('.fits',
                                                                                '_background_sources.fits')
         self.background_paramfile = self.paramfile.replace('.{}'.format(suffix),
@@ -610,6 +710,7 @@ class GrismTSO():
         # Copy #2 - contaings only the TSO grism source catalog,
         # is set to wfss mode, and has no background
         params['Inst']['mode'] = 'wfss'
+        params['Output']['grism_source_image'] = True
         params['simSignals']['bkgdrate'] = 0.
         params['simSignals']['zodiacal'] = 'None'
         params['simSignals']['scattered'] = 'None'
