@@ -36,6 +36,12 @@ from mirage.apt.read_apt_xml import ReadAPTXML
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
+# Determine if tests are being run on Travis
+ON_TRAVIS =  'travis' in os.path.expanduser('~')
+
+os.environ['MIRAGE_DATA'] = '/test/'
+
+
 # @pytest.fixture(scope="module")
 def temporary_directory(test_dir=TEMPORARY_DIR):
     """Create a test directory for permission management.
@@ -79,6 +85,8 @@ def test_observation_list_generation_minimal():
     assert os.path.isfile(observation_list_file)
 
 
+@pytest.mark.skipif(ON_TRAVIS,
+                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
 def test_complete_input_generation():
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
 
