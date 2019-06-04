@@ -40,6 +40,11 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
+# Determine if tests are being run on Travis
+ON_TRAVIS =  'travis' in os.path.expanduser('~')
+
+os.environ['MIRAGE_DATA'] = '/test/'
+
 # @pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
     '''Parse the given APT files and create a set of .yamls for a given
@@ -72,25 +77,11 @@ def RunAllAPTTemplates(instrument):
     else:
         os.makedirs(out_dir)
 
-    # Write observationlist.yaml
-    observationlist_file = os.path.join(out_dir, instrument + '_observationlist.yaml')
-    # write_observationlist.get_observation_dict(xml_file, pointing_file, observationlist_file,
-    #                                  ps_cat_sw=sw_cats, ps_cat_lw=lw_cats)
-    apt_xml_dict = generate_observationlist.get_observation_dict(xml_file, observationlist_file, cat_dict)
-
     # Create a series of data simulator input yaml files
-    yam = yaml_generator.SimInput()
-    yam.input_xml = xml_file
-    yam.pointing_file = pointing_file
-    yam.output_dir = out_dir
-    yam.simdata_output_dir = out_dir
-    yam.observation_list_file = observationlist_file
-    yam.use_JWST_pipeline = False
-    yam.use_linearized_darks = True
-    yam.datatype = 'linear'
-    yam.reffile_setup(offline=True)
-    yam.set_global_definitions()
-    yam.apt_xml_dict = apt_xml_dict
+    yam = yaml_generator.SimInput(input_xml=xml_file, pointing_file=pointing_file,
+                                  catalogs=cat_dict, use_JWST_pipeline=False,
+                                  verbose=True, output_dir=out_dir, simdata_output_dir=out_dir,
+                                  offline=True)
     yam.create_inputs()
 
     # Ensure that some of the expected files have been created
@@ -119,20 +110,24 @@ def RunAllAPTTemplates(instrument):
     #         'or the reference yaml is out of date.'
 
 
-# @pytest.mark.xfail
+@pytest.mark.skipif(ON_TRAVIS,
+                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
 def test_environment_variable():
     '''Ensure the MIRAGE_DATA environment variable has been set
     '''
-    MIRAGE_DATA = os.path.expandvars('MIRAGE_DATA')
-    assert MIRAGE_DATA is not None, "MIRAGE_DATA environment variable is not " +\
-                                    "set. This must be set to the base directory" +\
-                                    " containing the darks, cosmic ray, PSF, etc" +\
-                                    " input files needed for the simulation. " +\
-                                    "These files must be downloaded separately " +\
-                                    "from the Mirage package."
+    failure_msg = \
+        "MIRAGE_DATA environment variable is not set. This must be set to the " \
+        "base directory containing the darks, cosmic ray, PSF, etc input files " \
+        "needed for the simulation. These files must be downloaded separately " \
+        "from the Mirage package."
+
+    try:
+        env_var = os.environ['MIRAGE_DATA']
+        assert env_var != '', failure_msg
+    except KeyError:
+        assert False, failure_msg
 
 
-@pytest.mark.xfail
 def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''

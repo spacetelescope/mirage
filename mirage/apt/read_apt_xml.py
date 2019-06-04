@@ -490,6 +490,10 @@ class ReadAPTXML():
                 if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
 
+                # Special case for 8NIRSPEC dither pattern
+                if number_of_primary_dithers == '8NIRSPEC':
+                    number_of_primary_dithers = '8'
+
             else:
                 print('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
 
