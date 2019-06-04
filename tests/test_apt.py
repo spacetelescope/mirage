@@ -43,6 +43,8 @@ TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)
 # Determine if tests are being run on Travis
 ON_TRAVIS = os.path.expanduser('~') == '/home/travis'
 
+os.environ['MIRAGE_DATA'] = '/test/'
+
 # @pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
     '''Parse the given APT files and create a set of .yamls for a given

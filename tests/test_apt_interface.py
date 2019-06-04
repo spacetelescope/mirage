@@ -36,6 +36,8 @@ from mirage.apt.read_apt_xml import ReadAPTXML
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
+os.environ['MIRAGE_DATA'] = '/test/'
+
 # @pytest.fixture(scope="module")
 def temporary_directory(test_dir=TEMPORARY_DIR):
     """Create a test directory for permission management.

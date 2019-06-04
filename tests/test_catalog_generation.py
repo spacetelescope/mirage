@@ -23,6 +23,8 @@ from mirage.catalogs import create_catalog
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
 
+os.environ['MIRAGE_DATA'] = '/test/'
+
 
 def test_ptsrc_catalog_creation():
     """Test the generation of a basic point source catalog
