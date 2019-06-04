@@ -158,8 +158,8 @@ def test_for_proposal():
 
     assert ptsrc_map == p_map
     assert galaxy_map == g_map
-    assert sorted(ptsrc_name) == sorted(p_name)
-    assert sorted(galaxy_name) == sorted(g_name)
+    assert ptsrc_name == p_name
+    assert galaxy_name == g_name
 
     truth_ptsrc = ['ptsrc_1.cat', 'ptsrc_2.cat', 'ptsrc_3.cat']
     truth_galaxy = ['galaxy_1.cat', 'galaxy_2.cat', 'galaxy_3.cat']
