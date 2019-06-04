@@ -312,7 +312,7 @@ class WFSSSim():
         wfss_files_found = 0
         for i, pfile in enumerate(self.paramfiles):
             with open(pfile, 'r') as infile:
-                params = yaml.safe_load(infile)
+                params = yaml.load(infile)
 
             cats = [params['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
             cats = [e for e in cats if e.lower() != 'none']
@@ -383,7 +383,7 @@ class WFSSSim():
         import yaml
         try:
             with open(file, 'r') as infile:
-                data = yaml.safe_load(infile)
+                data = yaml.load(infile)
         except (FileNotFoundError, IOError) as e:
             print(e)
 

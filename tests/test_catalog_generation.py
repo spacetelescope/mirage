@@ -17,6 +17,7 @@ import numpy as np
 import os
 
 from astropy.io import ascii
+import pytest
 
 from mirage.catalogs import catalog_generator
 from mirage.catalogs import create_catalog
@@ -127,6 +128,7 @@ def test_2mass_plus_besaoncon_convenience_function():
     assert len(twomass.table) < len(both.table)
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_for_proposal():
     """Test the creation of source catalogs from a proposal"""
     xml = os.path.join(TEST_DATA_DIR, 'NIRCam/targets_with_large_separation.xml')
@@ -199,6 +201,7 @@ def test_for_proposal():
             pass
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
