@@ -41,7 +41,7 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 # Determine if tests are being run on Travis
-ON_TRAVIS = os.path.expanduser('~') == '/home/travis'
+ON_TRAVIS =  'travis' in os.path.expanduser('~')
 
 os.environ['MIRAGE_DATA'] = '/test/'
 
@@ -80,7 +80,8 @@ def RunAllAPTTemplates(instrument):
     # Create a series of data simulator input yaml files
     yam = yaml_generator.SimInput(input_xml=xml_file, pointing_file=pointing_file,
                                   catalogs=cat_dict, use_JWST_pipeline=False,
-                                  verbose=True, output_dir=out_dir, simdata_output_dir=out_dir)
+                                  verbose=True, output_dir=out_dir, simdata_output_dir=out_dir,
+                                  offline=True)
     yam.create_inputs()
 
     # Ensure that some of the expected files have been created
@@ -127,7 +128,6 @@ def test_environment_variable():
         assert False, failure_msg
 
 
-# @pytest.mark.xfail
 def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''

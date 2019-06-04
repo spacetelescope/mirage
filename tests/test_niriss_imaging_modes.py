@@ -32,7 +32,7 @@ from mirage import imaging_simulator
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
 # Determine if tests are being run on Travis
-ON_TRAVIS = os.path.expanduser('~') == '/home/travis'
+ON_TRAVIS =  'travis' in os.path.expanduser('~')
 
 
 @pytest.mark.skipif(ON_TRAVIS,

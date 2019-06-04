@@ -20,7 +20,7 @@ os.environ['TEST_NIRISS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_d
 os.environ['TEST_FGS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/FGS')
 
 # Determine if tests are being run on Travis
-ON_TRAVIS = os.path.expanduser('~') == '/home/travis'
+ON_TRAVIS =  'travis' in os.path.expanduser('~')
 
 
 @pytest.mark.skipif(ON_TRAVIS,

@@ -1,12 +1,14 @@
 channels:
 - http://ssb.stsci.edu/astroconda
 - http://ssb.stsci.edu/astroconda-dev
+- conda-forge
 - defaults
 dependencies:
 - asdf>=2.1.0.dev1+ga161518
 - astropy>=3.1.2
 - astroquery>=0.3.8
 - gwcs>=0.10a.dev21+g75e92da
+- healpy>=1.10
 - h5py>=2.8.0
 - jwst>=0.12.0a.dev115+g9d5eb8c
 - jwxml>=0.3.0
