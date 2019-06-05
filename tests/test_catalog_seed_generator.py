@@ -18,9 +18,16 @@ Use
 """
 from astropy.table import Table
 import numpy as np
+import os
 import webbpsf
 
 from mirage.seed_image import catalog_seed_image
+
+# Determine if tests are being run on Travis
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
+if ON_TRAVIS:
+    env_path = os.path.expandvars['CONDA_PREFIX']
+    os.environ["WEBBPSF_PATH"] = os.path.join(env_path, 'share/webbpsf-data')
 
 
 def create_dummy_psf_grid():
