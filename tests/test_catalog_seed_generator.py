@@ -38,7 +38,7 @@ def test_overlap_coordinates_full_frame():
     overlap between two stamp images
     """
     # Create instance of Catalog_seed
-    seed = catalog_seed_image.Catalog_seed()
+    seed = catalog_seed_image.Catalog_seed(offline=True)
 
     # Create a point sources table
     tab = Table()
@@ -99,9 +99,14 @@ def test_overlap_coordinates_full_frame():
     seed.coord_adjust['xoffset'] = 0  # Already defined, but let's be explicit
     seed.coord_adjust['yoffset'] = 0  # Already defined, but let's be explicit
     seed.output_dims = [2048, 2048]
+    seed.psf_library_core_x_dim = 301
+    seed.psf_library_core_y_dim = 301
+    seed.params = {'simSignals': {}}
+    seed.params['simSignals']['add_psf_wings'] = False
     for index in range(5):
-        psf, min_x, min_y = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
-                                                  ignore_detector=False)
+        psf, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
+                                                             stamp_dims[1], stamp_dims[0],
+                                                             ignore_detector=False)
         stamp_x_loc = 301 // 2 - min_x
         stamp_y_loc = 301 // 2 - min_y
         updated_psf_dimensions = psf.shape
@@ -117,7 +122,7 @@ def test_overlap_coordinates_subarray():
     """Test the function that calculates the coordinates for the
     overlap between two stamp images
     """
-    seed = catalog_seed_image.Catalog_seed()
+    seed = catalog_seed_image.Catalog_seed(offline=True)
 
     # Create a point sources table
     tab = Table()
@@ -153,6 +158,10 @@ def test_overlap_coordinates_subarray():
     seed.output_dims = [400, 400]  # Assume 400x400 pixel subarray
     seed.subarray_bounds = [1648, 1648, 2047, 2047]
     seed.ffsize = 2048
+    seed.psf_library_core_x_dim = 301
+    seed.psf_library_core_y_dim = 301
+    seed.params = {'simSignals': {}}
+    seed.params['simSignals']['add_psf_wings'] = False
     for index in range(5):
         results = seed.create_psf_stamp_coords(tab[index]['pixelx'], tab[index]['pixely'], stamp_dims,
                                                stamp_x, stamp_y, coord_sys='aperture', ignore_detector=False)
@@ -174,8 +183,9 @@ def test_overlap_coordinates_subarray():
                      (200, 400, 200, 400, 0, 200, 0, 200),
                      (0, 150, 0, 150, 151, 301, 151, 301)]
     for index in range(5):
-        psf, min_x, min_y = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
-                                                  ignore_detector=False)
+        psf, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
+                                                             stamp_dims[1], stamp_dims[0],
+                                                             ignore_detector=False)
         stamp_x_loc = 301 // 2 - min_x
         stamp_y_loc = 301 // 2 - min_y
         updated_psf_dimensions = psf.shape
