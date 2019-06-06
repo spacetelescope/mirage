@@ -1,0 +1,18 @@
+# This file defines the magnitude thresholds for using various sized PSF wing images.
+# The magnitudes listed below are the maximum (i.e. the dimmest) for which that file
+# will be used. So a table that looks like this:
+#
+#  abmag  stmag vegamag  number_of_pixels
+#    15    15     15           301
+#    20    20     20           101
+#
+# Specifies that sources brigher than 15th magnitude will use an image of the PSF wings
+# from file1.fits that is 301x301 pixels.
+# Sources between 15th and 20th magnitude will use the central 101x101 pixels from
+# file1.fits, and anything dimmer than 20th will not have wings added.
+#
+ abmag  stmag  vegamag    number_of_pixels
+
+  15     15      15             401
+  20     20      20             201
+  25     25      25             101
