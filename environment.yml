@@ -14,8 +14,8 @@ dependencies:
 - jwxml>=0.3.0
 - matplotlib>=3.0.0
 - numpy>=1.14.3
-- pip>=18.0
 - photutils>=0.6
+- pip>=18.0
 - pysynphot>=0.9.12
 - pytest>=3.8.1
 - python>=3.6,<3.7
