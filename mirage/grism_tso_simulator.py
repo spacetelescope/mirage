@@ -137,6 +137,9 @@ class GrismTSO():
         orig_parameters = utils.get_subarray_info(orig_parameters, subarray_table)
         orig_parameters = utils.read_pattern_check(orig_parameters)
 
+        self.basename = os.path.join(orig_parameters['Output']['directory'],
+                                     orig_parameters['Output']['file'][0:-5].split('/')[-1])
+
         # Determine file splitting information. First get some basic info
         # on the exposure
         self.numints = orig_parameters['Readout']['nint']
@@ -158,6 +161,7 @@ class GrismTSO():
         background_direct = catalog_seed_image.Catalog_seed()
         background_direct.paramfile = self.background_paramfile
         background_direct.make_seed()
+        background_segmentation_map = background_direct.seed_segmap
 
         # Run the disperser on the background sources
         print('\n\nDispersing background sources\n\n')
@@ -168,6 +172,9 @@ class GrismTSO():
         tso_direct = catalog_seed_image.Catalog_seed()
         tso_direct.paramfile = self.tso_paramfile
         tso_direct.make_seed()
+        tso_segmentation_map = tso_direct.seed_segmap
+        outside_tso_source = tso_segmentation_map == 0
+        tso_segmentation_map[outside_tso_source] = background_segmentation_map[outside_tso_source]
 
         # Dimensions are (y, x)
         self.seed_dimensions = tso_direct.nominal_dims
@@ -232,7 +239,7 @@ class GrismTSO():
         # file.
         print('lightcurves shape:', lightcurves.shape)
 
-        print('move below into seed_builder function')
+        print('move below into seed_builder function?')
 
         ints_per_segment = self.int_segment_indexes[1:] - self.int_segment_indexes[:-1]
         groups_per_segment = self.grp_segment_indexes[1:] - self.grp_segment_indexes[:-1]
@@ -240,12 +247,30 @@ class GrismTSO():
         print("ints_per_segment: ", ints_per_segment)
         print("Group segment indexes: ", self.grp_segment_indexes)
         print("groups_per_segment: ", groups_per_segment)
+
         total_frame_counter = 0
         previous_segment = 1
         segment_part_number = 0
+        segment_starting_int_number = 0
+
+        self.segment_part_number = 0
+        self.segment_ints = 0
+        self.segment_frames = 0
+        self.segment_frame_start_number = 0
+        self.segment_int_start_number = 0
+        self.part_int_start_number = 0
+        self.part_frame_start_number = 0
+
+        # List of all output seed files
+        self.seed_files = []
+
         for i, int_dim in enumerate(ints_per_segment):
+            int_start = self.int_segment_indexes[i]
             int_end = self.int_segment_indexes[i+1]
             for j, grp_dim in enumerate(groups_per_segment):
+                initial_frame = self.grp_segment_indexes[j]
+                # int_dim and grp_dim are the number of integrations and
+                # groups in the current segment PART
                 print("Integrations: {}, Groups: {}".format(int_dim, grp_dim))
                 segment_seed = np.zeros((int_dim, grp_dim, self.seed_dimensions[0], self.seed_dimensions[1]))
 
@@ -254,6 +279,13 @@ class GrismTSO():
 
 
                 for integ in np.arange(int_dim):
+                    overall_integration_number = int_start + integ
+
+                    #print('\n\nOverall integration number: {}'.format(overall_integration_number))
+                    #print('from: {} + {}'.format(self.int_segment_indexes[i], integ))
+                    #print('\n')
+
+
                     previous_frame = np.zeros(self.seed_dimensions)
                     for frame in np.arange(grp_dim):
                         print('TOTAL FRAME COUNTER: ', total_frame_counter)
@@ -293,21 +325,52 @@ class GrismTSO():
                 segment_number = np.where(int_end <= self.file_segment_indexes)[0][0]
                 if segment_number == previous_segment:
                     segment_part_number += 1
+                    self.part_int_start_number = int_start - segment_starting_int_number
+                    self.part_frame_start_number = initial_frame
+                    self.segment_ints += int_dim
+                    self.segment_frames += grp_dim
                 else:
                     segment_part_number = 1
                     previous_segment = copy.deepcopy(segment_number)
 
+                    self.segment_frame_start_number = initial_frame
+                    self.segment_int_start_number = int_start
+                    self.part_int_start_number = 0
+                    self.part_frame_start_number = 0
+                    segment_starting_int_number = copy.deepcopy(int_start)
+                    self.segment_ints = int_dim
+                    self.segment_frames = grp_dim
+
+
+
+
+                #self.segment_int_start_number = self.int_segment_indexes[i]
+                #self.segment_frame_start_number = self.grp_segment_indexes[j]
+                #self.part_int_start_number = overall_integration_number - self.segment_int_start_number  # THIS ISNT RIGHT YET- segment_starting_int_number
+                #self.part_frame_start_number = self.grp_segment_indexes[j]
+
                 print('Segment and part numbers: ', segment_number, segment_part_number)
+                print('Overall integration number: ', overall_integration_number)
                 segment_file_name = '{}seg{}_part{}_seed_image.fits'.format(segment_file_base,
                                                                             str(segment_number).zfill(3),
                                                                             str(segment_part_number).zfill(3))
+
+
+                print('\n\nSegment int and frame start numbers: {} {}'.format(self.segment_int_start_number, self.segment_frame_start_number))
+                print('Part int and frame start numbers (ints and frames within the segment): {} {}'.format(self.part_int_start_number, self.part_frame_start_number))
+
+
+
+
+
                 print('save the file here. Maybe need to move seed_catalog_images saveSeedImage into utils?')
 
 
                 # when saving here: segmentation map doesn't matter much since the seed is already dispersed
                 #
                 tso_seed_header = fits.getheader(tso_direct.seed_file)
-                self.save_seed(segment_seed, segmentation_map, tso_seed_header, orig_parameters)
+                self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters,
+                               segment_number, segment_part_number)
 
 
 
@@ -323,7 +386,7 @@ class GrismTSO():
                                                                                                self.frames_per_int,
                                                                                                self.numints,
                                                                                                frames_per_group=frames_per_group)
-        self.total_seed_segments = (len(self.grp_segment_indexes) - 1) * (len(self.int_segment_indexes) - 1)
+        #self.total_seed_segments = (len(self.grp_segment_indexes) - 1) * (len(self.int_segment_indexes) - 1)
 
         # If the file needs to be split, check to see what the splitting
         # would be in the case of groups rather than frames. This will
@@ -336,6 +399,7 @@ class GrismTSO():
                                                                                                 self.numints)
         else:
             self.file_segment_indexes = np.array([0, self.numints])
+        self.total_seed_segments = len(self.file_segment_indexes) - 1
 
     @staticmethod
     def find_transit_frames(lightcurve_collection):
@@ -520,7 +584,7 @@ class GrismTSO():
             disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
 
-    def save_seed(self, seed, segmentation_map, seed_header, params):
+    def save_seed(self, seed, segmentation_map, seed_header, params, segment_num, part_num):
         """
         """
         arrayshape = seed.shape
@@ -540,13 +604,18 @@ class GrismTSO():
         seed_header['UNITS'] = units
         seed_header['TGROUP'] = tgroup
 
+        if params['Readout']['pupil'][0].upper() == 'F':
+            usefilt = 'pupil'
+        else:
+            usefilt = 'filter'
+
         if self.total_seed_segments == 1:
-            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
+            self.seed_file = os.path.join(self.basename + '_' + params['Readout'][usefilt] +
                                           '_seed_image.fits')
         else:
-            seg_string = str(self.segment_number).zfill(3)
-            part_string = str(self.segment_part_number).zfill(3)
-            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
+            seg_string = str(segment_num).zfill(3)
+            part_string = str(part_num).zfill(3)
+            self.seed_file = os.path.join(self.basename + '_' + params['Readout'][usefilt] +
                                           '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
 
         self.seed_files.append(self.seed_file)
@@ -564,8 +633,8 @@ class GrismTSO():
         # can be split into multiple "segments" in order to cap the
         # maximum file size
         seed_header['EXSEGTOT'] = self.total_seed_segments
-        seed_header['EXSEGNUM'] = self.segment_number
-        seed_header['PART_NUM'] = self.segment_part_number
+        seed_header['EXSEGNUM'] = segment_num
+        seed_header['PART_NUM'] = part_num
 
         # Total number of integrations and groups in the current segment
         # (combining all parts of the segment)
@@ -595,15 +664,15 @@ class GrismTSO():
             h1.header[key] = seed_header[key]
 
         hdulist = fits.HDUList([h0, h1, h2])
-        hdulist.writeto(name, overwrite=True)
+        hdulist.writeto(self.seed_file, overwrite=True)
 
         print("Seed image and segmentation map saved as {}".format(self.seed_file))
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
-
+    """
     def seed_builder(self, not_in_transit, in_transit):
-        """not_in_transit is a list of frame numbers
+        not_in_transit is a list of frame numbers
 
         UGH, lots of stuff would have to be passed in here, or made
         into class variables
@@ -615,7 +684,6 @@ class GrismTSO():
         grism_seed_object
 
 
-        """
         ints_per_segment = self.int_segment_indexes[:-1] - self.int_segment_indexes[1:]
         groups_per_segment = self.grp_segment_indexes[:-1] - self.grp_segment_indexes[1:]
         print("Integration segment indexes: ", self.int_segment_indexes)
@@ -683,6 +751,7 @@ class GrismTSO():
                                                                             str(segment_number).zfill(3),
                                                                             str(segment_part_number).zfill(3))
                 #you have to save segment_seed here rather than returning it since you are in the loop
+    """
 
     def split_param_file(self, params):
         """Create 2 copies of the input parameter file. One will contain

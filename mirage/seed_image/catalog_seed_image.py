@@ -162,7 +162,7 @@ class Catalog_seed():
                                                                                               self.frames_per_integration,
                                                                                               self.params['Readout']['nint'],
                                                                                               frames_per_group=frames_per_group)
-            self.total_seed_segments = (len(group_segment_indexes) - 1) * (len(integration_segment_indexes) - 1)
+            #self.total_seed_segments = (len(group_segment_indexes) - 1) * (len(integration_segment_indexes) - 1)
 
             # If the file needs to be split, check to see what the splitting
             # would be in the case of groups rather than frames. This will
@@ -180,10 +180,8 @@ class Catalog_seed():
                 print(self.total_seed_segments)
                 print(split_seed_g, group_segment_indexes_g, self.file_segment_indexes)
                 print('')
-
-
-
-
+            else:
+                self.file_segment_indexes = integration_segment_indexes
 
         else:
             split_seed = False
@@ -195,6 +193,7 @@ class Catalog_seed():
             self.segment_part_number = 1
             #integration_segment_indexes_g = [0, 7, 14, 21, 28, 30]
             #use these values to determine the segment number to use in the output filename!!!
+        self.total_seed_segments = len(self.file_segment_indexes) - 1
 
 
         # Read in the pixel area map, which will be needed for certain
@@ -491,6 +490,9 @@ class Catalog_seed():
                             #self.segment_frame_start_number =  # should not need to be changed
                             #self.segment_int_start_number =   # should not need to be changed
                             self.part_int_start_number = int_start - segment_starting_int_number
+
+                            print('part_int_start_number made from: ', int_start, segment_starting_int_number)
+
                             self.part_frame_start_number = initial_frame
                         else:
                             print("New Segment!")
