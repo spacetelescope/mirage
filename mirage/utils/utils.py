@@ -151,6 +151,50 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
+def crop_to_subarray(data, bounds):
+    """
+    Crop the given full frame array down to the appropriate
+    subarray size and location based on the requested subarray
+    name.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        Full frame image or ramp. (x,y) = (2048, 2048)
+        May be 2D, 3D, or 4D
+
+    bounds : list
+        4-element list containing the full frame indices that
+        define the position of the subarray.
+        [xstart, ystart, xend, yend]
+
+    Returns
+    -------
+    data : numpy.ndarray
+        Input array cropped in x and y dimensions
+    """
+    dimensions = len(data.shape)
+    yl, xl = data.shape[-2:]
+
+    valid = [False, False, False, False]
+    valid = [(b >= 0 and b < xl) for b in bounds[0:3:2]]
+    validy = [(b >= 0 and b < yl) for b in bounds[1:4:2]]
+    valid.extend(validy)
+
+    if all(valid):
+        if dimensions == 2:
+            return data[bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        elif dimensions == 3:
+            return data[:, bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        elif dimensions == 4:
+            return data[:, :, bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        else:
+            raise ValueError(("In crop_to_subarray, input array is not 2, 3, or 4D."))
+    else:
+            raise ValueError(("WARNING: subarray bounds are outside the "
+                              "dimensions of the input array."))
+
+
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """

@@ -66,7 +66,7 @@ from mirage.ramp_generator import obs_generator
 from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES
 from mirage.utils.file_splitting import find_file_splits
-from mirage.utils import utils
+from mirage.utils import utils, file_io
 from mirage.yaml import yaml_update
 
 
@@ -100,6 +100,7 @@ class GrismTSO():
         self.disp_seed_filename = disp_seed_filename
         self.orders = orders
         self.create_continuum_seds = create_continuum_seds
+        self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
 
         # Make sure the right combination of parameter files and SED file
         # are given
@@ -153,6 +154,11 @@ class GrismTSO():
                                                                                                    self.numframes,
                                                                                                    self.numskips,
                                                                                                    self.numresets)
+
+        # Get gain map for later unit conversion
+        gainfile = orig_parameters['Reffiles']['gain']
+        gain, gainheader = file_io.read_gain_file(gainfile)
+
         # Make 2 copies of the input parameter file, separating the TSO
         # source from the other sources
         self.split_param_file(orig_parameters)
@@ -361,20 +367,59 @@ class GrismTSO():
 
 
 
+                # Disperser output is always full frame. Crop to the
+                # requested subarray if necessary
+                if orig_parameters['Readout']['array_name'] not in self.fullframe_apertures:
+                    print("Subarray bounds: {}".format(tso_direct.subarray_bounds))
+                    print("Dispersed seed image size: {}".format(segment_seed.shape))
+                    segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
+                    gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
 
+                # Segmentation map will be centered in a frame that is larger
+                # than full frame by a factor of sqrt(2), so crop appropriately
+                print('Cropping segmentation map')
+                segy, segx = tso_segmentation_map.shape
+                dx = int((segx - tso_direct.nominal_dims[1]) / 2)
+                dy = int((segy - tso_direct.nominal_dims[0]) / 2)
+                segbounds = [tso_direct.subarray_bounds[0] + dx, tso_direct.subarray_bounds[1] + dy,
+                             tso_direct.subarray_bounds[2] + dx, tso_direct.subarray_bounds[3] + dy]
+                tso_segmentation_map = utils.crop_to_subarray(tso_segmentation_map, segbounds)
 
-                print('save the file here. Maybe need to move seed_catalog_images saveSeedImage into utils?')
+                # Convert seed image to ADU/sec to be consistent
+                # with other simulator outputs
+                segment_seed /= gain
 
+                # Update seed image header to reflect the
+                # division by the gain
+                tso_direct.seedinfo['units'] = 'ADU/sec'
 
-                # when saving here: segmentation map doesn't matter much since the seed is already dispersed
-                #
+                # Save the seed image. Save in units of ADU/sec
+                print('Saving seed image')
                 tso_seed_header = fits.getheader(tso_direct.seed_file)
                 self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters,
                                segment_number, segment_part_number)
 
+                # Prepare dark current exposure if
+                # needed.
+                print('Running dark prep')
+                if self.override_dark is None:
+                    d = dark_prep.DarkPrep(offline=self.offline)
+                    d.paramfile = self.paramfile
+                    d.prepare()
+                    obslindark = d.prepDark
+                else:
+                    self.read_dark_product()
+                    obslindark = self.darkPrep
 
-
-
+                # Combine into final observation
+                print('Running observation generator')
+                obs = obs_generator.Observation(offline=self.offline)
+                obs.linDark = obslindark
+                obs.seed = segment_seed
+                obs.segmap = tso_segmentation_map
+                obs.seedheader = tso_direct.seedinfo
+                obs.paramfile = self.paramfile
+                obs.create()
 
     def file_splitting(self):
         """Determine file splitting details based on calculated data
