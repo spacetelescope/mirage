@@ -70,8 +70,9 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	simSignals_:
 	  pointsource_: my_point_sources.cat               #File containing a list of point sources to add (x,y locations and magnitudes)
 	  psfpath_: $MIRAGE_DATA/nircam/webbpsf_library/   #Path to PSF library
-	  psfbasename_: nircam                             #Basename of the files in the psf library
-	  psfpixfrac_: 0.25                                #Fraction of a pixel between entries in PSF library (e.g. 0.25 = files for PSF centered at 0.25 pixel intervals within pixel)
+	  gridded_psf_library_row_padding_: 4              # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
+  	  psf_wing_threshold_file_: config                 # File defining PSF sizes versus magnitude
+  	  add_psf_wings_: True                             # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
 	  psfwfe_: predicted                               #PSF WFE value ("predicted" or "requirements")
 	  psfwfegroup_: 0                                  #WFE realization group (0 to 4)
 	  galaxyListFile_: my_galaxies_catalog.list
@@ -612,23 +613,31 @@ PSF library path
 
 Path name to the PSF library to be used for adding point sources to the data. The code was developed around a PSF library constructed using WebbPSF (Perrin, 2014). This PSF library is included in the collection of Mirage `reference files <reference_files>`_ . Once that package is downloaded and the data files extracted from the tar file, set this field to point to the top-level directory of the PSF library.
 
-.. _psfbasename:
+.. _gridded_psf_library_row_padding:
 
-PSF library file basename
-+++++++++++++++++++++++++
+Gridded PSF Library Row Padding
++++++++++++++++++++++++++++++++
 
-*simSignals:psfbasename*
+The number of outer rows and columns to crop when evaluating the PSF library. This is done to avoid edge effects that can sometimes be
+present in the evaluated PSF. Recommended and default value is 4.
 
-Basename of the files in the PSF library. When using the default libraries that are distributed with Mirage, this should be set to the name of the instrument.
+.. _psf_wing_threshold_file:
 
-.. _psfpixfrac:
+PSF Wing Threshold File
++++++++++++++++++++++++
 
-Sub-pixel grid resolution of PSF library
-++++++++++++++++++++++++++++++++++++++++
+Ascii file that defines the overall size of the PSF (in pixels) versus magnitude. Through this file, the user can tune the size of the PSFs in the
+simulated data. If it is important for your science to see far out into the wings, you can enable that here. These files are located in the ``config``
+directory of the repo. There is one file per instrument. The default value for this keyword is ``config``. In this case, Mirage will know to look
+for the file in the ``config`` directory.
 
-*simSignals:psfpixfrac*
+.. _add_psf_wings:
 
-It is assumed that the PSF library contains a grid of PSFs centered at various sub-pixel locations. This parameter specifies the resolution of this grid. For example, if the library contains PSFs centered at every 0.25 pixels across a pixel in x and y, then this field should be set to 0.25. In the current collection of Mirage `reference files <reference_files>`_ the PSF library for NIRCam uses a resolution of 0.25, while those for NIRISS and FGS have a resolution of 0.1 pixels.
+Add PSF Wings
++++++++++++++
+
+Boolean value stating whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
+
 
 .. _psfwfe:
 
