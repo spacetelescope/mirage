@@ -72,7 +72,7 @@ from mirage.yaml import yaml_update
 
 class GrismTSO():
     def __init__(self, parameter_file, SED_file=None, SED_normalizing_catalog_column=None,
-                 final_SED_file=None, SED_dict=None, save_dispersed_seed=True, source_stamps_file=None,
+                 final_SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
                  extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"],
                  create_continuum_seds=True):
 
@@ -92,7 +92,6 @@ class GrismTSO():
         self.SED_file = SED_file
         self.SED_normalizing_catalog_column = SED_normalizing_catalog_column
         self.final_SED_file = final_SED_file
-        self.SED_dict = SED_dict
         self.save_dispersed_seed = save_dispersed_seed
         self.source_stamps_file = source_stamps_file
         self.extrapolate_SED = extrapolate_SED
@@ -172,7 +171,7 @@ class GrismTSO():
         # Run the disperser on the background sources
         print('\n\nDispersing background sources\n\n')
         background_dispersed = self.run_disperser(background_direct.seed_file, orders=self.orders,
-                                                  create_continuum_seds=True, add_background=True)  # finalize=True)
+                                                  create_continuum_seds=True, add_background=True)
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -188,9 +187,6 @@ class GrismTSO():
         # Read in the transmission spectrum that goes with the TSO source
         tso_params = utils.read_yaml(self.tso_paramfile)
         tso_catalog_file = tso_params['simSignals']['tso_grism_catalog']
-
-        print('TSO catalog file', tso_catalog_file)
-
 
         tso_catalog = ascii.read(tso_catalog_file)
         #self.check_tso_catalog_inputs(tso_catalog)
@@ -215,18 +211,22 @@ class GrismTSO():
 
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
         print('\n\nDispersing TSO source\n\n')
-        grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders, add_background=False)  # finalize=False)
+        grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders,
+                                               create_continuum_seds=False, add_background=False)
 
+        # Save the dispersed seed images if requested
+        if self.save_dispersed_seed:
+            h_back = fits.PrimaryHDU(background_dispersed.final)
+            h_back.header['EXTNAME'] = 'BACKGROUND_SOURCES'
+            h_tso = fits.ImageHDU(grism_seed_object.final)
+            h_tso.header['EXTNAME'] = 'TSO_SOURCE'
+            hlist = fits.HDUList([h_back, h_tso])
+            disp_filename = '{}_dispersed_seed_images.fits'.format(self.basename)
+            hlist.writeto(disp_filename, overwrite=True)
+            print('Dispersed seed images (background sources and TSO source) saved to {}.'
+                  .format(disp_filename))
 
-        #for i, order in enumerate(self.orders):
-        #    if i == 0:
-        #        no_transit_signal = copy.deepcopy(grism_seed_object.this_one[order].simulated_image)
-        #    else:
-        #        no_transit_signal += grism_seed_object.this_one[order].simulated_image
         no_transit_signal = grism_seed_object.final
-
-
-        print('Shape of no_transit_signal: {}'.format(no_transit_signal.shape))
 
         # Calculate file splitting info
         self.file_splitting()
@@ -399,27 +399,27 @@ class GrismTSO():
                 self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters,
                                segment_number, segment_part_number)
 
-                # Prepare dark current exposure if
-                # needed.
-                print('Running dark prep')
-                if self.override_dark is None:
-                    d = dark_prep.DarkPrep(offline=self.offline)
-                    d.paramfile = self.paramfile
-                    d.prepare()
-                    obslindark = d.prepDark
-                else:
-                    self.read_dark_product()
-                    obslindark = self.darkPrep
+        # Prepare dark current exposure if
+        # needed.
+        print('Running dark prep')
+        #if self.override_dark is None:
+        d = dark_prep.DarkPrep()
+        d.paramfile = self.paramfile
+        d.prepare()
+        # obslindark = d.prepDark
+        #else:
+        #    self.read_dark_product()
+        #    obslindark = self.darkPrep
 
-                # Combine into final observation
-                print('Running observation generator')
-                obs = obs_generator.Observation(offline=self.offline)
-                obs.linDark = obslindark
-                obs.seed = segment_seed
-                obs.segmap = tso_segmentation_map
-                obs.seedheader = tso_direct.seedinfo
-                obs.paramfile = self.paramfile
-                obs.create()
+        # Combine into final observation
+        print('Running observation generator')
+        obs = obs_generator.Observation()
+        obs.linDark = d.dark_files
+        obs.seed = self.seed_files
+        obs.segmap = tso_segmentation_map
+        obs.seedheader = tso_direct.seedinfo
+        obs.paramfile = self.paramfile
+        obs.create()
 
     def file_splitting(self):
         """Determine file splitting details based on calculated data
@@ -472,6 +472,8 @@ class GrismTSO():
         self.catalog_files = []
         parameters = utils.read_yaml(self.paramfile)
 
+        CATALOG_YAML_ENTRIES.remove('tso_grism_catalog')
+        CATALOG_YAML_ENTRIES.remove('tso_imaging_catalog')
         cats = [parameters['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
         cats = [e for e in cats if e.lower() != 'none']
         self.catalog_files.extend(cats)
@@ -578,7 +580,7 @@ class GrismTSO():
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
         if create_continuum_seds:
-            self.SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files, input_spectra=self.SED_dict,
+            self.SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
                                                                   input_spectra_file=self.SED_file,
                                                                   extrapolate_SED=self.extrapolate_SED,
                                                                   output_filename=self.final_SED_file,
@@ -833,6 +835,7 @@ class GrismTSO():
                           'movingTargetToTrack']
         for catalog in other_catalogs:
             params['simSignals'][catalog] = 'None'
+        params['simSignals']['pointsource'] = params['simSignals']['tso_grism_catalog']
         params['Output']['file'] = params['Output']['file'].replace('.fits', '_tso_grism_sources.fits')
 
         self.tso_paramfile = self.paramfile.replace('.{}'.format(suffix),

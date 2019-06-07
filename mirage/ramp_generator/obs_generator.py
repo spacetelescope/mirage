@@ -49,7 +49,7 @@ from mirage import version
 MIRAGE_VERSION = version.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
-MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss"],
+MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss", "ts_grism"],
          "niriss": ["imaging", "ami", "pom", "wfss"],
          "fgs": ["imaging"]}
 
@@ -1120,16 +1120,15 @@ class Observation():
         # Read in superbias file if present
         self.read_superbias_file()
 
-
-
-
         for i, linDark in enumerate(self.linDark):
-            basename = self.params['Output']['file']
+            print('Output name: ', self.params['Output']['file'])
+            temp_outdir, basename = os.path.split(self.params['Output']['file'])
 
             # Get the segment number of the file if present
             seg_location = linDark.find('_seg')
             if seg_location != -1:
                 seg_str = linDark[seg_location+4:seg_location+7]
+                print('first segment string: ', seg_str)
             else:
                 try:
                     seg_location = seed_dict[linDark][0].find('_seg')
@@ -1139,20 +1138,19 @@ class Observation():
                     seg_str = seed_dict[linDark][0][seg_location+4:seg_location+7]
                 else:
                     seg_str = ''
+                print('second segment string: ', seg_str)
 
             if seg_str != '':
                 # Assume standard JWST filename format
                 try:
+                    print("Creating output file name with segment number.")
                     parts = basename.split('_')
                     basename = '{}_{}_{}-seg{}_{}_{}'.format(parts[0], parts[1], parts[2], seg_str,
                                                              parts[3], parts[4])
                 except IndexError:
                     # Non-standard filename format
                     basename = basename.replace('.fits', '-seg{}.fits'.format(seg_str))
-            print('Basename is: {}'.format(basename))
-
-
-
+            basename = os.path.join(temp_outdir, basename)
 
             if i > 0:
                 self.linear_dark = self.read_dark_file(self.linDark[i])
@@ -2693,7 +2691,7 @@ class Observation():
         # nrc_tacq and nrc_coron are not currently implemented.
 
         exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
+                              "wfss": "NRC_WFSS", "ts_grism": "NRC_TSGRISM"},
                    "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
                               "wfss": "NIS_WFSS"},
                    "fgs": {"imaging": "FGS_IMAGE"}}

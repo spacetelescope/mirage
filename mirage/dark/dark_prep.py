@@ -809,7 +809,7 @@ class DarkPrep():
                     print(random_indices)
                     print(type(random_indices))
                     print(type(random_indices[0]))
-                    stop
+                    raise ValueError("Error in random choice.")
             else:
                 use_all_files = True
                 files_to_use = dark_list
@@ -1008,6 +1008,11 @@ class DarkPrep():
                    "This can be used as input to the observation"
                    "generator.".format(objname)))
             self.dark_files.append(objname)
+
+        # If only one dark current file is needed, return just the file
+        # name rather than a list.
+        if len(self.dark_files) == 1:
+            self.dark_files = self.dark_files[0]
 
         # important variables
         # self.linDark

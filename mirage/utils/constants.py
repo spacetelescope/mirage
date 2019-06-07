@@ -24,9 +24,10 @@ FNU_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.Hz
 FNU_MKS_UNITS = u.watt / u.m**2 / u.Hz
 
 CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
-                        'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
+                        'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack',
+                        'tso_imaging_catalog', 'tso_grism_catalog']
 
-TSO_MODES = ['ts_imaging', 'ts_wfss']
+TSO_MODES = ['ts_imaging', 'ts_grism']
 
 # Upper limit to the size of a seed image or dark current array. Arrays
 # containing more pixels than this limit will be split into segment files.
