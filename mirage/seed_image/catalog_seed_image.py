@@ -2133,9 +2133,21 @@ class Catalog_seed():
 
         Returns
         -------
-        psf : numpy.ndarray
+        full_psf : numpy.ndarray
             2D array containing the normalized PSF image. Total signal should
             be close to 1.0 (not exactly 1.0 due to asymmetries and distortion)
+            Array will be copped based on how much falls on or off the detector
+
+        k1 : int
+            Row number on the PSF/stamp image corresponding to the bottom-most
+            row that overlaps the detector/aperture
+
+        l1 : int
+            Column number on the PSF/stamp image corresponding to the left-most
+            column that overlaps the detector/aperture
+
+        add_wings : bool
+            Whether or not PSF wings are to be added to the PSF core
         """
         # PSF will always be centered
         psf_x_loc = psf_dim_x // 2
@@ -2286,6 +2298,12 @@ class Catalog_seed():
             into the final seed image. This stamp image can be either the
             PSF image itself, or the stamp image of the galaxy/extended
             source that the PSF is going to be convolved with.
+
+        stamp_x : float
+            Location in x of source within the stamp image
+
+        stamp_y : float
+            Location in y of source within the stamp image
 
         coord_sys : str
             Inidicates which coordinate system to return coordinates for.

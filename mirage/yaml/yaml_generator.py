@@ -1478,9 +1478,6 @@ class SimInput:
             f.write('  psf_wing_threshold_file: {}   # File defining PSF sizes versus magnitude\n'.format(input['psf_wing_threshold_file']))
             f.write('  add_psf_wings: {}  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n'.format(self.add_psf_wings))
             f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
-            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
-            f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
-                     'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac[instrument.lower()])))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
             f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
             f.write(('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies '

@@ -29,9 +29,14 @@ import numpy
 
 from mirage import imaging_simulator
 
-# os.environ['MIRAGE_DATA'] = ''
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
+# Determine if tests are being run on Travis
+ON_TRAVIS =  'travis' in os.path.expanduser('~')
+
+
+@pytest.mark.skipif(ON_TRAVIS,
+                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
 def test_niriss_imaging():
     nis = imaging_simulator.ImgSim(offline=True)
     nis.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_test.yaml')

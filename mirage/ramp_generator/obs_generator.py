@@ -1845,16 +1845,28 @@ class Observation():
 
     def get_cr_rate(self):
         """Get the base cosmic ray impact probability.
-        These numbers are from Kevin's original script. Not sure where
-        they come from or their units
+        
+        The following values are based on JWST-STScI-001928, "A library of simulated cosmic ray events impacting 
+        JWST HgCdTe detectors by Massimo Robberto", Table 1, times the pixel area of 18 microns square = 3.24e-06
+        square cm.  Values are in nucleon events per pixel per second.  Corresponding values from the report are
+        4.8983 nucleons/cm^2/second, 1.7783 nucleons/cm^2/second, and 3046.83 nucleons/cm^2/second.  The expected 
+        rates per full frame read (10.73677 seconds) over the whole set of 2048x2048 pixels are 715, 259, and 
+        444609 events respectively.
+        
+        Note that the SUNMIN rate is lower than the SUNMAX rate.  The MIN and MAX labels refer to the solar activity, 
+        and the galactic cosmic ray contribution at L2 is reduced at solar maximum compared to solar minimum.  The
+        FLARE case is for the largest solar flare event on record (see the Robberto report) and corresponds to conditions 
+        under which JWST would presumably not be operating. 
         """
         self.crrate = 0.
-        if "SUNMAX" in self.params["cosmicRay"]["library"]:
-            self.crrate = 1.6955e-04
+        # The previous values were per full frame read and there was a transcription issue in Volk's code.  These
+        # have been corrected.  Values are cosmic ray "hit" rates per pixel per second.
         if "SUNMIN" in self.params["cosmicRay"]["library"]:
-            self.crrate = 6.153e-05
+            self.crrate = 1.587e-05
+        if "SUNMAX" in self.params["cosmicRay"]["library"]:
+            self.crrate = 5.762e-06
         if "FLARES" in self.params["cosmicRay"]["library"]:
-            self.crrate = 0.10546
+            self.crrate = 0.0098729
 
         if self.crrate > 0.:
             print("Base cosmic ray probability per pixel per second: {}".format(self.crrate))
