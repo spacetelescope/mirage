@@ -1356,8 +1356,8 @@ class SimInput:
             f.write('cosmicRay:\n')
             cosmic_ray_path = os.path.join(self.datadir, instrument.lower(), 'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
-            f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
-            f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
+            f.write('  library: SUNMAX    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
+            f.write('  scale: 1.0     # Cosmic ray scaling factor\n')
             # temporary tweak here to make it work with NIRISS
             detector_label = input['detector']
 
