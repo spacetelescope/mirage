@@ -2034,14 +2034,6 @@ class Catalog_seed():
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
 
-        # The following fixes a format issue; it is not clear why the signa
-        # can have spaces around it in view of the above format string, but
-        # that is what happens.
-        alpha2 = alpha2.replace("0+0",'+')
-        delta2 = delta2.replace("0+0",'+')
-        alpha2 = alpha2.replace("0-0",'-')
-        delta2 = delta2.replace("0-0",'-')
-
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):

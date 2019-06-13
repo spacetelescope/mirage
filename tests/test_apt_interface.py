@@ -22,16 +22,6 @@ import numpy as np
 
 from mirage.yaml import generate_observationlist, yaml_generator
 from mirage.apt.read_apt_xml import ReadAPTXML
-# for debugging
-from mirage.apt import read_apt_xml, apt_inputs
-from mirage.utils import siaf_interface
-import importlib
-importlib.reload( yaml_generator )
-importlib.reload( generate_observationlist )
-importlib.reload( read_apt_xml )
-importlib.reload( apt_inputs )
-importlib.reload( siaf_interface )
-from mirage.yaml import generate_observationlist, yaml_generator
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
