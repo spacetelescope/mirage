@@ -2565,6 +2565,7 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
+
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
