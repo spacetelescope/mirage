@@ -1,7 +1,6 @@
 #! /usr/bin/env python
-
-import io
 import glob
+import io
 import os
 import yaml
 
@@ -25,18 +24,16 @@ parameter_defaults = {'PAV3': 275., 'DATE': '2020-09-20'}
 
 observation_file = os.path.join(output_directory, '793_observation_list.yaml')
 
-if 1:
-    generate_observationlist.get_observation_dict(xml_name, observation_file, catalogs=catalogues)
-    yam = yaml_generator.SimInput(input_xml=xml_name, pointing_file=pointing_name,
-                                  catalogs=catalogues, observation_list_file=observation_file,
-                                  verbose=True, output_dir=output_directory, simdata_output_dir=simdata_output_directory,
-                                  use_JWST_pipeline=True, offline=False, parameter_defaults=parameter_defaults)
+generate_observationlist.get_observation_dict(xml_name, observation_file, catalogs=catalogues)
+yam = yaml_generator.SimInput(input_xml=xml_name, pointing_file=pointing_name,
+                              catalogs=catalogues, observation_list_file=observation_file,
+                              verbose=True, output_dir=output_directory, simdata_output_dir=simdata_output_directory,
+                              use_JWST_pipeline=True, offline=False, parameter_defaults=parameter_defaults)
 
-    datatype = 'linear, raw'
-    yam.datatype = datatype
-    yam.create_inputs()
+datatype = 'linear, raw'
+yam.datatype = datatype
+yam.create_inputs()
 
-    #1/0
 
 yaml_files = glob.glob(os.path.join(output_directory, 'jw*.yaml'))
 
@@ -53,5 +50,4 @@ for file in yaml_files:
     t1 = imaging_simulator.ImgSim()
     t1.paramfile = str(modified_file)
     t1.create()
-    #1/0
 

@@ -40,9 +40,6 @@ OTECommissioning/*
 dev_scripts/*
 *config.json
 mirage.egg-info
-mirage_help.txt
-2018-12-04-Teamlet-mirage.pptx
-thatte_tests
 
 # Docs build #
 docs/_build
