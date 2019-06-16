@@ -52,7 +52,7 @@ def load_ote_from_deployment_yaml(deployments_file, out_dir, save=True):
 
     # Open existing file with previous deployments
     with open(deployments_file) as f:
-        deployment_errors = yaml.load(f)
+        deployment_errors = yaml.unsafe_load(f)
 
     # Create OTE object and list of segment tilts
     ote, segment_tilts = apply_deployment_errors(

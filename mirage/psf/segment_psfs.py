@@ -85,6 +85,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     elif not isinstance(detectors, list):
         raise TypeError('Please define detectors as a string or list, not {}'.format(type(detectors)))
 
+
     # Create PSF grids for all segments, detectors, and filters
     for i in range(18):
         start_time = time.time()
@@ -93,12 +94,15 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         print('GENERATING SEGMENT {} DATA'.format(segname))
         print('------------------------------')
 
+        det_filt_match = False
         for det in sorted(detectors):
             for filt in list(filters):
                 # Make sure the detectors and filters match
                 if (det in lib.nrca_short_detectors and filt not in lib.nrca_short_filters) \
                         or (det in lib.nrca_long_detectors and filt not in lib.nrca_long_filters):
                     continue
+
+                det_filt_match = True
 
                 # Define the filter and detector
                 nc.filter = filt
@@ -132,6 +136,11 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 hdu = fits.HDUList(primaryhdu)
                 hdu.writeto(filepath, overwrite=overwrite)
                 print('Saved gridded library file to {}'.format(filepath))
+
+        if det_filt_match == False:
+            raise ValueError('No matching filters and detectors given - all '
+                             'filters are longwave but detectors are shortwave, '
+                             'or vice versa.')
 
         print('\nElapsed time:', time.time() - start_time, '\n')
 
