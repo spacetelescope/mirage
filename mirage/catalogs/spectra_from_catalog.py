@@ -325,7 +325,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         attached. If no units are supplied, Mirage assumes wavelengths
         in microns and flux densities in Flambda units.
 
-    input_specctra_file : str
+    input_spectra_file : str
         Name of an hdf5 file containing spectra for some/all targets
 
     extrapolate_SED : bool

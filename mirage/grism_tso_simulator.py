@@ -73,8 +73,54 @@ from mirage.yaml import yaml_update
 class GrismTSO():
     def __init__(self, parameter_file, SED_file=None, SED_normalizing_catalog_column=None,
                  final_SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
-                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"],
-                 create_continuum_seds=True):
+                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"]):
+                 #create_continuum_seds=True):
+        """
+        Parameters
+        ----------
+        parameter_file : str
+            Name of input yaml file
+
+        SED_file : str
+            Name of hdf5 file containing spectra of some or all sources in
+            the simulated data
+
+        SED_normalizing_catalog_column : str
+            Name of the column in the ascii source catalogs to use when
+            normalizing input spectra in the ``SED_file`` IF some or all
+            of the spectra in that file contain normalized fluxes
+
+        final_SED_file : str
+            Name of hdf5 file produced by Mirage that contains spectra for
+            all simulated sources. In the case where some sources have only
+            broadband magnitudes but no entries in the ``SED_file``, Mirage
+            will interpolate/extrapolate to create continuum spectra and add
+            these to the spectra in the ``SED_file``
+
+        save_dispersed_seed : bool
+            Save the dispersed seed image to a fits file
+
+        source_stamps_file : str
+
+        extrapolate_SED : bool
+            Allow the disperser software to extrapolate when creating
+            continuum spectra from source catalog magnitudes. This is
+            done if the wavelength range covered by the filter magnitudes
+            does not cover the entire wavelength range of the grism+filter
+
+        override_dark : str
+            Name of file containing a Mirage dark current object appropriate
+            for the simulation. If provided, the ``dark_prep`` step will be
+            skipped. If ``None``, then a new dark current object will be
+            constructed
+
+        disp_seed_filename : str
+            Name of the file to save the dispsersed seed image into
+
+        orders : list
+            List of spectral orders to create during dispersion. Default
+            for NIRCam is ["+1", "+2"]
+        """
 
         # Use the MIRAGE_DATA environment variable
         env_var = 'MIRAGE_DATA'
@@ -294,13 +340,13 @@ class GrismTSO():
 
                     previous_frame = np.zeros(self.seed_dimensions)
                     for frame in np.arange(grp_dim):
-                        print('TOTAL FRAME COUNTER: ', total_frame_counter)
-                        print('integ and frame: ', integ, frame)
+                        #print('TOTAL FRAME COUNTER: ', total_frame_counter)
+                        #print('integ and frame: ', integ, frame)
                         # If a frame is from the part of the lightcurve
                         # with no transit, then the signal in the frame
                         # comes from no_transit_signal
                         if total_frame_counter in unaltered_frames:
-                            print("{} is unaltered.".format(total_frame_counter))
+                            #print("{} is unaltered.".format(total_frame_counter))
                             frame_only_signal = (background_dispersed.final + no_transit_signal) * self.frametime
                         # If the frame is from a part of the lightcurve
                         # where the transit is happening, then call the
@@ -324,7 +370,7 @@ class GrismTSO():
                     # total_frame_counter by the number of resets between
                     # integrations
                     total_frame_counter += self.numresets
-                    print('RESET FRAME! ', total_frame_counter)
+                    #print('RESET FRAME! ', total_frame_counter)
 
                 # At the end of the segment/part, save the segment_seed
                 # to a fits file.
@@ -580,11 +626,11 @@ class GrismTSO():
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
         if create_continuum_seds:
-            self.SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
-                                                                  input_spectra_file=self.SED_file,
-                                                                  extrapolate_SED=self.extrapolate_SED,
-                                                                  output_filename=self.final_SED_file,
-                                                                  normalizing_mag_column=self.SED_normalizing_catalog_column)
+            self.final_SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
+                                                                        input_spectra_file=self.SED_file,
+                                                                        extrapolate_SED=self.extrapolate_SED,
+                                                                        output_filename=self.final_SED_file,
+                                                                        normalizing_mag_column=self.SED_normalizing_catalog_column)
 
         # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
@@ -602,17 +648,12 @@ class GrismTSO():
             print('Background file is {}'.format(background_file))
         orders = self.orders
 
-
-        print(direct_file, self.crossing_filter, dmode, loc, self.instrument)
-        print(self.extrapolate_SED, self.SED_file, self.source_stamps_file)
-
-
         # Create dispersed seed image from the direct images
         disp_seed = Grism_seed([direct_file], self.crossing_filter,
                                dmode, config_path=loc, instrument=self.instrument.upper(),
-                               extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
+                               extrapolate_SED=self.extrapolate_SED, SED_file=self.final_SED_file,
                                SBE_save=self.source_stamps_file)
-        disp_seed.observation()#orders=orders)
+        disp_seed.observation()
         for order in orders:
             disp_seed.this_one[order].disperse_all(cache=True)
 
