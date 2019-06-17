@@ -1017,9 +1017,6 @@ class Observation():
         # Calculate the rate of cosmic ray hits expected per frame
         self.get_cr_rate()
 
-        # Multiply by the frametime to get probability per pixel per frame
-        self.crrate = self.crrate * self.frametime
-
         # Read in saturation file
         if self.params['Reffiles']['saturation'] is not None:
             self.read_saturation_file()
