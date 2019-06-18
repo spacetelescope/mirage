@@ -107,6 +107,13 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
         wfe_type = 'requirements'
     realization = header['OPDSLICE']
 
+    # make the check below pass for FGS
+    if instrument.lower() == 'fgs':
+        pupil = 'N/A'
+        pupilname = 'N/A'
+        filt = 'N/A'
+        filtername = 'N/A'
+
     if inst.lower() == instrument.lower() and det.lower() == detector.lower() and \
        filt.lower() == filtername.lower() and pupil.lower() == pupilname.lower() and \
        wfe_type == wavefront_error_type.lower() and realization == wavefront_error_group:
@@ -154,7 +161,13 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # confirm the properties of the file via the header. This way we don't
     # need to open and examine every file in the gridded library, which
     # saves at least a handful of seconds.
-    default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
+    if instrument.lower() == 'fgs':
+        default_file_pattern = '{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
+                                                                                        detector.lower(),
+                                                                                        wavefront_error.lower(),
+                                                                                        wavefront_error_group)
+    else:
+        default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
                                                                                         detector.lower(),
                                                                                         filtername.lower(),
                                                                                         pupilname.lower(),

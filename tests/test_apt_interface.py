@@ -22,16 +22,6 @@ import numpy as np
 
 from mirage.yaml import generate_observationlist, yaml_generator
 from mirage.apt.read_apt_xml import ReadAPTXML
-# for debugging
-# from mirage.apt import read_apt_xml, apt_inputs
-# from mirage.utils import siaf_interface
-# import importlib
-# importlib.reload( yaml_generator )
-# importlib.reload( generate_observationlist )
-# importlib.reload( read_apt_xml )
-# importlib.reload( apt_inputs )
-# importlib.reload( siaf_interface )
-# from mirage.yaml import generate_observationlist, yaml_generator
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
@@ -96,15 +86,11 @@ def test_complete_input_generation():
     for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
-            apt_file_seeds = ['1087_minimal', '1088', '1087', 'm31_field_test_observation']
-            # apt_file_seeds = ['1087']
-            # apt_file_seeds = ['1087_minimal']
+            apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
+            # apt_file_seeds = ['com1093']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
-            # apt_file_seeds = ['NIRCamTest']
-            # apt_file_seeds = ['1069']
-            # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
@@ -161,7 +147,6 @@ def test_complete_input_generation():
                                           catalogs=catalogs, observation_list_file=observation_list_file,
                                           verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
                                           offline=True)
-
             try:
                 yam.create_inputs()
             except RuntimeError as e:

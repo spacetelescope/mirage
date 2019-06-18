@@ -2611,7 +2611,8 @@ class Catalog_seed():
                                                         filter_name)
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
-            specific_mag_col = "fgs_magnitude"
+            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
+            filter_name = 'none'
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
@@ -2654,6 +2655,7 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
+
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
