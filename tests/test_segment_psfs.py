@@ -58,10 +58,11 @@ def test_directory(test_dir=TEMP_TEST_DIRECTORY):
     test_dir : str
         Path to directory used for testing
     """
+    # Create directory and yield its name
     ensure_dir_exists(test_dir)  # creates directory with default mode=511
     yield test_dir
 
-    print("teardown test directory")
+    # Remove directory
     if os.path.isdir(test_dir):
         shutil.rmtree(test_dir)
 
@@ -75,6 +76,7 @@ def test_library_file(test_directory):
     test_lib_filename : str
         Path to test library used for testing
     """
+    # Download file and yield its name
     test_lib_filename = os.path.join(test_directory, 'test_library',
                                      'nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg12.fits')
     ensure_dir_exists(os.path.dirname(test_lib_filename))
@@ -82,9 +84,6 @@ def test_library_file(test_directory):
     with fits.open(url) as hdulist:
         hdulist.writeto(test_lib_filename)
         yield test_lib_filename
-
-    if os.path.isfile(test_lib_filename):
-        os.remove(test_lib_filename)
 
 
 def test_generate_segment_psfs(test_directory):

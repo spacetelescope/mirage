@@ -42,10 +42,11 @@ def test_directory(test_dir=TEMP_TEST_DIRECTORY):
     test_dir : str
         Path to directory used for testing
     """
+    # Create directory and yield its name
     ensure_dir_exists(test_dir)  # creates directory with default mode=511
     yield test_dir
 
-    print("teardown test directory")
+    # Remove directory
     if os.path.isdir(test_dir):
         shutil.rmtree(test_dir)
 
