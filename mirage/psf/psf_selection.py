@@ -220,7 +220,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
         Path pointing to the location of the PSF library
 
     wings : bool, optional
-        ?
+        Must the library file contain PSF wings or PSF cores? Default is False.
 
     segment_id : int or None, optional
         If specified, returns a segment PSF library file and denotes the ID
