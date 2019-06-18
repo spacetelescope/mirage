@@ -243,68 +243,70 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     wfe = wfe.lower()
 
     for filename in psf_files:
-        # Open the file header
-        header = fits.getheader(filename)
-
-        # Determine if it is an ITM file
-        itm_sim = header.get('ORIGIN', '') == 'ITM'
-
-        # Compare the header entries to the user input
-        file_inst = header['INSTRUME'].upper()
-        file_det = header['DETECTOR'].upper()
-        file_filt = header['FILTER'].upper()
-
         try:
-            file_pupil = header['PUPIL_MASK'].upper()
+            header = fits.getheader(filename)
+
+            # Determine if it is an ITM file
+            itm_sim = header.get('ORIGIN', '') == 'ITM'
+
+            # Compare the header entries to the user input
+            file_inst = header['INSTRUME'].upper()
+            file_det = header['DETECTOR'].upper()
+            file_filt = header['FILTER'].upper()
+
+            try:
+                file_pupil = header['PUPIL_MASK'].upper()
+            except KeyError:
+                # If no pupil mask value is present, then assume the CLEAR is
+                # being used
+                if file_inst.upper() == 'NIRCAM':
+                    file_pupil = 'CLEAR'
+                elif file_inst.upper() == 'NIRISS':
+                    file_pupil = 'CLEARP'
+
+            # NIRISS has many filters in the pupil wheel. WebbPSF does
+            # not make a distinction, but Mirage does. Adjust the info
+            # to match Mirage's expectations
+            if file_inst.upper() == 'NIRISS' and file_filt in NIRISS_PUPIL_WHEEL_FILTERS:
+                save_filt = copy(file_filt)
+                if file_pupil == 'CLEARP':
+                    file_filt = 'CLEAR'
+                else:
+                    raise ValueError(('Pupil value is something other than '
+                                      'CLEARP, but the filter being used is '
+                                      'in the pupil wheel.'))
+                file_pupil = save_filt
+
+            if segment_id is None and not itm_sim:
+                opd = header['OPD_FILE']
+                if 'requirements' in opd:
+                    file_wfe = 'requirements'
+                elif 'predicted' in opd:
+                    file_wfe = 'predicted'
+
+                file_wfe_grp = header['OPDSLICE']
+
+            if segment_id is not None:
+                segment_id = int(segment_id)
+                file_segment_id = int(header['SEGID'])
+
+            # Evaluate if the file matches the given parameters
+            match = (file_inst == instrument
+                     and file_det == detector
+                     and file_filt == filt
+                     and file_pupil == pupil)
+            if not wings and segment_id is None and not itm_sim:
+                match = match and file_wfe_grp == wfe_group
+            if segment_id is not None:
+                match = match and file_segment_id == segment_id
+            elif not itm_sim:
+                match = match and file_wfe == wfe
+
+            # If so, add to the list of all matches
+            if match:
+                matches.append(filename)
         except KeyError:
-            # If no pupil mask value is present, then assume the CLEAR is
-            # being used
-            if file_inst.upper() == 'NIRCAM':
-                file_pupil = 'CLEAR'
-            elif file_inst.upper() == 'NIRISS':
-                file_pupil = 'CLEARP'
-
-        # NIRISS has many filters in the pupil wheel. WebbPSF does
-        # not make a distinction, but Mirage does. Adjust the info
-        # to match Mirage's expectations
-        if file_inst.upper() == 'NIRISS' and file_filt in NIRISS_PUPIL_WHEEL_FILTERS:
-            save_filt = copy(file_filt)
-            if file_pupil == 'CLEARP':
-                file_filt = 'CLEAR'
-            else:
-                raise ValueError(('Pupil value is something other than '
-                                  'CLEARP, but the filter being used is '
-                                  'in the pupil wheel.'))
-            file_pupil = save_filt
-
-        if segment_id is None and not itm_sim:
-            opd = header['OPD_FILE']
-            if 'requirements' in opd:
-                file_wfe = 'requirements'
-            elif 'predicted' in opd:
-                file_wfe = 'predicted'
-
-            file_wfe_grp = header['OPDSLICE']
-
-        if segment_id is not None:
-            segment_id = int(segment_id)
-            file_segment_id = int(header['SEGID'])
-
-        # Evaluate if the file matches the given parameters
-        match = (file_inst == instrument
-                 and file_det == detector
-                 and file_filt == filt
-                 and file_pupil == pupil)
-        if not wings and segment_id is None and not itm_sim:
-            match = match and file_wfe_grp == wfe_group
-        if segment_id is not None:
-            match = match and file_segment_id == segment_id
-        elif not itm_sim:
-            match = match and file_wfe == wfe
-
-        # If so, add to the list of all matches
-        if match:
-            matches.append(filename)
+            continue
 
     # Find files matching the requested inputs
     if len(matches) == 1:

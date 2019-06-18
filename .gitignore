@@ -29,6 +29,7 @@ mirages.egg-info/*
 #########
 .ipynb_checkpoints/*
 examples/.ipynb_checkpoints/*
+htmlcov/*
 *.aptbackup
 *.aptx
 *.docx
