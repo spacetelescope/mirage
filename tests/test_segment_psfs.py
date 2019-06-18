@@ -30,8 +30,6 @@ from mirage.utils.utils import ensure_dir_exists
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 TEMP_TEST_DIRECTORY = os.path.join(__location__, 'temp_data', 'test_segment_psfs')
 TEST_DATA_DIR = os.path.expandvars("$MIRAGE_DATA/test_data/test_segment_psfs")
-TEST_LIBRARY = os.path.join(__location__, 'test_data', 'segment_psfs',
-                            'nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg12.fits')
 
 # Load parametrized data
 PARAMETRIZED_DATA = parametrized_data()['test_segment_psfs']
@@ -66,6 +64,27 @@ def test_directory(test_dir=TEMP_TEST_DIRECTORY):
     print("teardown test directory")
     if os.path.isdir(test_dir):
         shutil.rmtree(test_dir)
+
+
+@pytest.fixture(scope="module")
+def test_library_file(test_directory):
+    """Download and save locally a segment PSF library file from Box for testing
+
+    Yields
+    -------
+    test_lib_filename : str
+        Path to test library used for testing
+    """
+    test_lib_filename = os.path.join(test_directory, 'test_library',
+                                     'nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg12.fits')
+    ensure_dir_exists(os.path.dirname(test_lib_filename))
+    url = "https://stsci.box.com/shared/static/4c0em1yhb1qsvrpku7j0jw1tztucvkih.fits"
+    with fits.open(url) as hdulist:
+        hdulist.writeto(test_lib_filename)
+        yield test_lib_filename
+
+    if os.path.isfile(test_lib_filename):
+        os.remove(test_lib_filename)
 
 
 def test_generate_segment_psfs(test_directory):
@@ -161,7 +180,7 @@ for i, tuple_string in enumerate(test_data):
 @pytest.mark.skipif(ON_TRAVIS,
                    reason="Cannot access mirage data in the central storage directory from Travis CI.")
 def test_get_segment_offset_remote(segment_number, correct_offset):
-    """Test the extraction of segment offsets from segment PSF libraries on the 
+    """Test the extraction of segment offsets from segment PSF libraries on the
     central storage directory.
 
     Parameters
@@ -199,12 +218,12 @@ def test_get_segment_offset_local_created(test_directory):
     assert type(y_arcsec) == np.float64, 'Incorrect conversion of segment offsets'
 
 
-def test_get_segment_offset_local_stored():
+def test_get_segment_offset_local_stored(test_library_file):
     """Test the extraction of segment offsets from a single segment PSF library
-    in the test_data directory.
+    in the temp_data directory.
     """
     # Get test library file
-    test_library_dir = os.path.dirname(TEST_LIBRARY)
+    test_library_dir = os.path.dirname(test_library_file)
     seg_id = 12
     segment_file = get_library_file(
         INSTRUMENT, DETECTOR, FILTER, 'CLEAR', '', 0, test_library_dir,
@@ -282,14 +301,14 @@ def test_get_gridded_segment_psf_library_list_local():
             'Segment PSF library not created correctly'
 
 
-def test_to_gridded_psfmodel():
+def test_to_gridded_psfmodel(test_library_file):
     """Test that the example library file can be correctly loaded as a
     GriddedPSFModel using the webbpsf.utils.to_griddedpsfmodel function.
 
     Note that this is more a test of webbpsf than of MIRaGe, but it is
     required for MIRaGe to work!
     """
-    with fits.open(TEST_LIBRARY) as hdulist:
+    with fits.open(test_library_file) as hdulist:
         lib_model = to_griddedpsfmodel(hdulist)
 
     assert isinstance(lib_model, photutils.psf.models.GriddedPSFModel), \
