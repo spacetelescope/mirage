@@ -105,8 +105,8 @@ def test_generate_segment_psfs(test_directory):
     # Ensure the OPD yaml and fits files were saved
     yaml_search_path = os.path.join(test_directory, 'deployment_errors*.yaml')
     opd_search_path = os.path.join(test_directory, 'OPD*.fits')
-    assert len(glob.glob(yaml_search_path)) > 0, 'Failed to generate randomly deployed OTE'
-    assert len(glob.glob(opd_search_path)) > 0, 'Failed to generate randomly deployed OTE'
+    assert len(glob.glob(yaml_search_path)) >= 2, 'Failed to generate randomly deployed OTE'
+    assert len(glob.glob(opd_search_path)) >= 2, 'Failed to generate randomly deployed OTE'
 
     # Ensure it doesn't work with mismatched filter & detector
     with pytest.raises(ValueError) as e:
