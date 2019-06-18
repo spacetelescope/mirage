@@ -29,7 +29,15 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
+    # Install MIRaGe dependencies
     - conda env update -f=environment.yml
+    # Install development versions of webbpsf and poppy
+    - conda uninstall poppy
+    - git clone git@github.com:spacetelescope/webbpsf.git
+    - pip install -e webbpsf/
+    - git clone git@github.com:spacetelescope/poppy.git
+    - pip install -e poppy/
+    # Install MIRaGe package
     - pip install -e .
 
 script:
