@@ -29,6 +29,8 @@ before_install:
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
 install:
+    # Remove WebbPSF conda install
+    - sed '/webbpsf/d' environment.yml
     # Install MIRaGe dependencies
     - conda env update -f=environment.yml
     # Install development versions of webbpsf and poppy

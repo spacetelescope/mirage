@@ -18,6 +18,10 @@ from mirage.yaml.yaml_generator import SimInput
 # Define directory and file locations
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
+# Reset the MIRAGE_DATA env variable to be a real location so yaml_generator
+# doesn't croak
+os.environ["MIRAGE_DATA"] = __location__
+
 
 def test_get_psf_path():
     """Test that the get_psf_path method of the yaml_generator.SimInput class
