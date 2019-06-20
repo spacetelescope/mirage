@@ -973,10 +973,6 @@ class Catalog_seed():
             total_frames += (numresets * (numints - 1))
 
         frameexptimes = self.frametime * np.arange(-1, total_frames)
-        print('frames_per_group: ', frames_per_group)
-        print('one int, total_frames: ', frames_per_integration)
-        print('all ints, total_frames is: ', total_frames)
-        print('frameexptimes is: ', frameexptimes)
 
         # output image dimensions
         dims = self.nominal_dims
@@ -1067,11 +1063,9 @@ class Catalog_seed():
             if input_type == 'pointSource':
                 stamp = eval_psf
                 stamp *= rate
-                print('Point source size: ', stamp.shape)
 
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
-                print('Extended source size: ', stamp.shape)
                 print('Extended source rotations turned off while evaluating rotate bug')
                 #stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
 
@@ -2390,7 +2384,7 @@ class Catalog_seed():
 
         i1 = aperture_x - stamp_x
         j1 = aperture_y - stamp_y
-        if ((i1 > (aperture_x_dim+1)) or (j1 > (aperture_y_dim+1))):
+        if ((i1 > (aperture_x_dim+1)) or (j1 > (aperture_y_dim+1))) and not ignore_detector:
             # In this case the stamp does not overlap the aperture at all
             return tuple([None]*8)
         delta_i1 = 0
@@ -2407,7 +2401,7 @@ class Catalog_seed():
         i2 = i1 + (stamp_x_dim + delta_i1)
         j2 = j1 + (stamp_y_dim + delta_j1)
 
-        if ((i2 < 0) or (j2 < 0)):
+        if ((i2 < 0) or (j2 < 0)) and not ignore_detector:
             # Stamp does not overlap the aperture at all
             return tuple([None]*8)
 
