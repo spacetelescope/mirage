@@ -144,7 +144,7 @@ class GrismTSO():
         self.override_dark = override_dark
         self.disp_seed_filename = disp_seed_filename
         self.orders = orders
-        self.create_continuum_seds = create_continuum_seds
+        #self.create_continuum_seds = create_continuum_seds
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
 
         # Make sure the right combination of parameter files and SED file
