@@ -242,6 +242,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
     pupil = pupil.upper()
     wfe = wfe.lower()
 
+    # handle the NIRISS NRM case
+    if pupil == 'NRM':
+        pupil = 'MASK_NRM'
+
     for filename in psf_files:
         header = fits.getheader(filename)
         file_inst = header['INSTRUME'].upper()
@@ -259,7 +263,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
             if file_inst.upper() == 'NIRCAM':
                 file_pupil = 'CLEAR'
             elif file_inst.upper() == 'NIRISS':
-                file_pupil = 'CLEARP'
+                try:
+                    file_pupil = header['PUPIL'].upper()  # can be 'MASK_NRM'
+                except KeyError:
+                    file_pupil = 'CLEARP'
 
         # NIRISS has many filters in the pupil wheel. Webbpsf does
         # not make a distinction, but Mirage does. Adjust the info
