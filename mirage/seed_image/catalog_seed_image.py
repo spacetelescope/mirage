@@ -177,7 +177,7 @@ class Catalog_seed():
 
                 print('\nOutputs:')
                 print(split_seed, group_segment_indexes, integration_segment_indexes)
-                print(self.total_seed_segments)
+                #print(self.total_seed_segments)
                 print(split_seed_g, group_segment_indexes_g, self.file_segment_indexes)
                 print('')
             else:

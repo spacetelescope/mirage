@@ -118,7 +118,7 @@ setup(
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
         'matplotlib>=1.4.3',
-        'numpy<=1.15',
+        'numpy>=1.15',
         'photutils>=0.4.0',
         'pysiaf>=0.1.11'
         'scipy>=0.17',
