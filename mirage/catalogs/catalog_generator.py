@@ -127,8 +127,8 @@ class PointSourceCatalog():
         if instrument == '' or filter_name == '':
             header = 'magnitude'
         else:
-            if 'guider' in instrument.lower():
-                header = '{}_magnitude'.format(instrument)
+            if instrument.lower() in ['fgs1', 'fgs2']:
+                header = '{}_magnitude'.format(instrument.lower())
             else:
                 header = '{}_{}_magnitude'.format(instrument, filter_name)
 

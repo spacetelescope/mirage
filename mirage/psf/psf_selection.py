@@ -107,6 +107,13 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
         wfe_type = 'requirements'
     realization = header['OPDSLICE']
 
+    # make the check below pass for FGS
+    if instrument.lower() == 'fgs':
+        pupil = 'N/A'
+        pupilname = 'N/A'
+        filt = 'N/A'
+        filtername = 'N/A'
+
     if inst.lower() == instrument.lower() and det.lower() == detector.lower() and \
        filt.lower() == filtername.lower() and pupil.lower() == pupilname.lower() and \
        wfe_type == wavefront_error_type.lower() and realization == wavefront_error_group:
@@ -154,7 +161,13 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # confirm the properties of the file via the header. This way we don't
     # need to open and examine every file in the gridded library, which
     # saves at least a handful of seconds.
-    default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
+    if instrument.lower() == 'fgs':
+        default_file_pattern = '{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
+                                                                                        detector.lower(),
+                                                                                        wavefront_error.lower(),
+                                                                                        wavefront_error_group)
+    else:
+        default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
                                                                                         detector.lower(),
                                                                                         filtername.lower(),
                                                                                         pupilname.lower(),
@@ -229,6 +242,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
     pupil = pupil.upper()
     wfe = wfe.lower()
 
+    # handle the NIRISS NRM case
+    if pupil == 'NRM':
+        pupil = 'MASK_NRM'
+
     for filename in psf_files:
         header = fits.getheader(filename)
         file_inst = header['INSTRUME'].upper()
@@ -246,7 +263,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
             if file_inst.upper() == 'NIRCAM':
                 file_pupil = 'CLEAR'
             elif file_inst.upper() == 'NIRISS':
-                file_pupil = 'CLEARP'
+                try:
+                    file_pupil = header['PUPIL'].upper()  # can be 'MASK_NRM'
+                except KeyError:
+                    file_pupil = 'CLEARP'
 
         # NIRISS has many filters in the pupil wheel. Webbpsf does
         # not make a distinction, but Mirage does. Adjust the info
@@ -268,6 +288,13 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
             file_wfe = 'predicted'
 
         file_wfe_grp = header['OPDSLICE']
+
+        # allow check below to pass for FGS
+        if instrument.lower() == 'fgs':
+            file_filt = 'N/A'
+            filt = 'N/A'
+            file_pupil = 'N/A'
+            pupil = 'N/A'
 
         if not wings:
             match = (file_inst == instrument and file_det == detector and file_filt == filt and

@@ -1156,7 +1156,7 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0004.asdf'))[0]
-                        self.lindark_list[instrument][det] = [None]
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
 
                     elif det == 'G2':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
@@ -1165,7 +1165,7 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0003.asdf'))[0]
-                        self.lindark_list[instrument][det] = [None]
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
 
                     elif det == 'NIS':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument],
@@ -1247,7 +1247,11 @@ class SimInput:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             # set the FilterWheel and PupilWheel for NIRISS
-            if input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
+            if input['APTTemplate'] in ['NirissAmi']:
+                filter_name = input['Filter']
+                input[filtkey] = filter_name
+                input[pupilkey] = 'NRM'
+            elif input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
                 filter_name = input['Filter']
                 if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
                     input[pupilkey] = filter_name
@@ -1356,8 +1360,8 @@ class SimInput:
             f.write('cosmicRay:\n')
             cosmic_ray_path = os.path.join(self.datadir, instrument.lower(), 'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
-            f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
-            f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
+            f.write('  library: SUNMAX    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
+            f.write('  scale: 1.0     # Cosmic ray scaling factor\n')
             # temporary tweak here to make it work with NIRISS
             detector_label = input['detector']
 
