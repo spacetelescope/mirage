@@ -30,7 +30,7 @@ def test_get_psf_path():
     # Make an instance of the SimInput class
     input_xml = os.path.join(__location__, 'test_data', 'NIRCam', '1144-OTE-10.xml')
     pointing_file = os.path.join(__location__, 'test_data', 'NIRCam', '1144-OTE-10.pointing')
-    yam = SimInput(input_xml, pointing_file)
+    yam = SimInput(input_xml, pointing_file, offline=True)
 
     # Fake the activity IDs and instrument
     n_activities = 101
