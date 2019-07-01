@@ -1164,7 +1164,7 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0004.asdf'))[0]
-                        self.lindark_list[instrument][det] = [None]
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
 
                     elif det == 'G2':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
@@ -1173,7 +1173,7 @@ class SimInput:
                         self.astrometric_list[instrument][det] = glob(
                             os.path.join(self.reference_file_dir[instrument],
                                          'distortion/*distortion_0003.asdf'))[0]
-                        self.lindark_list[instrument][det] = [None]
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
 
                     elif det == 'NIS':
                         self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument],
