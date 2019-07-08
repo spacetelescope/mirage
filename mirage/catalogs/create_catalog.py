@@ -21,7 +21,9 @@ from astroquery.irsa import Irsa
 from pysiaf.utils.projection import deproject_from_tangent_plane
 
 from mirage.apt.apt_inputs import get_filters
-from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, ExtendedCatalog
+from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, \
+    ExtendedCatalog, MovingPointSourceCatalog, MovingExtendedCatalog, \
+    MovingSersicCatalog
 from mirage.utils.utils import ensure_dir_exists
 
 
@@ -226,6 +228,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
         if point_source:
             for i, instrument in enumerate(instrument_filter_dict):
+                print('\n--- Creating {} point source catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
                                                         instrument=instrument, filters=filter_list,
@@ -246,8 +249,8 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
                 ensure_dir_exists(out_dir)
                 full_catalog_path = os.path.join(out_dir, ptsrc_catalog_name)
-                print('POINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
                 ptsrc_cat.save(full_catalog_path)
+                print('\nPOINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
                 ptsrc_catalog_names.append(full_catalog_path)
 
             ptsrc_catalog_list.append(ptsrc_cat)
@@ -256,14 +259,17 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
         if extragalactic:
             for i, instrument in enumerate(instrument_filter_dict):
+                print('\n--- Creating {} extragalactic catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
                                                       filter_list, boxflag=False, brightlimit=14.0,
                                                       seed=galaxy_seed)
+
                 if i == 0:
                     galaxy_cat = copy.deepcopy(tmp_cat)
                 else:
                     galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat)
+
 
             if save_catalogs:
                 gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -275,13 +281,14 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                     galaxy_catalog_mapping[str(value)] = gal_catalog_name
 
                 full_catalog_path = os.path.join(out_dir, gal_catalog_name)
-                print('GALAXY CATALOG SAVED: {}'.format(full_catalog_path))
                 galaxy_cat.save(full_catalog_path)
+                print('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
                 galaxy_catalog_names.append(full_catalog_path)
 
             galaxy_catalog_list.append(galaxy_cat)
         else:
             galaxy_cat = None
+
     return (ptsrc_catalog_list, galaxy_catalog_list, ptsrc_catalog_names, galaxy_catalog_names,
             ptsrc_catalog_mapping, galaxy_catalog_mapping)
 
@@ -1435,15 +1442,94 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
         combined[col].fill_value = magnitude_fill_value
     combined = combined.filled()
 
-    # --------------------Point Sources-------------------------------
-    if isinstance(cat1, PointSourceCatalog):
-        # Create new catalog object and populate
+    # NOTE that the order of this if/elif statement matters, as different
+    # catalog classes inherit from each other.
+
+    # --------------Moving Galaxies---------------------------------------
+    if isinstance(cat1, MovingSersicCatalog):
+        if cat1.velocity_units != cat2.velocity_units:
+            raise ValueError('Velocity unit mismatch in catalogs to combine.')
+        if cat1.radius_units != cat2.radius_units:
+            raise ValueError('Radius unit mismatch in catalogs to combine.')
+
         if cat1.location_units == 'position_RA_Dec':
-            new_cat = PointSourceCatalog(ra=combined['x_or_RA'].data,
-                                         dec=combined['y_or_Dec'].data)
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
+                                              dec=combined['y_or_Dec'].data,
+                                              ra_velocity=combined['ra_velocity'].data,
+                                              dec_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['pos_angle'].data,
+                                              radius_units=cat1.radius_units)
+            else:
+                new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
+                                              dec=combined['y_or_Dec'].data,
+                                              x_velocity=combined['ra_velocity'].data,
+                                              y_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['pos_angle'].data,
+                                              radius_units=cat1.radius_units)
         else:
-            new_cat = PointSourceCatalog(x=combined['x_or_RA'].data,
-                                         y=combined['y_or_Dec'].data)
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
+                                              y=combined['y_or_Dec'].data,
+                                              ra_velocity=combined['ra_velocity'].data,
+                                              dec_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['pos_angle'].data,
+                                              radius_units=cat1.radius_units)
+            else:
+                new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
+                                              y=combined['y_or_Dec'].data,
+                                              x_velocity=combined['ra_velocity'].data,
+                                              y_velocity=combined['dec_velocity'].data,
+                                              ellipticity=combined['ellipticity'].data,
+                                              radius=combined['radius'].data,
+                                              sersic_index=combined['sersic_index'].data,
+                                              position_angle=combined['pos_angle'].data,
+                                              radius_units=cat1.radius_units)
+
+    # --------------Moving Extended Sources-------------------------------
+    elif isinstance(cat1, MovingExtendedCatalog):
+        if cat1.velocity_units != cat2.velocity_units:
+            raise ValueError('Velocity unit mismatch in catalogs to combine.')
+
+        if cat1.location_units == 'position_RA_Dec':
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
+                                                dec=combined['y_or_Dec'].data,
+                                                ra_velocity=combined['ra_velocity'].data,
+                                                dec_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['pos_angle'].data)
+            else:
+                new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
+                                                dec=combined['y_or_Dec'].data,
+                                                x_velocity=combined['ra_velocity'].data,
+                                                y_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['pos_angle'].data)
+        else:
+            if cat1.velocity_units == 'velocity_RA_Dec':
+                new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
+                                                y=combined['y_or_Dec'].data,
+                                                ra_velocity=combined['ra_velocity'].data,
+                                                dec_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['pos_angle'].data)
+            else:
+                new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
+                                                y=combined['y_or_Dec'].data,
+                                                x_velocity=combined['ra_velocity'].data,
+                                                y_velocity=combined['dec_velocity'].data,
+                                                filenames=combined['filenames'].data,
+                                                position_angle=combined['pos_angle'].data)
 
     # --------------------Galaxies------------------------------------
     elif isinstance(cat1, GalaxyCatalog):
@@ -1456,7 +1542,7 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                     ellipticity=combined['ellipticity'].data,
                                     radius=combined['radius'].data,
                                     sersic_index=combined['sersic_index'].data,
-                                    position_angle=combined['position_angle'].data,
+                                    position_angle=combined['pos_angle'].data,
                                     radius_units=cat1.radius_units)
         else:
             new_cat = GalaxyCatalog(x=combined['x_or_RA'].data,
@@ -1464,7 +1550,7 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                     ellipticity=combined['ellipticity'].data,
                                     radius=combined['radius'].data,
                                     sersic_index=combined['sersic_index'].data,
-                                    position_angle=combined['position_angle'].data,
+                                    position_angle=combined['pos_angle'].data,
                                     radius_units=cat1.radius_units)
 
     # ------------------Extended Sources-------------------------------
@@ -1473,12 +1559,12 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
             new_cat = ExtendedCatalog(ra=combined['x_or_RA'].data,
                                       dec=combined['y_or_Dec'].data,
                                       filenames=combined['filenames'].data,
-                                      position_angle=combined['position_angle'].data)
+                                      position_angle=combined['pos_angle'].data)
         else:
             new_cat = ExtendedCatalog(x=combined['x_or_RA'].data,
                                       y=combined['y_or_Dec'].data,
                                       filenames=combined['filenames'].data,
-                                      position_angle=combined['position_angle'].data)
+                                      position_angle=combined['pos_angle'].data)
 
     # -------------Moving Point Sources--------------------------------
     elif isinstance(cat1, MovingPointSourceCatalog):
@@ -1508,91 +1594,16 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                    x_velocity=combined['ra_velocity'].data,
                                                    y_velocity=combined['dec_velocity'].data)
 
-    # --------------Moving Galaxies---------------------------------------
-    elif isinstance(cat1, MovingSersicCatalog):
-        if cat1.velocity_units != cat2.velocity_units:
-            raise ValueError('Velocity unit mismatch in catalogs to combine.')
-        if cat1.radius_units != cat2.radius_units:
-            raise ValueError('Radius unit mismatch in catalogs to combine.')
-
+    # --------------------Point Sources-------------------------------
+    elif isinstance(cat1, PointSourceCatalog):
+        # Create new catalog object and populate
         if cat1.location_units == 'position_RA_Dec':
-            if cat1.velocity_units == 'velocity_RA_Dec':
-                new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
-                                              dec=combined['y_or_Dec'].data,
-                                              ra_velocity=combined['ra_velocity'].data,
-                                              dec_velocity=combined['dec_velocity'].data,
-                                              ellipticity=combined['ellipticity'].data,
-                                              radius=combined['radius'].data,
-                                              sersic_index=combined['sersic_index'].data,
-                                              position_angle=combined['position_angle'].data,
-                                              radius_units=cat1.radius_units)
-            else:
-                new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
-                                              dec=combined['y_or_Dec'].data,
-                                              x_velocity=combined['ra_velocity'].data,
-                                              y_velocity=combined['dec_velocity'].data,
-                                              ellipticity=combined['ellipticity'].data,
-                                              radius=combined['radius'].data,
-                                              sersic_index=combined['sersic_index'].data,
-                                              position_angle=combined['position_angle'].data,
-                                              radius_units=cat1.radius_units)
+            new_cat = PointSourceCatalog(ra=combined['x_or_RA'].data,
+                                         dec=combined['y_or_Dec'].data)
         else:
-            if cat1.velocity_units == 'velocity_RA_Dec':
-                new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
-                                              y=combined['y_or_Dec'].data,
-                                              ra_velocity=combined['ra_velocity'].data,
-                                              dec_velocity=combined['dec_velocity'].data,
-                                              ellipticity=combined['ellipticity'].data,
-                                              radius=combined['radius'].data,
-                                              sersic_index=combined['sersic_index'].data,
-                                              position_angle=combined['position_angle'].data,
-                                              radius_units=cat1.radius_units)
-            else:
-                new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
-                                              y=combined['y_or_Dec'].data,
-                                              x_velocity=combined['ra_velocity'].data,
-                                              y_velocity=combined['dec_velocity'].data,
-                                              ellipticity=combined['ellipticity'].data,
-                                              radius=combined['radius'].data,
-                                              sersic_index=combined['sersic_index'].data,
-                                              position_angle=combined['position_angle'].data,
-                                              radius_units=cat1.radius_units)
+            new_cat = PointSourceCatalog(x=combined['x_or_RA'].data,
+                                         y=combined['y_or_Dec'].data)
 
-    # --------------Moving Extended Sources-------------------------------
-    elif isinstance(cat1, MovingExtendedCatalog):
-        if cat1.velocity_units != cat2.velocity_units:
-            raise ValueError('Velocity unit mismatch in catalogs to combine.')
-
-        if cat1.location_units == 'position_RA_Dec':
-            if cat1.velocity_units == 'velocity_RA_Dec':
-                new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
-                                                dec=combined['y_or_Dec'].data,
-                                                ra_velocity=combined['ra_velocity'].data,
-                                                dec_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
-                                                position_angle=combined['position_angle'].data)
-            else:
-                new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
-                                                dec=combined['y_or_Dec'].data,
-                                                x_velocity=combined['ra_velocity'].data,
-                                                y_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
-                                                position_angle=combined['position_angle'].data)
-        else:
-            if cat1.velocity_units == 'velocity_RA_Dec':
-                new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
-                                                y=combined['y_or_Dec'].data,
-                                                ra_velocity=combined['ra_velocity'].data,
-                                                dec_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
-                                                position_angle=combined['position_angle'].data)
-            else:
-                new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
-                                                y=combined['y_or_Dec'].data,
-                                                x_velocity=combined['ra_velocity'].data,
-                                                y_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
-                                                position_angle=combined['position_angle'].data)
 
     # -------------Add magnitude columns-------------------------------
     mag_cols = [colname for colname in combined.colnames if 'magnitude' in colname]
@@ -1601,7 +1612,9 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
         instrument = elements[0]
         minus_inst = col.split('{}_'.format(instrument))[-1]
         filter_name = minus_inst.split('_magnitude')[0]
-        new_cat.add_magnitude_column(combined[col].data, instrument=instrument, filter_name=filter_name)
+        new_cat.add_magnitude_column(combined[col].data, instrument=instrument,
+                                     filter_name=filter_name)
+
     return new_cat
 
 
