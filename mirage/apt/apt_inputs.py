@@ -124,7 +124,7 @@ class AptInput:
 
         """
         with open(self.observation_list_file, 'r') as infile:
-            self.obstab = yaml.load(infile)
+            self.obstab = yaml.safe_load(infile)
 
         OBSERVATION_LIST_FIELDS = 'Date PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
@@ -884,6 +884,9 @@ def get_filters(pointing_info):
 
             filter_list.extend(list(set(short_filters[short_filter_only])))
             filter_list.extend(list(set(long_filters[long_filter_only])))
+
+        elif inst.upper() == 'FGS':
+            filter_list = ['guider1', 'guider2']
 
         else:
             short_filters = np.array(pointing_info['FilterWheel'])[good]

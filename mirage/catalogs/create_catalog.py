@@ -22,6 +22,7 @@ from pysiaf.utils.projection import deproject_from_tangent_plane
 
 from mirage.apt.apt_inputs import get_filters
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, ExtendedCatalog
+from mirage.utils.utils import ensure_dir_exists
 
 
 def create_basic_exposure_list(xml_file, pointing_file):
@@ -243,8 +244,9 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 for value in for_obs:
                     ptsrc_catalog_mapping[str(value)] = ptsrc_catalog_name
 
-                print('POINT SOURCE CATALOG SAVED: {}'.format(ptsrc_catalog_name))
+                ensure_dir_exists(out_dir)
                 full_catalog_path = os.path.join(out_dir, ptsrc_catalog_name)
+                print('POINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
                 ptsrc_cat.save(full_catalog_path)
                 ptsrc_catalog_names.append(full_catalog_path)
 
@@ -272,8 +274,8 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 for value in for_obs:
                     galaxy_catalog_mapping[str(value)] = gal_catalog_name
 
-                print('GALAXY CATALOG SAVED: {}'.format(gal_catalog_name))
                 full_catalog_path = os.path.join(out_dir, gal_catalog_name)
+                print('GALAXY CATALOG SAVED: {}'.format(full_catalog_path))
                 galaxy_cat.save(full_catalog_path)
                 galaxy_catalog_names.append(full_catalog_path)
 
@@ -555,7 +557,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrum
     else:
         newfilters = filters
 
-    for loop in range(len(filters)):
+    for loop in range(len(newfilters)):
         jwst_mags = besancon_jwst[:, loop]
         if len(jwst_mags) != 1:
             jwst_mags = np.squeeze(jwst_mags)
@@ -835,7 +837,7 @@ def read_standard_magnitudes():
                         'niriss_f277w_magnitude', 'niriss_f356w_magnitude',
                         'niriss_f380m_magnitude', 'niriss_f430m_magnitude',
                         'niriss_f444w_magnitude', 'niriss_f480m_magnitude',
-                        'guider1_magnitude', 'guider2_magnitude',
+                        'fgs_guider1_magnitude', 'fgs_guider2_magnitude',
                         'nircam_f070w_magnitude', 'nircam_f090w_magnitude',
                         'nircam_f115w_magnitude', 'nircam_f140m_magnitude',
                         'nircam_f150w_magnitude', 'nircam_f150w2_magnitude',
@@ -1030,7 +1032,6 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     # Now, convert to JWST magnitudes either by transformation (for sources
     # with GAIA G/BP/RP magnitudes) or by interpolation (all other
     # cases).
-    out_magnitudes = np.zeros((nout, nfilters), dtype=np.float32)
     out_filter_names = make_filter_names(instrument, filter_names)
     inds = crossmatch_filter_names(in_filters, standard_filters)
     in_wavelengths = np.squeeze(np.copy(standard_values[0, inds]))
@@ -1041,6 +1042,9 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     if len(inds) == 1:
         out_wavelengths = np.zeros((1), dtype=np.float32)+out_wavelengths
     nfinal = noff + n1
+
+    out_magnitudes = np.zeros((nout, len(out_filter_names)),
+                              dtype=np.float32)
     for loop in range(nfinal):
         values = interpolate_magnitudes(in_wavelengths, in_magnitudes[loop, :],
                                         out_wavelengths, out_filter_names)
@@ -1330,9 +1334,9 @@ def make_filter_names(instrument, filters):
         if concatentated with spaces, it is the list of magnitudes header
         values that needs to be written to the source list file.
     """
-    instrument_names = ['Guider', 'NIRCam', 'NIRISS']
+    instrument_names = ['FGS', 'NIRCam', 'NIRISS']
     guider_filters = ['guider1', 'guider2']
-    guider_filter_names = ['guider1_magnitude', 'guider2_magnitude']
+    guider_filter_names = ['fgs_guider1_magnitude', 'fgs_guider2_magnitude']
     niriss_filters = ['F090W', 'F115W', 'F140M', 'F150W', 'F158M', 'F200W',
                       'F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
     niriss_filter_names = ['niriss_{}_magnitude'.format(filt.lower()) for filt in niriss_filters]
@@ -2202,8 +2206,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
                   'nircam_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
                   'niriss_f356w_magnitude': 20, 'niriss_f380m_magnitude': 26,
                   'niriss_f430m_magnitude': 28, 'niriss_f444w_magnitude': 21,
-                  'niriss_f480m_magnitude': 30, 'guider1_magnitude': 11,
-                  'guider2_magnitude': 11}
+                  'niriss_f480m_magnitude': 30, 'fgs_guider1_magnitude': 11,
+                  'fgs_guider2_magnitude': 11}
     module_path = pkg_resources.resource_filename('mirage', '')
     catalog_file = os.path.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
     catalog_values = np.loadtxt(catalog_file, comments='#')
@@ -2278,8 +2282,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             inst1 = 'NIRCam'
             filter_name = filter_names[loop].split('_')[1].upper()
         else:
-            inst1 = 'Guider'
-            filter_name = filter_names.strip('_magnitude')
+            inst1 = 'FGS'
+            filter_name = filter_names[loop].split('_')[1].upper()
         galaxy_cat.add_magnitude_column(mag1, instrument=inst1,
                                         filter_name=filter_name,
                                         magnitude_system='abmag')
