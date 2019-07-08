@@ -1836,8 +1836,6 @@ class Catalog_seed():
         view of the detector. This can be a fairly rough cut. We just need to remove sources
         that are very far from the detector.
 
-        CURRENTLY NOT USED
-
         Parameters:
         -----------
         index : list
@@ -2384,7 +2382,7 @@ class Catalog_seed():
 
         i1 = aperture_x - stamp_x
         j1 = aperture_y - stamp_y
-        if ((i1 > (aperture_x_dim+1)) or (j1 > (aperture_y_dim+1))) and not ignore_detector:
+        if ((i1 > (aperture_x_dim)) or (j1 > (aperture_y_dim))) and not ignore_detector:
             # In this case the stamp does not overlap the aperture at all
             return tuple([None]*8)
         delta_i1 = 0
@@ -2970,7 +2968,21 @@ class Catalog_seed():
         segmentation.initialize_map()
 
         # For each entry, create an image, and place it onto the final output image
+        start_time = time.time()
+        times = []
+        time_reported = False
         for entry in galaxylist:
+            # Warn user of how long this calcuation might take...
+            if len(times) < 30:
+                elapsed_time = time.time() - start_time
+                times.append(elapsed_time)
+                start_time = time.time()
+            elif len(times) == 30 and time_reported is False:
+                avg_time = np.mean(times)
+                total_time = len(galaxylist) * avg_time
+                print(("Expected time to process {} sources: {:.2f} seconds "
+                       "({:.2f} minutes)".format(len(galaxylist), total_time, total_time / 60)))
+                time_reported = True
 
             # Get position angle in the correct units. Inputs for each
             # source are degrees east of north. So we need to find the
