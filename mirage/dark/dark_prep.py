@@ -814,6 +814,8 @@ class DarkPrep():
                 use_all_files = True
                 files_to_use = dark_list
 
+            print('number_of_ints: ', number_of_ints)
+            print('use_all_files: ', use_all_files)
             print('dark files to use:')
             print(files_to_use)
 
@@ -855,6 +857,9 @@ class DarkPrep():
                 # in the input integration to produce
                 # the proposed output integration
                 self.data_volume_check(self.dark)
+
+
+                print('After data volume check: ', self.dark.data.shape)
 
                 # Compare the requested number of integrations
                 # to the number of integrations in the input dark
@@ -1180,6 +1185,7 @@ class DarkPrep():
 
             # Loop over integrations
             for integ in range(self.params['Readout']['nint']):
+            #for integ in range(dark.data.shape[0]):
                 frames = np.arange(0, self.params['Readout']['nframe'])
 
                 # Loop over groups
@@ -1191,6 +1197,8 @@ class DarkPrep():
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:
+                        print('integ: ', integ, 'frames: ', frames)
+                        print('dark.data.shape is: ', dark.data.shape)
                         accumimage = np.mean(dark.data[integ, frames, :, :], axis=0)
                         if dark.sbAndRefpix is not None:
                             zeroaccumimage = np.mean(dark.sbAndRefpix[integ, frames, :, :], axis=0)
