@@ -161,13 +161,13 @@ class WFSSSim():
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             background_file = ("{}_{}_back.fits"
                                .format(self.crossing_filter, dmode))
-            #orders = ["+1", "+2"]
-            orders = None
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
             print('Background file is {}'.format(background_file))
-            orders = None
+
+        # Default to extracting all orders
+        orders = None
 
         # Create dispersed seed image from the direct images
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
