@@ -21,10 +21,26 @@ Once the environment is built, activate it.::
     conda activate mirage
 
 
+Install Development-Version Dependencies
+----------------------------------------
+
+Unfortunately, there are conflicts with some of MIRaGe's dependencies that have not been addressed in the latest pip and conda versions. So, in order for MIRaGe to work, we need to download and install the development versions of those packages. (This will no longer be necessary once both packages make new releases.)
+
+To do this, first clone the git repositories for both the ``poppy`` and ``webbpsf`` packages somewhere on your computer::
+
+    git clone git://github.com/spacetelescope/poppy.git
+    git clone git://github.com/spacetelescope/webbpsf.git
+
+Then, install both ``poppy`` and ``webbpsf``::
+
+    pip install -e /path/to/poppy/
+    pip install -e /path/to/webbpsf/
+
+
 Install MIRaGe
 --------------
 
-To install the `mirage` package, first clone the repository:::
+Finally, to install the `mirage` package itself, first clone the repository:::
 
     git clone https://github.com/spacetelescope/mirage.git
 
