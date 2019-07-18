@@ -525,12 +525,14 @@ class Catalog_seed():
                                        'Reffiles-flux_cal': 'niriss_zeropoints.list',
                                        'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
                                        'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-filter_throughput': 'placeholder.txt'},
+                                       'Reffiles-filter_throughput': 'placeholder.txt',
+                                       'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt'},
                             'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
                                     'Reffiles-flux_cal': 'guider_zeropoints.list',
                                     'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
                                     'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-filter_throughput': 'placeholder.txt'}}
+                                    'Reffiles-filter_throughput': 'placeholder.txt',
+                                    'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
         for key1 in pathdict:
