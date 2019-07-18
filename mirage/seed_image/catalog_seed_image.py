@@ -2986,7 +2986,7 @@ class Catalog_seed():
 
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
-                                       xposang*np.pi/180., entry['counts_per_frame_e'])
+                                       xposang*np.pi/180., entry['countrate_e/s'])
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -3300,7 +3300,7 @@ class Catalog_seed():
         for entry, stamp in zip(extSources, extStamps):
             stamp_dims = stamp.shape
 
-            stamp *= entry['counts_per_frame_e']
+            stamp *= entry['countrate_e/s']
 
             # If the stamp needs to be convolved with the NIRCam PSF,
             # create the correct PSF  here and read it in
