@@ -113,15 +113,15 @@ setup(
                              'config/*.*']
                   },
     install_requires=[
-        'asdf>=1.2.0',
-        'astropy>=1.2',
+        'asdf>=2.1.0',
+        'astropy>=3.1.2',
         'jwst-backgrounds>=1.1.1',
-        'lxml>=3.6.4',
-        'matplotlib>=1.4.3',
-        'numpy<=1.15',
-        'photutils>=0.4.0',
-        'pysiaf>=0.1.11'
-        'scipy>=0.17',
+        'jwxml>=0.3.0',
+        'matplotlib>=3.0.0',
+        'numpy>=1.14.3',
+        'photutils>=0.6',
+        'pysiaf>=0.2.5'
+        'scipy>=1.1.0',
     ],
     include_package_data=True,
     cmdclass={
