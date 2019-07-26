@@ -37,6 +37,9 @@ import numpy as np
 from webbpsf.utils import to_griddedpsfmodel
 
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
+from mirage.utils.utils import expand_environment_variable
+
+MIRAGE_DIR = expand_environment_variable('MIRAGE_DATA')
 
 
 def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
@@ -80,6 +83,11 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
         Full path and filename if the file properties are as expected.
         None if the properties do not match.
     """
+
+    # Determine if the PSF path is default or not
+    default_psf = file_path == os.path.join(MIRAGE_DIR,
+                                               '{}/gridded_psf_library'.format(instrument.lower()))
+
     full_filename = os.path.join(file_path, filename)
     with fits.open(full_filename) as hdulist:
         header = hdulist[extname.upper()].header
@@ -101,11 +109,12 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
             pupil = 'CLEARP'
 
     opd_file = header['OPD_FILE']
-    if 'predicted' in opd_file:
-        wfe_type = 'predicted'
-    elif 'requirements' in opd_file:
-        wfe_type = 'requirements'
-    realization = header['OPDSLICE']
+    if default_psf:
+        if 'predicted' in opd_file:
+            wfe_type = 'predicted'
+        elif 'requirements' in opd_file:
+            wfe_type = 'requirements'
+        realization = header['OPDSLICE']
 
     # make the check below pass for FGS
     if instrument.lower() == 'fgs':
@@ -114,10 +123,15 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
         filt = 'N/A'
         filtername = 'N/A'
 
-    if inst.lower() == instrument.lower() and det.lower() == detector.lower() and \
-       filt.lower() == filtername.lower() and pupil.lower() == pupilname.lower() and \
-       wfe_type == wavefront_error_type.lower() and realization == wavefront_error_group:
+    match = inst.lower() == instrument.lower() and \
+            det.lower() == detector.lower() and \
+            filt.lower() == filtername.lower() and \
+            pupil.lower() == pupilname.lower()
+    if match and not default_psf:
         return full_filename
+    elif match and wfe_type == wavefront_error_type.lower() and \
+        realization == wavefront_error_group:
+            return full_filename
     else:
         return None
 
@@ -246,6 +260,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     """
     psf_files = glob(os.path.join(library_path, '*.fits'))
 
+    # Determine if the PSF path is default or not
+    default_psf = library_path == os.path.join(MIRAGE_DIR,
+                                               '{}/gridded_psf_library'.format(instrument.lower()))
+
     # Create a dictionary of header information for all PSF library files
     matches = []
 
@@ -322,11 +340,11 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                      and file_det == detector
                      and file_filt == filt
                      and file_pupil == pupil)
-            if not wings and segment_id is None and not itm_sim:
+            if not wings and segment_id is None and not itm_sim and default_psf:
                 match = match and file_wfe_grp == wfe_group
             if segment_id is not None:
                 match = match and file_segment_id == segment_id
-            elif not itm_sim:
+            elif not itm_sim and default_psf:
                 match = match and file_wfe == wfe
 
             # If so, add to the list of all matches

@@ -114,9 +114,12 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 nc.pupil = ote
 
                 # Generate the PSF grid
+                # NOTE: we are choosing a polychromatic simulation here to better represent the
+                # complexity of simulating unstacked PSFs. See the WebbPSF website for more details.
                 grid = nc.psf_grid(num_psfs=1, save=False, all_detectors=False,
-                                       use_detsampled_psf=True, fov_pixels=fov_pixels,
-                                        oversample=1, overwrite=overwrite)
+                                   use_detsampled_psf=True, fov_pixels=fov_pixels,
+                                   oversample=1, overwrite=overwrite, add_distortion=False,
+                                   nlambda=10)
 
                 # Remove and add header keywords about segment
                 del grid.meta["grid_xypos"]
