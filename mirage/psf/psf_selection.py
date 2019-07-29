@@ -39,7 +39,6 @@ from webbpsf.utils import to_griddedpsfmodel
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
 from mirage.utils.utils import expand_environment_variable
 
-MIRAGE_DIR = expand_environment_variable('MIRAGE_DATA')
 
 
 def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
@@ -85,7 +84,8 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
     """
 
     # Determine if the PSF path is default or not
-    default_psf = file_path == os.path.join(MIRAGE_DIR,
+    mirage_dir = expand_environment_variable('MIRAGE_DATA')
+    default_psf = file_path == os.path.join(mirage_dir,
                                                '{}/gridded_psf_library'.format(instrument.lower()))
 
     full_filename = os.path.join(file_path, filename)
@@ -261,7 +261,8 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     psf_files = glob(os.path.join(library_path, '*.fits'))
 
     # Determine if the PSF path is default or not
-    default_psf = library_path == os.path.join(MIRAGE_DIR,
+    mirage_dir = expand_environment_variable('MIRAGE_DATA')
+    default_psf = library_path == os.path.join(mirage_dir,
                                                '{}/gridded_psf_library'.format(instrument.lower()))
 
     # Create a dictionary of header information for all PSF library files
