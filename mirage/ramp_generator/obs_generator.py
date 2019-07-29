@@ -2812,6 +2812,12 @@ class Observation():
         outModel.meta.instrument.filter = fw
         outModel.meta.instrument.pupil = pw
 
+        # Specify whether the exposure is part of a TSO observation
+        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_wfss']:
+            outModel.meta.visit.tsovisit = False
+        else:
+            outModel.meta.visit.tsovisit = True
+
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
         outModel.meta.dither.total_points = self.params['Output']['total_primary_dither_positions']
@@ -3091,6 +3097,12 @@ class Observation():
 
         outModel[0].header['FILTER'] = fw
         outModel[0].header['PUPIL'] = pw
+
+        # Specify whether the exposure is part of a TSO observation
+        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_wfss']:
+            outModel[0].header['TSOVISIT'] = False
+        else:
+            outModel[0].header['TSOVISIT'] = True
 
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']

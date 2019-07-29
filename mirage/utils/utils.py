@@ -347,17 +347,23 @@ def get_subarray_info(params, subarray_table):
         if namps != 0:
             params['Readout']['namp'] = int(namps)
         else:
-            if ((params['Readout']['namp'] == 1) or
-               (params['Readout']['namp'] == 4)):
-                print(("CAUTION: Aperture {} can be used with either "
-                       "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
-                print("or a 4-amp readout. The difference is a factor of 4 in")
-                print(("readout time. You have requested {} amps."
-                       .format(params['Readout']['namp'])))
-            else:
-                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
-                                  "'Readout':'namp' in the input yaml file to one of these values."
-                                  .format(params['Readout']['array_name'])))
+            try:
+                if ((params['Readout']['namp'] == 1) or
+                   (params['Readout']['namp'] == 4)):
+                    print(("CAUTION: Aperture {} can be used with either "
+                           "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
+                    print("or a 4-amp readout. The difference is a factor of 4 in")
+                    print(("readout time. You have requested {} amps."
+                           .format(params['Readout']['namp'])))
+                else:
+                    raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
+                                      "'Readout':'namp' in the input yaml file to one of these values."
+                                      .format(params['Readout']['array_name'])))
+            except KeyError:
+                raise KeyError(("WARNING: 'Readout':'namp' not present in input yaml file. "
+                                "{} aperture requires the number of amps to be 1 or 4. Please set "
+                                "'Readout':'namp' in the input yaml file to one of these values."
+                                .format(params['Readout']['array_name'])))
     else:
         raise ValueError(("WARNING: subarray name {} not found in the "
                           "subarray dictionary {}."

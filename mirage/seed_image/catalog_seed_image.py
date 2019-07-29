@@ -332,6 +332,10 @@ class Catalog_seed():
         if self.params['Inst']['mode'].lower() == 'ts_imaging':
             tso_cat = self.getPointSourceList(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
 
+
+            print('TSO CAT')
+            print(tso_cat)
+
             # Create lists of seed images and segmentation maps for all
             # TSO objects
             tso_seeds = []
@@ -1865,6 +1869,10 @@ class Catalog_seed():
         if self.runStep['pointsource'] is True:
             pslist = self.getPointSourceList(self.params['simSignals']['pointsource'])
 
+            print('pslist:')
+            print(pslist)
+
+
             # translate the point source list into an image
             psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
 
@@ -2356,6 +2364,11 @@ class Catalog_seed():
         # Loop over the entries in the point source list
         for i, entry in enumerate(pointSources):
 
+
+            print('entry in ptsrc catalog:')
+            print(entry)
+
+
             # Find the PSF size to use based on the countrate
             psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
 
@@ -2385,6 +2398,8 @@ class Catalog_seed():
 
             # Get the coordinates that describe the overlap between the
             # PSF image and the output aperture
+            print('Last call to create_psf_stamp_coords:')
+            print(x_delta, y_delta)
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
                 (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                         updated_psf_dimensions,
@@ -2666,6 +2681,9 @@ class Catalog_seed():
         (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, (out_dims_x, out_dims_y),
                                                                stamp_x, stamp_y, stamp_dims,
                                                                ignore_detector=ignore_detector)
+
+        print('Js and Is:', j1, j2, i1, i2)
+
         y_points, x_points = np.mgrid[j1:j2, i1:i2]
 
         return xpos, ypos, x_points, y_points, (i1, i2), (j1, j2), (k1, k2), (l1, l2)

@@ -518,8 +518,15 @@ class GrismTSO():
         self.catalog_files = []
         parameters = utils.read_yaml(self.paramfile)
 
-        CATALOG_YAML_ENTRIES.remove('tso_grism_catalog')
-        CATALOG_YAML_ENTRIES.remove('tso_imaging_catalog')
+        try:
+            CATALOG_YAML_ENTRIES.remove('tso_grism_catalog')
+        except ValueError:
+            pass
+
+        try:
+            CATALOG_YAML_ENTRIES.remove('tso_imaging_catalog')
+        except ValueError:
+            pass
         cats = [parameters['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
         cats = [e for e in cats if e.lower() != 'none']
         self.catalog_files.extend(cats)
@@ -551,6 +558,8 @@ class GrismTSO():
             self.crossing_filter = pupil_name.upper()
             self.dispersion_direction = filter_name[-1].upper()
         elif self.instrument == 'nircam':
+            if 'CLEAR' in pupil_name.upper():
+                raise ValueError("ERROR: pupil cannot be CLEAR. It must be GRISMR or GRISMC.")
             self.crossing_filter = filter_name.upper()
             self.dispersion_direction = pupil_name[-1].upper()
         return parameters
