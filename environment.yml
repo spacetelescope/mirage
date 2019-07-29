@@ -26,4 +26,3 @@ dependencies:
 - pip:
     - jwst-backgrounds>=1.1.1
     - pysiaf==0.3.0
-    -
