@@ -22,6 +22,7 @@ import numpy as np
 
 from mirage.yaml import generate_observationlist, yaml_generator
 from mirage.apt.read_apt_xml import ReadAPTXML
+from mirage.utils.utils import ensure_dir_exists
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
@@ -32,9 +33,9 @@ ON_TRAVIS =  'travis' in os.path.expanduser('~')
 os.environ['MIRAGE_DATA'] = '/test/'
 
 
-# @pytest.fixture(scope="module")
+@pytest.fixture(scope="module")
 def temporary_directory(test_dir=TEMPORARY_DIR):
-    """Create a test directory for permission management.
+    """Create a temporary directory for testing.
 
     Parameters
     ----------
@@ -46,17 +47,16 @@ def temporary_directory(test_dir=TEMPORARY_DIR):
     test_dir : str
         Path to directory used for testing
     """
+    # Create directory and yield its name
+    ensure_dir_exists(test_dir)  # creates directory with default mode=511
+    yield test_dir
+
+    # Remove directory
     if os.path.isdir(test_dir):
         shutil.rmtree(test_dir)
-        os.mkdir(test_dir)  # creates directory with default mode=511
-    else:
-        os.mkdir(test_dir)
 
 
-def test_observation_list_generation_minimal():
-
-    # generate output directory
-    temporary_directory()
+def test_observation_list_generation_minimal(temporary_directory):
 
     instrument = 'NIRISS'
 
@@ -68,7 +68,7 @@ def test_observation_list_generation_minimal():
         catalogs[instrument.lower()] = source_list_file_name
 
     # Write observationlist.yaml
-    observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
+    observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(instrument.lower()))
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
     outputs = generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs)
 
@@ -77,11 +77,8 @@ def test_observation_list_generation_minimal():
 
 @pytest.mark.skipif(ON_TRAVIS,
                    reason="Cannot access mirage data in the central storage directory from Travis CI.")
-def test_complete_input_generation():
+def test_complete_input_generation(temporary_directory):
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
-
-    # generate output directory
-    temporary_directory()
 
     for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
@@ -126,18 +123,18 @@ def test_complete_input_generation():
             if skip_bool:
                 continue
 
-            obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
+            obs_yaml_files = glob.glob(os.path.join(temporary_directory, 'jw*.yaml'))
             for file in obs_yaml_files:
                 os.remove(file)
 
             if '.xml' in apt_file_seed:
                 apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
                 apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
-                observation_list_file = os.path.join(TEMPORARY_DIR,
+                observation_list_file = os.path.join(temporary_directory,
                                                      '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
 
             else:
-                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed))
+                observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(apt_file_seed))
                 apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
@@ -145,7 +142,7 @@ def test_complete_input_generation():
 
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
                                           catalogs=catalogs, observation_list_file=observation_list_file,
-                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
+                                          verbose=True, output_dir=temporary_directory, simdata_output_dir=temporary_directory,
                                           offline=True)
             try:
                 yam.create_inputs()
@@ -244,9 +241,3 @@ def test_xml_reader():
                 assert all(exposure_dict[col] == comparison_dict[col].data), print(program, col,
                                                                                    exposure_dict[col],
                                                                                    comparison_dict[col].data)
-
-
-# for debugging
-if __name__ == '__main__':
-    test_complete_input_generation()
-    #test_xml_reader()

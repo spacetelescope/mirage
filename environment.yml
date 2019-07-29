@@ -5,7 +5,7 @@ channels:
 - defaults
 dependencies:
 - asdf>=2.1.0.dev1+ga161518
-- astropy>=3.1.2
+- astropy==3.2.1
 - astroquery>=0.3.8
 - gwcs>=0.10a.dev21+g75e92da
 - healpy>=1.10
@@ -13,15 +13,16 @@ dependencies:
 - jwst>=0.12.0a.dev115+g9d5eb8c
 - jwxml>=0.3.0
 - matplotlib>=3.0.0
-- numpy>=1.14.3
+- numpy>=1.16
 - photutils>=0.6
 - pip>=18.0
 - pysynphot>=0.9.12
 - pytest>=3.8.1
 - python>=3.6,<3.7
 - scipy>=1.1.0
+- sphinx>=2.1
 - webbpsf>=0.8.0
 - yaml>=0.1.7
 - pip:
     - jwst-backgrounds>=1.1.1
-    - pysiaf>=0.2.5
+    - pysiaf==0.3.0

@@ -109,7 +109,9 @@ def test_overlap_coordinates_full_frame():
     seed.psf_library_core_x_dim = 301
     seed.psf_library_core_y_dim = 301
     seed.params = {'simSignals': {}}
-    seed.params['simSignals']['add_psf_wings'] = False
+    seed.add_psf_wings = False
+    seed.psf_library_oversamp = 1
+
     for index in range(5):
         psf, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
                                                              stamp_dims[1], stamp_dims[0],
@@ -168,7 +170,8 @@ def test_overlap_coordinates_subarray():
     seed.psf_library_core_x_dim = 301
     seed.psf_library_core_y_dim = 301
     seed.params = {'simSignals': {}}
-    seed.params['simSignals']['add_psf_wings'] = False
+    seed.add_psf_wings = False
+    seed.psf_library_oversamp = 1
     for index in range(5):
         results = seed.create_psf_stamp_coords(tab[index]['pixelx'], tab[index]['pixely'], stamp_dims,
                                                stamp_x, stamp_y, coord_sys='aperture', ignore_detector=False)

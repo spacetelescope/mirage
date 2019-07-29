@@ -10,7 +10,7 @@ Readout:
   resets_bet_ints: 1 #Number of detector resets between integrations
   array_name: NIS_CEN    #Name of array (FULL, SUB160, SUB64P, etc)
   filter: F380M       #Filter of simulated data (F090W, F322W2, etc)
-  pupil: CLEAR        #Pupil element for simulated data (CLEAR, GRISMC, etc)
+  pupil: CLEARP        #Pupil element for simulated data (CLEAR, GRISMC, etc)
   namp: 4        #Number of amplifiers used to read out array. Only used for NIRCam/NRCA5_GRISMXX_<filter> array_names
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
@@ -18,7 +18,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   linearized_darkfile: None # Linearized dark ramp to use as input. Supercedes dark above
   badpixmask: $MIRAGE_DATA/niriss/reference_files/badpix/jwst_niriss_mask_0008.fits # If linearized dark is used, populate output DQ extensions using this file
   superbias: $MIRAGE_DATA/niriss/reference_files/superbias/jwst_niriss_superbias_0080.fits #Superbias file. Set to None or leave blank if not using
-  linearity: $MIRAGE_DATA/niriss/reference_files/linearity/jwst_niriss_linearity_0010.fits #linearity correction coefficients
+  linearity: $MIRAGE_DATA/niriss/reference_files/linearity/jwst_niriss_linearity_0011.fits #linearity correction coefficients
   saturation: $MIRAGE_DATA/niriss/reference_files/saturation/jwst_niriss_saturation_0010.fits #well depth reference files
   gain: $MIRAGE_DATA/niriss/reference_files/gain/jwst_niriss_gain_0005.fits
   pixelflat: None
@@ -51,7 +51,10 @@ cosmicRay:
 
 simSignals:
   pointsource: $TEST_NIRISS_DATA/niriss_point_sources_mod.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: $MIRAGE_DATA/niriss/webbpsf_library/  #Path to PSF library
+  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
+  psf_wing_threshold_file: config   # File defining PSF sizes versus magnitude
+  add_psf_wings: False  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
+  psfpath: $MIRAGE_DATA/niriss/gridded_psf_library/  #Path to PSF library
   psfbasename: niriss                        #Basename of the files in the psf library
   psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
@@ -74,6 +77,7 @@ simSignals:
   poissonseed: 2012872553                  #Random number generator seed for Poisson simulation)
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
+  expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
 
 Telescope:
   ra: 80.48113382123029 #RA of simulated pointing
