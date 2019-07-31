@@ -132,6 +132,12 @@ class SimInput:
             Default values of parameters like roll angle (PAV3) to pass on to observation list
             generator
         """
+        # If no catalogs are given, then set up some dummy defaults
+        if catalogs is None:
+            catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
+                        'niriss': 'none',
+                        'fgs': 'none'}
+
         self.info = {}
         self.input_xml = input_xml
         self.pointing_file = pointing_file
@@ -175,7 +181,7 @@ class SimInput:
         self.set_global_definitions()
         self.path_defs()
 
-        if (input_xml is not None) and (catalogs is not None):
+        if (input_xml is not None) and (catalogs != 'None'):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
@@ -1009,8 +1015,10 @@ class SimInput:
 
     def path_defs(self):
         """Expand input files to have full paths"""
-        self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
-        self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
+        if self.input_xml is not None:
+            self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
+        if self.pointing_file is not None:
+            self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
         self.output_dir = os.path.abspath(os.path.expandvars(self.output_dir))
         self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
         if self.table_file is not None:
