@@ -2769,6 +2769,14 @@ class Observation():
         outModel.meta.target.ra = self.ra
         outModel.meta.target.dec = self.dec
 
+        # Grism TSO data have the XREF_SCI and YREF_SCI keywords populated.
+        # These are used to describe the location of the source on the detector.
+        try:
+            outModel.meta.wcsinfo.siaf_xref_sci = self.seedheader['XREF_SCI']
+            outModel.meta.wcsinfo.siaf_yref_sci = self.seedheader['YREF_SCI']
+        except KeyError:
+            pass
+
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         outModel.meta.pointing.ra_v1 = self.ra
         outModel.meta.pointing.dec_v1 = self.dec

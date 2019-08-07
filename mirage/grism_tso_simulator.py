@@ -56,6 +56,7 @@ import astropy.units as u
 import batman
 import numpy as np
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+import pysiaf
 from scipy.interpolate import interp1d
 
 from mirage import wfss_simulator
@@ -754,6 +755,16 @@ class GrismTSO():
         seed_header['PTINTSRT'] = self.part_int_start_number
         seed_header['PTFRMSRT'] = self.part_frame_start_number
 
+        # The 1b pipeline adds two header keywords to the data indicating the position
+        # of the source on the detector. Currently the pipeline assumes that the
+        # source is at the reference location of the aperture being used. Since Mirage
+        # outputs are equivalent to what is produced by the 1b pipeline, we need to
+        # add these keywords manually.
+        siaf = pysiaf.Siaf('nircam')[params['Readout']['array_name']]
+        seed_header['XREF_SCI'] = siaf.XSciRef
+        seed_header['YREF_SCI'] = siaf.YSciRef
+
+        # Save
         h0 = fits.PrimaryHDU()
         h1 = fits.ImageHDU(seed, name='DATA')
         h2 = fits.ImageHDU(segmentation_map)
