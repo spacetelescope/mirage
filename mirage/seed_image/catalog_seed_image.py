@@ -1372,10 +1372,6 @@ class Catalog_seed():
             total_frames += (numresets * (numints - 1))
 
         frameexptimes = self.frametime * np.arange(-1, total_frames)
-        print('frames_per_group: ', frames_per_group)
-        print('one int, total_frames: ', frames_per_integration)
-        print('all ints, total_frames is: ', total_frames)
-        print('frameexptimes is: ', frameexptimes)
 
         # output image dimensions
         dims = self.nominal_dims
@@ -1466,11 +1462,9 @@ class Catalog_seed():
             if input_type == 'pointSource':
                 stamp = eval_psf
                 stamp *= rate
-                print('Point source size: ', stamp.shape)
 
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
-                print('Extended source size: ', stamp.shape)
                 print('Extended source rotations turned off while evaluating rotate bug')
                 #stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
 
@@ -2678,13 +2672,17 @@ class Catalog_seed():
 
         # Get coordinates that describe the overlap between the stamp
         # and the aperture
-        (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, (out_dims_x, out_dims_y),
+        (i1, i2, j1, j2, k1, k2, l1, l2) = self.cropped_coords(xpos, ypos, (out_dims_y, out_dims_x),
                                                                stamp_x, stamp_y, stamp_dims,
                                                                ignore_detector=ignore_detector)
 
-        print('Js and Is:', j1, j2, i1, i2)
-
-        y_points, x_points = np.mgrid[j1:j2, i1:i2]
+        # If the stamp is completely off the detector, use dummy arrays
+        # for x_points and y_points
+        if j1 is None or j2 is None or i1 is None or i2 is None:
+            x_points = np.zeros((2, 2))
+            y_points = x_points
+        else:
+            y_points, x_points = np.mgrid[j1:j2, i1:i2]
 
         return xpos, ypos, x_points, y_points, (i1, i2), (j1, j2), (k1, k2), (l1, l2)
 
@@ -2750,27 +2748,27 @@ class Catalog_seed():
 
         Parameters:
         -----------
-        x_det : flt
+        aperture_x : float
             Column location of source on detector (aperture coordinate system
             including any padding for WFSS seed image)
 
-        y_det : flt
+        aperture_y : float
             Row location of source on detector (aperture coordinate system
             including any padding for WFSS seed image)
 
-        psfxdim : int
-            Number of columns in the PSF/stamp image that are being placed
-            onto the detector/aperture
+        aperture_dims : tup
+            (y, x) dimensions of the aperture on which the sources will be placed
+            (e.g. full frame, full_frame+extra, subarray)
 
-        psfydim : int
-            Number of rows in the PSF/stamp image that are being placed
-            onto the detector/aperture
+        stamp_x : float
+            Location in x of source within the stamp image
 
-        aperturexdim : int
-            Number of columns in the final seed image
+        stamp_y : float
+            Location in y of source within the stamp image
 
-        apertureydim : int
-            Number of rows in the final seed image
+        stamp_dims : tup
+            (y, x) dimensions of the source's stamp image. (e.g. the size of the PSF
+            or galaxy image stamp)
 
         ignore_detector: bool
             If True, the returned coordinates can have values outside the
@@ -2822,7 +2820,7 @@ class Catalog_seed():
 
         i1 = aperture_x - stamp_x
         j1 = aperture_y - stamp_y
-        if ((i1 > (aperture_x_dim+1)) or (j1 > (aperture_y_dim+1))):
+        if ((i1 > (aperture_x_dim+1)) or (j1 > (aperture_y_dim+1))) and not ignore_detector:
             # In this case the stamp does not overlap the aperture at all
             return tuple([None]*8)
         delta_i1 = 0
@@ -2839,7 +2837,7 @@ class Catalog_seed():
         i2 = i1 + (stamp_x_dim + delta_i1)
         j2 = j1 + (stamp_y_dim + delta_j1)
 
-        if ((i2 < 0) or (j2 < 0)):
+        if ((i2 < 0) or (j2 < 0)) and not ignore_detector:
             # Stamp does not overlap the aperture at all
             return tuple([None]*8)
 
@@ -2960,7 +2958,8 @@ class Catalog_seed():
                                                         filter_name)
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
-            specific_mag_col = "fgs_magnitude"
+            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
+            filter_name = 'none'
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
@@ -3003,6 +3002,7 @@ class Catalog_seed():
         delta2 = "%1s%2.2d:%2.2d:%7.4f" % (sign, decd, decm, decs)
         alpha2 = alpha2.replace(" ", "0")
         delta2 = delta2.replace(" ", "0")
+
         return alpha2, delta2
 
     def RADecToXY_astrometric(self, ra, dec):
@@ -3463,21 +3463,25 @@ class Catalog_seed():
                                                         galdims, galdims[1] // 2, galdims[0] // 2,
                                                         coord_sys='aperture')
 
-            # Convolve the galaxy image with the PSF image
-            stamp = s1.fftconvolve(stamp, psf_image, mode='same')
+            # Make sure the stamp is at least partially on the detector
+            if i1 is not None and i2 is not None and j1 is not None and j2 is not None:
+                # Convolve the galaxy image with the PSF image
+                stamp = s1.fftconvolve(stamp, psf_image, mode='same')
 
-            # Now add the stamp to the main image
-            if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
-                galimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
-                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
-                    noiseval += self.grism_background
-                segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+                # Now add the stamp to the main image
+                if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
+                    galimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
+                    # Divide readnoise by 100 sec, which is a 10 group RAPID ramp
+                    noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
+                    if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                        noiseval += self.grism_background
+                    segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
 
+                else:
+                    pass
+                    # print("Source located entirely outside the field of view. Skipping.")
             else:
                 pass
-                # print("Source located entirely outside the field of view. Skipping.")
 
         return galimage, segmentation.segmap
 
@@ -3779,19 +3783,22 @@ class Catalog_seed():
                                                             stamp_dims, stamp_dims[1] // 2, stamp_dims[0] // 2,
                                                             coord_sys='aperture')
 
-            # Now add the stamp to the main image
-            if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
-                extimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
+            # Make sure the stamp is at least partially on the detector
+            if i1 is not None and i2 is not None and j1 is not None and j2 is not None:
 
-            # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
-            noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-            if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
-                noiseval += self.grism_background
+                # Now add the stamp to the main image
+                if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
+                    extimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
 
-            # Make segmentation map
-            indseg = self.seg_from_photutils(stamp[l1:l2, k1:k2] * entry['countrate_e/s'],
-                                             entry['index'], noiseval)
-            segmentation.segmap[j1:j2, i1:i2] += indseg
+                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
+                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                    noiseval += self.grism_background
+
+                # Make segmentation map
+                indseg = self.seg_from_photutils(stamp[l1:l2, k1:k2] * entry['countrate_e/s'],
+                                                 entry['index'], noiseval)
+                segmentation.segmap[j1:j2, i1:i2] += indseg
         return extimage, segmentation.segmap
 
     def enlarge_stamp(self, image, dims):
