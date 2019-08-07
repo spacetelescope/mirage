@@ -162,6 +162,9 @@ class SimInput:
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
+        self.psf_paths = None
+        self.expand_catalog_for_segments = False
+        self.add_psf_wings = True
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
@@ -405,6 +408,9 @@ class SimInput:
         self.info['sequence_id'] = seq
         # self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
 
+        # Deal with user-provided PSFs that differ across observations/visits/exposures
+        self.info['psfpath'] = self.get_psf_path()
+
         # write out the updated table, including yaml filenames
         # start times, and reference files
         #if 0: #for debugging
@@ -451,7 +457,6 @@ class SimInput:
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
             file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
-            file_dict['psfpath'] = self.global_psfpath[instrument]
 
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
@@ -465,12 +470,17 @@ class SimInput:
 
         total_exposures = 0
         for obs in obs_ids:
-            visit_list = list(set([m[10:] for m in mosaic_numbers if m[7:10] == obs]))
+            visit_list = list(set([m[10:] for m in mosaic_numbers
+                                   if m[7:10] == obs]))
             n_visits = len(visit_list)
-            exposure_list = list(set([vf[20:25] for vf in self.info['yamlfile'] if vf[7:10] == obs and vf[10:13] in visit_list]))
-            n_exposures = len(exposure_list)
+            activity_list = list(set([vf[17:29] for vf in self.info['yamlfile']
+                                      if vf[7:10] == obs]))
+            n_activities = len(activity_list)
+            exposure_list = list(set([vf[20:25] for vf in self.info['yamlfile']
+                                      if vf[7:10] == obs]))
+            n_exposures = len(exposure_list) * n_activities
             total_exposures += n_exposures
-            all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs and m[10:13] in visit_list]
+            all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs]
             total_files = len(all_obs_files)
 
             obs_id_int = np.array([np.int(ele) for ele in self.info['ObservationID']])
@@ -513,10 +523,11 @@ class SimInput:
             print('Observation {}:'.format(obs))
             print(instrument_string)
             print('    {} visit(s)'.format(n_visits))
+            print('    {} activitiy(ies)'.format(n_activities))
             print('    {} exposure(s)'.format(n_exposures))
-            print('    {} file(s)'.format(total_files))
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
                 print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
+            print('    {} file(s)'.format(total_files))
 
         print('\n{} exposures total.'.format(total_exposures))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
@@ -720,7 +731,7 @@ class SimInput:
         self.info['outputfits'] = fits_names
 
     def set_global_definitions(self):
-        """Store the subarray defnitions of all supported instruments."""
+        """Store the subarray definitions of all supported instruments."""
         # TODO: Investigate how this could be combined with the creation of
         #  self.configfiles in reffile_setup()
 
@@ -1035,9 +1046,6 @@ class SimInput:
         instrument : str
             Name of instrument
         """
-
-        # self.instrument = instrument.lower()
-
         # Prepare to find files listed as 'config'
         # and set up PSF path
 
@@ -1211,6 +1219,67 @@ class SimInput:
         elif file.lower() == 'config':
             file = os.path.join(self.modpath, 'config', self.configfiles[prop])
         return file
+
+
+    def get_psf_path(self):
+        """ Create a list of the path to the PSF library directory for
+        each observation/visit/exposure in the APT program.
+
+        Parameters:
+        -----------
+        psf_paths : list, str, or None
+            Either a list of the paths to the PSF library(ies), with a
+            length equal to the number of activities in the APT program,
+            a string containing the path to one PSF library,
+            or None. If a list, each path will be written
+            chronologically into each yaml file. If a string, that path
+            will be written into every yaml file. If None, the
+            default PSF library path will be used for all yamls.
+
+        Returns:
+        --------
+        paths_out : list
+            The list of paths to the PSF library(ies), with a length
+            equal to the number of activities in the APT program.
+        """
+        act_ids = sorted(list(set(self.info['act_id'])))
+        act_id_indices = []
+        for act_id in self.info['act_id']:
+            act_id_indices.append(act_ids.index(act_id))
+        n_activities = len(act_ids)
+
+        # If no path explicitly provided, use the default path.
+        if self.psf_paths is None:
+            print('No PSF path provided. Using default path as PSF path for all yamls.')
+            paths_out = []
+            for instrument in self.info['Instrument']:
+                default_path = self.global_psfpath[instrument.lower()]
+                # default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
+                paths_out.append(default_path)
+            return paths_out
+
+        elif isinstance(self.psf_paths, str):
+            print('Using provided PSF path.')
+            paths_out = [self.psf_paths] * len(self.info['act_id'])
+            return paths_out
+
+        elif isinstance(self.psf_paths, list) and len(self.psf_paths) != n_activities:
+            raise ValueError('Invalid PSF paths parameter provided. Please '
+                             'provide the psf_paths in the form of a list of '
+                             'strings with a length equal to the number of '
+                             'activities in the APT program ({}), not equal to {}.'
+                             .format(n_activities, len(self.psf_paths)))
+
+        elif isinstance(self.psf_paths, list):
+            print('Using provided PSF paths.')
+            paths_out = [sorted(self.psf_paths)[i] for i in act_id_indices]  # Why is this sorted..?? Seg number?
+            return paths_out
+
+        elif not isinstance(self.psf_paths, list) or not isinstance(self.psf_paths, str):
+            raise TypeError('Invalid PSF paths parameter provided. Please '
+                            'provide the psf_paths in the form of a list or string, not'
+                            '{}'.format(type(self.psf_paths)))
+
 
     def table_to_dict(self, tab):
         """
@@ -1412,7 +1481,7 @@ class SimInput:
                      .format(PointSourceCatalog)))
             f.write('  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.\n')
             f.write('  psf_wing_threshold_file: {}   # File defining PSF sizes versus magnitude\n'.format(input['psf_wing_threshold_file']))
-            f.write('  add_psf_wings: True  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n')
+            f.write('  add_psf_wings: {}  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n'.format(self.add_psf_wings))
             f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
             f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
@@ -1445,6 +1514,9 @@ class SimInput:
                      .format(np.random.randint(1, 2**32-2))))
             f.write('  photonyield: True                         #Apply photon yield in simulation\n')
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
+            f.write('  expand_catalog_for_segments: {}                     # Expand catalog for 18 segments and use distinct PSFs\n'
+                .format(self.expand_catalog_for_segments))
+
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))

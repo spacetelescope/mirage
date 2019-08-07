@@ -13,7 +13,8 @@ mirages.egg-info/*
 
 # Lists and images #
 ######################
-#*.list
+mirage/catalogs/*.list
+*uncal*.list
 *.list~
 *.fits
 *.yaml
@@ -22,14 +23,13 @@ mirages.egg-info/*
 *.txt~
 
 # exceptions
-!tests/test_data/*/*.list
-!examples/*/*.list
 !tests/test_data/*/*.yaml
 
 # Other #
 #########
 .ipynb_checkpoints/*
 examples/.ipynb_checkpoints/*
+htmlcov/*
 *.aptbackup
 *.aptx
 *.docx

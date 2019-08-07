@@ -1,0 +1,99 @@
+test_deployments:
+    test_load_ote_from_deployment_yaml:
+        segment_tilts:
+            [[  7.10006473,   2.21016087],
+             [ 17.85673777,  -6.31227651],
+             [ 27.02872241,  75.70412222],
+             [119.31345178,  65.64938812],
+             [-10.19816647,  42.48939102],
+             [ -0.84538615,  -8.8120464 ],
+             [107.29459629,  -4.36493751],
+             [-50.7584335,  16.00515899],
+             [ -0.20779595, -59.08308773],
+             [ 19.45176575,  57.77244303],
+             [ -1.69734899,  38.04584567],
+             [  5.97757253, -25.58136989],
+             [ 14.28421744,  66.04868174],
+             [ 21.97157023, -14.89018761],
+             [  2.08378816, -64.53292406],
+             [ 29.49622994,  60.48878897],
+             [ 55.43197608,  93.62705051],
+             [ 53.22953882,  40.36709799],
+             [ 16.2661078, -96.72482537]]
+        segment_state_no_tilts:
+            [[ 44.20931099, -24.63954699,   0.71760843],
+             [-52.60468505,  39.14917276,   9.70219346],
+             [-41.25983187, -13.64471944,   1.16821054],
+             [ 14.27099658,  -8.79016504,  -2.85052902],
+             [  8.84999133, -23.16390646,  10.21052933],
+             [  5.2416823 ,  23.24138901,  -6.61255706],
+             [-10.09502606, -26.26606191,   8.10635585],
+             [ 14.48088512, -11.27174388,   3.89138499],
+             [ 69.59914648, -17.47854809,  -3.64283532],
+             [ 47.08076705, -20.77011833,  -0.09526566],
+             [ 23.80467725,  47.6376518 ,  -1.63026766],
+             [ -2.46398886, -10.75747789,  -5.17444684],
+             [-14.66885887,  -4.55900906,   2.3197763 ],
+             [-76.36320117,  39.85008389,  -5.56042414],
+             [ 16.26017422,  11.62325692, -18.935292  ],
+             [-46.61574511,  17.85715086,  12.4163389 ],
+             [ 26.73889025,  67.60475394,  -4.07549103],
+             [-49.57499556,  -8.21854889,   0.15090601]]
+test_segment_psfs:
+    test_generate_segment_psfs:
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg01.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg02.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg03.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg04.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg05.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg06.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg07.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg08.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg09.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg10.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg11.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg12.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg13.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg14.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg15.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg16.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg17.fits"
+        - "nircam_nrca3_f212n_fovp101_samp1_npsf1_seg18.fits"
+    test_get_segment_library_list:
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg01.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg02.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg03.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg04.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg05.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg06.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg07.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg08.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg09.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg10.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg11.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg12.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg13.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg14.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg15.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg16.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg17.fits"
+        - "nircam_nrca3_f212n_fovp1024_samp1_npsf1_seg18.fits"
+    test_get_segment_offset_remote:
+        - "(28.26170323272001, -34.22985842711999)"
+        - "(-7.8062218548390385, 1.4606508631915933)"
+        - "(-25.67894182287715, 21.936076033380896)"
+        - "(-27.519739205400008, -50.28893497032001)"
+        - "(-12.608550657184962, -13.360401167341921)"
+        - "(-2.155100159460413, 3.036760334163812)"
+        - "(1.8276628017600005, -45.22252814488001)"
+        - "(15.07169951875621, 16.541719955710587)"
+        - "(12.306598774462492, 21.610113782491435)"
+        - "(-24.216532123320004, -8.198137500400001)"
+        - "(7.357917590939171, -14.24759020703008)"
+        - "(7.532331578313969, 8.077137976712994)"
+        - "(27.6874146918, 6.018992468159997)"
+        - "(4.854866861856098, 10.065423806712637)"
+        - "(-14.280222321974437, -23.116901297141414)"
+        - "(25.356725430840008, 12.434193123999998)"
+        - "(-39.74696604963331, 22.49575613228794)"
+        - "(-10.862660308154577, 25.954353080265825)"
