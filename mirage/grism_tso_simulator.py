@@ -218,6 +218,7 @@ class GrismTSO():
         print('\n\nDispersing background sources\n\n')
         background_dispersed = self.run_disperser(background_direct.seed_file, orders=self.orders,
                                                   create_continuum_seds=True, add_background=True)
+        print('Max signal in dispersed background img: {}'.format(np.max(background_dispersed.final)))
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -259,6 +260,7 @@ class GrismTSO():
         print('\n\nDispersing TSO source\n\n')
         grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders,
                                                create_continuum_seds=False, add_background=False)
+        print('Max signal in dispersed img: {}'.format(np.max(grism_seed_object.final)))
 
         # Save the dispersed seed images if requested
         if self.save_dispersed_seed:
@@ -348,6 +350,8 @@ class GrismTSO():
                         if total_frame_counter in unaltered_frames:
                             #print("{} is unaltered.".format(total_frame_counter))
                             frame_only_signal = (background_dispersed.final + no_transit_signal) * self.frametime
+                            print('Max signal in frame_only_signal: {}'.format(np.max(frame_only_signal)))
+                            print('input to this, max in background disp and tso disp images: {}, {}'.format(np.max(background_dispersed.final), np.max(no_transit_signal)))
                         # If the frame is from a part of the lightcurve
                         # where the transit is happening, then call the
                         # cached disperser with the appropriate lightcurve
