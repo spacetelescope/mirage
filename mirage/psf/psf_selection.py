@@ -20,7 +20,7 @@ Use
 
     This module can be imported and called as such:
     ::
-        from mirage.psf import psf_selction
+        from mirage.psf import psf_selection
         library = psf_selection.get_gridded_psf_library('nircam', 'nrcb1',
                                                         'f200w', 'clear',
                                                         'predicted', 0,
@@ -37,6 +37,8 @@ import numpy as np
 from webbpsf.utils import to_griddedpsfmodel
 
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
+from mirage.utils.utils import expand_environment_variable
+
 
 
 def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
@@ -80,6 +82,12 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
         Full path and filename if the file properties are as expected.
         None if the properties do not match.
     """
+
+    # Determine if the PSF path is default or not
+    mirage_dir = expand_environment_variable('MIRAGE_DATA')
+    default_psf = file_path == os.path.join(mirage_dir,
+                                               '{}/gridded_psf_library'.format(instrument.lower()))
+
     full_filename = os.path.join(file_path, filename)
     with fits.open(full_filename) as hdulist:
         header = hdulist[extname.upper()].header
@@ -101,11 +109,12 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
             pupil = 'CLEARP'
 
     opd_file = header['OPD_FILE']
-    if 'predicted' in opd_file:
-        wfe_type = 'predicted'
-    elif 'requirements' in opd_file:
-        wfe_type = 'requirements'
-    realization = header['OPDSLICE']
+    if default_psf:
+        if 'predicted' in opd_file:
+            wfe_type = 'predicted'
+        elif 'requirements' in opd_file:
+            wfe_type = 'requirements'
+        realization = header['OPDSLICE']
 
     # make the check below pass for FGS
     if instrument.lower() == 'fgs':
@@ -114,10 +123,15 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
         filt = 'N/A'
         filtername = 'N/A'
 
-    if inst.lower() == instrument.lower() and det.lower() == detector.lower() and \
-       filt.lower() == filtername.lower() and pupil.lower() == pupilname.lower() and \
-       wfe_type == wavefront_error_type.lower() and realization == wavefront_error_group:
+    match = inst.lower() == instrument.lower() and \
+            det.lower() == detector.lower() and \
+            filt.lower() == filtername.lower() and \
+            pupil.lower() == pupilname.lower()
+    if match and not default_psf:
         return full_filename
+    elif match and wfe_type == wavefront_error_type.lower() and \
+        realization == wavefront_error_group:
+            return full_filename
     else:
         return None
 
@@ -189,16 +203,23 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         library_file = get_library_file(instrument, detector, filtername, pupilname,
                                         wavefront_error, wavefront_error_group, library_path)
 
-    print("PSFs will be generated using: {}".format(os.path.basename(library_file)))
+    print("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
 
     try:
         library = to_griddedpsfmodel(library_file)
+    except KeyError:
+        # Handle input ITM images
+        itm_sim = fits.getval(library_file, 'ORIGIN')
+        if itm_sim:
+            library = _load_itm_library(library_file)
+
     except OSError:
         print("OSError: Unable to open {}.".format(library_file))
     return library
 
 
-def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_path, wings=False):
+def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
+                     library_path, wings=False, segment_id=None):
     """Given an instrument and filter name along with the path of
     the PSF library, find the appropriate library file to load.
 
@@ -219,21 +240,32 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
     wfe : str
         Wavefront error. Can be 'predicted' or 'requirements'
 
-     wfe_group : int
+    wfe_group : int
         Wavefront error realization group. Must be an integer from 0 - 9.
 
     library_path : str
         Path pointing to the location of the PSF library
 
+    wings : bool, optional
+        Must the library file contain PSF wings or PSF cores? Default is False.
+
+    segment_id : int or None, optional
+        If specified, returns a segment PSF library file and denotes the ID
+        of the mirror segment
+
     Returns
     --------
     matches : str
-        Name of the PSF library file for the instrument and filtername
+        Name of the PSF library file for the instrument and filter name
     """
     psf_files = glob(os.path.join(library_path, '*.fits'))
 
+    # Determine if the PSF path is default or not
+    mirage_dir = expand_environment_variable('MIRAGE_DATA')
+    default_psf = library_path == os.path.join(mirage_dir,
+                                               '{}/gridded_psf_library'.format(instrument.lower()))
+
     # Create a dictionary of header information for all PSF library files
-    # psf_table = {}
     matches = []
 
     instrument = instrument.upper()
@@ -247,65 +279,80 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group, library_
         pupil = 'MASK_NRM'
 
     for filename in psf_files:
-        header = fits.getheader(filename)
-        file_inst = header['INSTRUME'].upper()
         try:
+            header = fits.getheader(filename)
+
+            # Determine if it is an ITM file
+            itm_sim = header.get('ORIGIN', '') == 'ITM'
+
+            # Compare the header entries to the user input
+            file_inst = header['INSTRUME'].upper()
             file_det = header['DETECTOR'].upper()
+            file_filt = header['FILTER'].upper()
+
+            try:
+                file_pupil = header['PUPIL_MASK'].upper()
+            except KeyError:
+                # If no pupil mask value is present, then assume the CLEAR is
+                # being used
+                if file_inst.upper() == 'NIRCAM':
+                    file_pupil = 'CLEAR'
+                elif file_inst.upper() == 'NIRISS':
+                    try:
+                        file_pupil = header['PUPIL'].upper()  # can be 'MASK_NRM'
+                    except KeyError:
+                        file_pupil = 'CLEARP'
+
+            # NIRISS has many filters in the pupil wheel. WebbPSF does
+            # not make a distinction, but Mirage does. Adjust the info
+            # to match Mirage's expectations
+            if file_inst.upper() == 'NIRISS' and file_filt in NIRISS_PUPIL_WHEEL_FILTERS:
+                save_filt = copy(file_filt)
+                if file_pupil == 'CLEARP':
+                    file_filt = 'CLEAR'
+                else:
+                    raise ValueError(('Pupil value is something other than '
+                                      'CLEARP, but the filter being used is '
+                                      'in the pupil wheel.'))
+                file_pupil = save_filt
+
+            if segment_id is None and not itm_sim:
+                opd = header['OPD_FILE']
+                if 'requirements' in opd:
+                    file_wfe = 'requirements'
+                elif 'predicted' in opd:
+                    file_wfe = 'predicted'
+
+                file_wfe_grp = header['OPDSLICE']
+
+            if segment_id is not None:
+                segment_id = int(segment_id)
+                file_segment_id = int(header['SEGID'])
+
+            # allow check below to pass for FGS
+            if instrument.lower() == 'fgs':
+                file_filt = 'N/A'
+                filt = 'N/A'
+                file_pupil = 'N/A'
+                pupil = 'N/A'
+
+            # Evaluate if the file matches the given parameters
+            match = (file_inst == instrument
+                     and file_det == detector
+                     and file_filt == filt
+                     and file_pupil == pupil)
+            if not wings and segment_id is None and not itm_sim and default_psf:
+                match = match and file_wfe_grp == wfe_group
+            if segment_id is not None:
+                match = match and file_segment_id == segment_id
+            elif not itm_sim and default_psf:
+                match = match and file_wfe == wfe
+
+            # If so, add to the list of all matches
+            if match:
+                matches.append(filename)
         except KeyError:
-            file_det = header['DET_NAME'].upper()
-        file_filt = header['FILTER'].upper()
-
-        try:
-            file_pupil = header['PUPIL_MASK'].upper()
-        except KeyError:
-            # If no pupil mask value is present, then assume the CLEAR is
-            # being used
-            if file_inst.upper() == 'NIRCAM':
-                file_pupil = 'CLEAR'
-            elif file_inst.upper() == 'NIRISS':
-                try:
-                    file_pupil = header['PUPIL'].upper()  # can be 'MASK_NRM'
-                except KeyError:
-                    file_pupil = 'CLEARP'
-
-        # NIRISS has many filters in the pupil wheel. Webbpsf does
-        # not make a distinction, but Mirage does. Adjust the info
-        # to match Mirage's expectations
-        if file_inst.upper() == 'NIRISS' and file_filt in NIRISS_PUPIL_WHEEL_FILTERS:
-            save_filt = copy(file_filt)
-            if file_pupil == 'CLEARP':
-                file_filt = 'CLEAR'
-            else:
-                raise ValueError(('Pupil value is something other than '
-                                  'CLEARP, but the filter being used is '
-                                  'in the pupil wheel.'))
-            file_pupil = save_filt
-
-        opd = header['OPD_FILE']
-        if 'requirements' in opd:
-            file_wfe = 'requirements'
-        elif 'predicted' in opd:
-            file_wfe = 'predicted'
-
-        file_wfe_grp = header['OPDSLICE']
-
-        # allow check below to pass for FGS
-        if instrument.lower() == 'fgs':
-            file_filt = 'N/A'
-            filt = 'N/A'
-            file_pupil = 'N/A'
-            pupil = 'N/A'
-
-        if not wings:
-            match = (file_inst == instrument and file_det == detector and file_filt == filt and
-                     file_pupil == pupil and file_wfe == wfe and file_wfe_grp == wfe_group)
-        else:
-            match = (file_inst == instrument and file_det == detector and file_filt == filt and
-                     file_pupil == pupil and file_wfe == wfe)
-
-        if match:
-            matches.append(filename)
-        # psf_table[filename] = [file_inst, file_det, file_filt, file_pupil, file_wfe, file_wfe_grp, match]
+            continue
 
     # Find files matching the requested inputs
     if len(matches) == 1:
@@ -397,3 +444,37 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
                    "These must be even."))
             raise ValueError
     return psf_wing
+
+
+def _load_itm_library(library_file):
+    """Load ITM FITS file
+
+    Parameters
+    ----------
+    library_path : str
+        Path pointing to the location of the PSF library
+
+    Returns
+    -------
+    library : photutils.griddedPSFModel
+        Object containing PSF library
+    """
+    data = fits.getdata(library_file)
+    hdr = fits.getheader(library_file)
+    if data.shape == (2048, 2048):
+        # TODO: Remove when Shannon adds her 3rd dimension check
+        # Add (empty) 3rd dimension to the data
+        data = np.array([data])
+
+        # Add PSF location and oversampling keywords
+        hdr['DET_YX0'] = ('(1023, 1023)', "The #0 PSF's (y,x) detector pixel position")
+        hdr['OVERSAMP'] = (1, 'Oversampling factor for FFTs in computation')
+
+        # Convert to HDUList and create library
+        phdu = fits.PrimaryHDU(data, hdr)
+        hdulist = fits.HDUList(phdu)
+        library = to_griddedpsfmodel(hdulist, ext=0)
+
+        return library
+    else:
+        raise ValueError('Expecting ITM data of size (2048, 2048), not {}'.format(data.shape))

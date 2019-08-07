@@ -114,11 +114,11 @@ setup(
                   },
     install_requires=[
         'asdf>=1.2.0',
-        'astropy>=1.2',
+        'astropy>=3.2.1',
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
         'matplotlib>=1.4.3',
-        'numpy>=1.15',
+        'numpy',
         'photutils>=0.4.0',
         'pysiaf>=0.1.11'
         'scipy>=0.17',

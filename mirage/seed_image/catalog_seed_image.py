@@ -41,6 +41,8 @@ from ..utils import siaf_interface
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
 from mirage.utils.file_splitting import find_file_splits
+from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
+                                get_segment_offset, get_segment_library_list)
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -115,6 +117,8 @@ class Catalog_seed():
         self.params = utils.get_subarray_info(self.params, self.subdict)
         self.coord_transform = self.read_distortion_reffile()
         self.grism_direct_factor = grism_factor(self.params['Inst']['instrument'].lower())
+        self.expand_catalog_for_segments = bool(self.params['simSignals']['expand_catalog_for_segments'])
+        self.add_psf_wings = self.params['simSignals']['add_psf_wings']
 
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
@@ -202,18 +206,32 @@ class Catalog_seed():
 
         # Read in the PSF library file corresponding to the detector and filter
         # For WFSS simulations, use the PSF libraries with the appropriate CLEAR element
-        psf_pupil = self.params['Readout']['pupil']
-        psf_filter = self.params['Readout']['filter']
+        self.psf_pupil = self.params['Readout']['pupil']
+        self.psf_filter = self.params['Readout']['filter']
         if self.params['Readout']['pupil'].lower() in ['grismr', 'grismc']:
-            psf_pupil = 'CLEAR'
+            self.psf_pupil = 'CLEAR'
         if self.params['Readout']['filter'].lower() in ['gr150r', 'gr150c']:
-            psf_filter = 'CLEAR'
+            self.psf_filter = 'CLEAR'
 
-        self.psf_library = get_gridded_psf_library(self.params['Inst']['instrument'], self.detector,
-                                                   psf_filter, psf_pupil,
-                                                   self.params['simSignals']['psfwfe'],
-                                                   self.params['simSignals']['psfwfegroup'],
-                                                   self.params['simSignals']['psfpath'])
+        # If reading in a normal PSF, use get_gridded_psf_library to get a
+        # single photutils.griddedPSFModel object
+        if not self.expand_catalog_for_segments:
+            self.psf_library = get_gridded_psf_library(
+                self.params['Inst']['instrument'], self.detector, self.psf_filter, self.psf_pupil,
+                self.params['simSignals']['psfwfe'],
+                self.params['simSignals']['psfwfegroup'],
+                self.params['simSignals']['psfpath'])
+            self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library.data.shape[-2:]
+            self.psf_library_oversamp = self.psf_library.oversampling
+
+        # If reading in segment PSFs, use get_gridded_segment_psf_library_list
+        # to get a list of photutils.griddedPSFModel objects
+        else:
+            self.psf_library = get_gridded_segment_psf_library_list(
+                self.params['Inst']['instrument'], self.detector, self.psf_filter,
+                self.params['simSignals']['psfpath'], pupilname=self.psf_pupil)
+            self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library[0].data.shape[-2:]
+            self.psf_library_oversamp = 1
 
         # Set the psf core dimensions to actually be 2 rows and columns
         # less than the dimensions in the library file. This is because
@@ -224,32 +242,32 @@ class Catalog_seed():
         # edge row or column in the evaluated array. So we do this to be
         # sure that we are evaluating the library with a slightly smaller
         # array than the array in the library.
-        self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library.data.shape[-2:]
-        self.psf_library_core_x_dim = np.int(self.psf_library_core_x_dim / self.psf_library.oversampling) - \
+        self.psf_library_core_x_dim = np.int(self.psf_library_core_x_dim / self.psf_library_oversamp) - \
             self.params['simSignals']['gridded_psf_library_row_padding']
-        self.psf_library_core_y_dim = np.int(self.psf_library_core_y_dim / self.psf_library.oversampling) - \
+        self.psf_library_core_y_dim = np.int(self.psf_library_core_y_dim / self.psf_library_oversamp) - \
             self.params['simSignals']['gridded_psf_library_row_padding']
 
-        self.psf_wings = get_psf_wings(self.params['Inst']['instrument'], self.detector,
-                                       psf_filter, psf_pupil,
-                                       self.params['simSignals']['psfwfe'],
-                                       self.params['simSignals']['psfwfegroup'],
-                                       os.path.join(self.params['simSignals']['psfpath'], 'psf_wings'))
+        if self.add_psf_wings is True:
+            self.psf_wings = get_psf_wings(self.params['Inst']['instrument'], self.detector,
+                                           self.psf_filter, self.psf_pupil,
+                                           self.params['simSignals']['psfwfe'],
+                                           self.params['simSignals']['psfwfegroup'],
+                                           os.path.join(self.params['simSignals']['psfpath'], 'psf_wings'))
 
-        # Read in the file that defines PSF array sizes based on magnitude
-        self.psf_wing_sizes = ascii.read(self.params['simSignals']['psf_wing_threshold_file'])
-        max_wing_size = self.psf_wings.shape[0]
-        too_large = np.where(np.array(self.psf_wing_sizes['number_of_pixels']) > max_wing_size)[0]
-        if len(too_large) > 0:
-            print(('Some PSF sizes in {} are larger than the PSF library file dimensions. '
-                   'Resetting these values in the table to be equal to the PSF dimensions'
-                   .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
-            self.psf_wing_sizes['number_of_pixels'][too_large] = max_wing_size
+            # Read in the file that defines PSF array sizes based on magnitude
+            self.psf_wing_sizes = ascii.read(self.params['simSignals']['psf_wing_threshold_file'])
+            max_wing_size = self.psf_wings.shape[0]
+            too_large = np.where(np.array(self.psf_wing_sizes['number_of_pixels']) > max_wing_size)[0]
+            if len(too_large) > 0:
+                print(('Some PSF sizes in {} are larger than the PSF library file dimensions. '
+                       'Resetting these values in the table to be equal to the PSF dimensions'
+                       .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
+                self.psf_wing_sizes['number_of_pixels'][too_large] = max_wing_size
 
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             print('Creating signal rate image of synthetic inputs.')
-            self.seedimage, self.seed_segmap = self.addedSignals()
+            self.seedimage, self.seed_segmap = self.create_sidereal_image()
             outapp = ''
 
         # If we are tracking a non-sidereal target, then
@@ -924,12 +942,14 @@ class Catalog_seed():
                                        'Reffiles-flux_cal': 'niriss_zeropoints.list',
                                        'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
                                        'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-filter_throughput': 'placeholder.txt'},
+                                       'Reffiles-filter_throughput': 'placeholder.txt',
+                                       'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt'},
                             'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
                                     'Reffiles-flux_cal': 'guider_zeropoints.list',
                                     'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
                                     'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-filter_throughput': 'placeholder.txt'}}
+                                    'Reffiles-filter_throughput': 'placeholder.txt',
+                                    'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt'}}
         config_files = all_config_files[self.params['Inst']['instrument'].lower()]
 
         for key1 in pathdict:
@@ -1760,7 +1780,7 @@ class Catalog_seed():
                                                'temp_non_sidereal_point_sources.list')
             ptsrc.write(temp_ptsrc_filename, format='ascii', overwrite=True)
 
-            ptsrc = self.getPointSourceList(temp_ptsrc_filename)
+            ptsrc = self.get_point_source_list(temp_ptsrc_filename)
             ptsrcCRImage, ptsrcCRSegmap = self.make_point_source_image(ptsrc)
             totalCRList.append(ptsrcCRImage)
             totalSegList.append(ptsrcCRSegmap)
@@ -1829,7 +1849,7 @@ class Catalog_seed():
                               "You shouldn't be here."))
         return totalCRImage, totalSegmap, track_ra_vel, track_dec_vel, velFlag
 
-    def addedSignals(self):
+    def create_sidereal_image(self):
         # Generate a signal rate image from input sources
         if (self.params['Output']['grism_source_image'] == False) and (not self.params['Inst']['mode'] in ["pom", "wfss"]):
             signalimage = np.zeros(self.nominal_dims)
@@ -1861,27 +1881,61 @@ class Catalog_seed():
         # Adjust point source locations using astrometric distortion
         # Translate magnitudes to counts in a single frame
         if self.runStep['pointsource'] is True:
-            pslist = self.getPointSourceList(self.params['simSignals']['pointsource'])
+            if not self.expand_catalog_for_segments:
 
-            print('pslist:')
-            print(pslist)
+                # Translate the point source list into an image
+                print('Calculating point source lists')
+                pslist = self.get_point_source_list(self.params['simSignals']['pointsource'])
+                psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
 
+            elif self.expand_catalog_for_segments:
+                # Expand the point source list for each mirror segment, and add together
+                # the 18 point source images that used different PSFs.
+                print('Expanding the source catalog for 18 mirror segments')
 
-            # translate the point source list into an image
-            psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
+                # Create empty image and segmentation map
+                ptsrc_segmap = segmap.SegMap()
+                ptsrc_segmap.ydim, ptsrc_segmap.xdim = self.output_dims
+                ptsrc_segmap.initialize_map()
+                psfimage = np.zeros(self.output_dims)
+
+                library_list = get_segment_library_list(
+                    self.params['Inst']['instrument'].lower(), self.detector, self.psf_filter,
+                    self.params['simSignals']['psfpath'], pupil=self.psf_pupil
+                )
+                for i_segment in np.arange(1, 19):
+                    print('\nCalculating point source lists for segment {}'.format(i_segment))
+                    # Get the RA/Dec offset that matches the given segment
+                    offset_vector = get_segment_offset(i_segment, self.detector, library_list)
+
+                    # need to add a new offset option to get_point_source_list:
+                    pslist = self.get_point_source_list(self.params['simSignals']['pointsource'],
+                                                        segment_offset=offset_vector)
+
+                    # Create a point source image, using the specific point
+                    # source list and PSF for the given segment
+                    seg_psfimage, ptsrc_segmap = self.make_point_source_image(pslist, segment_number=i_segment,
+                                                                           ptsrc_segmap=ptsrc_segmap)
+
+                    if self.params['Output']['save_intermediates'] is True:
+                        seg_psfImageName = self.basename + '_pointSourceRateImage_seg{:02d}.fits'.format(i_segment)
+                        h0 = fits.PrimaryHDU(seg_psfimage)
+                        h0.writeto(seg_psfImageName, overwrite=True)
+                        print("    Segment {} point source image and segmap saved as {}".format(i_segment,
+                                                                                                seg_psfImageName))
+
+                    psfimage += seg_psfimage
+
+            ptsrc_segmap = ptsrc_segmap.segmap
 
             # save the point source image for examination by user
             if self.params['Output']['save_intermediates'] is True:
-                psfImageName = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
+                psf_image_name = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
                 h0 = fits.PrimaryHDU(psfimage)
                 h1 = fits.ImageHDU(ptsrc_segmap)
                 hlist = fits.HDUList([h0, h1])
-                hlist.writeto(psfImageName, overwrite=True)
-                # ptsrc_seg_file = psfImageName[0:-5] + '_segmap.fits'
-                # self.saveSingleFits(psfimage, psfImageName)
-                print("Point source image and segmap saved as {}".format(psfImageName))
-                # self.saveSingleFits(ptsrc_segmap, ptsrc_seg_file)
-                # print("Point source segmentation map saved as {}".format(ptsrc_seg_file))
+                hlist.writeto(psf_image_name, overwrite=True)
+                print("Point source image and segmap saved as {}".format(psf_image_name))
 
             # Add the point source image to the overall image
             signalimage = signalimage + psfimage
@@ -2015,7 +2069,7 @@ class Catalog_seed():
 
     #    return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
 
-    def getPointSourceList(self, filename, source_type='pointsources'):
+    def get_point_source_list(self, filename, source_type='pointsources', segment_offset=None):
         """Read in the list of point sources to add, calculate positions
         on the detector, filter out sources outside the detector, and
         calculate countrates corresponding to the given magnitudes
@@ -2037,35 +2091,10 @@ class Catalog_seed():
         pointSourceList : astropy.table.Table
             Table containing source information
         """
-        # Find the array sizes of the PSF files in the library. Assume they are all the same.
-        # We want the distance from the PSF peak to the edge, assuming the peak is centered
-        if self.params['simSignals']['psfwfe'] != 0:
-            numstr = str(self.params['simSignals']['psfwfe'])
-        else:
-            numstr = 'zero'
-        # psflibfiles = glob.glob(self.params['simSignals']['psfpath'] + '*')
-        # psflibfiles = glob.glob(os.path.join(self.params['simSignals']['psfpath'], '*.fits'))
-
-        # If a PSF library is specified, then just get the dimensions from one of the files
-        if self.params['simSignals']['psfpath'] is not None:
-            #h = fits.open(psflibfiles[0])
-            #edgex = h[0].header['NAXIS1'] / 2 - 1
-            #edgey = h[0].header['NAXIS2'] / 2 - 1
-            #edgex = self.psf_library_x_dim // 2
-            #edgey = self.psf_library_y_dim // 2
-            #edgex = np.int(self.max_psf_wing_size // 2)
-            #edgey = np.int(self.max_psf_wing_size // 2)
-            #self.psfhalfwidth = np.array([edgex, edgey])
-            #h.close()
-            pass
-        else:
-            # if no PSF library is specified, then webbpsf will be creating the PSF on the
-            # fly. In this case, we assume webbpsf's default output size of 301x301 pixels?
-            edgex = int(301 / 2)
-            edgey = int(301 / 2)
-            print("INFO: no PSF library specified, but point sources are to be added to")
-            print("the output. PSFs will be generated by WebbPSF on the fly")
-            raise NotImplementedError("Not yet implemented.")
+        # Make sure that a valid PSF path has been provided
+        if not os.path.isdir(self.params['simSignals']['psfpath']):
+            raise ValueError('Invalid PSF path provided in YAML:',
+                             self.params['simSignals']['psfpath'])
 
         pointSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees',
                                        'Dec_degrees', 'magnitude', 'countrate_e/s',
@@ -2073,7 +2102,7 @@ class Catalog_seed():
                                 dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f', 'S50'))
 
         try:
-            lines, pixelflag, magsys = self.readPointSourceFile(filename)
+            lines, pixelflag, magsys = self.read_point_source_file(filename)
             if pixelflag:
                 print("Point source list input positions assumed to be in units of pixels.")
             else:
@@ -2082,7 +2111,8 @@ class Catalog_seed():
             raise NameError("WARNING: Unable to open the point source list file {}".format(filename))
 
         # Create table of point source countrate versus psf size
-        self.translate_psf_table(magsys)
+        if self.add_psf_wings is True:
+            self.translate_psf_table(magsys)
 
         # File to save adjusted point source locations
         psfile = self.params['Output']['file'][0:-5] + '_{}.list'.format(source_type)
@@ -2126,6 +2156,11 @@ class Catalog_seed():
         pslist.write('#\n')
         pslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
                       "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame    TSO_lightcurve_catalog\n"))
+
+        # If creating a segment-wise simulation, shift all of the RAs/Decs in
+        # the list by the given offset
+        if segment_offset is not None:
+            lines = self.shift_sources_by_offset(lines, segment_offset, pixelflag)
 
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
@@ -2251,6 +2286,9 @@ class Catalog_seed():
         ydim : int
             Size of PSF in pixels in the y direction
         """
+        if self.add_psf_wings is False:
+            return self.psf_library_core_x_dim
+
         brighter = np.where(countrate >= self.psf_wing_sizes['countrate'])[0]
         if len(brighter) == 0:
             # Dimmest bin == size of pf library
@@ -2259,6 +2297,41 @@ class Catalog_seed():
         else:
             dimension = self.psf_wing_sizes['number_of_pixels'][brighter[0]]
         return dimension
+
+    def shift_sources_by_offset(self, lines, segment_offset, pixelflag):
+        print('    Shifting point source locations by arcsecond offset {}'.format(segment_offset))
+
+        shifted_lines = lines.copy()
+        shifted_lines.remove_rows(np.arange(0, len(shifted_lines)))
+
+        V2ref_arcsec = self.siaf.V2Ref
+        V3ref_arcsec = self.siaf.V3Ref
+        position_angle = self.params['Telescope']['rotation']
+        print('    Position angle = ', position_angle)
+        attitude_ref = pysiaf.utils.rotations.attitude(V2ref_arcsec, V3ref_arcsec, self.ra, self.dec, position_angle)
+
+        # Shift every source by the appropriate offset
+        x_displacement_arcsec, y_displacement_arcsec = segment_offset
+        for line in lines:
+            x_or_RA, y_or_Dec = line['x_or_RA', 'y_or_Dec']
+            # Convert the input source locations to V2/V3
+            if not pixelflag:
+                # Convert RA/Dec (sky frame) to V2/V3 (telescope frame)
+                v2, v3 = pysiaf.utils.rotations.getv2v3(attitude_ref, x_or_RA, y_or_Dec)
+            else:
+                # Convert X/Y (detector frame) to V2/V3 (telescope frame)
+                v2, v3 = self.siaf.det_to_tel(x_or_RA, y_or_Dec)
+
+            # Add the arcsecond displacement to each V2/V3 source position
+            v2 -= x_displacement_arcsec
+            v3 += y_displacement_arcsec
+
+            # Translate back to RA/Dec and save
+            ra, dec = pysiaf.utils.rotations.pointing(attitude_ref, v2, v3)
+            # TODO: need to be smarter about which magnitude to use here
+            shifted_lines.add_row([ra, dec, line['magnitude']])
+
+        return shifted_lines
 
     def remove_outside_fov_sources(self, index, source, pixflag, delta_pixels):
         """Filter out entries in the source catalog that are located well outside the field of
@@ -2328,13 +2401,18 @@ class Catalog_seed():
 
         return filtered_indexes, filtered_sources
 
-    def make_point_source_image(self, pointSources):
+    def make_point_source_image(self, pointSources, segment_number=None, ptsrc_segmap=None):
         """Create a seed image containing all of the point sources
         provided by the source catalog
 
         Parameters
         ----------
         pointSources : astropy.table.Table
+            Table of point sources
+        segment_number : int, optional
+            The number of the mirror segment to make an image for
+        ptsrc_segmap : optional
+            The point source segmentation map to keep adding to
 
         Returns
         -------
@@ -2350,10 +2428,11 @@ class Catalog_seed():
         # Create the empty image
         psfimage = np.zeros(self.output_dims)
 
-        # Create empty segmentation map
-        seg = segmap.SegMap()
-        seg.ydim, seg.xdim = self.output_dims
-        seg.initialize_map()
+        if ptsrc_segmap is None:
+            # Create empty segmentation map
+            ptsrc_segmap = segmap.SegMap()
+            ptsrc_segmap.ydim, ptsrc_segmap.xdim = self.output_dims
+            ptsrc_segmap.initialize_map()
 
         # Loop over the entries in the point source list
         for i, entry in enumerate(pointSources):
@@ -2369,8 +2448,10 @@ class Catalog_seed():
             # Assume same PSF size in x and y
             psf_y_dim = psf_x_dim
 
-            scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                                          psf_x_dim, psf_y_dim)
+            scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(
+                entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
+                segment_number=segment_number
+            )
             scaled_psf *= entry['countrate_e/s']
 
             # PSF may not be centered in array now if part of the array falls
@@ -2407,8 +2488,8 @@ class Catalog_seed():
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
                 if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
                     noiseval += self.grism_background
-                seg.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
-            except:
+                ptsrc_segmap.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+            except IndexError:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
                 # getpointsourcelist because if the PSF is not centered
@@ -2419,9 +2500,10 @@ class Catalog_seed():
             if ((len(pointSources) > 100) and (np.mod(i, 100))) == 0:
                 print('{}: Working on source {}'.format(str(datetime.datetime.now()), i))
 
-        return psfimage, seg.segmap
+        return psfimage, ptsrc_segmap
 
-    def create_psf_stamp(self, x_location, y_location, psf_dim_x, psf_dim_y, ignore_detector=False):
+    def create_psf_stamp(self, x_location, y_location, psf_dim_x, psf_dim_y,
+                         ignore_detector=False, segment_number=None):
         """From the gridded PSF model, location within the aperture, and
         dimensions of the stamp image (either the library PSF image, or
         the galaxy/extended stamp image with which the PSF will be
@@ -2485,8 +2567,13 @@ class Catalog_seed():
         # This assumes a square PSF shape!!!!
         # If no wings are to be added, then we can skip all the wing-
         # and pixel phase-related work below.
-        if ((self.params['simSignals']['add_psf_wings'] is False) or (delta_core_to_wing_x <= 0)):
+        if ((self.add_psf_wings is False) or (delta_core_to_wing_x <= 0)):
             add_wings = False
+
+            if segment_number is not None:
+                library = self.psf_library[segment_number - 1]
+            else:
+                library = self.psf_library
 
             # Get coordinates decribing overlap between the evaluated psf
             # core and the full frame of the detector. We really only need
@@ -2504,10 +2591,10 @@ class Catalog_seed():
             # to the square of the oversampling factor. They must be scaled
             # down by that factor to be equivalent to the webbpsf output,
             # where the summed signal is close to 1.0
-            flux_scaling_factor = self.psf_library.oversampling**2
+            flux_scaling_factor = self.psf_library_oversamp**2
 
             # Step 4
-            full_psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
+            full_psf = library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
                                                  x_0=xc_core, y_0=yc_core)
             k1 = k1c
             l1 = l1c
@@ -2571,7 +2658,7 @@ class Catalog_seed():
                 # to the square of the oversampling factor. They must be scaled
                 # down by that factor to be equivalent to the webbpsf output,
                 # where the summed signal is close to 1.0
-                flux_scaling_factor = self.psf_library.oversampling**2
+                flux_scaling_factor = self.psf_library_oversamp**2
 
                 # Step 4
                 psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
@@ -2881,7 +2968,7 @@ class Catalog_seed():
 
         return psf[nyshift - ydist:nyshift + ydist + 1, nxshift - xdist:nxshift + xdist + 1]
 
-    def readPointSourceFile(self, filename):
+    def read_point_source_file(self, filename):
         """Read in the point source catalog file
 
          Parameters:
@@ -3434,7 +3521,7 @@ class Catalog_seed():
             #psf_shape = np.array([psf_dimensions, psf_dimensions])
 
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
-            psf_shape = np.array((psf_dimensions / self.psf_library.oversampling) -
+            psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
                                  self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 # print('Enlarging galaxy stamp to be the same size or larger than the psf')
@@ -3522,7 +3609,7 @@ class Catalog_seed():
                               dtype=('i', 'f', 'f', 'S14', 'S14', 'f', 'f', 'f', 'f', 'f'))
 
         try:
-            lines, pixelflag, magsys = self.readPointSourceFile(filename)
+            lines, pixelflag, magsys = self.read_point_source_file(filename)
             if pixelflag:
                 print("Extended source list input positions assumed to be in units of pixels.")
             else:
@@ -3744,7 +3831,7 @@ class Catalog_seed():
                 # the psf size. This is so the upcoming convolution will
                 # produce an output that includes the wings of the PSF
                 psf_dimensions = np.array(self.psf_library.data.shape[-2:])
-                psf_shape = np.array((psf_dimensions / self.psf_library.oversampling) -
+                psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
                                      self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
                 if ((stamp_dims[0] < psf_shape[0]) or (stamp_dims[1] < psf_shape[1])):
                     stamp = self.enlarge_stamp(stamp, psf_shape)
