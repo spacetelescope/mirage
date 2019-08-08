@@ -437,7 +437,6 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
     # opening and examining all files in the library.
     if wings_file is None:
         # Find the file containing the PSF wings
-        print('Looking for PSF wings file')
         wings_file = get_library_file(instrument, detector, filtername, pupilname,
                                       wavefront_error, wavefront_error_group, library_path, wings=True)
 
