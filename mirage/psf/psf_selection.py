@@ -287,7 +287,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
             # Compare the header entries to the user input
             file_inst = header['INSTRUME'].upper()
-            file_det = header['DETECTOR'].upper()
+            try:
+                file_det = header['DETECTOR'].upper()
+            except KeyError:
+                file_det = header['DET_NAME'].upper()
             file_filt = header['FILTER'].upper()
 
             try:
@@ -340,7 +343,9 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             match = (file_inst == instrument
                      and file_det == detector
                      and file_filt == filt
-                     and file_pupil == pupil)
+                     and file_pupil == pupil
+                     and file_wfe == wfe)
+
             if not wings and segment_id is None and not itm_sim and default_psf:
                 match = match and file_wfe_grp == wfe_group
             if segment_id is not None:
@@ -351,13 +356,17 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             # If so, add to the list of all matches
             if match:
                 matches.append(filename)
-        except KeyError:
+        except KeyError as e:
+            print('looking for PSF wing file raised Error:\n{}\nContinuing.'.format(e))
             continue
 
     # Find files matching the requested inputs
     if len(matches) == 1:
         return matches[0]
     elif len(matches) == 0:
+        print('Requested parameters:\ninstrument {}\ndetector {}\nfilt {}\npupil {}\nwfe {}\n'
+              'wfe_group {}\nlibrary_path {}\n'.format(instrument, detector, filt, pupil, wfe,
+                                                       wfe_group, library_path))
         raise ValueError("No PSF library file found matching requested parameters.")
     elif len(matches) > 1:
         raise ValueError("More than one PSF library file matches requested parameters: {}".format(matches))
@@ -428,6 +437,7 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
     # opening and examining all files in the library.
     if wings_file is None:
         # Find the file containing the PSF wings
+        print('Looking for PSF wings file')
         wings_file = get_library_file(instrument, detector, filtername, pupilname,
                                       wavefront_error, wavefront_error_group, library_path, wings=True)
 
