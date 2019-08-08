@@ -490,7 +490,7 @@ def get_pointing_stub(obstart, obsend):
 
 def compute_local_roll(pa_v3, ra_ref, dec_ref, v2_ref, v3_ref):
     """
-    Computes the position angle of V3 (measured N to E) at the center af an aperture.
+    Computes the position angle of V3 (measured N to E) at the reference point of an aperture.
 
     Parameters
     ----------

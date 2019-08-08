@@ -1524,7 +1524,7 @@ class SimInput:
                 pav3_value = input['pav3']
             else:
                 pav3_value = input['PAV3']
-            f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(pav3_value))
+            f.write('  rotation: {}                    # PA_V3 in degrees, i.e. the position angle of the V3 axis at V1 (V2=0, V3=0) measured from N to E.\n'.format(pav3_value))
             f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
             f.write('\n')
             f.write('newRamp:\n')
