@@ -274,6 +274,9 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     pupil = pupil.upper()
     wfe = wfe.lower()
 
+    # set default
+    file_wfe = ''
+
     # handle the NIRISS NRM case
     if pupil == 'NRM':
         pupil = 'MASK_NRM'
