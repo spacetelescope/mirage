@@ -40,6 +40,7 @@ import numpy as np
 from astropy.io import fits, ascii
 from astropy.table import Table
 from astropy.time import Time, TimeDelta
+import pysiaf
 
 from . import unlinearize
 from ..utils import read_fits, utils, siaf_interface
@@ -2585,8 +2586,10 @@ class Observation():
         outModel.meta.target.dec = self.dec
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
-        outModel.meta.pointing.ra_v1 = self.ra
-        outModel.meta.pointing.dec_v1 = self.dec
+        # compute pointing of V1 axis
+        pointing_ra_v1, pointing_dec_v1 = pysiaf.rotations.pointing(self.attitude_matrix, 0., 0.)
+        outModel.meta.pointing.ra_v1 = pointing_ra_v1
+        outModel.meta.pointing.dec_v1 = pointing_dec_v1
         outModel.meta.pointing.pa_v3 = self.params['Telescope']['rotation']
 
         ramptime = self.frametime * (1 + self.params['Readout']['ngroup'] *
@@ -2863,8 +2866,10 @@ class Observation():
         outModel[0].header['TARG_DEC'] = self.dec  # not correct
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
-        outModel[0].header['RA_V1'] = self.ra
-        outModel[0].header['DEC_V1'] = self.dec
+        # compute pointing of V1 axis
+        pointing_ra_v1, pointing_dec_v1 = pysiaf.rotations.pointing(self.attitude_matrix, 0., 0.)
+        outModel[0].header['RA_V1'] = pointing_ra_v1
+        outModel[0].header['DEC_V1'] = pointing_dec_v1
         outModel[0].header['PA_V3'] = self.params['Telescope']['rotation']
 
         ramptime = self.frametime * (1 + self.params['Readout']['ngroup'] *

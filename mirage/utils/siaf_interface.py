@@ -71,7 +71,7 @@ def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, 
         Dec value of pointing in degrees
 
     telescope_roll : float
-        Position angle of the telescope in degrees
+        PA_V3, Position angle of the telescope in degrees
 
     v2_arcsec : float
         The V2 value in arcseconds of the reference location for the
