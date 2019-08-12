@@ -357,7 +357,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             if match:
                 matches.append(filename)
         except KeyError as e:
-            print(e)
+            print('looking for PSF wing file raised Error:\n{}\nContinuing.'.format(e))
             continue
 
     # Find files matching the requested inputs
