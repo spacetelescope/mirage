@@ -31,6 +31,7 @@ Use
 from copy import copy
 from glob import glob
 import os
+import warnings
 
 from astropy.io import fits
 import numpy as np
@@ -357,7 +358,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             if match:
                 matches.append(filename)
         except KeyError as e:
-            print('While searching for PSF file, error raised when examining {}:\n{}\nContinuing.'.format(os.path.basename(filename), e))
+            warnings.warn('While searching for PSF file, error raised when examining {}:\n{}\nContinuing.'.format(os.path.basename(filename), e))
             continue
 
     # Find files matching the requested inputs
