@@ -3061,6 +3061,10 @@ class Catalog_seed():
         segmentation.ydim = yd
         segmentation.initialize_map()
 
+        # Create table of point source countrate versus psf size
+        if self.add_psf_wings is True:
+            self.translate_psf_table(magsys)
+
         # For each entry, create an image, and place it onto the final output image
         for entry in galaxylist:
 
@@ -3076,7 +3080,7 @@ class Catalog_seed():
 
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
-                                       xposang*np.pi/180., entry['counts_per_frame_e'])
+                                       xposang*np.pi/180., entry['countrate_e/s'])
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -3084,14 +3088,19 @@ class Catalog_seed():
             # produce an output that includes the wings of the PSF
             galdims = stamp.shape
 
-            # *******OR SHOULD WE ALWAYS CONVOLVE WITH A LARGER PSF? IF PSF IS SMALL,
-            # THIS WILL ARTIFICIALLY PUSH SIGNAL TOWARDS THE CORE OF THE GALAXY, I THINK.
-            #psf_dimensions = self.find_psf_size(entry['countrate_e/s'])
-            #psf_shape = np.array([psf_dimensions, psf_dimensions])
-
+            #print('Uncomment the lines below to return to the case where only the')
+            #print('PSF core is used for convolution')
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
             psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
                                  self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
+
+
+            # Find the PSF size to use based on the countrate
+            #print('\n\nTEST OF INCLUDING WINGS IN PSF TO CONVOLVE WITH GALAXY\n\n')
+            #psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
+            #psf_shape = [psf_x_dim, psf_x_dim]
+            #print('\n\nTEST OF INCLUDING WINGS IN PSF TO CONVOLVE WITH GALAXY\n\n')
+
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 # print('Enlarging galaxy stamp to be the same size or larger than the psf')
                 stamp = self.enlarge_stamp(stamp, psf_shape)
@@ -3100,6 +3109,10 @@ class Catalog_seed():
             # Get the PSF which will be convolved with the galaxy profile
             psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                          psf_shape[1], psf_shape[0], ignore_detector=True)
+
+            # Normalize the signal in the PSF stamp so that the final galaxy
+            # signal will match the requested value
+            psf_image = psf_image / np.sum(psf_image)
 
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
@@ -3390,7 +3403,7 @@ class Catalog_seed():
         for entry, stamp in zip(extSources, extStamps):
             stamp_dims = stamp.shape
 
-            stamp *= entry['counts_per_frame_e']
+            stamp *= entry['countrate_e/s']
 
             # If the stamp needs to be convolved with the NIRCam PSF,
             # create the correct PSF  here and read it in
@@ -3409,6 +3422,10 @@ class Catalog_seed():
                 # Create the PSF
                 psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                              psf_shape[1], psf_shape[0], ignore_detector=True)
+
+                # Normalize the PSF so that the final signal in the extended
+                # source mathces the requested signal
+                psf_image = psf_image / np.sum(psf_image)
 
                 # If the source subpixel location is beyond 0.5 (i.e. the edge
                 # of the pixel), then we shift the wing->core offset by 1.

@@ -262,8 +262,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
     # Determine if the PSF path is default or not
     mirage_dir = expand_environment_variable('MIRAGE_DATA')
-    default_psf = library_path == os.path.join(mirage_dir,
-                                               '{}/gridded_psf_library'.format(instrument.lower()))
+    gridded_dir = os.path.join(mirage_dir, '{}/gridded_psf_library'.format(instrument.lower()))
+    if wings:
+        gridded_dir = os.path.join(gridded_dir, 'psf_wings')
+    default_psf = library_path == gridded_dir
 
     # Create a dictionary of header information for all PSF library files
     matches = []
@@ -287,11 +289,14 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
             # Compare the header entries to the user input
             file_inst = header['INSTRUME'].upper()
-            file_det = header['DETECTOR'].upper()
+            try:
+                file_det = header['DETECTOR'].upper()
+            except KeyError:
+                file_det = header['DET_NAME'].upper()
             file_filt = header['FILTER'].upper()
 
             try:
-                file_pupil = header['PUPIL_MASK'].upper()
+                file_pupil = header['PUPIL'].upper()
             except KeyError:
                 # If no pupil mask value is present, then assume the CLEAR is
                 # being used
@@ -351,7 +356,8 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             # If so, add to the list of all matches
             if match:
                 matches.append(filename)
-        except KeyError:
+        except KeyError as e:
+            print(e)
             continue
 
     # Find files matching the requested inputs
