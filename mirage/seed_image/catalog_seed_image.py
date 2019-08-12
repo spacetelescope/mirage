@@ -2079,7 +2079,6 @@ class Catalog_seed():
             Y coordinate value in the aperture corresponding to the input location
         """
         loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
-
         if self.coord_transform is not None:
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
