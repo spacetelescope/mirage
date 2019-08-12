@@ -3088,18 +3088,14 @@ class Catalog_seed():
             # produce an output that includes the wings of the PSF
             galdims = stamp.shape
 
-            #print('Uncomment the lines below to return to the case where only the')
-            #print('PSF core is used for convolution')
+            # Using the PSF "core" normalized to 1 will keep more light near
+            # the core of the galaxy, compared to the more rigorous
+            # approach that uses the full convolution including the wings.
+            # Whether this is a problem or not will depend on the relative
+            # sizes of the photometry aperture versus the extended source.
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
             psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
                                  self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
-
-
-            # Find the PSF size to use based on the countrate
-            #print('\n\nTEST OF INCLUDING WINGS IN PSF TO CONVOLVE WITH GALAXY\n\n')
-            #psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
-            #psf_shape = [psf_x_dim, psf_x_dim]
-            #print('\n\nTEST OF INCLUDING WINGS IN PSF TO CONVOLVE WITH GALAXY\n\n')
 
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 # print('Enlarging galaxy stamp to be the same size or larger than the psf')
@@ -3420,6 +3416,11 @@ class Catalog_seed():
                     stamp_dims = stamp.shape
 
                 # Create the PSF
+                # Using the PSF "core" normalized to 1 will keep more light near
+                # the core of the galaxy, compared to the more rigorous
+                # approach that uses the full convolution including the wings.
+                # Whether this is a problem or not will depend on the relative
+                # sizes of the photometry aperture versus the extended source.
                 psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                              psf_shape[1], psf_shape[0], ignore_detector=True)
 
