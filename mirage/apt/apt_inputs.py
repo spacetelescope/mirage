@@ -850,6 +850,10 @@ def get_filters(pointing_info):
     """Return a dictionary of instruments and filters contained within a
     pointing dictionary from an APT file.
 
+    This function is aware that sometimes filters are installed in pupil wheels,
+    and also that some wheels contain non-filter items such as the NIRCam
+    weak lenses. It will return a list of those items that are indeed spectral bandpass filters.
+
     Parameters
     ----------
     pointing_info : dict
@@ -878,6 +882,9 @@ def get_filters(pointing_info):
 
             filter_list = list(set(short_pupils))
             filter_list.remove('CLEAR')
+            for wfsc_optic in  ['WLP8', 'WLM8', 'GDHS0', 'GDHS60']:
+                if wfsc_optic in filter_list:
+                    filter_list.remove(wfsc_optic)
 
             filter_list.extend(list(set(long_pupils)))
             filter_list.remove('CLEAR')

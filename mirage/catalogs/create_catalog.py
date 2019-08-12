@@ -1338,7 +1338,7 @@ def make_filter_names(instrument, filters):
     niriss_filter_names = ['niriss_{}_magnitude'.format(filt.lower()) for filt in niriss_filters]
     nircam_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F150W2',
                       'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
-                      'F212N', 'F250M', 'F277W', 'F300M', 'F322W2', 'F323N',
+                      'F212N', 'WLP4',  'F250M', 'F277W', 'F300M', 'F322W2', 'F323N',
                       'F335M', 'F356W', 'F360M', 'F405N', 'F410M', 'F430M',
                       'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
     nircam_filter_names = ['nircam_{}_magnitude'.format(filt.lower()) for filt in nircam_filters]

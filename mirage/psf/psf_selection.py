@@ -297,7 +297,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             file_filt = header['FILTER'].upper()
 
             try:
-                file_pupil = header['PUPIL_MASK'].upper()
+                file_pupil = header['PUPIL'].upper()
             except KeyError:
                 # If no pupil mask value is present, then assume the CLEAR is
                 # being used
