@@ -291,6 +291,11 @@ def test_locations():
     test like this because Travis does not have access to the
     distortion reference file itself.
     """
+    # Apertures to skip for this testing. These apertures don't use the
+    # reference files in the intended way.
+    apertures_to_skip = ['NRCA5_GRISMC_WFSS', 'NRCA5_GRISMR_WFSS', 'NRCB5_GRISMC_WFSS',
+                         'NRCB5_GRISMR_WFSS', 'NIS_SUBSTRIP96', 'NIS_SUBSTRIP256']
+
     # RA, Dec of pointing
     c = catalog_seed_image.Catalog_seed()
 
@@ -307,24 +312,18 @@ def test_locations():
         dec_entry = pointing_dec + delta
         ra_list.append(ra_entry)
         dec_list.append(dec_entry)
-    print(ra_list)
-    print(dec_list)
 
     xy_vals = {}
     instrument_list = ['nircam', 'niriss', 'fgs']
 
-    #for instrument, aperture_list in zip(instrument_list, [nircam_apertures, niriss_apertures, fgs_apertures]):
     for instrument in instrument_list:
         siaf = siaf_interface.get_instance(instrument)
         for aperture in siaf.apernames:
-            if 'WEDGE' in aperture or 'MASK' in aperture or aperture in ['NRCA5_GRISMC_WFSS', 'NRCA5_GRISMR_WFSS', 'NRCB5_GRISMC_WFSS', 'NRCB5_GRISMR_WFSS', 'NIS_SUBSTRIP96', 'NIS_SUBSTRIP256']:
+            if 'WEDGE' in aperture or 'MASK' in aperture or aperture in apertures_to_skip:
                 continue
-            print('instrument: ', instrument)
-            print('aperture: ', aperture)
 
             key_value = '{}_{}'.format(instrument, aperture)
             if key_value not in reference_file_values.keys():
-                print('Skipping {}'.format(key_value))
                 continue
 
             c.local_roll, c.attitude_matrix, c.ffsize, \
@@ -347,10 +346,5 @@ def test_locations():
 
             # Set the tolerance to be pretty high, so that filter-specific
             # differences hopefully won't be caught
-            print(xvals_from_siaf)
-            print(reference_file_values['{}_{}'.format(instrument, aperture)][0])
-            print('')
-            print(yvals_from_siaf)
-            print(reference_file_values['{}_{}'.format(instrument, aperture)][1])
             assert np.allclose(xvals_from_siaf, reference_file_values['{}_{}'.format(instrument, aperture)][0], atol=0.5)
             assert np.allclose(yvals_from_siaf, reference_file_values['{}_{}'.format(instrument, aperture)][1], atol=0.5)
