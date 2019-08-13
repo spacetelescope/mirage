@@ -171,6 +171,11 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     index = siaf_aperture_definitions['AperName'].tolist().index(aperture_name)
     aperture._parent_apertures = siaf_aperture_definitions['parent_apertures'][index]
 
+    # If multiuple apertures are listed as parents keep only the first
+    if ';' in aperture._parent_apertures:
+        print('Multiple parent apertures: {}'.format(aperture._parent_apertures))
+        aperture._parent_apertures = aperture._parent_apertures.split(';')[0]
+
     if aperture_name in master_aperture_names:
         # if master aperture, use it directly to transform to science frame
         x_sci, y_sci = aperture.det_to_sci(x_det, y_det)
