@@ -2686,6 +2686,8 @@ class Catalog_seed():
         if self.coord_transform is not None:
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
+            pixelx -= self.subarray_bounds[0]
+            pixely -= self.subarray_bounds[1]
         else:
             # print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
@@ -2751,6 +2753,8 @@ class Catalog_seed():
             Declination value in DD:MM:SS
         """
         if self.coord_transform is not None:
+            pixelx += self.subarray_bounds[0]
+            pixely += self.subarray_bounds[1]
             loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
             # Use SIAF to do the calculations if the distortion reffile is
