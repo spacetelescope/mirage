@@ -377,16 +377,26 @@ class AptInput:
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
+        # fix data for filename generation
+        # set parallel seq id
+        for j, isparallel in enumerate(self.exposure_tab['ParallelInstrument']):
+            if isparallel:
+                self.exposure_tab['sequence_id'][j] = '2'
+
+        # set exposure number (new sequence for every combination of seq id and act id)
+        temp_table = Table([self.exposure_tab['sequence_id'], self.exposure_tab['exposure'], self.exposure_tab['act_id']], names=('sequence_id', 'exposure', 'act_id'))
+        for act_id in np.unique(temp_table['act_id']):
+            prime_index = np.where((temp_table['sequence_id'] == '1') & (temp_table['act_id'] == act_id))[0]
+            temp_table['exposure'][prime_index] = ['{:05d}'.format(n+1) for n in np.arange(len(prime_index))]
+            parallel_index = np.where((temp_table['sequence_id'] == '2') & (temp_table['act_id'] == act_id))[0]
+            temp_table['exposure'][parallel_index] = ['{:05d}'.format(n+1) for n in np.arange(len(parallel_index))]
+        self.exposure_tab['exposure'] = list(temp_table['exposure'])
+
         self.check_aperture_override()
 
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
-
-        #detectors_file = os.path.join(self.output_dir,
-        #                              '{}_expanded_for_detectors.csv'.format(infile.split('.')[0]))
-        #ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
-        #print('Wrote exposure table to {}'.format(detectors_file))
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
@@ -674,7 +684,7 @@ class AptInput:
                                 skip = True
 
                             if skip:
-                                act_counter += 1
+                                # act_counter += 1
                                 continue
                             act = self.base36encode(act_counter)
                             activity_id.append(act)
@@ -732,7 +742,7 @@ class AptInput:
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.
                             observation_id.append("V{}P{}{}{}{}".format(vid, '00000000', vgrp, seq, act))
-                            act_counter += 1
+                            # act_counter += 1
 
                     except ValueError as e:
                         if verbose:
