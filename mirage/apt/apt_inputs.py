@@ -881,25 +881,40 @@ def get_filters(pointing_info):
             long_filter_only = np.where(long_pupils == 'CLEAR')[0]
 
             filter_list = list(set(short_pupils))
-            filter_list.remove('CLEAR')
-            for wfsc_optic in  ['WLP8', 'WLM8', 'GDHS0', 'GDHS60']:
-                if wfsc_optic in filter_list:
-                    filter_list.remove(wfsc_optic)
+            sw_pupil_vals_to_skip = ['CLEAR', 'WLP8', 'WLM8', 'GDHS0', 'GDHS60',
+                                     'MASKBAR', 'MASKIPR', 'MASKRND', 'PINHOLES']
+            for skipped_optic in  sw_pupil_vals_to_skip:
+                if skipped_optic in filter_list:
+                    filter_list.remove(skipped_optic)
 
-            filter_list.extend(list(set(long_pupils)))
-            filter_list.remove('CLEAR')
+            long_pupil_set = list(set(long_pupils))
+            lw_pupil_vals_to_skip = ['CLEAR', 'GRISMR', 'GRISMC', 'MASKBAR',
+                                     'MASKIPR', 'MASKRND', 'PINHOLES']
+            for optic_to_skip in lw_pupil_vals_to_skip:
+                if optic_to_skip in long_pupil_set:
+                    long_pupil_set.remove(optic_to_skip)
 
+            filter_list.extend(long_pupil_set)
             filter_list.extend(list(set(short_filters[short_filter_only])))
             filter_list.extend(list(set(long_filters[long_filter_only])))
 
         else:
+            pupil_vals_to_skip = ['CLEARP', 'GR700XD', 'NRM']
+            filter_vals_to_skip = ['CLEAR', 'GR150R', 'GR150C']
             short_filters = np.array(pointing_info['FilterWheel'])[good]
             short_pupils = np.array(pointing_info['PupilWheel'])[good]
 
             short_filter_only = np.where(short_pupils == 'CLEAR')[0]
-            filter_list = list(set(short_pupils))
-            filter_list.remove('CLEAR')
-            filter_list.append(list(set(short_filters[short_filter_only])))
+            short_pupil_list = list(set(short_pupils))
+            for optic_to_skip in pupil_vals_to_skip:
+                if optic_to_skip in short_pupil_list:
+                    short_pupil_list.remove(optic_to_skip)
+            filter_list = short_pupil_list
+            filter_list.extend(list(set(short_filters[short_filter_only])))
+
+            for optic_to_skip in pupil_vals_to_skip+filter_vals_to_skip:
+                if optic_to_skip in filter_list:
+                    filter_list.remove(optic_to_skip)
 
         filters[inst.upper()] = filter_list
     return filters

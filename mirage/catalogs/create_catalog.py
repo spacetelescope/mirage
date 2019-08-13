@@ -116,6 +116,12 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
     galaxy_catalog_names : list
         List of filenames of the saved galaxy catalogs
+
+    ptsrc_catalog_mapping : dict
+        Dictionary mapping point source catalog file to observation number
+
+    galaxy_catalog_mapping : dict
+        Dictionary mapping galaxy source catalog file to observation number
     """
     pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
     instrument_filter_dict = get_filters(pointing_dictionary)
