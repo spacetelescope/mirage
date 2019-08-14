@@ -729,6 +729,7 @@ class SimInput:
 
         self.info['yamlfile'] = yaml_names
         self.info['outputfits'] = fits_names
+        # Table([self.info['yamlfile']]).pprint()
 
     def set_global_definitions(self):
         """Store the subarray definitions of all supported instruments."""
