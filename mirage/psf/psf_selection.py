@@ -31,6 +31,7 @@ Use
 from copy import copy
 from glob import glob
 import os
+import warnings
 
 from astropy.io import fits
 import numpy as np
@@ -262,8 +263,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
     # Determine if the PSF path is default or not
     mirage_dir = expand_environment_variable('MIRAGE_DATA')
-    default_psf = library_path == os.path.join(mirage_dir,
-                                               '{}/gridded_psf_library'.format(instrument.lower()))
+    gridded_dir = os.path.join(mirage_dir, '{}/gridded_psf_library'.format(instrument.lower()))
+    if wings:
+        gridded_dir = os.path.join(gridded_dir, 'psf_wings')
+    default_psf = library_path == gridded_dir
 
     # Create a dictionary of header information for all PSF library files
     matches = []
@@ -360,7 +363,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             if match:
                 matches.append(filename)
         except KeyError as e:
-            print('looking for PSF wing file raised Error:\n{}\nContinuing.'.format(e))
+            warnings.warn('While searching for PSF file, error raised when examining {}:\n{}\nContinuing.'.format(os.path.basename(filename), e))
             continue
 
     # Find files matching the requested inputs
