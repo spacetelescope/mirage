@@ -45,6 +45,7 @@ import pysiaf
 from . import unlinearize
 from ..utils import read_fits, utils, siaf_interface
 from ..utils import set_telescope_pointing_separated as stp
+from mirage.utils.constants import EXPTYPES
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -1843,18 +1844,18 @@ class Observation():
 
     def get_cr_rate(self):
         """Get the base cosmic ray impact probability.
-        
-        The following values are based on JWST-STScI-001928, "A library of simulated cosmic ray events impacting 
+
+        The following values are based on JWST-STScI-001928, "A library of simulated cosmic ray events impacting
         JWST HgCdTe detectors by Massimo Robberto", Table 1, times the pixel area of 18 microns square = 3.24e-06
         square cm.  Values are in nucleon events per pixel per second.  Corresponding values from the report are
-        4.8983 nucleons/cm^2/second, 1.7783 nucleons/cm^2/second, and 3046.83 nucleons/cm^2/second.  The expected 
-        rates per full frame read (10.73677 seconds) over the whole set of 2048x2048 pixels are 715, 259, and 
+        4.8983 nucleons/cm^2/second, 1.7783 nucleons/cm^2/second, and 3046.83 nucleons/cm^2/second.  The expected
+        rates per full frame read (10.73677 seconds) over the whole set of 2048x2048 pixels are 715, 259, and
         444609 events respectively.
-        
-        Note that the SUNMIN rate is lower than the SUNMAX rate.  The MIN and MAX labels refer to the solar activity, 
+
+        Note that the SUNMIN rate is lower than the SUNMAX rate.  The MIN and MAX labels refer to the solar activity,
         and the galactic cosmic ray contribution at L2 is reduced at solar maximum compared to solar minimum.  The
-        FLARE case is for the largest solar flare event on record (see the Robberto report) and corresponds to conditions 
-        under which JWST would presumably not be operating. 
+        FLARE case is for the largest solar flare event on record (see the Robberto report) and corresponds to conditions
+        under which JWST would presumably not be operating.
         """
         self.crrate = 0.
         # The previous values were per full frame read and there was a transcription issue in Volk's code.  These
@@ -2501,19 +2502,8 @@ class Observation():
             numint, numgroup, ys, xs = ramp.shape
             outModel.zeroframe = np.zeros((numint, ys, xs))
 
-        # EXPTYPE OPTIONS
-        # exptypes = ['NRC_IMAGE', 'NRC_WFSS', 'NRC_TACQ', 'NRC_CORON',
-        #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
-        # nrc_tacq and nrc_coron are not currently implemented.
-
-        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
-                              "wfss": "NIS_WFSS"},
-                   "fgs": {"imaging": "FGS_IMAGE"}}
-
         try:
-            outModel.meta.exposure.type = exptype[self.params['Inst']['instrument'].lower()]\
+            outModel.meta.exposure.type = EXPTYPES[self.params['Inst']['instrument'].lower()]\
                 [self.params['Inst']['mode'].lower()]
         except:
             raise ValueError('EXPTYPE mapping not complete for this!!! FIX ME!')
@@ -2786,13 +2776,8 @@ class Observation():
             outModel = fits.HDUList([ex0, ex1, ex2, ex3])
             groupextnum = 3
 
-        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE"},
-                   "fgs": {"imaging": "FGS_IMAGE"}}
-
         try:
-            outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['instrument'].lower()]\
+            outModel[0].header['EXP_TYPE'] = EXPTYPES[self.params['Inst']['instrument'].lower()]\
                                              [self.params['Inst']['mode'].lower()]
         except:
             raise ValueError('EXPTYPE mapping not complete for this!!! FIX ME!')
