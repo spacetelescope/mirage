@@ -181,11 +181,13 @@ class SimInput:
         self.set_global_definitions()
         self.path_defs()
 
-        if (input_xml is not None) and (catalogs != 'None'):
+        if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
                                                      verbose=self.verbose, parameter_defaults=parameter_defaults)
+        else:
+            print('No input xml file provided. Observation dictionary not constructed.')
 
         self.reffile_setup(offline=offline)
 
