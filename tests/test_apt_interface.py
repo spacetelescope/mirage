@@ -130,19 +130,15 @@ def test_complete_input_generation(temporary_directory):
             if '.xml' in apt_file_seed:
                 apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
                 apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
-                observation_list_file = os.path.join(temporary_directory,
-                                                     '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
-
             else:
-                observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(apt_file_seed))
                 apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             print('Processing program {}'.format(apt_file_xml))
 
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                          catalogs=catalogs, observation_list_file=observation_list_file,
-                                          verbose=True, output_dir=temporary_directory, simdata_output_dir=temporary_directory,
+                                          catalogs=catalogs, verbose=True, output_dir=TEMPORARY_DIR,
+                                          simdata_output_dir=TEMPORARY_DIR,
                                           offline=True)
             try:
                 yam.create_inputs()

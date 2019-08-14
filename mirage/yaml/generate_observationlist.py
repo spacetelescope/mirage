@@ -174,9 +174,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
         Read default values from configuration file
 
     """
-    # avoid side effects
-    catalogs = copy.deepcopy(catalogs)
-
     # Read in filters from APT .xml file
     readxml_obj = read_apt_xml.ReadAPTXML()
 
@@ -209,52 +206,99 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
         unique_inst_obs = np.unique(np.array(xml_dict['ObservationID'])[inst_observations])
         number_of_obs[instrument_name.lower()] = len(unique_inst_obs)
 
-    # Strip out catalogs for any instruments that aren't used
-    input_catalogs = copy.deepcopy(catalogs)
-    for key in input_catalogs:
-        if key.upper() not in used_instruments:
-            del catalogs[key]
-
-    number_of_observations = len(unique_observation_ids)
-    number_of_exposures = len(xml_dict['ObservationID'])
-
-    # Check that the appropriate catalogs have been included
-    for inst in used_instruments:
-        if inst.lower() not in catalogs.keys():
-            raise KeyError('Missing a catalog entry for {} in the catalog dictionary.'.format(inst))
-
-    entry_numbers = []
-
     # ensure that catalog files are lists with number of elements matching the number of observations
     if not isinstance(catalogs, collections.Mapping):
-        raise ValueError('Please provide a catalog dictionary.')
+        raise TypeError('Please provide a catalog dictionary.')
 
-    for key in catalogs.keys():
-        catalog_file_list = None
-        catalog_files = None
-        if key.lower() == 'nircam':
-            # check that a dictionary is provided for nircam
-            if not isinstance(catalogs[key], collections.Mapping):
-                raise ValueError('Please provide a lw/sw dictionary for nircam.')
+    # Determine what kind of catalog has been provided
+    # input_catalogs = copy.deepcopy(catalogs)
+    if any(x in ['nircam', 'fgs', 'niriss'] for x in catalogs.keys()):
+        cat_type = 'inst'
+    elif set(catalogs.keys()) == set(['gal', 'ptsrc']):
+        cat_type = 'object'
+    else:
+        raise ValueError('Invalid catalog dictionary provided.')
+
+    # Process instrument-specific catalogs (assuming only point source)
+    input_catalogs = copy.deepcopy(catalogs)
+    ptsrc_catalog_lists = {}
+    gal_catalog_lists = {}
+    if cat_type == 'inst':
+        # Strip out catalogs for any instruments that aren't used
+        for key in catalogs:
+            if key.upper() not in used_instruments:
+                del input_catalogs[key]
+
+        # Check that the appropriate catalogs have been included
+        for inst in used_instruments:
+            if inst.lower() not in input_catalogs.keys():
+                raise KeyError('Missing a catalog entry for {} in the catalog dictionary.'.format(inst))
+
+        for inst in input_catalogs.keys():
+            if inst.lower() == 'nircam':
+                # check that a dictionary is provided for nircam
+                if not isinstance(input_catalogs[inst], collections.Mapping):
+                    raise ValueError('Please provide a lw/sw dictionary for nircam.')
+                else:
+                    ptsrc_catalog_lists[inst] = {}
+                    gal_catalog_lists[inst] = {}
+                    for module_key in input_catalogs[inst].keys():
+                        catalog_files = input_catalogs[inst][module_key]
+
+                        # If the provided catalog is a string, multiply it by
+                        # n_exposures
+                        if isinstance(catalog_files, str):
+                            catalog_file_list = [catalog_files] * number_of_obs[inst]
+                            ptsrc_catalog_lists[inst][module_key] = catalog_file_list
+                        # If the provided catalog is a list, use that
+                        elif isinstance(catalog_files, list):
+                            ptsrc_catalog_lists[inst][module_key] = catalog_files
+                        else:
+                            raise TypeError('Must provide catalogs as file path '
+                                            'strings, or a list of file path strings.')
+                        gal_catalog_lists[inst][module_key] = ['None'] * number_of_obs[inst]
+
+                        if len(ptsrc_catalog_lists[inst][module_key]) != number_of_obs[inst]:
+                            raise RuntimeError(('Please specify one catalog per observation for {}. '
+                                                'Current catalog is {}').format(key.lower(),
+                                                                                catalog_file_list))
+
             else:
-                for module_key in catalogs[key].keys():
-                    catalog_files = catalogs[key][module_key]
-                    if isinstance(catalog_files, str):
-                        catalog_file_list = [catalog_files] * number_of_obs[key]
-                        catalogs[key][module_key] = catalog_file_list
-                    if len(catalogs[key][module_key]) != number_of_obs[key]:
-                        raise RuntimeError(('Please specify one catalog per observation for {}. '
-                                            'Current catalog is {}').format(key.lower(),
-                                                                            catalogs[key][module_key]))
+                catalog_files = input_catalogs[inst]
+                if isinstance(catalog_files, str):
+                    catalog_file_list = [catalog_files] * number_of_obs[inst]
+                    ptsrc_catalog_lists[inst] = catalog_file_list
+                    gal_catalog_lists[inst] = ['None'] * number_of_obs[inst]
+                else:
+                    raise TypeError('Must provide catalogs as file path strings.')
 
-        else:
-            catalog_files = catalogs[key]
-            if isinstance(catalog_files, str):
-                catalog_file_list = [catalog_files] * number_of_obs[key]
-                catalogs[key] = catalog_file_list
-            if len(catalogs[key]) != number_of_obs[key]:
-                raise RuntimeError(('Please specify one catalog per observation for {}. '
-                                    'Current catalog is {}').format(key.lower(), catalogs[key]))
+                if len(catalog_file_list) != number_of_obs[inst]:
+                    raise RuntimeError(('Please specify one catalog per observation for {}. '
+                                        'Current catalog is {}').format(inst.lower(), catalog_file_list))
+
+    # Process object-specific catalogs (expecting one point source and one galactic catalog,
+    # each containing columns for all instruments)
+    elif cat_type == 'object':
+        ptsrc_catalog = input_catalogs['ptsrc']
+        gal_catalog = input_catalogs['gal']
+        if not (isinstance(ptsrc_catalog, str) and isinstance(gal_catalog, str)):
+            raise TypeError('Must provide catalogs as file path strings.')
+
+        for inst in used_instruments:
+            inst = inst.lower()
+            ptsrc_catalog_file_list = [ptsrc_catalog] * number_of_obs[inst]
+            gal_catalog_file_list = [gal_catalog] * number_of_obs[inst]
+
+            if inst == 'nircam':
+                ptsrc_catalog_lists[inst] = {}
+                gal_catalog_lists[inst] = {}
+                ptsrc_catalog_lists[inst]['sw'] = ptsrc_catalog_file_list
+                ptsrc_catalog_lists[inst]['lw'] = ptsrc_catalog_file_list
+                gal_catalog_lists[inst]['sw'] = gal_catalog_file_list
+                gal_catalog_lists[inst]['lw'] = gal_catalog_file_list
+            else:
+                ptsrc_catalog_lists[inst] = ptsrc_catalog_file_list
+                gal_catalog_lists[inst] = gal_catalog_file_list
 
     # if verbose:
     #     print('Summary of dictionary extracted from {}'.format(xml_file))
@@ -266,7 +310,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     default_values = {}
     default_values['Date'] = '2019-07-04'
     default_values['PAV3'] = '111.'
-    default_values['GalaxyCatalog'] = 'None'
     default_values['ExtendedCatalog'] = 'None'
     default_values['ExtendedScale'] = '1.0'
     default_values['ExtendedCenter'] = '1024,1024'
@@ -299,6 +342,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
     for inst in all_instruments:
         counter[inst] = 0
 
+    entry_numbers = []
     observation_numbers = np.unique(xml_dict['ObservationID'])
     for observation_index, observation_number in enumerate(observation_numbers):
         first_index = xml_dict['ObservationID'].index(observation_number)
@@ -332,7 +376,10 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                         "    FilterConfig:\n",
                         "      SW:\n",
                         "        Filter: {}\n".format(sw_filt),
-                        "        PointSourceCatalog: {}\n".format(catalogs[instrument.lower()]['sw'][counter[instrument]]),
+                        "        PointSourceCatalog: {}\n".format(
+                            ptsrc_catalog_lists[instrument.lower()]['sw'][counter[instrument]]),
+                        "        GalaxyCatalog: {}\n".format(
+                            gal_catalog_lists[instrument.lower()]['sw'][counter[instrument]]),
                         "        BackgroundRate: {}\n".format(default_values['BackgroundRate_sw']),
                         ]
 
@@ -343,7 +390,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
                         "      LW:\n",
                         "        Filter: {}\n".format(lw_filt),
                         "        PointSourceCatalog: {}\n".format(
-                            catalogs[instrument.lower()]['lw'][counter[instrument]]),
+                            ptsrc_catalog_lists[instrument.lower()]['lw'][counter[instrument]]),
+                        "        GalaxyCatalog: {}\n".format(
+                            gal_catalog_lists[instrument.lower()]['lw'][counter[instrument]]),
                         "        BackgroundRate: {}\n".format(
                             default_values['BackgroundRate_lw']),
                         ]
@@ -368,7 +417,10 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_defaults=None,
 
                     text += [
                         "    Filter: {}\n".format(filter_value),
-                        "    PointSourceCatalog: {}\n".format(catalogs[instrument.lower()][counter[instrument]]),
+                        "    PointSourceCatalog: {}\n".format(
+                            ptsrc_catalog_lists[instrument.lower()][counter[instrument]]),
+                        "    GalaxyCatalog: {}\n".format(
+                            gal_catalog_lists[instrument.lower()][counter[instrument]]),
                         "    BackgroundRate: {}\n".format(default_values['BackgroundRate']),
                         ]
 

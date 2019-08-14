@@ -188,16 +188,17 @@ class SimInput:
         Add list(s) of source catalogs to the table containing the
         observation information
         """
-        self.info['point_source'] = [None] * len(self.info['Module'])
-        self.info['galaxyListFile'] = [None] * len(self.info['Module'])
-        self.info['extended'] = [None] * len(self.info['Module'])
-        self.info['convolveExtended'] = [False] * len(self.info['Module'])
-        self.info['movingTarg'] = [None] * len(self.info['Module'])
-        self.info['movingTargSersic'] = [None] * len(self.info['Module'])
-        self.info['movingTargExtended'] = [None] * len(self.info['Module'])
-        self.info['movingTargToTrack'] = [None] * len(self.info['Module'])
+        n_exposures = len(self.info['Module'])
+        self.info['point_source'] = [None] * n_exposures
+        self.info['galaxyListFile'] = [None] * n_exposures
+        self.info['extended'] = [None] * n_exposures
+        self.info['convolveExtended'] = [False] * n_exposures
+        self.info['movingTarg'] = [None] * n_exposures
+        self.info['movingTargSersic'] = [None] * n_exposures
+        self.info['movingTargExtended'] = [None] * n_exposures
+        self.info['movingTargToTrack'] = [None] * n_exposures
 
-        for i in range(len(self.info['ShortFilter'])):
+        for i in range(n_exposures):
             if np.int(self.info['detector'][i][-1]) < 5:
                 filtkey = 'ShortFilter'
                 pupilkey = 'ShortPupil'
@@ -245,7 +246,7 @@ class SimInput:
             else:
                 self.info['movingTargToTrack'][i] = None
         if self.convolveExtended is True:
-            self.info['convolveExtended'] = [True] * len(self.info['Module'])
+            self.info['convolveExtended'] = [True] * n_exposures
 
     def catalog_match(self, filter, pupil, catalog_list, cattype):
         """
