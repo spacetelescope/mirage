@@ -34,9 +34,11 @@ import pysiaf
 
 from . import moving_targets
 from . import segmentation_map as segmap
+from ..reference_files import crds_tools
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
+from ..utils.constants import CRDS_FILE_TYPES
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
@@ -81,6 +83,9 @@ class Catalog_seed():
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.crds_env_variables()
+
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -104,7 +109,12 @@ class Catalog_seed():
         """MAIN FUNCTION"""
         # Read in input parameters and quality check
         self.readParameterFile()
-        self.fullPaths()
+
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict)
         self.filecheck()
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
@@ -555,13 +565,26 @@ class Catalog_seed():
 
         for key1 in pathdict:
             for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
+                if self.params[key1][key2].lower() not in ['none', 'config', 'crds']:
                     self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
                 elif self.params[key1][key2].lower() == 'config':
                     cfile = config_files['{}-{}'.format(key1, key2)]
                     fpath = os.path.join(self.modpath, 'config', cfile)
                     self.params[key1][key2] = fpath
                     print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
+                elif key2 in CRDS_FILE_TYPES.keys() and self.params[key1][key2].lower() == 'crds':
+                    # 'crds' set for one of the reference files means to
+                    # search for the best reference file currently in CRDS
+                    # and download if it is not already present in
+                    # self.crds_datadir
+                    mapping = crds_tools.get_reffiles(self.crds_dict, [CRDS_FILE_TYPES[key2]])
+                    self.params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
+                    print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+
+                    # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
+                    if key2 == 'ipc':
+                        self.params['Reffiles']['invertIPC'] = True
+
 
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
@@ -3579,7 +3602,7 @@ class Catalog_seed():
         # Load the yaml file
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except (ScannerError, FileNotFoundError, IOError) as e:
             print(e)
 

@@ -42,9 +42,10 @@ from astropy.table import Table
 from astropy.time import Time, TimeDelta
 import pysiaf
 
-from . import unlinearize
-from ..utils import read_fits, utils, siaf_interface
-from ..utils import set_telescope_pointing_separated as stp
+from mirage.ramp_generator import unlinearize
+from mirage.reference_files import crds_tools
+from mirage.utils import read_fits, utils, siaf_interface
+from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES
 from mirage import version
 
@@ -87,6 +88,9 @@ class Observation():
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.crds_env_variables()
 
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure
@@ -272,7 +276,7 @@ class Observation():
             # designed to remove IPC effects to one designed to
             # add IPC effects
             if self.params['Reffiles']['invertIPC']:
-                print("Iverting IPC kernel prior to convolving with image")
+                print("Inverting IPC kernel prior to convolving with image")
                 kernel = self.invert_ipc_kernel(kernel)
             self.kernel = np.copy(kernel)
         kshape = kernel.shape
@@ -950,15 +954,17 @@ class Observation():
 
     def create(self):
         """MAIN FUNCTION"""
-        print('')
-        print("Running observation generator....")
-        print('')
+        print("\nRunning observation generator....\n")
 
         # Read in the parameter file
         self.read_parameter_file()
 
-        # Expand all paths in order to be more condor-friendly
-        self.full_paths()
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict)
+
         self.file_check()
 
         # Get the input dark if a filename is supplied
@@ -1989,18 +1995,17 @@ class Observation():
             newkernel = np.copy(kern)
             newkernel[:, :, ys:ye, xs:xe] = realout1
 
-        if self.params['Output']['save_intermediates']:
-            # Save the inverted kernel for future simulator runs
-            h0 = fits.PrimaryHDU()
-            h1 = fits.ImageHDU(newkernel)
-            h1.header["DETECTOR"] = self.detector
-            h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
-            hlist = fits.HDUList([h0, h1])
-            indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
-            outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
-            hlist.writeto(outname, overwrite=True)
-            print(("Inverted IPC kernel saved to {} for future simulator "
-                   "runs.".format(outname)))
+        # Save the inverted kernel for future simulator runs
+        h0 = fits.PrimaryHDU()
+        h1 = fits.ImageHDU(newkernel)
+        h1.header["DETECTOR"] = self.detector
+        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+        hlist = fits.HDUList([h0, h1])
+        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+        hlist.writeto(outname, overwrite=True)
+        print(("Inverted IPC kernel saved to {} for future simulator "
+                "runs.".format(outname)))
         return newkernel
 
     def mask_refpix(self, ramp, zero):
@@ -2623,7 +2628,7 @@ class Observation():
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
         outModel.meta.dither.total_points = self.params['Output']['total_primary_dither_positions']
-        outModel.meta.dither.pattern_size = 0.0
+        outModel.meta.dither.pattern_size = 'DEFAULT'
         outModel.meta.dither.subpixel_type = self.params['Output']['subpix_dither_type']
         outModel.meta.dither.subpixel_number = self.params['Output']['subpix_dither_position']
         outModel.meta.dither.subpixel_total_points = self.params['Output']['total_subpix_dither_positions']
@@ -2900,7 +2905,7 @@ class Observation():
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']
         outModel[0].header['NUMDTHPT'] = self.params['Output']['total_primary_dither_positions']
-        outModel[0].header['PATTSIZE'] = 0.0
+        outModel[0].header['PATTSIZE'] = 'DEFAULT'
         outModel[0].header['SUBPXTYP'] = self.params['Output']['subpix_dither_type']
         outModel[0].header['SUBPXNUM'] = self.params['Output']['subpix_dither_position']
         outModel[0].header['SUBPXPNS'] = self.params['Output']['total_subpix_dither_positions']

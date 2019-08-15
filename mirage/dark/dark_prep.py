@@ -33,7 +33,8 @@ import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 
-from ..utils import read_fits, utils, siaf_interface
+from mirage.reference_files import crds_tools
+from mirage.utils import read_fits, utils, siaf_interface
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -62,6 +63,9 @@ class DarkPrep():
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.crds_env_variables()
+
     def check_params(self):
         """Check for acceptible values for the input parameters in the
         yaml file.
@@ -75,10 +79,16 @@ class DarkPrep():
         # make sure the input is a linearized dark, and not
         # a raw dark
         if self.params['Inst']['use_JWST_pipeline'] is False:
-            if self.params['Reffiles']['linearized_darkfile'] is None:
+            if self.params['Reffiles']['linearized_darkfile'].lower() == 'none':
                 raise ValueError(("WARNING: You specified no use of the JWST pipeline, but "
                                   "have not provided a linearized dark file to use. Without the "
                                   "pipeline, a raw dark cannot be used."))
+
+        # If no raw dark nor linearized dark is given, then there is no
+        # input to work with.
+        if (self.params['Reffiles']['linearized_darkfile'].lower() == 'none' and
+            self.params['Reffiles']['dark'].lower() == 'none'):
+            raise ValueError(("WARNING: No raw nor linearized dark file given. Unable to proceed."))
 
         # Make sure nframe, nskip, ngroup are all integers
         try:
@@ -648,12 +658,16 @@ class DarkPrep():
 
     def prepare(self):
         """MAIN FUNCTION"""
+        print("\nRunning dark_prep....\n")
 
         # Read in the yaml parameter file
         self.read_parameter_file()
 
-        # Expand locations to be full path names
-        self.full_paths()
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict)
         self.filecheck()
 
         # Base name for output files

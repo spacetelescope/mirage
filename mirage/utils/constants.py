@@ -32,6 +32,14 @@ FNU_MKS_UNITS = u.watt / u.m**2 / u.Hz
 CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
                         'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
 
+CRDS_FILE_TYPES = {'badpixmask': 'mask',
+                   'astrometric': 'distortion',
+                   'gain': 'gain',
+                   'ipc': 'ipc',
+                   'linearity': 'linearity',
+                   'pixelAreaMap': 'area',
+                   'saturation': 'saturation',
+                   'superbias': 'superbias'}
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when

@@ -95,6 +95,7 @@ import os
 import argparse
 from glob import glob
 from copy import deepcopy
+import datetime
 
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
@@ -104,15 +105,17 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
+from ..reference_files import crds_tools
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
+from ..utils.constants import CRDS_FILE_TYPES
 
 ENV_VAR = 'MIRAGE_DATA'
 
 
 class SimInput:
-    def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
+    def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
                  use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
                  output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
@@ -131,6 +134,41 @@ class SimInput:
         parameter_defaults : dict
             Default values of parameters like roll angle (PAV3) to pass on to observation list
             generator
+
+        reffile_defaults : str or dict
+            Controls how the CRDS reference file entries are presented in
+            the yaml file.
+
+            'crds' - The string 'crds' is used for all entries, and CRDS
+                     will be queried at run-time and appropriate files
+                     downloaded if they are not already present.
+
+            'crds_full_name' - CRDS will be queried before creating the
+                               yaml files, and actual filenames will be
+                               placed into the yaml files.
+
+            reffile_dictionary - If the user provides a dictionary of
+                                 reference file names, then the yaml file
+                                 will be populated with these names. Any
+                                 needed instrument/detector options not
+                                 present in the dictionary will default to
+                                 'crds_full_name' such that CRDS is
+                                 queried for these files. With this option,
+                                 users can use their own, non-CRDS
+                                 reference files, if desired.
+
+                                 The dictionary structure must be:
+
+                r_dict = {'nircam': {'bad_pix_mask': {'nrca1': 'bpm_a1.fits',
+                                                      'nrca2': 'bpm_a2.fits',
+                                                      'nrca3': 'crds_full_name'},
+                                     'distortion': {'nrca1': {'f070w': 'dist_a1.asdf', 'f090w': 'dist_a1.asdf'},
+                                                    'nrca2': {'f070w': 'dist_a2.asdf', 'f090w': 'dist_a2.asdf'}
+                                                   }
+                                    }
+                                    This format seems easiest assuming users
+                                    are overriding only one/few types of reference
+                                    files at a time.
         """
         self.info = {}
         self.input_xml = input_xml
@@ -142,6 +180,7 @@ class SimInput:
         self.verbose = verbose
         self.output_dir = output_dir
         self.simdata_output_dir = simdata_output_dir
+        self.reffile_defaults = reffile_defaults
 
         self.table_file = None
         self.use_nonstsci_names = False
@@ -168,6 +207,9 @@ class SimInput:
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.crds_env_variables()
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -247,6 +289,118 @@ class SimInput:
                 self.info['movingTargToTrack'][i] = None
         if self.convolveExtended is True:
             self.info['convolveExtended'] = [True] * n_exposures
+
+    def add_crds_reffile_names(self):
+        """
+        """
+        # Get all combinations of instrument, detector, filter, exp_type,
+        all_combinations = []
+        for i in range(len(self.info['Instrument'])):
+            # Get instrument information for the exposure
+            instrument = self.info['Instrument'][i]
+            detector = self.info['detector'][i]
+            if instrument == 'NIRCAM':
+                detector = 'NRC{}'.format(detector)
+                if '5' in detector:
+                    filtername = self.info['LongFilter'][i]
+                    pupilname = self.info['LongPupil'][i]
+                    detector = detector.replace('5', 'LONG')
+                else:
+                    filtername = self.info['ShortFilter'][i]
+                    pupilname = self.info['ShortPupil'][i]
+            elif instrument == 'NIRISS':
+                filtername = self.info['ShortFilter'][i]
+                pupilname = self.info['ShortPupil'][i]
+            elif instrument == 'FGS':
+                filtername = 'N/A'
+                pupilname = 'N/A'
+            readpattern = self.info['ReadoutPattern'][i]
+
+            if instrument == 'NIRCAM':
+                exptype = 'NRC_IMAGE'
+            elif instrument == 'NIRISS':
+                exptype = 'NIS_IMAGE'
+            elif instrument == 'FGS':
+                exptype = 'FGS_IMAGE'
+
+            entry = (instrument, detector, filtername, pupilname, readpattern, exptype)
+            all_combinations.append(entry)
+        combinations = list(set(all_combinations))
+
+        # Loop over combinations, create metadata dict, and get reffiles
+        for status in combinations:
+
+            # Create metadata dictionary
+            date = datetime.date.today().isoformat()
+            current_date = datetime.datetime.now()
+            time = current_date.time().isoformat()
+            status_dict = {'INSTRUME': status[0], 'DETECTOR': status[1],
+                           'FILTER': status[2], 'PUPIL': status[3],
+                           'READPATT': status[4], 'EXP_TYPE': status[5],
+                           'DATE-OBS': date, 'TIME-OBS': time,
+                           'SUBARRAY': 'FULL'}
+            if status[0] == 'NIRCAM':
+                if status[1] in ['A5', 'B5']:
+                    status_dict['CHANNEL'] = 'LONG'
+                else:
+                    status_dict['CHANNEL'] = 'SHORT'
+
+            # Query CRDS
+            print(status_dict)
+            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()))
+
+            # Identify entries in the original list that use this combination
+            match = all_combinations == status
+            self.info['superbias'][match] = reffiles['superbias']
+            self.info['linearity'][match] = reffiles['linearity']
+            self.info['saturation'][match] = reffiles['saturation']
+            self.info['gain'][match] = reffiles['gain']
+            self.info['astrometric'][match] = reffiles['distortion']
+            self.info['ipc'][match] = reffiles['ipc']
+            self.info['pixelAreaMap'][match] = reffiles['area']
+
+    def add_reffile_names_from_dict(self):
+        """Not yet implemented
+        """
+        raise TypeError("Setting reference files via a user-input dictionary is not yet supported.")
+
+        #for instrument, det in zip([s.lower() for s in self.info['Instrument']], self.info['detector']):
+        for i in range(len(self.info['Instrument'])):
+
+            # Get instrument information for the exposure
+            instrument = self.info['Instrument'][i]
+            detector = self.info['detector'][i]
+            if instrument == 'NIRCAM':
+                if '5' in detector:
+                    filtername = self.info['LongFilter'][i]
+                    pupilname = self.info['LongPupil'][i]
+                else:
+                    filtername = self.info['ShortFilter'][i]
+                    pupilname = self.info['ShortPupil'][i]
+            elif instrument == 'NIRISS':
+                filtername = self.info['ShortFilter'][i]
+                pupilname = self.info['ShortPupil'][i]
+            elif instrument == 'FGS':
+                filtername = 'N/A'
+                pupilname = 'N/A'
+
+            # Check to see if there is a corresponding entry in the provided
+            # dictionary
+            for filetype in self.reffile_defaults[instrument]:
+                try:
+                    override_file = self.reffile_defaults[instrument][filetype][detector]
+                except:
+                    something
+
+
+
+
+
+
+            print(self.info['Instrument'][i], self.info['detector'][i], self.info['Filter'][i], self.info['LongFilter'][i], self.info['ShortFilter'][i], self.info['Pupil'][i], self.info['LongPupil'][i], self.info['ShortPupil'][i])
+
+
+
 
     def catalog_match(self, filter, pupil, catalog_list, cattype):
         """
@@ -337,27 +491,72 @@ class SimInput:
         # these lists to the dictionary
         darks = []
         lindarks = []
-        superbias = []
-        linearity = []
-        saturation = []
-        gain = []
-        astrometric = []
-        ipc = []
-        pam = []
+        #superbias = []
+        #linearity = []
+        #saturation = []
+        #gain = []
+        #astrometric = []
+        #ipc = []
+        #pam = []
 
-        # detector_labels = self.info['detector']
-        # for det in detector_labels:
+
+        for i in range(224):
+            print(self.info['Instrument'][i], self.info['detector'][i], self.info['Filter'][i], self.info['LongFilter'][i], self.info['ShortFilter'][i], self.info['LongPupil'][i], self.info['ShortPupil'][i], self.info['Mode'][i], self.info['APTTemplate'][i])
+
+        for k in self.info:
+            print(k)
+
+
+        if isinstance(self.reffile_defaults, str):
+
+            # If self.reffile_defaults is set to 'crds' then print the
+            # string 'crds' in the entry for all reference files. The
+            # actual reference file names will then be identified by
+            # querying CRDS at run-time. In this way, once a yaml
+            # file has been generated, it will effectively always be
+            # up to date, even as reference files change.
+            if self.reffile_defaults == 'crds':
+                column_data = ['crds'] * len(self.info['Instrument'])
+                self.info['superbias'] = column_data
+                self.info['linearity'] = column_data
+                self.info['saturation'] = column_data
+                self.info['gain'] = column_data
+                self.info['astrometric'] = column_data
+                self.info['ipc'] = column_data
+                self.info['pixelAreaMap'] = column_data
+
+            # If self.reffile_defaults is set to 'crds_full_name' then
+            # we query CRDS now, and add the reference file names to the
+            # yaml files. This allows for easier tracing of what
+            # reference files were used to create a particular exposure.
+            # (Although that info is always saved in the header of the
+            # exposure itself, as well.)
+            elif self.reffile_defaults == 'crds_full_name':
+                self.add_crds_reffile_names()
+
+            else:
+                raise ValueError(("self.reffile_defaults is a string, but not "
+                                  "equal to 'crds' nor 'crds_full_name'. Unable "
+                                  "to proceed."))
+
+        # If self.reffile_defaults is a dictionary, then we add the
+        # filenames in the dictionary to the yaml file. Any entries
+        # not present in the dictionary will revert to 'crds'
+        elif isinstance(self.reffile_defaults, dict):
+            self.add_reffile_names_from_dict()
+
+        # Get the list of dark current files to use
         for instrument, det in zip([s.lower() for s in self.info['Instrument']], self.info['detector']):
             instrument = instrument.lower()
             darks.append(self.get_dark(instrument, det))
             lindarks.append(self.get_lindark(instrument, det))
-            superbias.append(self.get_reffile(self.superbias_list[instrument], det))
-            linearity.append(self.get_reffile(self.linearity_list[instrument], det))
-            saturation.append(self.get_reffile(self.saturation_list[instrument], det))
-            gain.append(self.get_reffile(self.gain_list[instrument], det))
-            astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
-            ipc.append(self.get_reffile(self.ipc_list[instrument], det))
-            pam.append(self.get_reffile(self.pam_list[instrument], det))
+            #superbias.append(self.get_reffile(self.superbias_list[instrument], det))
+            #linearity.append(self.get_reffile(self.linearity_list[instrument], det))
+            #saturation.append(self.get_reffile(self.saturation_list[instrument], det))
+            #gain.append(self.get_reffile(self.gain_list[instrument], det))
+            #astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
+            #ipc.append(self.get_reffile(self.ipc_list[instrument], det))
+            #pam.append(self.get_reffile(self.pam_list[instrument], det))
 
         self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
@@ -367,13 +566,15 @@ class SimInput:
         else:
             self.info['dark'] = darks
             self.info['lindark'] = [None] * len(lindarks)
-        self.info['superbias'] = superbias
-        self.info['linearity'] = linearity
-        self.info['saturation'] = saturation
-        self.info['gain'] = gain
-        self.info['astrometric'] = astrometric
-        self.info['ipc'] = ipc
-        self.info['pixelAreaMap'] = pam
+
+        print('done setting darks')
+        #self.info['superbias'] = superbias
+        #self.info['linearity'] = linearity
+        #self.info['saturation'] = saturation
+        #self.info['gain'] = gain
+        #self.info['astrometric'] = astrometric
+        #self.info['ipc'] = ipc
+        #self.info['pixelAreaMap'] = pam
 
         # Add setting describing whether JWST pipeline will be used
         self.info['use_JWST_pipeline'] = [self.use_JWST_pipeline] * len(darks)
@@ -416,6 +617,11 @@ class SimInput:
         #if 0: #for debugging
         #    for key in self.info.keys():
         #        print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
+        for key in self.info:
+            print(key)
+            print(key, len(self.info[key]))
+
+
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
         # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
