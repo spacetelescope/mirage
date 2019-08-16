@@ -90,7 +90,7 @@ class Observation():
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
         # Check that CRDS-related environment variables are set correctly
-        self.crds_datadir = crds_tools.crds_env_variables()
+        self.crds_datadir = crds_tools.env_variables()
 
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure

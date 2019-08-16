@@ -200,7 +200,7 @@ class SimInput:
         self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
 
         # Check that CRDS-related environment variables are set correctly
-        self.crds_datadir = crds_tools.crds_env_variables()
+        self.crds_datadir = crds_tools.env_variables()
         #params={'INSTRUME': 'NIRCAM', 'DETECTOR': 'NRCB3', 'FILTER': 'F187N', 'PUPIL': 'CLEAR', 'READPATT': 'SHALLOW4', 'EXP_TYPE': 'NRC_IMAGE', 'DATE-OBS': '2019-08-15', 'TIME-OBS': '21:37:58.402207', 'SUBARRAY': 'FULL', 'CHANNEL': 'SHORT'}
         #import crds
         #print('TEST3')

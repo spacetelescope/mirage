@@ -34,7 +34,7 @@ from mirage.utils.utils import ensure_dir_exists
 from mirage.utils.constants import EXPTYPES
 
 
-def crds_env_variables():
+def env_variables():
     """Check the values of the CRDS-related environment variables
 
     Returns
@@ -42,12 +42,12 @@ def crds_env_variables():
     crds_data_path : str
         Full path to the location of the CRDS reference files
     """
-    crds_data_path = crds_path_check()
-    crds_server_check()
+    crds_data_path = path_check()
+    server_check()
     return crds_data_path
 
 
-def crds_path_check():
+def path_check():
     """Check that the CRDS_PATH environment variable is set. This will be
     the location to which CRDS reference files are downloaded. If the env
     variable is not set, default to use $HOME/crds_cache/
@@ -68,7 +68,7 @@ def crds_path_check():
         return crds_path
 
 
-def crds_server_check():
+def server_check():
     """Check that the CRDS_SERVER_URL environment variable is set. This
     controls where Mirage will look for CRDS information. If the env
     variable is not set, set it to the JWST CRDS server.

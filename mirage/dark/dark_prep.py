@@ -64,7 +64,7 @@ class DarkPrep():
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
 
         # Check that CRDS-related environment variables are set correctly
-        self.crds_datadir = crds_tools.crds_env_variables()
+        self.crds_datadir = crds_tools.env_variables()
 
     def check_params(self):
         """Check for acceptible values for the input parameters in the
