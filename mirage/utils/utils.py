@@ -299,6 +299,17 @@ def full_paths(params, module_path, crds_dictionary):
     return params
 
 
+def get_all_reffiles(param_dict):
+    """
+    """
+    # Place import statement here in order to avoid circular import
+    # with crd_tools
+    from mirage.reference_files import crds_tools
+
+    mapping = crds_tools.get_reffiles(param_dict, list(CRDS_FILE_TYPES.values()))
+    return mapping
+
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.

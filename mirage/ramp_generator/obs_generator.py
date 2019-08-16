@@ -1800,54 +1800,6 @@ class Observation():
             outramp[i, :, :] = accumimage
         return outramp, zeroframe
 
-    def full_paths(self):
-        """Expand all input paths to be full paths
-        This is to allow for easier Condor-ization of many runs."""
-        pathdict = {'Reffiles': ['dark', 'linearized_darkfile',
-                                 'superbias', 'badpixmask',
-                                 'subarray_defs', 'readpattdefs',
-                                 'linearity', 'saturation', 'gain',
-                                 'pixelflat', 'illumflat',
-                                 'astrometric',
-                                 'ipc', 'crosstalk', 'occult',
-                                 'filtpupilcombo', 'pixelAreaMap',
-                                 'flux_cal'],
-                    'cosmicRay': ['path'],
-                    'simSignals': ['pointsource', 'psfpath',
-                                   'galaxyListFile', 'extended',
-                                   'movingTargetList',
-                                   'movingTargetSersic',
-                                   'movingTargetExtended',
-                                   'movingTargetToTrack'],
-                    'Output': ['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'Reffiles-filtpupilcombo': 'nircam_filter_pupil_pairings.list'},
-                            'niriss': {'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-flux_cal': 'niriss_zeropoints.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'Reffiles-filtpupilcombo': 'niriss_dual_wheel_list.txt'},
-                            'fgs': {'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'Reffiles-filtpupilcombo': 'guider_filter_dummy.list'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
     def get_cr_rate(self):
         """Get the base cosmic ray impact probability.
 

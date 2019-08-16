@@ -527,65 +527,6 @@ class Catalog_seed():
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
-    def fullPaths(self):
-        # Expand all input paths to be full paths
-        # This is to allow for easier Condor-ization of
-        # many runs
-        pathdict = {'Reffiles':['dark', 'linearized_darkfile', 'superbias',
-                                'subarray_defs', 'linearity',
-                                'saturation', 'gain', 'pixelflat',
-                                'illumflat', 'ipc', 'astrometric',
-                                'crosstalk', 'occult', 'pixelAreaMap',
-                                'flux_cal', 'readpattdefs', 'filter_throughput'],
-                    'simSignals':['pointsource', 'psfpath', 'galaxyListFile', 'extended',
-                                  'movingTargetList', 'movingTargetSersic',
-                                  'movingTargetExtended', 'movingTargetToTrack',
-                                  'psf_wing_threshold_file'],
-                    'Output':['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-filter_throughput': 'placeholder.txt',
-                                       'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt'},
-                            'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-flux_cal': 'niriss_zeropoints.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-filter_throughput': 'placeholder.txt',
-                                       'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt'},
-                            'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-filter_throughput': 'placeholder.txt',
-                                    'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config', 'crds']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-                elif key2 in CRDS_FILE_TYPES.keys() and self.params[key1][key2].lower() == 'crds':
-                    # 'crds' set for one of the reference files means to
-                    # search for the best reference file currently in CRDS
-                    # and download if it is not already present in
-                    # self.crds_datadir
-                    mapping = crds_tools.get_reffiles(self.crds_dict, [CRDS_FILE_TYPES[key2]])
-                    self.params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
-                    print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
-
-                    # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
-                    if key2 == 'ipc':
-                        self.params['Reffiles']['invertIPC'] = True
-
-
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
         countrate image containing the static sources

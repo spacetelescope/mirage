@@ -388,63 +388,6 @@ class DarkPrep():
         for ref in rlist:
             self.ref_check(ref)
 
-    def full_paths(self):
-        """Expand all input paths to be full paths
-        This is to allow for easier Condor-ization of
-        many runs"""
-        pathdict = {'Reffiles': ['dark', 'linearized_darkfile',
-                                 'superbias', 'subarray_defs', 'readpattdefs',
-                                 'linearity', 'saturation', 'gain', 'pixelflat',
-                                 'illumflat', 'astrometric', 'badpixmask',
-                                 'ipc', 'crosstalk',
-                                 'occult', 'pixelAreaMap'],
-                    'cosmicRay': ['path'],
-                    'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
-                                   'extended', 'movingTargetList',
-                                   'movingTargetSersic',
-                                   'movingTargetExtended',
-                                   'movingTargetToTrack'],
-                    'newRamp': ['dq_configfile', 'sat_configfile',
-                                'superbias_configfile', 'refpix_configfile',
-                                'linear_configfile'],
-                    'Output': ['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'newRamp-dq_configfile': 'dq_init.cfg',
-                                       'newRamp-sat_configfile': 'saturation.cfg',
-                                       'newRamp-superbias_configfile': 'superbias.cfg',
-                                       'newRamp-refpix_configfile': 'refpix.cfg',
-                                       'newRamp-linear_configfile': 'linearity.cfg'},
-                            'niriss': {'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'newRamp-dq_configfile': 'dq_init.cfg',
-                                       'newRamp-sat_configfile': 'saturation.cfg',
-                                       'newRamp-superbias_configfile': 'superbias.cfg',
-                                       'newRamp-refpix_configfile': 'refpix.cfg',
-                                       'newRamp-linear_configfile': 'linearity.cfg'},
-                            'fgs': {'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'newRamp-dq_configfile': 'dq_init.cfg',
-                                    'newRamp-sat_configfile': 'saturation.cfg',
-                                    'newRamp-superbias_configfile': 'superbias.cfg',
-                                    'newRamp-refpix_configfile': 'refpix.cfg',
-                                    'newRamp-linear_configfile': 'linearity.cfg'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
     def get_base_dark(self):
         """Read in the dark current ramp that will serve as the
         base for the simulated ramp"""
