@@ -1534,60 +1534,60 @@ class SimInput:
 
         # superbias
         try:
-            files['superbias'] = self.reffile_defaults[instrument]['superbias'][detector][readpattern]
+            files['superbias'] = self.reffile_overrides[instrument]['superbias'][detector][readpattern]
         except KeyError:
             superbias = 'none'
 
         # linearity
         try:
-            files['linearity'] = self.reffile_defaults[instrument]['linearity'][detector]
+            files['linearity'] = self.reffile_overrides[instrument]['linearity'][detector]
         except KeyError:
             files['linearity'] = 'none'
 
         # saturation
         try:
-            files['saturation'] = self.reffile_defaults[instrument]['saturation'][detector]
+            files['saturation'] = self.reffile_overrides[instrument]['saturation'][detector]
         except KeyError:
             files['saturation'] = 'none'
 
         # gain
         try:
-            files['gain'] = self.reffile_defaults[instrument]['gain'][detector]
+            files['gain'] = self.reffile_overrides[instrument]['gain'][detector]
         except KeyError:
             files['gain'] = 'none'
 
         # distortion
         try:
             if instrument == 'nircam':
-                files['distortion'] = self.reffile_defaults[instrument]['distortion'][detector][filtername][exptype]
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][filtername][exptype]
             elif instrument == 'niriss':
-                files['distortion'] = self.reffile_defaults[instrument]['distortion'][detector][pupilname][exptype]
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][pupilname][exptype]
             elif instrument == 'fgs':
-                files['distortion'] = self.reffile_defaults[instrument]['distortion'][detector][exptype]
-            except KeyError:
-                files['distortion'] = 'none'
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][exptype]
+        except KeyError:
+            files['distortion'] = 'none'
 
         # ipc
         try:
-            files['ipc'] = self.reffile_defaults[instrument]['ipc'][detector]
+            files['ipc'] = self.reffile_overrides[instrument]['ipc'][detector]
         except KeyError:
             files['ipc'] = 'none'
 
         # pixel area map
         try:
             if instrument in ['nircam, niriss']:
-                files['area'] = self.reffile_defaults[instrument]['area'][detector][filtername][pupilname][exptype]
+                files['area'] = self.reffile_overrides[instrument]['area'][detector][filtername][pupilname][exptype]
             elif instrument == 'fgs':
-                files['area'] = self.reffile_defaults[instrument]['area'][detector]
-            except KeyError:
-                files['area'] = 'none'
+                files['area'] = self.reffile_overrides[instrument]['area'][detector]
+        except KeyError:
+            files['area'] = 'none'
 
         # bad pixel map
         try:
             if instrument in ['nircam', 'niriss']:
-                files['badpixmask'] = self.reffile_defaults[instrument]['badpixmask'][detector]
+                files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector]
             elif instrument == 'fgs':
-                files['badpixmask'] = self.reffile_defaults[instrument]['badpixmask'][detector][exptype]
+                files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector][exptype]
         except KeyError:
             files['badpixmask'] = 'none'
 

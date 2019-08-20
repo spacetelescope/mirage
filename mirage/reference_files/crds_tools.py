@@ -154,9 +154,7 @@ def get_reffiles(parameter_dict, reffile_types):
     # variables are set in the functions above
     import crds
 
-    print('crds.URL is: {}'.format(crds.URL))
     crds.URL = 'https://jwst-crds.stsci.edu'
-    print('crds.URL is: {}'.format(crds.URL))
     reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
     #reffile_mapping = crds.getrecommendations(parameter_dict, reftypes=reffile_types)
     if reffile_mapping == 'N/A':
