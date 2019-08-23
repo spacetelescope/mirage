@@ -107,14 +107,14 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
                            'badpixmask': {detector_name: 'reffile_name.fits'}
                            },
-                'niriss': {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
-                           'linearity':  {detector_name: 'reffile_name.fits'},
-                           'saturation': {detector_name: 'reffile_name.fits'},
-                           'gain':       {detector_name: 'reffile_name.fits'},
+                'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
+                           'linearity':  'reffile_name.fits',
+                           'saturation': 'reffile_name.fits',
+                           'gain':       'reffile_name.fits',
                            'distortion': {pupil: {exposure_type: 'reffile_name.fits'}},
-                           'ipc':        {detector_name: 'reffile_name.fits'},
-                           'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
-                           'badpixmask': {detector_name: 'reffile_name.fits'}
+                           'ipc':        'reffile_name.fits',
+                           'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
+                           'badpixmask': 'reffile_name.fits'
                            },
                 'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
                            'linearity':  {detector_name: 'reffile_name.fits'},

@@ -93,6 +93,7 @@ History
 import sys
 import os
 import argparse
+from copy import deepcopy
 from glob import glob
 from copy import deepcopy
 import datetime
@@ -1050,6 +1051,54 @@ class SimInput:
             self.global_psf_wing_threshold_file[instrument] = os.path.join(self.modpath, 'config', psf_wing_threshold_file)
             self.global_psfpath[instrument] = psfpath
 
+    def lowercase_dict_keys(self):
+        """To make reference file override dictionary creation easier for
+        users, allow the input keys to be case insensitive. Take the user
+        input dictionary and translate all the keys to be lower case.
+        """
+        for key in self.reffile_overrides:
+            if key.lower() != key:
+                newkey = key.lower()
+                self.reffile_overrides[newkey] = self.reffile_overrides.pop(key)
+            else:
+                newkey = key
+            if isinstance(self.reffile_overrides[newkey], dict):
+                for key2 in self.reffile_overrides[newkey]:
+                    if (key2.lower() != key2):
+                        newkey2 = key2.lower()
+                        self.reffile_overrides[newkey][newkey2] = self.reffile_overrides[newkey].pop(key2)
+                    else:
+                        newkey2 = key2
+                    if isinstance(self.reffile_overrides[newkey][newkey2], dict):
+                        for key3 in self.reffile_overrides[newkey][newkey2]:
+                            if (key3.lower() != key3):
+                                newkey3 = key3.lower()
+                                self.reffile_overrides[newkey][newkey2][newkey3] = self.reffile_overrides[newkey][newkey2].pop(key3)
+                            else:
+                                newkey3 = key3
+                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3], dict):
+                                for key4 in self.reffile_overrides[newkey][newkey2][newkey3]:
+                                    if (key4.lower() != key4):
+                                        newkey4 = key4.lower()
+                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4] = self.reffile_overrides[newkey][newkey2][newkey3].pop(key4)
+                                    else:
+                                        newkey4 = key4
+                                    if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4], dict):
+                                        for key5 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4]:
+                                            if (key5.lower() != key5):
+                                                newkey5 = key5.lower()
+                                                self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4].pop(key5)
+                                            else:
+                                                newkey5 = key5
+                                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5], dict):
+                                                for key6 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5]:
+                                                    if (key6.lower() != key6):
+                                                        newkey6 = key6.lower()
+                                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5][newkey6] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5].pop(key6)
+                                                    else:
+                                                        newkey6 = key6
+
+
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
         date_obs = []
@@ -1564,31 +1613,58 @@ class SimInput:
         readpattern = readpattern.lower()
         exptype = exptype.lower()
 
+        # Make all of the nested dictionaries such that they have case-
+        # insensitive keys. This will allow the user to use upper or lower
+        # case for keys in their input dictionaries.
+        self.lowercase_dict_keys()
+
         # CRDS uses NRCALONG rather than NRCA5.
         if 'long' in detector:
             detector = detector.replace('long', '5')
 
+        # For NIRISS, set filter and pupil names according to where they
+        # really are.
+        if instrument == 'niriss':
+            if filtername.upper() in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                temp = deepcopy(filtername)
+                filtername = deepcopy(pupilname)
+                pupilname = temp
+                if pupilname == 'clear':
+                    pupilname = 'clearp'
+
         # superbias
         try:
-            files['superbias'] = self.reffile_overrides[instrument]['superbias'][detector][readpattern]
+            if instrument in ['nircam', 'fgs']:
+                files['superbias'] = self.reffile_overrides[instrument]['superbias'][detector][readpattern]
+            elif instrument == 'niriss':
+                files['superbias'] = self.reffile_overrides[instrument]['superbias'][readpattern]
         except KeyError:
             files['superbias'] = 'none'
 
         # linearity
         try:
-            files['linearity'] = self.reffile_overrides[instrument]['linearity'][detector]
+            if instrument in ['nircam', 'fgs']:
+                files['linearity'] = self.reffile_overrides[instrument]['linearity'][detector]
+            elif instrument == 'niriss':
+                files['linearity'] = self.reffile_overrides[instrument]['linearity']
         except KeyError:
             files['linearity'] = 'none'
 
         # saturation
         try:
-            files['saturation'] = self.reffile_overrides[instrument]['saturation'][detector]
+            if instrument in ['nircam', 'fgs']:
+                files['saturation'] = self.reffile_overrides[instrument]['saturation'][detector]
+            elif instrument == 'niriss':
+                files['saturation'] = self.reffile_overrides[instrument]['saturation']
         except KeyError:
             files['saturation'] = 'none'
 
         # gain
         try:
-            files['gain'] = self.reffile_overrides[instrument]['gain'][detector]
+            if instrument in ['nircam', 'fgs']:
+                files['gain'] = self.reffile_overrides[instrument]['gain'][detector]
+            elif instrument == 'niriss':
+                files['gain'] = self.reffile_overrides[instrument]['gain']
         except KeyError:
             files['gain'] = 'none'
 
@@ -1597,7 +1673,7 @@ class SimInput:
             if instrument == 'nircam':
                 files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][filtername][exptype]
             elif instrument == 'niriss':
-                files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][pupilname][exptype]
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][pupilname][exptype]
             elif instrument == 'fgs':
                 files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][exptype]
         except KeyError:
@@ -1605,14 +1681,19 @@ class SimInput:
 
         # ipc
         try:
-            files['ipc'] = self.reffile_overrides[instrument]['ipc'][detector]
+            if instrument in ['nircam', 'fgs']:
+                files['ipc'] = self.reffile_overrides[instrument]['ipc'][detector]
+            elif instrument == 'niriss':
+                files['ipc'] = self.reffile_overrides[instrument]['ipc']
         except KeyError:
             files['ipc'] = 'none'
 
         # pixel area map
         try:
-            if instrument in ['nircam', 'niriss']:
+            if instrument == 'nircam':
                 files['area'] = self.reffile_overrides[instrument]['area'][detector][filtername][pupilname][exptype]
+            elif instrument == 'niriss':
+                files['area'] = self.reffile_overrides[instrument]['area'][filtername][pupilname][exptype]
             elif instrument == 'fgs':
                 files['area'] = self.reffile_overrides[instrument]['area'][detector]
         except KeyError:
@@ -1620,8 +1701,10 @@ class SimInput:
 
         # bad pixel map
         try:
-            if instrument in ['nircam', 'niriss']:
+            if instrument == 'nircam':
                 files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector]
+            elif instrument == 'niriss':
+                files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask']
             elif instrument == 'fgs':
                 files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector][exptype]
         except KeyError:
