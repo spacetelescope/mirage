@@ -182,7 +182,10 @@ class SimInput:
         self.verbose = verbose
         self.output_dir = output_dir
         self.simdata_output_dir = simdata_output_dir
-        self.reffile_defaults = reffile_defaults
+        if reffile_defaults in ['crds', 'crds_full_name']:
+            self.reffile_defaults = reffile_defaults
+        else:
+            raise ValueError("reffile_defaults must be 'crds' or 'crds_full_name'")
         self.reffile_overrides = reffile_overrides
 
         self.table_file = None
@@ -201,16 +204,6 @@ class SimInput:
 
         # Check that CRDS-related environment variables are set correctly
         self.crds_datadir = crds_tools.env_variables()
-        #params={'INSTRUME': 'NIRCAM', 'DETECTOR': 'NRCB3', 'FILTER': 'F187N', 'PUPIL': 'CLEAR', 'READPATT': 'SHALLOW4', 'EXP_TYPE': 'NRC_IMAGE', 'DATE-OBS': '2019-08-15', 'TIME-OBS': '21:37:58.402207', 'SUBARRAY': 'FULL', 'CHANNEL': 'SHORT'}
-        #import crds
-        #print('TEST3')
-        #test = crds.getreferences(params, ['dark'])
-        ##test = crds_tools.get_reffiles(params, ['dark'])
-        #print(test)
-        #stop
-
-
-
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -304,6 +297,7 @@ class SimInput:
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
+        ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
 
@@ -332,10 +326,25 @@ class SimInput:
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
             #sbias, lin, sat, gainfile, dist, ipcfile, pam = self.reffiles_from_dict(status)
-            manual_reffiles = self.reffiles_from_dict(status)
-            for key in manual_reffiles:
-                if manual_reffiles[key] != 'none':
-                    reffiles[key] = manual_reffiles[key]
+            if self.reffile_overrides is not None:
+                manual_reffiles = self.reffiles_from_dict(status)
+
+                if detector.upper() in ['NRCB5', 'NRCBLONG']:
+                    print('manual_reffiles is:', manual_reffiles)
+
+                for key in manual_reffiles:
+                    if manual_reffiles[key] != 'none':
+                        badpixmask keys are different in line below. reffiles uses mask while manual_reffiles uses badpixmask
+                        maybe cleaner to change inside crds_tools?
+                        reffiles[key] = manual_reffiles[key]
+
+            # Check to see if a version of the inverted IPC kernel file
+            # exists already in the same directory. If so, use that and
+            # avoid having to invert the kernel at run time.
+            inverted_file, must_invert = SimInput.inverted_ipc_kernel_check(reffiles['ipc'])
+            if not must_invert:
+                reffiles['ipc'] = inverted_file
+            reffiles['invert_ipc'] = must_invert
 
             # Identify entries in the original list that use this combination
             match = [i for i, item in enumerate(all_obs_info) if item==status]
@@ -347,8 +356,9 @@ class SimInput:
             gain_arr[match] = reffiles['gain']
             distortion_arr[match] = reffiles['distortion']
             ipc_arr[match] = reffiles['ipc']
+            ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
-            badpixmask_arr[match] = reffiles['badpixmask']
+            badpixmask_arr[match] = reffiles['mask']
 
         self.info['superbias'] = list(superbias_arr)
         self.info['linearity'] = list(linearity_arr)
@@ -356,6 +366,7 @@ class SimInput:
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
         self.info['ipc'] = list(ipc_arr)
+        self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
 
@@ -386,6 +397,9 @@ class SimInput:
             for key in manual_reffiles:
                 if manual_reffiles[key] == 'none':
                     manual_reffiles[key] = 'crds'
+
+            print('there needs to be an entry alongside the bad pixel mask in self.reffile_overrides')
+            print('that says whether the kernel needs to be inverted or not.')
 
             # Identify entries in the original list that use this combination
             match = [i for i, item in enumerate(all_obs_info) if item==status]
@@ -507,6 +521,7 @@ class SimInput:
             self.info['gain'] = column_data
             self.info['astrometric'] = column_data
             self.info['ipc'] = column_data
+            self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
             self.info['badpixmask'] = column_data
 
@@ -917,9 +932,32 @@ class SimInput:
         unique_combinations = list(set(all_combinations))
         return all_combinations, unique_combinations
 
-    def make_output_names(self):
+    @staticmethod
+    def inverted_ipc_kernel_check(filename):
+        """Given a CRDS-named IPC reference file, check for the
+        existence of a file containing the inverse kernel, which
+        is what Mirage really needs. This is based solely on filename,
+        using the prefix that Mirage prepends to a kernel filename.
+
+        Parameters
+        ----------
+        filename : str
+            Fits file containing IPC correction kernel
+
+        Returns
+        -------
+        inverted_filename : str
+            Name of fits file containing the inverted IPC kernel
+
+        exists : bool
+            True if the file already exists, False if not
         """
-        Create output yaml file names to go with all of the
+        dirname, basename = os.path.split(filename)
+        inverted_name = os.path.join(dirname, "Kernel_to_add_IPC_effects_from_{}".format(basename))
+        return inverted_name, not os.path.isfile(inverted_name)
+
+    def make_output_names(self):
+        """Create output yaml file names to go with all of the
         entries in the dictionary
         """
         yaml_names = []
@@ -1507,7 +1545,7 @@ class SimInput:
                             'provide the psf_paths in the form of a list or string, not'
                             '{}'.format(type(self.psf_paths)))
 
-    def reffiles_from_dict(obs_params):
+    def reffiles_from_dict(self, obs_params):
         """For a given set of observing parameters (instrument, detector,
         filter, etc), check to see if the user has provided any reference
         files to use. These will override the results of the CRDS query.
@@ -1526,17 +1564,21 @@ class SimInput:
         files = {}
         (instrument, detector, filtername, pupilname, readpattern, exptype) = obs_params
         instrument = instrument.lower()
-        detecotr = detector.lower()
+        detector = detector.lower()
         filtername = filtername.lower()
         pupilname = pupilname.lower()
-        readpttern = readpattern.lower()
+        readpattern = readpattern.lower()
         exptype = exptype.lower()
+
+        # CRDS uses NRCALONG rather than NRCA5.
+        if 'long' in detector:
+            detector = detector.replace('long', '5')
 
         # superbias
         try:
             files['superbias'] = self.reffile_overrides[instrument]['superbias'][detector][readpattern]
         except KeyError:
-            superbias = 'none'
+            files['superbias'] = 'none'
 
         # linearity
         try:
@@ -1575,7 +1617,7 @@ class SimInput:
 
         # pixel area map
         try:
-            if instrument in ['nircam, niriss']:
+            if instrument in ['nircam', 'niriss']:
                 files['area'] = self.reffile_overrides[instrument]['area'][detector][filtername][pupilname][exptype]
             elif instrument == 'fgs':
                 files['area'] = self.reffile_overrides[instrument]['area'][detector]
@@ -1583,9 +1625,19 @@ class SimInput:
             files['area'] = 'none'
 
         # bad pixel map
+        if detector == 'nrcb5':
+            print('Looking for:')
+            print(instrument, detector, filtername, pupilname, readpattern, exptype)
+            print(self.reffile_overrides['nircam']['badpixmask'])
+            print('\n\n\n\n\n')
         try:
             if instrument in ['nircam', 'niriss']:
                 files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector]
+                if detector == 'nrcb5':
+                    print('\n\n\nINNIRCAMNIRISS\n\n\n')
+                    print(instrument, detector)
+                    print(self.reffile_overrides[instrument]['badpixmask'][detector])
+                    print(files['badpixmask'])
             elif instrument == 'fgs':
                 files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector][exptype]
         except KeyError:
@@ -1718,7 +1770,7 @@ class SimInput:
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
             f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
-                     'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(False)))
+                     'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(input['invert_ipc'])))
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
                      .format(input['pixelAreaMap'])))
