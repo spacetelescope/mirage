@@ -285,7 +285,12 @@ class SimInput:
             self.info['convolveExtended'] = [True] * n_exposures
 
     def add_crds_reffile_names(self):
-        """
+        """Add specific reference file names to self.info. This should be
+        done if self.reffile_defaults is set to 'crds_full_name'. For each
+        instrument configuration and observing mode, query CRDS for the
+        best reference files. Identify which exposures in self.info
+        match the observing configuration, and add the reference file
+        names to their records in self.info.
         """
         all_obs_info, unique_obs_info = self.info_for_all_observations()
 
@@ -329,9 +334,6 @@ class SimInput:
             if self.reffile_overrides is not None:
                 manual_reffiles = self.reffiles_from_dict(status)
 
-                if detector.upper() in ['NRCB5', 'NRCBLONG']:
-                    print('manual_reffiles is:', manual_reffiles)
-
                 for key in manual_reffiles:
                     if manual_reffiles[key] != 'none':
                         badpixmask keys are different in line below. reffiles uses mask while manual_reffiles uses badpixmask
@@ -371,7 +373,12 @@ class SimInput:
         self.info['badpixmask'] = list(badpixmask_arr)
 
     def add_reffile_overrides(self):
-        """
+        """If the user provides a nested dictionary in
+        self.reffile_overrides, search through the dictionary, identify
+        exposures that match the observing mode and instrument config
+        for each dictionary entry, and populate the reference file
+        entries in self.info with the file names from
+        self.reffile_overrides.
         """
         all_obs_info, unique_obs_info = self.info_for_all_observations()
 
@@ -397,9 +404,6 @@ class SimInput:
             for key in manual_reffiles:
                 if manual_reffiles[key] == 'none':
                     manual_reffiles[key] = 'crds'
-
-            print('there needs to be an entry alongside the bad pixel mask in self.reffile_overrides')
-            print('that says whether the kernel needs to be inverted or not.')
 
             # Identify entries in the original list that use this combination
             match = [i for i, item in enumerate(all_obs_info) if item==status]
@@ -592,24 +596,12 @@ class SimInput:
             if par.lower() == 'false':
                 seq.append('1')
         self.info['sequence_id'] = seq
-        # self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
 
         # Deal with user-provided PSFs that differ across observations/visits/exposures
         self.info['psfpath'] = self.get_psf_path()
 
-        # write out the updated table, including yaml filenames
-        # start times, and reference files
-        #if 0: #for debugging
-        #    for key in self.info.keys():
-        #        print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
-        for key in self.info:
-            print(key)
-            print(key, len(self.info[key]))
-
-
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
-        # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
         print('Updated observation table file saved to {}'.format(final_file))
 
         # Now go through the lists one element at a time
@@ -1625,19 +1617,9 @@ class SimInput:
             files['area'] = 'none'
 
         # bad pixel map
-        if detector == 'nrcb5':
-            print('Looking for:')
-            print(instrument, detector, filtername, pupilname, readpattern, exptype)
-            print(self.reffile_overrides['nircam']['badpixmask'])
-            print('\n\n\n\n\n')
         try:
             if instrument in ['nircam', 'niriss']:
                 files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector]
-                if detector == 'nrcb5':
-                    print('\n\n\nINNIRCAMNIRISS\n\n\n')
-                    print(instrument, detector)
-                    print(self.reffile_overrides[instrument]['badpixmask'][detector])
-                    print(files['badpixmask'])
             elif instrument == 'fgs':
                 files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector][exptype]
         except KeyError:

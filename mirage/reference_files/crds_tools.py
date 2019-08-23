@@ -4,7 +4,8 @@
 This module contains functions used to indentify and download reference files
 from CRDS and place them in the expected location for Mirage reference files.
 
-This module uses the crds software package (LINK HERE) which is installed when
+This module uses the crds software package
+(https://hst-crds.stsci.edu/static/users_guide/index.html) which is installed when
 the JWST calibration pipeline package is installed. Reference files are
 identified by supplying some basic metadata from the exposure being calibrated.
 
@@ -154,9 +155,7 @@ def get_reffiles(parameter_dict, reffile_types):
     # variables are set in the functions above
     import crds
 
-    crds.URL = 'https://jwst-crds.stsci.edu'
     reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
-    #reffile_mapping = crds.getrecommendations(parameter_dict, reftypes=reffile_types)
     if reffile_mapping == 'N/A':
         deal_with_it()
     return reffile_mapping
