@@ -156,6 +156,9 @@ def get_reffiles(parameter_dict, reffile_types):
     import crds
 
     reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
-    if reffile_mapping == 'N/A':
-        deal_with_it()
+
+    # Will we ever come across a case where no reference file is found?
+    for key, value in reffile_mapping.items():
+        if value == 'N/A':
+            reffile_mapping[key] = None
     return reffile_mapping

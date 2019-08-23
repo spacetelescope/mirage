@@ -336,9 +336,11 @@ class SimInput:
 
                 for key in manual_reffiles:
                     if manual_reffiles[key] != 'none':
-                        badpixmask keys are different in line below. reffiles uses mask while manual_reffiles uses badpixmask
-                        maybe cleaner to change inside crds_tools?
-                        reffiles[key] = manual_reffiles[key]
+                        if key == 'badpixmask':
+                            crds_key = 'mask'
+                        else:
+                            crds_key = key
+                        reffiles[crds_key] = manual_reffiles[key]
 
             # Check to see if a version of the inverted IPC kernel file
             # exists already in the same directory. If so, use that and
