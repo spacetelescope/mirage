@@ -153,15 +153,6 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
-class CaseInsensitiveDict(dict):
-    def __setitem__(self, key, value):
-        key = key.lower()
-        dict.__setitem__(self, key, value)
-
-    def __getitem__(self, key):
-        key = key.lower()
-        return dict.__getitem__(self, key)
-
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
