@@ -73,6 +73,8 @@ class Catalog_seed():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        self.offline = offline
+
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -114,7 +116,7 @@ class Catalog_seed():
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
         # Expand param entries to full paths where appropriate
-        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict)
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
         self.filecheck()
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
@@ -3901,6 +3903,9 @@ class Catalog_seed():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
+
+        print(pth)
+
         c1 = os.path.exists(pth)
         if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "

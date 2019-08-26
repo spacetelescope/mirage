@@ -23,7 +23,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   gain: $MIRAGE_DATA/niriss/reference_files/gain/jwst_niriss_gain_0005.fits
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/niriss/reference_files/distortion/jwst_niriss_distortion_0008.asdf #Astrometric distortion file (asdf)
+  astrometric: $MIRAGE_DATA/niriss/reference_files/distortion/jwst_niriss_distortion_0010.asdf #Astrometric distortion file (asdf)
   distortion_coeffs: $MIRAGE_DATA/niriss/reference_files/SIAF/NIRISS_SIAF_09-28-2017.csv        #CSV file containing distortion coefficients
   ipc: $MIRAGE_DATA/niriss/reference_files/ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits  #File containing IPC kernel to apply
   invertIPC: False     #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.

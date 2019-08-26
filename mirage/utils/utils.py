@@ -189,7 +189,7 @@ def expand_environment_variable(variable_name, offline=False):
     return variable_directory
 
 
-def full_paths(params, module_path, crds_dictionary):
+def full_paths(params, module_path, crds_dictionary, offline=False):
     """Expand the relevant input paths from the input yaml file to be full
     paths.
 
@@ -205,6 +205,10 @@ def full_paths(params, module_path, crds_dictionary):
         Dictionary of basic observation metadata that is used by CRDS to
         select appropriate reference files.
 
+    offline : bool
+        Set to True in order to skip downloading reference files from CRDS
+        and instead only return the dictionary of reference file names.
+
     Returns
     -------
     params : dict
@@ -213,19 +217,20 @@ def full_paths(params, module_path, crds_dictionary):
     # Place import statement here in order to avoid circular import
     # with crd_tools
     from mirage.reference_files import crds_tools
-    pathdict = {'Reffiles':['dark', 'linearized_darkfile', 'badpixmask',
-                            'superbias', 'linearity', 'saturation', 'gain',
-                            'pixelflat', 'illumflat', 'ipc', 'astrometric',
-                            'crosstalk', 'occult', 'pixelAreaMap',
-                            'subarray_defs', 'filtpupilcombo',
-                            'flux_cal', 'readpattdefs', 'filter_throughput'],
-                'simSignals':['pointsource', 'psfpath', 'galaxyListFile',
-                              'extended', 'movingTargetList', 'movingTargetSersic',
-                                'movingTargetExtended', 'movingTargetToTrack',
-                                'psf_wing_threshold_file', 'zodiacal', 'scattered'],
-                'newRamp': ['dq_configfile', 'sat_configfile','superbias_configfile',
+    pathdict = {'Reffiles': ['dark', 'linearized_darkfile', 'badpixmask',
+                             'superbias', 'linearity', 'saturation', 'gain',
+                             'pixelflat', 'illumflat', 'ipc', 'astrometric',
+                             'crosstalk', 'occult', 'pixelAreaMap',
+                             'subarray_defs', 'filtpupilcombo',
+                             'flux_cal', 'readpattdefs', 'filter_throughput'],
+                'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
+                               'extended', 'movingTargetList', 'movingTargetSersic',
+                               'movingTargetExtended', 'movingTargetToTrack',
+                               'psf_wing_threshold_file', 'zodiacal', 'scattered'],
+                'cosmicRay': ['path'],
+                'newRamp': ['dq_configfile', 'sat_configfile', 'superbias_configfile',
                             'refpix_configfile', 'linear_configfile'],
-                'Output':['file', 'directory']}
+                'Output': ['file', 'directory']}
 
     all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
                                    'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
@@ -279,7 +284,7 @@ def full_paths(params, module_path, crds_dictionary):
                 # search for the best reference file currently in CRDS
                 # and download if it is not already present in
                 # self.crds_datadir
-                mapping = crds_tools.get_reffiles(crds_dictionary, [CRDS_FILE_TYPES[key2]])
+                mapping = crds_tools.get_reffiles(crds_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
                 params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
                 print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
 

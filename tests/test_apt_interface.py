@@ -28,8 +28,9 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
 # Determine if tests are being run on Travis
-ON_TRAVIS =  'travis' in os.path.expanduser('~')
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
 
+orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
 
 
@@ -237,3 +238,8 @@ def test_xml_reader():
                 assert all(exposure_dict[col] == comparison_dict[col].data), print(program, col,
                                                                                    exposure_dict[col],
                                                                                    comparison_dict[col].data)
+
+
+# Return environment variable to original value. This is helpful when
+# calling many tests at once, some of which need the real value.
+os.environ['MIRAGE_DATA'] = orig_mirage_data

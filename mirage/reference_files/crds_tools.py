@@ -135,7 +135,7 @@ def dict_from_yaml(yaml_dict):
     return crds_dict
 
 
-def get_reffiles(parameter_dict, reffile_types):
+def get_reffiles(parameter_dict, reffile_types, download=True):
     """Determine CRDS's best reference files to use for a particular
     observation, and download them if they are not already present in
     the CRDS_PATH. The determination is made based on the information in
@@ -150,12 +150,28 @@ def get_reffiles(parameter_dict, reffile_types):
     reffile_types : list
         List of reference file types to look up and download. These must
         be contained in CRDS's list of reference file types.
+
+    download : bool
+        If True (default), the identified best reference files will be
+        downloaded. If False, the dictionary of best reference files will
+        still be returned, but the files will not be downloaded. The use
+        of False is primarily intended to support testing on Travis.
     """
     # IMPORTANT: Import of crds package must be done AFTER the environment
     # variables are set in the functions above
     import crds
 
-    reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
+    if download:
+        reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
+    else:
+        # If the files will not be downloaded, still return the same local
+        # paths that are returned when the files are downloaded. Note that
+        # this follows the directory structure currently assumed by CRDS.
+        crds_path = os.environ.get('CRDS_PATH')
+        reffile_mapping = crds.getrecommendations(parameter_dict, reftypes=reffile_types)
+        for key, value in reffile_mapping.items():
+            instrument = value.split('_')[1]
+            reffile_mapping[key] = os.path.join(crds_path, 'references/jwst', instrument, value)
 
     # Will we ever come across a case where no reference file is found?
     for key, value in reffile_mapping.items():

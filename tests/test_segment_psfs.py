@@ -36,7 +36,7 @@ PARAMETRIZED_DATA = parametrized_data()['test_segment_psfs']
 SUCCESS_GENERATE_SEGMENT_PSF = None
 
 # Determine if tests are being run on Travis
-ON_TRAVIS =  'travis' in os.path.expanduser('~')
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
 
 # Define default inputs
 INSTRUMENT = 'NIRCam'

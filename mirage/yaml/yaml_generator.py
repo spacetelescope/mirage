@@ -118,9 +118,9 @@ ENV_VAR = 'MIRAGE_DATA'
 
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
-                 reffile_overrides=None,
-                 use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
-                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False):
+                 reffile_overrides=None, use_JWST_pipeline=True, catalogs=None,
+                 observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
+                 parameter_defaults=None, offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -199,9 +199,10 @@ class SimInput:
         self.psf_paths = None
         self.expand_catalog_for_segments = False
         self.add_psf_wings = True
+        self.offline = offline
 
         # Expand the MIRAGE_DATA environment variable
-        self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
+        self.datadir = expand_environment_variable(ENV_VAR, offline=self.offline)
 
         # Check that CRDS-related environment variables are set correctly
         self.crds_datadir = crds_tools.env_variables()
@@ -218,7 +219,7 @@ class SimInput:
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
                                                      verbose=self.verbose, parameter_defaults=parameter_defaults)
 
-        self.reffile_setup(offline=offline)
+        self.reffile_setup()
 
     def add_catalogs(self):
         """
@@ -327,11 +328,11 @@ class SimInput:
                     status_dict['CHANNEL'] = 'SHORT'
 
             # Query CRDS
-            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()))
+            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
+                                               download=not self.offline)
 
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
-            #sbias, lin, sat, gainfile, dist, ipcfile, pam = self.reffiles_from_dict(status)
             if self.reffile_overrides is not None:
                 manual_reffiles = self.reffiles_from_dict(status)
 
@@ -1346,7 +1347,7 @@ class SimInput:
         # elif self.crosstalk == 'config':
         #     self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
-    def reffile_setup(self, offline=False):
+    def reffile_setup(self):
         """Create lists of reference files associate with each detector.
 
         Parameters
@@ -1407,7 +1408,7 @@ class SimInput:
             for list_name in list_names:
                 getattr(self, '{}_list'.format(list_name))[instrument] = {}
 
-            if offline:
+            if self.offline:
                 # no access to central store. Set all files to none.
                 for list_name in list_names:
                     if list_name in 'dark lindark'.split():
@@ -1418,39 +1419,9 @@ class SimInput:
                         getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
 
             elif instrument == 'nircam':
-                sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
-                lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
-                gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
-                sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
-                ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
-                dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
-                pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
                 rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
                 lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
                 for det in self.det_list[instrument]:
-                    sbfiles = glob(os.path.join(sb_dir, '*fits'))
-                    self.superbias_list[instrument][det] = [d for d in sbfiles if 'NRC' + det in d][0]
-                    linfiles = glob(os.path.join(lin_dir, '*fits'))
-                    longdet = deepcopy(det)
-                    if '5' in det:
-                        longdet = det.replace('5', 'LONG')
-                    self.linearity_list[instrument][det] = [d for d in linfiles if 'NRC' + longdet in d][0]
-
-                    gainfiles = glob(os.path.join(gain_dir, '*fits'))
-                    self.gain_list[instrument][det] = [d for d in gainfiles if 'NRC' + det in d][0]
-
-                    satfiles = glob(os.path.join(sat_dir, '*fits'))
-                    self.saturation_list[instrument][det] = [d for d in satfiles if 'NRC' + det in d][0]
-
-                    ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
-                    self.ipc_list[instrument][det] = [d for d in ipcfiles if 'NRC' + det in d][0]
-
-                    distfiles = glob(os.path.join(dist_dir, '*asdf'))
-                    self.astrometric_list[instrument][det] = [d for d in distfiles if 'NRC' + det in d][0]
-
-                    pamfiles = glob(os.path.join(pam_dir, '*fits'))
-                    self.pam_list[instrument][det] = [d for d in pamfiles if det in d][0]
-
                     self.dark_list[instrument][det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
                     self.lindark_list[instrument][det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
@@ -1467,42 +1438,20 @@ class SimInput:
             else:  # niriss and fgs
                 for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                               '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
-                        self.astrometric_list[instrument][det] = glob(
-                            os.path.join(self.reference_file_dir[instrument],
-                                         'distortion/*distortion_0004.asdf'))[0]
+                                                                            '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
                         self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
 
                     elif det == 'G2':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                               '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
-                        self.astrometric_list[instrument][det] = glob(
-                            os.path.join(self.reference_file_dir[instrument],
-                                         'distortion/*distortion_0003.asdf'))[0]
+                                                                            '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
                         self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
 
                     elif det == 'NIS':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument],
-                                                                           'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
                                                                             '*uncal.fits'))
                         self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/linearized',
                                                                                '*linear_dark_prep_object.fits'))
-                        self.astrometric_list[instrument][det] = glob(
-                            os.path.join(self.reference_file_dir[instrument],
-                                         'distortion/*distortion*.asdf'))[0]
-                    self.superbias_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'superbias/*superbias*.fits'))[0]
-                    self.linearity_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'linearity/*linearity*.fits'))[0]
-                    self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
-                    self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
-
-                    # suspecting that the FGS wcs reference file has a problem
-                    # self.astrometric_list[instrument][det] = 'none'
-
-                    self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'pam/*area*.fits'))[0]
 
     def set_config(self, file, prop):
         """
@@ -1527,7 +1476,6 @@ class SimInput:
         elif file.lower() == 'config':
             file = os.path.join(self.modpath, 'config', self.configfiles[prop])
         return file
-
 
     def get_psf_path(self):
         """ Create a list of the path to the PSF library directory for

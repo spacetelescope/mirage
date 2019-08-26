@@ -53,6 +53,8 @@ class DarkPrep():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        self.offline = offline
+
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -610,7 +612,7 @@ class DarkPrep():
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
         # Expand param entries to full paths where appropriate
-        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict)
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
         self.filecheck()
 
         # Base name for output files
@@ -803,7 +805,7 @@ class DarkPrep():
         """Read in the yaml parameter file"""
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except FileNotFoundError:
             print("WARNING: unable to open {}".format(self.paramfile))
 

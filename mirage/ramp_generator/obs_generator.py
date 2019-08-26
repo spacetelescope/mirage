@@ -72,6 +72,7 @@ class Observation():
         self.segmap = None
         self.seedheader = None
         self.seedunits = 'ADU/sec'
+        self.offline = offline
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -963,7 +964,7 @@ class Observation():
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
         # Expand param entries to full paths where appropriate
-        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict)
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
 
         self.file_check()
 
@@ -1553,6 +1554,7 @@ class Observation():
         for ref in rlist:
             self.ref_check(ref)
         for path in plist:
+            print('\n\n\n{}\n\n\n'.format(path))
             self.path_check(path)
 
     def flag_saturation(self, data, sat):
@@ -1922,8 +1924,8 @@ class Observation():
         # Force subkernel to be 4D to make the function cleaner
         # Dimensions are (kernely, kernelx, detectory, detectorx)
         if len(dims) == 2:
+            subkernel = np.expand_dims(subkernel, axis=2)
             subkernel = np.expand_dims(subkernel, axis=3)
-            subkernel = np.expand_dims(subkernel, axis=4)
         dims = subkernel.shape
 
         delta = subkernel * 0.
@@ -2033,6 +2035,9 @@ class Observation():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
+
+        print(pth)
+
         c1 = os.path.exists(pth)
         if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
@@ -2251,7 +2256,7 @@ class Observation():
         """Read in the yaml parameter file (main input to Mirage)."""
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except FileNotFoundError as e:
             print("WARNING: unable to open {}".format(self.paramfile))
 
