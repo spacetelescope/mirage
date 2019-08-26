@@ -24,7 +24,11 @@ from mirage.catalogs import create_catalog
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
 
-orig_mirage_data = os.environ['MIRAGE_DATA']
+# Determine if tests are being run on Travis
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
+
+if not ON_TRAVIS:
+    orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
 
 
@@ -275,5 +279,5 @@ def test_cat_from_file():
         cat_object = catalog_generator.cat_from_file(cat_path, catalogs[cat_name][0])
         assert isinstance(cat_object, catalogs[cat_name][1])
 
-
-os.environ['MIRAGE_DATA'] = orig_mirage_data
+if not ON_TRAVIS:
+    os.environ['MIRAGE_DATA'] = orig_mirage_data

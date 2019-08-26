@@ -43,7 +43,8 @@ TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)
 # Determine if tests are being run on Travis
 ON_TRAVIS = 'travis' in os.path.expanduser('~')
 
-orig_mirage_data = os.environ['MIRAGE_DATA']
+if not ON_TRAVIS:
+    orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
 
 
@@ -138,7 +139,8 @@ def test_RunNIRCamAPTTemplates():
 
 # Return environment variable to original value. This is helpful when
 # calling many tests at once, some of which need the real value.
-os.environ['MIRAGE_DATA'] = orig_mirage_data
+if not ON_TRAVIS:
+    os.environ['MIRAGE_DATA'] = orig_mirage_data
 
 # for debugging
 # if __name__ == '__main__':
