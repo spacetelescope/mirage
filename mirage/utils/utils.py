@@ -315,7 +315,7 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
     Returns
     -------
     count_rate : float or list
-        Count rate (e/s) corresponding to the input magnutude(s)
+        Count rate (e/s) corresponding to the input magnitude(s)
 
     """
     # For NIRISS AMI mode, the count rate values calculated need to be
@@ -327,24 +327,31 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
         count_scale = 0.15 / 0.84
     else:
         count_scale = 1.
+
     if magsys.lower() == 'abmag':
         try:
             return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
         except:
             raise ValueError(("AB mag to countrate conversion failed."
                               "magnitude = {}, photfnu = {}".format(mag, photfnu)))
-    if magsys.lower() == 'vegamag':
+
+    elif magsys.lower() == 'vegamag':
         try:
             return count_scale * (10**((vegamag_zeropoint - mag) / 2.5))
         except:
             raise ValueError(("Vega mag to countrate conversion failed."
                               "magnitude = {}".format(mag)))
-    if magsys.lower() == 'stmag':
+
+    elif magsys.lower() == 'stmag':
         try:
             return count_scale * (10**((mag + 21.099934378) / -2.5) / photflam)
         except:
             raise ValueError(("ST mag to countrate conversion failed."
                               "magnitude = {}, photflam = {}".format(mag, photflam)))
+
+    elif magsys.lower() == 'countrate':
+        # no conversion necessary
+        return mag
 
 
 def parse_RA_Dec(ra_string, dec_string):
