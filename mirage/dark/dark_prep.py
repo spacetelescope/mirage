@@ -33,7 +33,8 @@ import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 
-from ..utils import read_fits, utils, siaf_interface
+from mirage.reference_files import crds_tools
+from mirage.utils import read_fits, utils, siaf_interface
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -52,6 +53,8 @@ class DarkPrep():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        self.offline = offline
+
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -61,6 +64,9 @@ class DarkPrep():
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.env_variables()
 
     def check_params(self):
         """Check for acceptible values for the input parameters in the
@@ -75,10 +81,16 @@ class DarkPrep():
         # make sure the input is a linearized dark, and not
         # a raw dark
         if self.params['Inst']['use_JWST_pipeline'] is False:
-            if self.params['Reffiles']['linearized_darkfile'] is None:
+            if self.params['Reffiles']['linearized_darkfile'].lower() == 'none':
                 raise ValueError(("WARNING: You specified no use of the JWST pipeline, but "
                                   "have not provided a linearized dark file to use. Without the "
                                   "pipeline, a raw dark cannot be used."))
+
+        # If no raw dark nor linearized dark is given, then there is no
+        # input to work with.
+        if (self.params['Reffiles']['linearized_darkfile'].lower() == 'none' and
+            self.params['Reffiles']['dark'].lower() == 'none'):
+            raise ValueError(("WARNING: No raw nor linearized dark file given. Unable to proceed."))
 
         # Make sure nframe, nskip, ngroup are all integers
         try:
@@ -378,63 +390,6 @@ class DarkPrep():
         for ref in rlist:
             self.ref_check(ref)
 
-    def full_paths(self):
-        """Expand all input paths to be full paths
-        This is to allow for easier Condor-ization of
-        many runs"""
-        pathdict = {'Reffiles': ['dark', 'linearized_darkfile',
-                                 'superbias', 'subarray_defs', 'readpattdefs',
-                                 'linearity', 'saturation', 'gain', 'pixelflat',
-                                 'illumflat', 'astrometric', 'badpixmask',
-                                 'ipc', 'crosstalk',
-                                 'occult', 'pixelAreaMap'],
-                    'cosmicRay': ['path'],
-                    'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
-                                   'extended', 'movingTargetList',
-                                   'movingTargetSersic',
-                                   'movingTargetExtended',
-                                   'movingTargetToTrack'],
-                    'newRamp': ['dq_configfile', 'sat_configfile',
-                                'superbias_configfile', 'refpix_configfile',
-                                'linear_configfile'],
-                    'Output': ['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'newRamp-dq_configfile': 'dq_init.cfg',
-                                       'newRamp-sat_configfile': 'saturation.cfg',
-                                       'newRamp-superbias_configfile': 'superbias.cfg',
-                                       'newRamp-refpix_configfile': 'refpix.cfg',
-                                       'newRamp-linear_configfile': 'linearity.cfg'},
-                            'niriss': {'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'newRamp-dq_configfile': 'dq_init.cfg',
-                                       'newRamp-sat_configfile': 'saturation.cfg',
-                                       'newRamp-superbias_configfile': 'superbias.cfg',
-                                       'newRamp-refpix_configfile': 'refpix.cfg',
-                                       'newRamp-linear_configfile': 'linearity.cfg'},
-                            'fgs': {'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'newRamp-dq_configfile': 'dq_init.cfg',
-                                    'newRamp-sat_configfile': 'saturation.cfg',
-                                    'newRamp-superbias_configfile': 'superbias.cfg',
-                                    'newRamp-refpix_configfile': 'refpix.cfg',
-                                    'newRamp-linear_configfile': 'linearity.cfg'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
     def get_base_dark(self):
         """Read in the dark current ramp that will serve as the
         base for the simulated ramp"""
@@ -648,12 +603,16 @@ class DarkPrep():
 
     def prepare(self):
         """MAIN FUNCTION"""
+        print("\nRunning dark_prep....\n")
 
         # Read in the yaml parameter file
         self.read_parameter_file()
 
-        # Expand locations to be full path names
-        self.full_paths()
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
         self.filecheck()
 
         # Base name for output files
@@ -846,7 +805,7 @@ class DarkPrep():
         """Read in the yaml parameter file"""
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except FileNotFoundError:
             print("WARNING: unable to open {}".format(self.paramfile))
 

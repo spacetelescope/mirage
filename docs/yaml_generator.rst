@@ -3,12 +3,12 @@
 Simulating Observations from an APT File
 ========================================
 
-The easiest way to simulate a large amount of obsrvtions using Mirage is to begin with the `APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ file of a JWST proposal. Mirage contains functions that can (for imaging and WFSS modes) create the collection of yaml files necessary to simulate all of the observations contained in the APT file.
+The easiest way to simulate a large amount of obsrvtions using Mirage is to begin with the `APT <https://jwst-docs.stsci.edu/display/JPP/JWST+Astronomers+Proposal+Tool%2C+APT>`_ file of a JWST proposal. Mirage contains functions that can (for imaging and WFSS modes) create the collection of yaml files necessary to simulate all of the observations contained in the APT file. Specifically, the *yaml_generator.py* module will take the APT files, along with several other inputs, and will output yaml files that Mirage can use to create all the observations contained in the APT files.
 
 Examples of this functionality are shown in the `notebooks <https://github.com/spacetelescope/mirage/tree/master/examples>`_ in the *Mirage* repository. Below are step-by-step instructions explaining how to create *Mirage* input yaml files from an APT file.
 
 Export XML and Pointing files from APT
--------------------------------------
+--------------------------------------
 Open the proposal within APT and under the File menu, choose Export, and select the xml and pointing files. Only one file at a time can be exported, so the process must be repeated for each.
 
 .. _additional_yaml_generator_inputs:
@@ -33,7 +33,7 @@ Alternatively, the user may provide a string containing a single catalog name, r
                }
 
 
-Note that currently this format is used for point source catalogs only. Other types of catalogs are limited to a single entry in a separate parameter dictionary as shown in the :ref:`Other Paramteres section <other_params>`. Catalog entries will be made more consistent in a future update. In the meantime, the easiest way to get the proper (non-point-source) catalogs into the yaml files is to use a single catalog for all observations and instruments. This is easily done by adding all necessary magnitude columns into a single catalog, or by combining existing *Mirage* catalogs. See the `Catalog Generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ for examples.
+Note that currently this format is used for point source catalogs only. Other types of catalogs are limited to a single entry in a separate parameter dictionary as shown in the :ref:`Other Parameters section <other_params>`. Catalog entries will be made more consistent in a future update. In the meantime, the easiest way to get the proper (non-point-source) catalogs into the yaml files is to use a single catalog for all observations and instruments. This is easily done by adding all necessary magnitude columns into a single catalog, or by combining existing *Mirage* catalogs. See the `Catalog Generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ for examples.
 
 
 .. Background Specification
@@ -73,6 +73,102 @@ There are currently a number of parameters which can only be set using the ``par
     param_values['BackgroundRate_lw'] = 'low'
     param_values['BackgroundRate'] = '0.5'
 
+.. _override_reffiles:
+
+JWST Calibration Reference Files
+++++++++++++++++++++++++++++++++
+
+Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, and `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ files.
+
+Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.html>`_ package from STScI to identify the appropriate reference files for a given exposure. These files are automatically downloaded to the user's machine at one of two times:
+
+1) When running *yaml_generator.py* if the ``reffile_defaults`` option is set to 'crds_full_names' (see :ref:`Run the Yaml Generator <yaml_generator>` for more details).
+2) When running any of the three main parts of Mirage: the :ref:`catalog seed generator <source_catalogs>`, :ref:`dark preparation <dark_prep>`, or :ref:`observation generator <obs_generator>`.
+
+.. tip::
+
+    In order to specify a location on your machine to store the downloaded reference files, you must have the CRDS_PATH environment variable set to that location. If this environment variable is not set, Mirage will default to use $HOME/crds_cache/
+
+.. important::
+
+    Due to a limitation of the **CRDS** package, the CRDS_PATH and CRDS_SERVER_URL environment variables must be set BEFORE importing the **CRDS** package. If you are running Mirage using code that imports **CRDS** *or any other packages that import CRDS* (such as Mirage's **dark_prep** module or the **jwst** package, which contains the calibration pipeline) prior to running Mirage, you should explicitly set the environment variables before importing those packages. If you do not, you will get the following error:
+
+    CRDS - ERROR -  (FATAL) CRDS server connection and cache load FAILED.  Cannot continue.
+    CRDS - ERROR -  See `https://hst-crds.stsci.edu/docs/cmdline_bestrefs/ <https://hst-crds.stsci.edu/docs/cmdline_bestrefs/>`_ or `https://jwst-crds.stsci.edu/docs/cmdline_bestrefs/ <https://jwst-crds.stsci.edu/docs/cmdline_bestrefs/>`_
+    CRDS - ERROR -  for more information on configuring CRDS,  particularly CRDS_PATH and CRDS_SERVER_URL. : [Errno 2] No such file or directory: '$HOME/crds_cache/config/jwst/server_config'
+
+    If you wish to set the environment variables in your code, simply add lines such as these prior to importing **jwst** or **CRDS**:
+
+    os.environ["CRDS_PATH"] = '{}/crds_cache'.format(os.environ.get('HOME'))
+    os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
+
+    **If your code does not import any packages that rely on the CRDS package, then you may safely neglect setting the two environment variables, and Mirage will set them for you prior to importing CRDS.**
+
+
+It is also possible to specify that Mirage use reference files other than those downloaded from CRDS. In order to do this, you must supply a dictionary of filenames. Due to the varying number of selection criteria needed to uniquely identify the reference file that matches up with a particular exposure, this dictionary is composed of multiple levels of nested dictionaries. Not all possibilities are required. You may specify reference files only for the particular observing modes you are interested in. Any modes in your APT file that are not contained within the dictionary will revert to using the reference files identified by CRDS. Below is a dictionary showing all nesting required for all reference files. Note that the dictionary structure is instrument dependent since a reference file type for different instruments does not necessarily have the same selection criteria.
+
+.. important::
+    If you choose to provide your own reference files, it is best to use these same reference files when running the JWST calibration pipeline on the simulated data files produced by Mirage. Not doing this can lead to systematic errors in your calibrated data.
+
+Here is a view of the dictionary structure required when specifying reference files. The easiest way to see the set of allowed values for a particular property (e.g. exposure_type), go to the `JWST Keyword Dictionary <https://mast.stsci.edu/portal/Mashup/Clients/jwkeywords/index.html>`_, and search for the appropriate keyword. Exposure type is EXP_TYPE, filter is FILTER, pupil is PUPIL, detctor_name is DETECTOR, readpattern is READPATT.
+
+::
+
+    override = {'nircam': {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
+                           'linearity':  {detector_name: 'reffile_name.fits'},
+                           'saturation': {detector_name: 'reffile_name.fits'},
+                           'gain':       {detector_name: 'reffile_name.fits'},
+                           'distortion': {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
+                           'ipc':        {detector_name: 'reffile_name.fits'},
+                           'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
+                           'badpixmask': {detector_name: 'reffile_name.fits'}
+                           },
+                'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
+                           'linearity':  'reffile_name.fits',
+                           'saturation': 'reffile_name.fits',
+                           'gain':       'reffile_name.fits',
+                           'distortion': {pupil: {exposure_type: 'reffile_name.fits'}},
+                           'ipc':        'reffile_name.fits',
+                           'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
+                           'badpixmask': 'reffile_name.fits'
+                           },
+                'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
+                           'linearity':  {detector_name: 'reffile_name.fits'},
+                           'saturation': {detector_name: 'reffile_name.fits'},
+                           'gain':       {detector_name: 'reffile_name.fits'},
+                           'distortion': {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'ipc':        {detector_name: 'reffile_name.fits'},
+                           'area':       {detector_name: 'reffile_name.asdf'},
+                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}}
+                           }
+
+
+Here we show an example dictionary for a particular set of observations.
+
+::
+
+    override = {'nircam': {'superbias':  {'nrcb5': {'bright2': 'my_reffiles/my_superbias_for_b5.fits',
+                                                    'rapid': 'my_reffiles/my_superbias_for_b5.fits',
+                                                    'shallow4': 'my_reffiles/my_superbias_for_b5.fits'
+                                                    },
+                                          'nrcb4': {'rapid': 'my_reffiles/my_superbias_for_b4.fits'}
+                                          },
+                           'linearity':  {'nrcb5': 'my_reffiles/my_linearity_for_b5.fits',
+                                          'nrcb4': 'my_reffiles/my_linearity_for_b4.fits'},
+                           'saturation': {'nrcb5': 'my_reffiles/my_saturation_for_b5.fits',
+                                          'nrcb4': 'my_reffiles/my_saturation_for_b4.fits'},
+                           'gain':       {'nrcb5': 'my_reffiles/my_gain_for_b5.fits',
+                                          'nrcb4': 'my_reffiles/my_gain_for_b4.fits'},
+                           'distortion': {'nrcb5': {'f322w2': {'nrc_image': 'my_reffiles/my_distortion_for_b5.asdf'}},
+                                          'nrcb4': {'f444w':  {'nrc_image': 'my_reffiles/my_distortion_for_b4.asdf'}}},
+                           'ipc':        {'nrcb5': 'my_reffiles/my_ipc_for_b5.fits',
+                                          'nrcb4': 'my_reffiles/my_ipc_for_b4.fits'},
+                           'area':       {'nrcb5': {'f322w2': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b5.asdf'}}},
+                                          'nrcb4': {'f444w':  {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.asdf'}}}},
+                           'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
+                                          'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
+                            }
+                }
 
 
 .. _yaml_generator:
@@ -84,16 +180,26 @@ With the XML and pointing files in hand, and additional inputs defined above, Mi
 
 Setting the ``use_linearized_darks`` option to True will cause the *yaml_generator* to look for linearized dark current files to use with the simulations. These files may be present in the collection of *Mirage* :ref:`reference files <reference_files>`. If linearized darks are not present, leaving this option as False will cause `Mirage` to use raw dark current ramps as inputs.
 
-Note that the point source catalogs and other parameters described above are inputs as well.
+The ``reffile_defaults`` keyword can have one of two values, which induce slightly different behavior. The best value to use depends upon your use case.
+
+``crds`` (default) - This option will place the string 'crds' in the yaml file entries for CRDS reference files. When Mirage (i.e. the seed generator, dark prep, or observation generator) is run, it will query CRDS for the best reference files to use, and download those files to your CRDS_PATH directory if they are not already present. This has the advantage that your yaml files will always have Mirage use the latest, best reference files whenever they are used.
+
+``crds_full_name`` - This option will cause *yaml_generator.py* to query CRDS, which will identify and download the best reference files if they are not already in your CRDS_PATH. It will then place the names of these best reference files into the yaml files being created. This creates yaml files that will always use the same reference files whenever they are run, meaning the outputs should be consistent every time. In this case, if new reference files are delivered to CRDS, the yaml files, and therefore Mirage, will not know that information.
+
+Set ``reffile_overrides`` equal to the name of your nested reference file dictionary, if present.
+
+Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
+
 
 ::
 
-	  from mirage.yaml import yaml_generator
+    from mirage.yaml import yaml_generator
 
-	  yam = yaml_generator.SimInput(xml_file, pointing_file, catalogs=catalogs, verbose=True,
+    yam = yaml_generator.SimInput(xml_file, pointing_file, catalogs=catalogs, verbose=True,
                                   output_dir='/location/to/place/yaml_files',
                                   simdata_output_dir='/location/to/place/simulated_data',
-                                  parameter_defaults=param_values, datatype='raw')
+                                  parameter_defaults=param_values, datatype='raw',
+                                  reffile_defaults='crds', reffile_overrides=reffile_overrides)
     yam.use_linearized_darks = True
     yam.create_inputs()
 

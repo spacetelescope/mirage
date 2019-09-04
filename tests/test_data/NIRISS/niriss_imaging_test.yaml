@@ -50,7 +50,10 @@ cosmicRay:
 
 simSignals:
   pointsource: $TEST_DATA/niriss_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: $MIRAGE_DATA/niriss/webbpsf_library/  #Path to PSF library
+  psfpath: $MIRAGE_DATA/niriss/gridded_psf_library/  #Path to PSF library
+  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
+  add_psf_wings: True   # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding
+  psf_wing_threshold_file: config
   psfbasename: niriss                        #Basename of the files in the psf library
   psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
@@ -65,6 +68,7 @@ simSignals:
   movingTargetExtended: None      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
   movingTargetConvolveExtended: True       #convolve the extended moving targets with PSF before adding.
   movingTargetToTrack: None #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+  expand_catalog_for_segments: False
   zodiacal:  None                          #Zodiacal light count rate image file
   zodiscale:  1.0                            #Zodi scaling factor
   scattered:  None                          #Scattered light count rate image file

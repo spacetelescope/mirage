@@ -209,7 +209,7 @@ class ImgSeed:
 
         if os.path.isfile(file):
             with open(file,'r') as f:
-                params = yaml.load(f)
+                params = yaml.safe_load(f)
         else:
             print(("WARNING: {} does not exist."
                    .format(file)))

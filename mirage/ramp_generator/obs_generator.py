@@ -42,9 +42,11 @@ from astropy.table import Table
 from astropy.time import Time, TimeDelta
 import pysiaf
 
-from . import unlinearize
-from ..utils import read_fits, utils, siaf_interface
-from ..utils import set_telescope_pointing_separated as stp
+from mirage.ramp_generator import unlinearize
+from mirage.reference_files import crds_tools
+from mirage.utils import read_fits, utils, siaf_interface
+from mirage.utils import set_telescope_pointing_separated as stp
+from mirage.utils.constants import EXPTYPES
 from mirage import version
 
 MIRAGE_VERSION = version.__version__
@@ -70,6 +72,7 @@ class Observation():
         self.segmap = None
         self.seedheader = None
         self.seedunits = 'ADU/sec'
+        self.offline = offline
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -86,6 +89,9 @@ class Observation():
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.env_variables()
 
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure
@@ -271,7 +277,7 @@ class Observation():
             # designed to remove IPC effects to one designed to
             # add IPC effects
             if self.params['Reffiles']['invertIPC']:
-                print("Iverting IPC kernel prior to convolving with image")
+                print("Inverting IPC kernel prior to convolving with image")
                 kernel = self.invert_ipc_kernel(kernel)
             self.kernel = np.copy(kernel)
         kshape = kernel.shape
@@ -949,15 +955,17 @@ class Observation():
 
     def create(self):
         """MAIN FUNCTION"""
-        print('')
-        print("Running observation generator....")
-        print('')
+        print("\nRunning observation generator....\n")
 
         # Read in the parameter file
         self.read_parameter_file()
 
-        # Expand all paths in order to be more condor-friendly
-        self.full_paths()
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
+
         self.file_check()
 
         # Get the input dark if a filename is supplied
@@ -1546,6 +1554,7 @@ class Observation():
         for ref in rlist:
             self.ref_check(ref)
         for path in plist:
+            print('\n\n\n{}\n\n\n'.format(path))
             self.path_check(path)
 
     def flag_saturation(self, data, sat):
@@ -1793,68 +1802,20 @@ class Observation():
             outramp[i, :, :] = accumimage
         return outramp, zeroframe
 
-    def full_paths(self):
-        """Expand all input paths to be full paths
-        This is to allow for easier Condor-ization of many runs."""
-        pathdict = {'Reffiles': ['dark', 'linearized_darkfile',
-                                 'superbias', 'badpixmask',
-                                 'subarray_defs', 'readpattdefs',
-                                 'linearity', 'saturation', 'gain',
-                                 'pixelflat', 'illumflat',
-                                 'astrometric',
-                                 'ipc', 'crosstalk', 'occult',
-                                 'filtpupilcombo', 'pixelAreaMap',
-                                 'flux_cal'],
-                    'cosmicRay': ['path'],
-                    'simSignals': ['pointsource', 'psfpath',
-                                   'galaxyListFile', 'extended',
-                                   'movingTargetList',
-                                   'movingTargetSersic',
-                                   'movingTargetExtended',
-                                   'movingTargetToTrack'],
-                    'Output': ['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'Reffiles-filtpupilcombo': 'nircam_filter_pupil_pairings.list'},
-                            'niriss': {'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-flux_cal': 'niriss_zeropoints.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'Reffiles-filtpupilcombo': 'niriss_dual_wheel_list.txt'},
-                            'fgs': {'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'Reffiles-filtpupilcombo': 'guider_filter_dummy.list'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
     def get_cr_rate(self):
         """Get the base cosmic ray impact probability.
-        
-        The following values are based on JWST-STScI-001928, "A library of simulated cosmic ray events impacting 
+
+        The following values are based on JWST-STScI-001928, "A library of simulated cosmic ray events impacting
         JWST HgCdTe detectors by Massimo Robberto", Table 1, times the pixel area of 18 microns square = 3.24e-06
         square cm.  Values are in nucleon events per pixel per second.  Corresponding values from the report are
-        4.8983 nucleons/cm^2/second, 1.7783 nucleons/cm^2/second, and 3046.83 nucleons/cm^2/second.  The expected 
-        rates per full frame read (10.73677 seconds) over the whole set of 2048x2048 pixels are 715, 259, and 
+        4.8983 nucleons/cm^2/second, 1.7783 nucleons/cm^2/second, and 3046.83 nucleons/cm^2/second.  The expected
+        rates per full frame read (10.73677 seconds) over the whole set of 2048x2048 pixels are 715, 259, and
         444609 events respectively.
-        
-        Note that the SUNMIN rate is lower than the SUNMAX rate.  The MIN and MAX labels refer to the solar activity, 
+
+        Note that the SUNMIN rate is lower than the SUNMAX rate.  The MIN and MAX labels refer to the solar activity,
         and the galactic cosmic ray contribution at L2 is reduced at solar maximum compared to solar minimum.  The
-        FLARE case is for the largest solar flare event on record (see the Robberto report) and corresponds to conditions 
-        under which JWST would presumably not be operating. 
+        FLARE case is for the largest solar flare event on record (see the Robberto report) and corresponds to conditions
+        under which JWST would presumably not be operating.
         """
         self.crrate = 0.
         # The previous values were per full frame read and there was a transcription issue in Volk's code.  These
@@ -1963,8 +1924,8 @@ class Observation():
         # Force subkernel to be 4D to make the function cleaner
         # Dimensions are (kernely, kernelx, detectory, detectorx)
         if len(dims) == 2:
+            subkernel = np.expand_dims(subkernel, axis=2)
             subkernel = np.expand_dims(subkernel, axis=3)
-            subkernel = np.expand_dims(subkernel, axis=4)
         dims = subkernel.shape
 
         delta = subkernel * 0.
@@ -1988,18 +1949,17 @@ class Observation():
             newkernel = np.copy(kern)
             newkernel[:, :, ys:ye, xs:xe] = realout1
 
-        if self.params['Output']['save_intermediates']:
-            # Save the inverted kernel for future simulator runs
-            h0 = fits.PrimaryHDU()
-            h1 = fits.ImageHDU(newkernel)
-            h1.header["DETECTOR"] = self.detector
-            h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
-            hlist = fits.HDUList([h0, h1])
-            indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
-            outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
-            hlist.writeto(outname, overwrite=True)
-            print(("Inverted IPC kernel saved to {} for future simulator "
-                   "runs.".format(outname)))
+        # Save the inverted kernel for future simulator runs
+        h0 = fits.PrimaryHDU()
+        h1 = fits.ImageHDU(newkernel)
+        h1.header["DETECTOR"] = self.detector
+        h1.header["INSTRUME"] = self.params["Inst"]["instrument"]
+        hlist = fits.HDUList([h0, h1])
+        indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
+        outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
+        hlist.writeto(outname, overwrite=True)
+        print(("Inverted IPC kernel saved to {} for future simulator "
+                "runs.".format(outname)))
         return newkernel
 
     def mask_refpix(self, ramp, zero):
@@ -2075,6 +2035,9 @@ class Observation():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
+
+        print(pth)
+
         c1 = os.path.exists(pth)
         if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
@@ -2293,7 +2256,7 @@ class Observation():
         """Read in the yaml parameter file (main input to Mirage)."""
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except FileNotFoundError as e:
             print("WARNING: unable to open {}".format(self.paramfile))
 
@@ -2501,19 +2464,8 @@ class Observation():
             numint, numgroup, ys, xs = ramp.shape
             outModel.zeroframe = np.zeros((numint, ys, xs))
 
-        # EXPTYPE OPTIONS
-        # exptypes = ['NRC_IMAGE', 'NRC_WFSS', 'NRC_TACQ', 'NRC_CORON',
-        #            'NRC_DARK', 'NRC_TSIMAGE', 'NRC_TSGRISM']
-        # nrc_tacq and nrc_coron are not currently implemented.
-
-        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
-                              "wfss": "NIS_WFSS"},
-                   "fgs": {"imaging": "FGS_IMAGE"}}
-
         try:
-            outModel.meta.exposure.type = exptype[self.params['Inst']['instrument'].lower()]\
+            outModel.meta.exposure.type = EXPTYPES[self.params['Inst']['instrument'].lower()]\
                 [self.params['Inst']['mode'].lower()]
         except:
             raise ValueError('EXPTYPE mapping not complete for this!!! FIX ME!')
@@ -2633,7 +2585,7 @@ class Observation():
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
         outModel.meta.dither.total_points = self.params['Output']['total_primary_dither_positions']
-        outModel.meta.dither.pattern_size = 0.0
+        outModel.meta.dither.pattern_size = 'DEFAULT'
         outModel.meta.dither.subpixel_type = self.params['Output']['subpix_dither_type']
         outModel.meta.dither.subpixel_number = self.params['Output']['subpix_dither_position']
         outModel.meta.dither.subpixel_total_points = self.params['Output']['total_subpix_dither_positions']
@@ -2786,13 +2738,8 @@ class Observation():
             outModel = fits.HDUList([ex0, ex1, ex2, ex3])
             groupextnum = 3
 
-        exptype = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                              "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
-                   "niriss": {"imaging": "NIS_IMAGE"},
-                   "fgs": {"imaging": "FGS_IMAGE"}}
-
         try:
-            outModel[0].header['EXP_TYPE'] = exptype[self.params['Inst']['instrument'].lower()]\
+            outModel[0].header['EXP_TYPE'] = EXPTYPES[self.params['Inst']['instrument'].lower()]\
                                              [self.params['Inst']['mode'].lower()]
         except:
             raise ValueError('EXPTYPE mapping not complete for this!!! FIX ME!')
@@ -2915,7 +2862,7 @@ class Observation():
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']
         outModel[0].header['NUMDTHPT'] = self.params['Output']['total_primary_dither_positions']
-        outModel[0].header['PATTSIZE'] = 0.0
+        outModel[0].header['PATTSIZE'] = 'DEFAULT'
         outModel[0].header['SUBPXTYP'] = self.params['Output']['subpix_dither_type']
         outModel[0].header['SUBPXNUM'] = self.params['Output']['subpix_dither_position']
         outModel[0].header['SUBPXPNS'] = self.params['Output']['total_subpix_dither_positions']

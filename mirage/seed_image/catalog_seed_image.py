@@ -34,9 +34,11 @@ import pysiaf
 
 from . import moving_targets
 from . import segmentation_map as segmap
+from ..reference_files import crds_tools
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
+from ..utils.constants import CRDS_FILE_TYPES
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
@@ -71,6 +73,8 @@ class Catalog_seed():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        self.offline = offline
+
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -80,6 +84,9 @@ class Catalog_seed():
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.env_variables()
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -104,7 +111,12 @@ class Catalog_seed():
         """MAIN FUNCTION"""
         # Read in input parameters and quality check
         self.readParameterFile()
-        self.fullPaths()
+
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.pararms = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
         self.filecheck()
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
@@ -516,52 +528,6 @@ class Catalog_seed():
         print("Seed image and segmentation map saved as {}".format(self.seed_file))
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")
-
-    def fullPaths(self):
-        # Expand all input paths to be full paths
-        # This is to allow for easier Condor-ization of
-        # many runs
-        pathdict = {'Reffiles':['dark', 'linearized_darkfile', 'superbias',
-                                'subarray_defs', 'linearity',
-                                'saturation', 'gain', 'pixelflat',
-                                'illumflat', 'ipc', 'astrometric',
-                                'crosstalk', 'occult', 'pixelAreaMap',
-                                'flux_cal', 'readpattdefs', 'filter_throughput'],
-                    'simSignals':['pointsource', 'psfpath', 'galaxyListFile', 'extended',
-                                  'movingTargetList', 'movingTargetSersic',
-                                  'movingTargetExtended', 'movingTargetToTrack',
-                                  'psf_wing_threshold_file'],
-                    'Output':['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-filter_throughput': 'placeholder.txt',
-                                       'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt'},
-                            'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-flux_cal': 'niriss_zeropoints.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-filter_throughput': 'placeholder.txt',
-                                       'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt'},
-                            'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-filter_throughput': 'placeholder.txt',
-                                    'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
 
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
@@ -3597,7 +3563,7 @@ class Catalog_seed():
         # Load the yaml file
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except (ScannerError, FileNotFoundError, IOError) as e:
             print(e)
 
@@ -3955,6 +3921,9 @@ class Catalog_seed():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
+
+        print(pth)
+
         c1 = os.path.exists(pth)
         if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
