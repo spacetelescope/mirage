@@ -116,6 +116,9 @@ def dict_from_yaml(yaml_dict):
     if '5' in crds_dict['DETECTOR']:
         crds_dict['DETECTOR'] = crds_dict['DETECTOR'].replace('5', 'LONG')
 
+    if 'FGS' in crds_dict['DETECTOR']:
+        crds_dict['DETECTOR'] = 'GUIDER{}'.format(crds_dict['DETECTOR'][-1])
+
     if instrument == 'NIRCAM':
         if crds_dict['DETECTOR'] in ['NRCALONG', 'NRCBLONG']:
             crds_dict['CHANNEL'] = 'SHORT'
