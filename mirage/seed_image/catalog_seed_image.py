@@ -2120,15 +2120,9 @@ class Catalog_seed():
                                                           coord_sys='full_frame',
                                                           ignore_detector=ignore_detector)
 
-            # PSFs in GriddedPSFModel by default have a total signal equal
-            # to the square of the oversampling factor. They must be scaled
-            # down by that factor to be equivalent to the webbpsf output,
-            # where the summed signal is close to 1.0
-            flux_scaling_factor = self.psf_library_oversamp**2
-
             # Step 4
-            full_psf = library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
-                                                 x_0=xc_core, y_0=yc_core)
+            full_psf = library.evaluate(x=xpts_core, y=ypts_core, flux=1.0,
+                                        x_0=xc_core, y_0=yc_core)
             k1 = k1c
             l1 = l1c
 
@@ -2187,14 +2181,8 @@ class Catalog_seed():
                                                               psf_core_half_width_x, psf_core_half_width_y,
                                                               coord_sys='full_frame', ignore_detector=ignore_detector)
 
-                # PSFs in GriddedPSFModel by default have a total signal equal
-                # to the square of the oversampling factor. They must be scaled
-                # down by that factor to be equivalent to the webbpsf output,
-                # where the summed signal is close to 1.0
-                flux_scaling_factor = self.psf_library_oversamp**2
-
                 # Step 4
-                psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
+                psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=1.,
                                                 x_0=xc_core, y_0=yc_core)
 
                 # Step 5
