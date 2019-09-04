@@ -33,7 +33,7 @@ Alternatively, the user may provide a string containing a single catalog name, r
                }
 
 
-Note that currently this format is used for point source catalogs only. Other types of catalogs are limited to a single entry in a separate parameter dictionary as shown in the :ref:`Other Paramteres section <other_params>`. Catalog entries will be made more consistent in a future update. In the meantime, the easiest way to get the proper (non-point-source) catalogs into the yaml files is to use a single catalog for all observations and instruments. This is easily done by adding all necessary magnitude columns into a single catalog, or by combining existing *Mirage* catalogs. See the `Catalog Generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ for examples.
+Note that currently this format is used for point source catalogs only. Other types of catalogs are limited to a single entry in a separate parameter dictionary as shown in the :ref:`Other Parameters section <other_params>`. Catalog entries will be made more consistent in a future update. In the meantime, the easiest way to get the proper (non-point-source) catalogs into the yaml files is to use a single catalog for all observations and instruments. This is easily done by adding all necessary magnitude columns into a single catalog, or by combining existing *Mirage* catalogs. See the `Catalog Generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ for examples.
 
 
 .. Background Specification
@@ -89,12 +89,28 @@ Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.
 
     In order to specify a location on your machine to store the downloaded reference files, you must have the CRDS_PATH environment variable set to that location. If this environment variable is not set, Mirage will default to use $HOME/crds_cache/
 
+.. important::
+
+    Due to a limitation of the **CRDS** package, the CRDS_PATH and CRDS_SERVER_URL environment variables must be set BEFORE importing the **CRDS** package. If you are running Mirage using code that imports **CRDS** *or any other packages that import CRDS* (such as Mirage's **dark_prep** module or the **jwst** package, which contains the calibration pipeline) prior to running Mirage, you should explicitly set the environment variables before importing those packages. If you do not, you will get the following error:
+
+    CRDS - ERROR -  (FATAL) CRDS server connection and cache load FAILED.  Cannot continue.
+    CRDS - ERROR -  See `https://hst-crds.stsci.edu/docs/cmdline_bestrefs/ <https://hst-crds.stsci.edu/docs/cmdline_bestrefs/>`_ or `https://jwst-crds.stsci.edu/docs/cmdline_bestrefs/ <https://jwst-crds.stsci.edu/docs/cmdline_bestrefs/>`_
+    CRDS - ERROR -  for more information on configuring CRDS,  particularly CRDS_PATH and CRDS_SERVER_URL. : [Errno 2] No such file or directory: '$HOME/crds_cache/config/jwst/server_config'
+
+    If you wish to set the environment variables in your code, simply add lines such as these prior to importing **jwst** or **CRDS**:
+
+    os.environ["CRDS_PATH"] = '{}/crds_cache'.format(os.environ.get('HOME'))
+    os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
+
+    **If your code does not import any packages that rely on the CRDS package, then you may safely neglect setting the two environment variables, and Mirage will set them for you prior to importing CRDS.**
+
+
 It is also possible to specify that Mirage use reference files other than those downloaded from CRDS. In order to do this, you must supply a dictionary of filenames. Due to the varying number of selection criteria needed to uniquely identify the reference file that matches up with a particular exposure, this dictionary is composed of multiple levels of nested dictionaries. Not all possibilities are required. You may specify reference files only for the particular observing modes you are interested in. Any modes in your APT file that are not contained within the dictionary will revert to using the reference files identified by CRDS. Below is a dictionary showing all nesting required for all reference files. Note that the dictionary structure is instument dependent since a reference file type for different instruments does not necessarily have the same selection criteria.
 
-.. tip::
+.. important::
     If you choose to provide your own reference files, it is best to use these same reference files when running the JWST calibration pipeline on the simualted data files produced by Mirage. Not doing this can lead to systematic errors in your calibrated data.
 
-Here is a view of the dictionary structure required when specifying reference files. All keys are assumed to be lower case strings. The easiest way to see the set of allowed values for a particular property (e.g. exposure_type), go to the `JWST Keyword Dictionary <https://mast.stsci.edu/portal/Mashup/Clients/jwkeywords/index.html>`_, and search for the appropriate keyword. Exposure type is EXP_TYPE, filter is FILTER, pupil is PUPIL, detctor_name is DETECTOR, readpattern is READPATT.
+Here is a view of the dictionary structure required when specifying reference files. The easiest way to see the set of allowed values for a particular property (e.g. exposure_type), go to the `JWST Keyword Dictionary <https://mast.stsci.edu/portal/Mashup/Clients/jwkeywords/index.html>`_, and search for the appropriate keyword. Exposure type is EXP_TYPE, filter is FILTER, pupil is PUPIL, detctor_name is DETECTOR, readpattern is READPATT.
 
 ::
 
