@@ -25,7 +25,7 @@ import re
 
 from astropy.io import ascii as asc
 
-from mirage.utils.constants import CRDS_FILE_TYPES
+from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS
 
 
 def append_dictionary(base_dictionary, added_dictionary, braid=False):
@@ -153,6 +153,33 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
+def check_niriss_filter():
+    """
+    This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12 
+    filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and 
+    pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil 
+    parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a 
+    parameter file with FILTER = F277W and PUPIL = CLEAR or FILTER = F090W and PUPIL = CLEAR for imaging and either will 
+    produce the desired result although the actual pairings would be F277W/CLEARP and CLEAR/F090W respectively.
+    
+    The code also corrects CLEARP to CLEAR if needed.
+    
+    There are no parameters or return values for this routine.  It works with self.params, so this routine needs to be
+    called after the .yaml parameter file is read.
+    """
+    if self.params['Inst']['instrument'].lower() == 'niriss':
+        str1 = self.params['Readout']['filter']
+        str2 = self.params['Readout']['pupil']
+        if self.params['Readout']['filter'] in NIRISS_PUPIL_WHEEL_FILTERS:
+            self.params['Readout']['filter'] = str2
+            self.params['Readout']['pupil'] = str1
+            if self.params['Readout']['filter'] == 'CLEARP':
+                self.params['Readout']['filter'] = 'CLEAR'
+        if self.params['Readout']['filter'] in NIRISS_FILTER_WHEEL_FILTERS:
+            if str2 == 'CLEAR':
+                self.params['Readout']['pupil'] = 'CLEARP'
+     
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
