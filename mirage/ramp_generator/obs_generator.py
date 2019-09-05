@@ -44,7 +44,7 @@ import pysiaf
 
 from mirage.ramp_generator import unlinearize
 from mirage.reference_files import crds_tools
-from mirage.utils import read_fits, utils, siaf_interface, check_niriss_filter
+from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES
 from mirage import version
@@ -2257,7 +2257,7 @@ class Observation():
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.safe_load(infile)
-                check_niriss_filter()
+                utils.check_niriss_filter()
         except FileNotFoundError as e:
             print("WARNING: unable to open {}".format(self.paramfile))
 
