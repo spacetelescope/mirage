@@ -3675,37 +3675,8 @@ class Catalog_seed():
         # manually add a Detector key to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
-
-        # When the instrument is NIRISS, look at the FILTER/PUPIL combinations
-        # and make these work properly, the idea being that the user can put
-        # any of the 12 allowed filter names in the FILTER keyword and the code
-        # will take care of tracking which are actually in the FILTER wheel and
-        # which are in the PUPIL wheel.  Similarly, the PUPIL item can be
-        # CLEAR or CLEARP and the code will keep track of whether it 
-        # needs to be CLEAR or CLEARP for regular imaging.  One should be able
-        # to put NRM or GR150C or GR150R in the PUPIL parameter and the filter
-        # name in the FILTER parameter and get the right values out.
-        #
-        # There is a check on CLEARP plus pupil wheel filters because that would
-        # be an easy mistake to make when making files by hand as opposed to
-        # from an APT file.
-        #
-        # Note that this block of code is also found in obs_generater.py as
-        # the .yaml file is read in again there.
-
-        if self.params['Inst']['instrument'].lower() == 'niriss':
-            pupil_slots = ['F090W','F115W','F140M','F150W','F158M','F200W']
-            filter_slots = ['F277W','F356W','F380M','F430M','F444W','F480M']
-            str1 = self.params['Readout']['filter']
-            str2 = self.params['Readout']['pupil']
-            if self.params['Readout']['filter'] in pupil_slots:
-                self.params['Readout']['filter'] = str2
-                self.params['Readout']['pupil'] = str1
-                if self.params['Readout']['filter'] == 'CLEARP':
-                    self.params['Readout']['filter'] = 'CLEAR'
-            if self.params['Readout']['filter'] in filter_slots:
-                if str2 == 'CLEAR':
-                    self.params['Readout']['pupil'] = 'CLEARP'
+            
+        utils.check_niriss_filter()
             
         # Make sure the requested filter is allowed. For imaging, all filters
         # are allowed. In the future, other modes will be more restrictive
@@ -3714,7 +3685,7 @@ class Catalog_seed():
             usefilt = 'pupil'
         else:
             usefilt = 'filter'
-
+        
         # If instrument is FGS, then force filter to be 'NA' for the purposes
         # of constructing the correct PSF input path name. Then change to be
         # the DMS-required "N/A" when outputs are saved
