@@ -2257,7 +2257,10 @@ class Observation():
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.safe_load(infile)
-                utils.check_niriss_filter()
+                if self.params['Inst']['instrument'].lower() == 'niriss':
+                    newfilter,newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
+                    self.params['Readout']['filter'] = newfilter
+                    self.params['Readout']['pupil'] = newpupil
         except FileNotFoundError as e:
             print("WARNING: unable to open {}".format(self.paramfile))
 
