@@ -153,7 +153,7 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter(filter,pupil):
+def check_niriss_filter(oldfilter,oldpupil):
     """
     This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
     that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12 
@@ -167,9 +167,9 @@ def check_niriss_filter(filter,pupil):
     
     Parameters:
     
-    filter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
+    oldfilter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
     
-    pupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+    oldpupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
     
     Return values:
     
@@ -179,19 +179,19 @@ def check_niriss_filter(filter,pupil):
     
     Note that this routine should only be called when the instrument is NIRISS.
     """
-    str1 = filter
-    str2 = pupil
-    if filter in NIRISS_PUPIL_WHEEL_FILTERS:
+    str1 = oldfilter
+    str2 = oldpupil
+    if oldfilter in NIRISS_PUPIL_WHEEL_FILTERS:
         newfilter = str2
         newpupil = str1
         if newfilter == 'CLEARP':
             newfilter = 'CLEAR'
-    if filter in NIRISS_FILTER_WHEEL_FILTERS:
-        if pupil == 'CLEAR':
+    if oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
+        if oldpupil == 'CLEAR':
             newpupil = 'CLEARP'
         else:
-            newpupil = pupil
-        newfilter = filter
+            newpupil = oldpupil
+        newfilter = oldfilter
     return newfilter, newpupil
      
 def ensure_dir_exists(fullpath):
