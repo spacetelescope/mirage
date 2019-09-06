@@ -153,7 +153,7 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter():
+def check_niriss_filter(filter,pupil):
     """
     This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
     that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12 
@@ -165,20 +165,34 @@ def check_niriss_filter():
     
     The code also corrects CLEARP to CLEAR if needed.
     
-    There are no parameters or return values for this routine.  It works with self.params, so this routine needs to be
-    called after the .yaml parameter file is read.
+    Parameters:
+    
+    filter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
+    
+    pupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+    
+    Return values:
+    
+    newfilter:   a string value, the proper FILTER parameter for the requested NIRISS filter name
+    
+    newpupil:    a string value, the proper PUPIL parameter for the requested NIRISS filter name
+    
+    Note that this routine should only be called when the instrument is NIRISS.
     """
-    if self.params['Inst']['instrument'].lower() == 'niriss':
-        str1 = self.params['Readout']['filter']
-        str2 = self.params['Readout']['pupil']
-        if self.params['Readout']['filter'] in NIRISS_PUPIL_WHEEL_FILTERS:
-            self.params['Readout']['filter'] = str2
-            self.params['Readout']['pupil'] = str1
-            if self.params['Readout']['filter'] == 'CLEARP':
-                self.params['Readout']['filter'] = 'CLEAR'
-        if self.params['Readout']['filter'] in NIRISS_FILTER_WHEEL_FILTERS:
-            if str2 == 'CLEAR':
-                self.params['Readout']['pupil'] = 'CLEARP'
+    str1 = filter
+    str2 = pupil
+    if filter in NIRISS_PUPIL_WHEEL_FILTERS:
+        newfilter = str2
+        newpupil = str1
+        if newfilter == 'CLEARP':
+            newfilter = 'CLEAR'
+    if filter in NIRISS_FILTER_WHEEL_FILTERS:
+        if pupil == 'CLEAR':
+            newpupil = 'CLEARP'
+        else:
+            newpupil = pupil
+        newfilter = filter
+    return newfilter, newpupil
      
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
