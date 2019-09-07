@@ -118,9 +118,10 @@ ENV_VAR = 'MIRAGE_DATA'
 
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
-                 reffile_overrides=None, use_JWST_pipeline=True, catalogs=None,
+                 reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
+                 background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
-                 parameter_defaults=None, offline=False):
+                 offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -174,17 +175,20 @@ class SimInput:
                                     files at a time.
         """
         # If no catalogs are given, then set up some dummy defaults
-        if catalogs is None:
-            catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
-                        'niriss': 'none',
-                        'fgs': 'none'}
+        #if catalogs is None:
+        #    catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
+        #                'niriss': 'none',
+        #                'fgs': 'none'}
+
+        parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
+                               'dates': dates}
 
         self.info = {}
         self.input_xml = input_xml
         self.pointing_file = pointing_file
         self.datatype = datatype
         self.use_JWST_pipeline = use_JWST_pipeline
-        self.catalogs = catalogs
+        #self.catalogs = catalogs
         self.observation_list_file = observation_list_file
         self.verbose = verbose
         self.output_dir = output_dir
@@ -222,8 +226,9 @@ class SimInput:
         if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
-                                                     verbose=self.verbose, parameter_defaults=parameter_defaults)
+            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
+                                                     verbose=self.verbose,
+                                                     parameter_overrides=parameter_overrides)
         else:
             print('No input xml file provided. Observation dictionary not constructed.')
 
@@ -652,7 +657,6 @@ class SimInput:
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
             file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
-
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
 
@@ -1820,8 +1824,8 @@ class SimInput:
             f.write('cosmicRay:\n')
             cosmic_ray_path = os.path.join(self.datadir, instrument.lower(), 'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
-            f.write('  library: SUNMAX    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
-            f.write('  scale: 1.0     # Cosmic ray scaling factor\n')
+            f.write('  library: {}    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n'.format(input['CosmicRayLibrary']))
+            f.write('  scale: {}     # Cosmic ray scaling factor\n'.format(input['CosmicRayScale']))
             # temporary tweak here to make it work with NIRISS
             detector_label = input['detector']
 

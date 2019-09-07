@@ -130,7 +130,7 @@ class AptInput:
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
                                   'MovingTargetSersic MovingTargetExtended ' \
                                   'MovingTargetConvolveExtended MovingTargetToTrack ' \
-                                  'BackgroundRate DitherIndex'.split()
+                                  'BackgroundRate DitherIndex CosmicRayLibrary CosmicRayScale'.split()
 
         nircam_mapping = {'ptsrc': 'PointSourceCatalog',
                           'galcat': 'GalaxyCatalog',
@@ -169,7 +169,7 @@ class AptInput:
                 for key in OBSERVATION_LIST_FIELDS:
                     if key == 'Date':
                         value = entry[key].strftime('%Y-%m-%d')
-                    elif key in ['PAV3', 'Instrument']:
+                    elif key in ['PAV3', 'Instrument', 'CosmicRayLibrary', 'CosmicRayScale']:
                         value = str(entry[key])
                     else:
                         value = str(None)
@@ -201,7 +201,6 @@ class AptInput:
                             intab[key].append(str(None))
 
         intab['epoch_start_date'] = intab['Date']
-
         return intab
 
     def base36encode(self, integer):

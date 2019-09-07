@@ -140,6 +140,13 @@ class ReadAPTXML():
         except:
             pi_name = piname_default
 
+        # Get target names - - - - - - - - - - - - - - - - - - - - - - - - - -
+        targs = tree.find(self.apt + 'Targets')
+        target_elements = targs.findall(self.apt + 'Target')
+        self.target_names = []
+        for target in target_elements:
+            self.target_names.append(target.find(self.apt + 'TargetName').text)
+
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
         # Find all observations (but use only those that use NIRCam or are WFSC)
@@ -465,7 +472,7 @@ class ReadAPTXML():
 
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
-      
+
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
 
@@ -649,7 +656,7 @@ class ReadAPTXML():
                 # Combine primary and subpixel dithers
                 number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
 
-                
+
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower() == 'niriss') and (element_tag_stripped == 'ExposureList')) | \
                         ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
@@ -660,7 +667,7 @@ class ReadAPTXML():
 
                         # Load dither information into dictionary
                         exposure_dict['DitherPatternType'] = DitherPatternType
-                        
+
                         if (number_of_dithers is None) | (number_of_dithers == 'NONE'):
                             number_of_dithers = 1 * number_of_subpixel_positions
 
