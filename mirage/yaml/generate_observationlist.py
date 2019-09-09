@@ -498,7 +498,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
     # Set default values. These are overwritten if there is an appropriate
     # entry in parameter_defaults
     default_values = {}
-    default_values['Date'] = '2020-02-20'
+    default_values['Date'] = '2021-10-04'
     default_values['PAV3'] = '0.'
     default_values['PointsourceCatalog'] = 'None'
     default_values['GalaxyCatalog'] = 'None'
