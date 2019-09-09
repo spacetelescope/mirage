@@ -188,7 +188,6 @@ class SimInput:
         self.pointing_file = pointing_file
         self.datatype = datatype
         self.use_JWST_pipeline = use_JWST_pipeline
-        #self.catalogs = catalogs
         self.observation_list_file = observation_list_file
         self.verbose = verbose
         self.output_dir = output_dir
@@ -1137,7 +1136,8 @@ class SimInput:
         act_overhead = 90  # seconds. (filter change)
         visit_overhead = 600  # seconds. (slew)
 
-        # Get visit, activity_id info for first exposure
+        # Get visit, activity_id, dither_id info for first exposure
+        ditherid = self.info['dither'][0]
         actid = self.info['act_id'][0]
         visit = self.info['visit_num'][0]
         # obsname = self.info['obs_label'][0]
@@ -1151,6 +1151,7 @@ class SimInput:
             next_actid = self.info['act_id'][i]
             next_visit = self.info['visit_num'][i]
             next_obsname = self.info['obs_label'][i]
+            next_ditherid = self.info['dither'][i]
 
             # Find the readpattern of the file
             readpatt = self.info['ReadoutPattern'][i]
@@ -1189,21 +1190,11 @@ class SimInput:
                 # for observations using all 4 shortwave B detectors. In that case,
                 # we need to build the aperture name from the combination of detector
                 # and subarray name.
-                # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
-                #     # aperture = self.info['aperture']
-                #
-                # elif np.all(np.unique(self.info['Instrument']) == 'NIRCAM'):
-                #     sub = self.info['Subarray'][i]
-                #     det = 'NRC' + self.info['detector'][i]
-                #     aperture = det + '_' + sub
-
                 aperture = self.info['aperture'][i]
                 if 'NRC' == aperture[0:3]:
                     sub = self.info['Subarray'][i]
                     det = 'NRC' + self.info['detector'][i]
                     aperture = det + '_' + sub
-
-
 
                 # Get the number of amps from the subarray definition file
                 match = aperture == subarray_def['AperName']
@@ -1226,15 +1217,22 @@ class SimInput:
                 namp.append(amp)
 
                 # same activity ID
-                if next_actid == actid:
-                    # in this case, the start time should remain the same
-                    date_obs.append(base_date)
-                    time_obs.append(base_time)
-                    expstart.append(base.mjd)
-                    continue
+                # Remove this for now, since Mirage was not correctly
+                # specifying activities. At the moment all exposures have
+                # the same activity ID, which means we must allow the
+                # the epoch_start_date to change even if the activity ID
+                # does not. This will change back in the future when we
+                # figure out more realistic activity ID values.
+                #if next_actid == actid:
+                #    # in this case, the start time should remain the same
+                #    date_obs.append(base_date)
+                #    time_obs.append(base_time)
+                #    expstart.append(base.mjd)
+                #    continue
 
                 epoch_date = self.info['epoch_start_date'][i]
                 epoch_time = deepcopy(epoch_base_time0)
+
                 # new epoch - update the base time
                 if epoch_date != epoch_base_date:
                     epoch_base_date = deepcopy(epoch_date)
@@ -1253,12 +1251,19 @@ class SimInput:
                 if next_visit != visit:
                     # visit break. Larger overhead
                     overhead = visit_overhead
+
+                # This block should be updated when we have more realistic
+                # activity IDs
                 elif ((next_actid > actid) & (next_visit == visit)):
                     # same visit, new activity. Smaller overhead
                     overhead = act_overhead
+                elif ((next_ditherid != ditherid) & (next_visit == visit)):
+                    # same visit, new dither position. Smaller overhead
+                    overhead = act_overhead
                 else:
-                    # should never get in here
-                    raise NotImplementedError()
+                    # same observation, activity, dither. Filter changes
+                    # will still fall in here, which is not accurate
+                    overhead = 0.
 
                 # For cases where the base time needs to change
                 # continue down here
@@ -1288,6 +1293,7 @@ class SimInput:
                 actid = deepcopy(next_actid)
                 visit = deepcopy(next_visit)
                 obsname = deepcopy(next_obsname)
+                ditherid = deepcopy(next_ditherid)
 
         self.info['date_obs'] = date_obs
         self.info['time_obs'] = time_obs

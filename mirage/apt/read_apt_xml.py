@@ -49,7 +49,7 @@ class ReadAPTXML():
                           'ApertureOverride', 'ObservationName',
                           'DitherPatternType', 'ImageDithers', # NIRISS
                           'number_of_dithers', # uniform name across instruments
-                          'FiducialPointOverride',
+                          'FiducialPointOverride', 'TargetID'
                           ]
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
                              'ReadoutPattern', 'Groups', 'Integrations',
@@ -215,6 +215,9 @@ class ReadAPTXML():
                 # label tag not present
                 obs_label = 'Observation 1'
 
+            # Get target name
+            targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
+
             # extract visit numbers
             visit_numbers = [np.int(element.items()[0][1]) for element in obs if
                              element.tag.split(self.apt)[1] == 'Visit']
@@ -229,6 +232,7 @@ class ReadAPTXML():
                                              'CoordinatedParallel': coordparallel,
                                              'ObservationID': observation_number,
                                              'ObservationName': obs_label,
+                                             'TargetID': targ_name
                                              }
 
             if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration',

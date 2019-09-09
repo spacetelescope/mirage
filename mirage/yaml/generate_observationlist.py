@@ -30,7 +30,7 @@ from ..apt import read_apt_xml
 
 # Get the mapping between the user-input catalog dictionary keys and
 # the keys used in the full table of observation parameters
-CAT_TYPE_MAPPING = {'point_souce': 'PointsourceCatalog', 'galaxy': 'GalaxyCatalog',
+CAT_TYPE_MAPPING = {'point_source': 'PointsourceCatalog', 'galaxy': 'GalaxyCatalog',
                     'extended': 'ExtendedCatalog', 'moving_pointsource': 'MovingTargetList',
                     'moving_sersic': 'MovingTargetSersic', 'moving_extended': 'MovingTargetExtended',
                     'moving_target_to_track': 'MovingTargetToTrack'}
@@ -112,12 +112,12 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
     for key1 in cats:
 
         # Find the observation numbers that use this target
-        match = targets == key1
+        match = np.array(targets) == key1
 
         # Check to see if the second level of the input dictionary is
         # a dictionary of catalogs, or a dictionary of instruments
         keys2 = cats[key1].keys()
-        keys_present = [True if poss in cat_keys else False for poss in POSSIBLE_CATS]
+        keys_present = [True if poss in keys2 else False for poss in POSSIBLE_CATS]
         if any(keys_present):
             # Dictionary contains catalog names, so we use the same catalogs
             # for all instruments
@@ -136,7 +136,7 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
             # populate the different catalogs for each instrument
             for obs_number in obs_nums[match]:
                 for instrument in keys2:
-                    ctypes = cats[key1][key2].keys()
+                    ctypes = cats[key1][instrument].keys()
                     for ctype in ctypes:
                         obs_cats[obs_number][instrument][CAT_TYPE_MAPPING[ctype]] = cats[key1][instrument][ctype]
     return obs_cats
@@ -185,6 +185,160 @@ def dictionary_slice(dictionary, index):
     new_dict = {}
     for key in dictionary.keys():
         new_dict[key] = [dictionary[key][index]]
+    return new_dict
+
+
+def ensure_lower_case_background_keys(dictionary):
+    """Ensure that the dictionary keys in the nested dictionary are all
+    lower case. This was designed to be used on the user-input
+    background level dictionary
+
+    Parameters
+    ----------
+    dictionary : dict
+        Nested dictionary of background values
+        background = {'001': {'nircam': {'sw': 0.2, 'lw': 0.3}, 'niriss': 0.4, 'fgs': 0.2},
+                      '002': {'nircam': {'sw': 'medium', 'lw': 'high'}, 'niriss': 'low', 'fgs': 'high'},
+                      '003': {'nircam': {'sw': 0.75, 'lw': 'high'}, 'niriss': 0.2, 'fgs': 0.1}}
+
+    Returns
+    -------
+    new_dict : dict
+        Same as input dictionary, but with all keys converted to lower case
+    """
+    new_dict = {}
+    for observation_number, obs_dict in dictionary.items():
+        new_dict[observation_number] = {}
+        for instrument, inst_data in obs_dict.items():
+            # nircam with it's dictionary of sw and lw doesn't necessarily
+            # have to be present, if the input proposal has no nircam
+            # observations
+            if isinstance(inst_data, collections.Mapping):
+                new_dict[observation_number][instrument.lower()] = {}
+                for channel, channel_val in inst_data.items():
+                    new_dict[observation_number][instrument.lower()][channel.lower()] = channel_val
+            else:
+                new_dict[observation_number][instrument.lower()] = inst_data
+    return new_dict
+
+
+def ensure_lower_case_keys(dictionary):
+    """Ensure that the dictionary keys in the nested dictionary are all
+    lower case. This was designed to be used on the user-input
+    background level dictionary
+
+    Parameters
+    ----------
+    dictionary : dict
+        Nested dictionary of background values
+        background = {'001': {'nircam': {'sw': 0.2, 'lw': 0.3}, 'niriss': 0.4, 'fgs': 0.2},
+                      '002': {'nircam': {'sw': 'medium', 'lw': 'high'}, 'niriss': 'low', 'fgs': 'high'},
+                      '003': {'nircam': {'sw': 0.75, 'lw': 'high'}, 'niriss': 0.2, 'fgs': 0.1}}
+
+    Returns
+    -------
+    new_dict : dict
+        Same as input dictionary, but with all keys converted to lower case
+    """
+    new_dict = {}
+    for key1, value1 in dictionary.items():
+        new_dict[key1] = {}
+        for key2, value2 in value1.items():
+            # nircam with it's dictionary of sw and lw doesn't necessarily
+            # have to be present, if the input proposal has no nircam
+            # observations
+            if isinstance(value2, collections.Mapping):
+                new_dict[key1][key2.lower()] = {}
+                for key3, value3 in value2.items():
+                    new_dict[key1][key2.lower()][key3.lower()] = value3
+            else:
+                new_dict[key1][key2.lower()] = value2
+    return new_dict
+
+
+def ensure_lower_case_catalogs_keys(dictionary):
+    """Ensure that the dictionary keys in the nested dictionary are all
+    lower case. This was designed to be used on the user-input
+    background level dictionary
+
+    Parameters
+    ----------
+    dictionary : dict
+        Nested dictionary of background values
+        background = {'001': {'nircam': {'sw': 0.2, 'lw': 0.3}, 'niriss': 0.4, 'fgs': 0.2},
+                      '002': {'nircam': {'sw': 'medium', 'lw': 'high'}, 'niriss': 'low', 'fgs': 'high'},
+                      '003': {'nircam': {'sw': 0.75, 'lw': 'high'}, 'niriss': 0.2, 'fgs': 0.1}}
+
+        catalogs = {'TARG1': {'point_source': 'ptsrc1.cat',
+                              'galaxy': 'galaxy1.cat',
+                              'extended': 'ex1.cat',
+                              'moving_pointsource': 'mt_ptsrc1.cat',
+                              'moving_sersic': 'mt_gal_1.cat',
+                              'moving_extended': 'mt_ext_1.cat',
+                              'moving_target_to_track': 'mt_track_1.cat'
+                              },
+                    'TARG2': {'point_source': 'ptsrc2.cat',
+                              'galaxy': 'galaxy2.cat',
+                              'extended': 'ex2.cat',
+                              'moving_pointsource': 'mt_ptsrc2.cat',
+                              'moving_sersic': 'mt_gal_2.cat',
+                              'moving_extended': 'mt_ext_2.cat',
+                              'moving_target_to_track': 'mt_track_2.cat'
+                              }
+                    }
+
+        # Different catalogs for each instrument in each observation
+        catalogs = {'TARG1': {'nircam': {'point_source': 'ptsrc_nrc_1.cat',
+                                         'galaxy': 'galaxy_nrc_1.cat',
+                                         'extended': 'ex_nrc_1.cat',
+                                         'moving_pointsource': 'mt_ptsrc_nrc_1.cat',
+                                         'moving_sersic': 'mt_gal_nrc_1.cat',
+                                         'moving_extended': 'mt_ext_nrc_1.cat',
+                                         'moving_target_to_track': 'mt_track_nrc_1.cat'
+                                         },
+                              'niriss': {'point_source': 'ptsrc_nis_1.cat',
+                                         'galaxy': 'galaxy_nis_1.cat',
+                                         'extended': 'ex_nis_1.cat',
+                                         'moving_pointsource': 'mt_ptsrc_nis_1.cat',
+                                         'moving_sersic': 'mt_gal_nis_1.cat',
+                                         'moving_extended': 'mt_ext_nis_1.cat',
+                                         'moving_target_to_track': 'mt_track_nis_1.cat'
+                                         }
+                              },
+                    'TARG2': {'nircam': {'point_source': 'ptsrc_nrc_2.cat',
+                                         'galaxy': 'galaxy_nrc_2.cat',
+                                         'extended': 'ex_nrc_2.cat',
+                                         'moving_pointsource': 'mt_ptsrc_nrc_2.cat',
+                                         'moving_sersic': 'mt_gal_nrc_2.cat',
+                                         'moving_extended': 'mt_ext_nrc_2.cat',
+                                         'moving_target_to_track': 'mt_track_nrc_2.cat'
+                                         },
+                              'niriss': {'point_source': 'ptsrc_nis_2.cat',
+                                         'galaxy': 'galaxy_nis_2.cat',
+                                         'extended': 'ex_nis_2.cat',
+                                         'moving_pointsource': 'mt_ptsrc_nis_2.cat',
+                                         'moving_sersic': 'mt_gal_nis_2.cat',
+                                         'moving_extended': 'mt_ext_nis_2.cat',
+                                         'moving_target_to_track': 'mt_track_nis_2.cat'
+                                         }
+                              },
+                    }
+
+    Returns
+    -------
+    new_dict : dict
+        Same as input dictionary, but with all keys converted to lower case
+    """
+    new_dict = {}
+    for target_name, targ_dict in dictionary.items():
+        new_dict[target_name] = {}
+        for key2, value2 in targ_dict.items():
+            if isinstance(value2, collections.Mapping):
+                new_dict[target_name][key2.lower()] = {}
+                for key3, value3 in targ_dict[key2][key3]:
+                    new_dict[target_name][key2.lower()][key3.lower()] = value3
+            else:
+                new_dict[target_name][key2.lower()] = value2
     return new_dict
 
 
@@ -339,151 +493,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
     unique_observation_ids = np.unique(all_observation_ids).tolist()
 
     # List of target names from the proposal
-    all_targets = readxml_obj.target_names
-
-    # Only require the number of catalogs equal to the number of observations
-    # for each instrument. Keep in mind that multiple instruments can be involved in
-    # a given observation due to parallels. But in the case of serial observations
-    # with different instruments, we don't want to over-count observations and
-    # require more catalogs than are really necessary
-    #number_of_obs = {}
-    #for instrument_name in used_instruments:
-    #    inst_observations = np.array(np.array(xml_dict['Instrument']) == instrument_name)
-    #    unique_inst_obs = np.unique(np.array(xml_dict['ObservationID'])[inst_observations])
-    #    number_of_obs[instrument_name.lower()] = len(unique_inst_obs)
-
-
-    # Translate the dictionary of catalogs into a per-obervation, per-instrument dictionary
-
-    # Same catalogs for all observations and instruments
-    # catalogs = {'pointsource': 'ptsrc.cat', 'galaxy': 'gal.cat'}
-
-    # Same catalogs for all instruments within each observation
-    # catalogs = {'my_targ_1': {'pointsource': 'ptsrc1.cat', 'galaxy': 'galaxy1.cat', 'extended': 'ex1.cat'},
-    #             'my_targ_2': {'pointsource': 'ptsrc2.cat', 'galaxy': 'galaxy2.cat', 'extended': 'ex2.cat'}}
-
-    # Different catalogs for each instrument in each observation
-    # catalogs = {'my_targ_1': {'nircam': {'pointsource': 'ptsrc1.cat', 'galaxy': 'galaxy1.cat', 'extended': 'ex1.cat'},
-    #                           'niriss': {'pointsource': 'ptsrc_nis.cat', 'galaxy': 'galaxy_nis.cat'}},
-    #             'my_targ_2': {'nircam': {'pointsource': 'ptsrc2.cat', 'galaxy': 'galaxy2.cat', 'extended': 'ex2.cat'}}}
-
-
-
-
-
-
-
-
-
-    """
-    ######################PREVIOUS CODE#########################
-    # ensure that catalog files are lists with number of elements matching the number of observations
-    if not isinstance(catalogs, collections.Mapping):
-        raise TypeError('Please provide a catalog dictionary.')
-
-    # Determine what kind of catalog has been provided
-    # input_catalogs = copy.deepcopy(catalogs)
-    if any(x in ['nircam', 'fgs', 'niriss'] for x in catalogs.keys()):
-        cat_type = 'inst'
-    elif set(catalogs.keys()) == set(['gal', 'ptsrc']):
-        cat_type = 'object'
-    else:
-        raise ValueError('Invalid catalog dictionary provided.')
-
-    # Process instrument-specific catalogs (assuming only point source)
-    input_catalogs = copy.deepcopy(catalogs)
-    ptsrc_catalog_lists = {}
-    gal_catalog_lists = {}
-    if cat_type == 'inst':
-        # Strip out catalogs for any instruments that aren't used
-        for key in catalogs:
-            if key.upper() not in used_instruments:
-                del input_catalogs[key]
-
-        # Check that the appropriate catalogs have been included
-        for inst in used_instruments:
-            if inst.lower() not in input_catalogs.keys():
-                raise KeyError('Missing a catalog entry for {} in the catalog dictionary.'.format(inst))
-
-        for inst in input_catalogs.keys():
-            if inst.lower() == 'nircam':
-                # check that a dictionary is provided for nircam
-                if not isinstance(input_catalogs[inst], collections.Mapping):
-                    raise ValueError('Please provide a lw/sw dictionary for nircam.')
-                else:
-                    ptsrc_catalog_lists[inst] = {}
-                    gal_catalog_lists[inst] = {}
-                    for module_key in input_catalogs[inst].keys():
-                        catalog_files = input_catalogs[inst][module_key]
-
-                        # If the provided catalog is a string, multiply it by
-                        # n_exposures
-                        if isinstance(catalog_files, str):
-                            catalog_file_list = [catalog_files] * number_of_obs[inst]
-                            ptsrc_catalog_lists[inst][module_key] = catalog_file_list
-                        # If the provided catalog is a list, use that
-                        elif isinstance(catalog_files, list):
-                            ptsrc_catalog_lists[inst][module_key] = catalog_files
-                        else:
-                            raise TypeError('Must provide catalogs as file path '
-                                            'strings, or a list of file path strings.')
-                        gal_catalog_lists[inst][module_key] = ['None'] * number_of_obs[inst]
-
-                        if len(ptsrc_catalog_lists[inst][module_key]) != number_of_obs[inst]:
-                            raise RuntimeError(('Please specify one catalog per observation for {}. '
-                                                'Current catalog is {}').format(key.lower(),
-                                                                                catalog_file_list))
-
-            else:
-                catalog_files = input_catalogs[inst]
-                if isinstance(catalog_files, str):
-                    catalog_file_list = [catalog_files] * number_of_obs[inst]
-                    ptsrc_catalog_lists[inst] = catalog_file_list
-                    gal_catalog_lists[inst] = ['None'] * number_of_obs[inst]
-                else:
-                    raise TypeError('Must provide catalogs as file path strings.')
-
-                if len(catalog_file_list) != number_of_obs[inst]:
-                    raise RuntimeError(('Please specify one catalog per observation for {}. '
-                                        'Current catalog is {}').format(inst.lower(), catalog_file_list))
-
-    # Process object-specific catalogs (expecting one point source and one galactic catalog,
-    # each containing columns for all instruments)
-    elif cat_type == 'object':
-        ptsrc_catalog = input_catalogs['ptsrc']
-        gal_catalog = input_catalogs['gal']
-        if not (isinstance(ptsrc_catalog, str) and isinstance(gal_catalog, str)):
-            raise TypeError('Must provide catalogs as file path strings.')
-
-        for inst in used_instruments:
-            inst = inst.lower()
-            ptsrc_catalog_file_list = [ptsrc_catalog] * number_of_obs[inst]
-            gal_catalog_file_list = [gal_catalog] * number_of_obs[inst]
-
-            if inst == 'nircam':
-                ptsrc_catalog_lists[inst] = {}
-                gal_catalog_lists[inst] = {}
-                ptsrc_catalog_lists[inst]['sw'] = ptsrc_catalog_file_list
-                ptsrc_catalog_lists[inst]['lw'] = ptsrc_catalog_file_list
-                gal_catalog_lists[inst]['sw'] = gal_catalog_file_list
-                gal_catalog_lists[inst]['lw'] = gal_catalog_file_list
-            else:
-                ptsrc_catalog_lists[inst] = ptsrc_catalog_file_list
-                gal_catalog_lists[inst] = gal_catalog_file_list
-    ######################PREVIOUS CODE#########################
-    """
-
-
-
-
-
-
-
-    # if verbose:
-    #     print('Summary of dictionary extracted from {}'.format(xml_file))
-    #     for key in xml_dict.keys():
-    #         print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))
-
+    all_targets = xml_dict['TargetID']
 
     # Set default values. These are overwritten if there is an appropriate
     # entry in parameter_defaults
@@ -502,7 +512,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
     default_values['MovingTargetToTrack'] = 'None'
     default_values['BackgroundRate_sw'] = 'low'
     default_values['BackgroundRate_lw'] = 'low'
-    default_values['BackgroundRate'] = '0.5'
+    default_values['BackgroundRate'] = 'low'
     default_values['CosmicRayLibrary'] = 'SUNMAX'
     default_values['CosmicRayScale'] = 1.0
     default_parameter_name_list = ['MovingTargetConvolveExtended', 'ExtendedScale', 'ExtendedCenter']
@@ -543,10 +553,14 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
         else:
             bkeys = list(background.keys())
             if (isinstance(background[bkeys[0]], str) or isinstance(background[bkeys[0]], float) or isinstance(background[bkeys[0]], int)):
+                # Case where one background is specified for all instruments
+                # in each observation
                 background = convert_background_dict(background)
             else:
-                # Just use background as-is below when looping over observations
-                pass
+                # Case where the user inputs the full dictionary, with a
+                # background value for each instrument and observation.
+                # Force all dictionary keys to be lower case.
+                background = ensure_lower_case_keys(background)
 
     # Dates
     # dates = '2019-5-25'
@@ -558,6 +572,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
             # Now set dates to None so that it won't be used when looping
             # over observations below
             dates = None
+            print('Modified date default type is: ', type(default_values['Date']), default_values['Date'])
         else:
             # Just use dates below when looping over observations
             pass
@@ -610,6 +625,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
             # catalogs for each target, or different catalogs for each instrument
             # and target, then translate this dictionary into a dictionary of
             # catalogs for each observation and instrument
+            catalogs = ensure_lower_case_keys(catalogs)
             catalogs_per_observation = catalog_dictionary_per_observation(catalogs,
                                                                           np.array(all_observation_ids),
                                                                           np.array(all_targets),
@@ -666,7 +682,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                                "dictionary. Quitting.".format(observation_number)))
                         raise KeyError
 
-
                 # Get the proper catalog values
                 if catalogs_per_observation is None:
                     ptsrc_catalog_value = default_values['PointsourceCatalog']
@@ -678,10 +693,10 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                     mov_tracked_catalog_value = default_values['MovingTargetToTrack']
                 else:
                     try:
-                        catalogs_to_use = catalogs_per_observation[observation_number][instrument]
+                        catalogs_to_use = catalogs_per_observation[observation_number][instrument.lower()]
                     except KeyError:
                         print(("ERROR: Missing observation number or instrument entry in catalog "
-                               "dictionary. Failed to find catalogs[{}][{}]".format(observation_number, instrument)))
+                               "dictionary. Failed to find catalogs[{}][{}]".format(observation_number, instrument.lower())))
                         raise KeyError
                     ptsrc_catalog_value = catalogs_to_use['PointsourceCatalog']
                     galaxy_catalog_value = catalogs_to_use['GalaxyCatalog']
@@ -789,7 +804,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                         background_value = default_values['BackgroundRate']
                     else:
                         try:
-                            background_value = background[observation_number][instrument]
+                            background_value = background[observation_number][instrument.lower()]
                         except KeyError:
                             print(("ERROR: Missing entry in the background dictionary for observation "
                                    "number: {}, instrument: {}".format(observation_number, instrument)))
