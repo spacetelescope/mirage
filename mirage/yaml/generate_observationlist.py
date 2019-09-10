@@ -572,7 +572,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
             # Now set dates to None so that it won't be used when looping
             # over observations below
             dates = None
-            print('Modified date default type is: ', type(default_values['Date']), default_values['Date'])
         else:
             # Just use dates below when looping over observations
             pass
@@ -667,8 +666,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                     try:
                         date_value = dates[observation_number]
                     except KeyError:
-                        print(("ERROR: No date value specified for Observation {} in date dictionary. "
-                               "Quitting.".format(observation_number)))
+                        print(("\n\nERROR: No date value specified for Observation {} in date dictionary. "
+                               "Quitting.\n\n".format(observation_number)))
                         raise KeyError
 
                 # Get the proper PAV3 value
@@ -678,8 +677,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                     try:
                         pav3_value = pav3[observation_number]
                     except KeyError:
-                        print(("ERROR: No roll angle value specified for Observation {} in roll_angle "
-                               "dictionary. Quitting.".format(observation_number)))
+                        print(("\n\nERROR: No roll angle value specified for Observation {} in roll_angle "
+                               "dictionary. Quitting.\n\n".format(observation_number)))
                         raise KeyError
 
                 # Get the proper catalog values
@@ -695,8 +694,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                     try:
                         catalogs_to_use = catalogs_per_observation[observation_number][instrument.lower()]
                     except KeyError:
-                        print(("ERROR: Missing observation number or instrument entry in catalog "
-                               "dictionary. Failed to find catalogs[{}][{}]".format(observation_number, instrument.lower())))
+                        print(("\n\nERROR: Missing observation number or instrument entry in catalog "
+                               "dictionary. Failed to find catalogs[{}][{}]\n\n".format(observation_number,
+                                                                                        instrument.lower())))
                         raise KeyError
                     ptsrc_catalog_value = catalogs_to_use['PointsourceCatalog']
                     galaxy_catalog_value = catalogs_to_use['GalaxyCatalog']
@@ -715,8 +715,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                         cr_library_value = cosmic_rays[observation_number]['library']
                         cr_scale_value = cosmic_rays[observation_number]['scale']
                     except KeyError:
-                        print(("ERROR: No cosmic ray library and/or scale value specified for "
-                               "Observation {} in cosmic_ray dictionary. Quitting."
+                        print(("\n\nERROR: No cosmic ray library and/or scale value specified for "
+                               "Observation {} in cosmic_ray dictionary. Quitting.\n\n"
                                .format(observation_number)))
                         raise KeyError
 
@@ -747,8 +747,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                             background_sw_value = background[observation_number]['nircam']['sw']
                             background_lw_value = background[observation_number]['nircam']['lw']
                         except KeyError:
-                            print(("ERROR: Missing entry in the background dictionary for NIRCam SW and/or "
-                                   "LW channels, observation number: {}".format(observation_number)))
+                            print(("\n\nERROR: Missing entry in the background dictionary for NIRCam SW and/or "
+                                   "LW channels, observation number: {}\n\n".format(observation_number)))
                             raise KeyError
 
                     text += [
@@ -806,8 +806,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
                         try:
                             background_value = background[observation_number][instrument.lower()]
                         except KeyError:
-                            print(("ERROR: Missing entry in the background dictionary for observation "
-                                   "number: {}, instrument: {}".format(observation_number, instrument)))
+                            print(("\n\nERROR: Missing entry in the background dictionary for observation "
+                                   "number: {}, instrument: {}\n\n".format(observation_number, instrument)))
                             raise KeyError
 
                     text += [
