@@ -3663,7 +3663,12 @@ class Catalog_seed():
         # manually add a Detector key to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
-
+            
+        if self.params['Inst']['instrument'].lower() == 'niriss':
+            newfilter,newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
+            self.params['Readout']['filter'] = newfilter
+            self.params['Readout']['pupil'] = newpupil
+            
         # Make sure the requested filter is allowed. For imaging, all filters
         # are allowed. In the future, other modes will be more restrictive
 
@@ -3671,7 +3676,7 @@ class Catalog_seed():
             usefilt = 'pupil'
         else:
             usefilt = 'filter'
-
+        
         # If instrument is FGS, then force filter to be 'NA' for the purposes
         # of constructing the correct PSF input path name. Then change to be
         # the DMS-required "N/A" when outputs are saved
