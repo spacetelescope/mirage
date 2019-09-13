@@ -121,9 +121,9 @@ def dict_from_yaml(yaml_dict):
 
     if instrument == 'NIRCAM':
         if crds_dict['DETECTOR'] in ['NRCALONG', 'NRCBLONG']:
-            crds_dict['CHANNEL'] = 'SHORT'
-        else:
             crds_dict['CHANNEL'] = 'LONG'
+        else:
+            crds_dict['CHANNEL'] = 'SHORT'
 
     # For the purposes of choosing reference files, the exposure type should
     # always be set to imaging, since it is used to locate sources in the
