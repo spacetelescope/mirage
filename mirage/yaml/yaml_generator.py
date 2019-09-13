@@ -97,6 +97,7 @@ from copy import deepcopy
 from glob import glob
 from copy import deepcopy
 import datetime
+import warnings
 
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
@@ -510,8 +511,13 @@ class SimInput:
 
             self.info = apt.exposure_tab
 
-            # Add start time info to each element
-            self.make_start_times()
+            # Add start time info to each element.
+            # Ignore warnings as astropy.time.Time will give a warning
+            # related to unknown leap seconds if the date is too far in
+            # the future.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.make_start_times()
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
@@ -1111,7 +1117,6 @@ class SimInput:
                                                     else:
                                                         newkey6 = key6
 
-
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
         date_obs = []
@@ -1263,7 +1268,7 @@ class SimInput:
                 else:
                     # same observation, activity, dither. Filter changes
                     # will still fall in here, which is not accurate
-                    overhead = 0.
+                    overhead = 10.
 
                 # For cases where the base time needs to change
                 # continue down here

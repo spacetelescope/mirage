@@ -1554,7 +1554,6 @@ class Observation():
         for ref in rlist:
             self.ref_check(ref)
         for path in plist:
-            print('\n\n\n{}\n\n\n'.format(path))
             self.path_check(path)
 
     def flag_saturation(self, data, sat):
