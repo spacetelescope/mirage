@@ -107,6 +107,8 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
         obs_cats[number] = {'nircam': {}, 'niriss': {}, 'fgs': {}}
         for cat_type in POSSIBLE_CATS:
             obs_cats[number]['nircam'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
+            obs_cats[number]['niriss'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
+            obs_cats[number]['fgs'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
 
     # Loop over the keys in the top level of the input dictionary
     for key1 in cats:
@@ -601,7 +603,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
         cat_keys = catalogs.keys()
         keys_present = [True if poss in cat_keys else False for poss in POSSIBLE_CATS]
         if any(keys_present):
-            for cat_key in cat_keys[keys_present]:
+            for cat_key in cat_keys:
                 if cat_key == 'point_source':
                     default_values['PointsourceCatalog'] = catalogs[cat_key]
                 if cat_key == 'galaxy':
