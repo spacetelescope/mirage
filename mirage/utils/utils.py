@@ -156,31 +156,38 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
 def check_niriss_filter(oldfilter,oldpupil):
     """
     This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
-    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12 
-    filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and 
-    pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil 
-    parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a 
-    parameter file with FILTER = F277W and PUPIL = CLEAR or FILTER = F090W and PUPIL = CLEAR for imaging and either will 
+    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
+    filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and
+    pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil
+    parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a
+    parameter file with FILTER = F277W and PUPIL = CLEAR or FILTER = F090W and PUPIL = CLEAR for imaging and either will
     produce the desired result although the actual pairings would be F277W/CLEARP and CLEAR/F090W respectively.
-    
+
     The code also corrects CLEARP to CLEAR if needed.
-    
-    Parameters:
-    
-    oldfilter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
-    
-    oldpupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
-    
-    Return values:
-    
-    newfilter:   a string value, the proper FILTER parameter for the requested NIRISS filter name
-    
-    newpupil:    a string value, the proper PUPIL parameter for the requested NIRISS filter name
-    
+
+    Parameters
+    ----------
+
+    oldfilter :  str
+        Assumed to be the self.params['Readout']['filter'] value from the .yaml file
+
+    oldpupil :  str
+        Assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+
+    Returns
+    -------
+
+    newfilter : str
+        The proper FILTER parameter for the requested NIRISS filter name
+
+    newpupil : str
+        The proper PUPIL parameter for the requested NIRISS filter name
+
     Note that this routine should only be called when the instrument is NIRISS.
     """
     str1 = oldfilter
     str2 = oldpupil
+
     if oldfilter in NIRISS_PUPIL_WHEEL_FILTERS:
         newfilter = str2
         newpupil = str1
@@ -193,7 +200,7 @@ def check_niriss_filter(oldfilter,oldpupil):
             newpupil = oldpupil
         newfilter = oldfilter
     return newfilter, newpupil
-     
+
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
