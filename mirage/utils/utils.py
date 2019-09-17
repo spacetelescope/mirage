@@ -199,6 +199,10 @@ def check_niriss_filter(oldfilter,oldpupil):
         else:
             newpupil = oldpupil
         newfilter = oldfilter
+    else:
+        # Case where oldfilter is an optic other than a filter (e.g. a grism)
+        newfilter = oldfilter
+        newpupil = oldpupil
     return newfilter, newpupil
 
 def ensure_dir_exists(fullpath):
