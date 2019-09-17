@@ -445,7 +445,9 @@ def expand_for_dithers(indict, verbose=True):
     return expanded
 
 
-def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None, verbose=False):
+def get_observation_dict(xml_file, yaml_file, catalogs,
+                         parameter_overrides={'cosmic_rays': None, 'background': None, 'roll_angle': None, 'dates': None},
+                         verbose=False):
     """Write observation list file (required mirage input) on the basis of APT files.
 
     Parameters
@@ -459,7 +461,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs, parameter_overrides=None
         dictionary itself, e.g. catalogs['nircam']['lw'] = somefile
         If the user prvides a list of catalogs, that list has to have one entry per observation in
         the program, accounting for any instrument used.
-    parameter_defaults : dict
+    parameter_overrides : dict
         Dictionary of default parameter value, e.g. date, roll angle, ...
 
     Returns
