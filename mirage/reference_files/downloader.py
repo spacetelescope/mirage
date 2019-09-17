@@ -13,47 +13,22 @@ import gzip
 from mirage.utils.utils import ensure_dir_exists
 
 
-NIRCAM_REFFILES_URL = [('https://stsci.box.com/shared/static/6eomezd68n3surgqut8if6gy8l6lf3xk.gz', 'nircam_reference_files.tar.gz')]
-NIRISS_REFFILES_URL = [('https://stsci.box.com/shared/static/evlv7vxszgmiff3zdmdxnol6u6h8pa9j.gz', 'niriss_reference_files.tar.gz')]
-FGS_REFFILES_URL = [('https://stsci.box.com/shared/static/ia5z21m69tb08hd5zpv01c43g0px3gfm.gz', 'fgs_reference_files.tar.gz')]
-
+# Cosmic ray libraries
 NIRCAM_CR_LIBRARY_URL = [('https://stsci.box.com/shared/static/4cw7wmsqw9qhdozl4owz0tmr6ozusfqr.gz', 'mirage_nircam_cr_library.tar.gz')]
 NIRISS_CR_LIBRARY_URL = [('https://stsci.box.com/shared/static/uxyb08cjkf1i7yd4fhryrhi6dr4da9pg.gz', 'mirage_niriss_cr_library.tar.gz')]
 FGS_CR_LIBRARY_URL = [('https://stsci.box.com/shared/static/d5oswszqbwt6i027g6ue3usi47dmyign.gz', 'mirage_fgs_cr_library.tar.gz')]
 
-NIRCAM_INDIVIDUAL_PSF_URLS = [('https://stsci.box.com/shared/static/4rw5p9dd8ofa13pnmgfgz1svr8qustcv.gz', 'nircam_a1_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/ngx0mfo6pppe9zbrvzh28n90fe6v4d6i.gz', 'nircam_a2_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/nc2tt2w4cbylwy0ny7bxme37xtnd26cm.gz', 'nircam_a3_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/27bkgppw3ajyhfvl6nnv2wt9mlcn0ae9.gz', 'nircam_a4_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/gg48crkex2afjqb11replcg0gs2bm5cv.gz', 'nircam_a5_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/tg2pjk829oc73ijl9kda0j4ccagg75ce.gz', 'nircam_b1_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/7vmp33fb6hwcyesl39z7v7rcgpq4ls5x.gz', 'nircam_b2_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/55yf2n72l0xlc6u6t6igv5e8u8zcnunq.gz', 'nircam_b3_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/5gbse7nhpwnfptpip5bci3uyt0sate4y.gz', 'nircam_b4_subpix_grid_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/b3fepnceqznfmwct9sszoc2lzxl8iaku.gz', 'nircam_b5_subpix_grid_webbpsf_library.tar.gz')]
-NIRISS_INDIVIDUAL_PSF_URLS = [('https://stsci.box.com/shared/static/29z7ounfn61gjwi3kiu04hc0f8qgaot9.gz', 'niriss_subpix_grid_f090w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/i5yhe4zbzxawnah8csdpp4qtk9dmao1t.gz', 'niriss_subpix_grid_f115w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/s1j1kpx0aes1ntf4qrlyl1mhitj0sz2u.gz', 'niriss_subpix_grid_f140m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/cc5kjqp78uvtrmlpd0jk6llobajkhavr.gz', 'niriss_subpix_grid_f150w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/g0lwik43s7erbpsm6r5slq1739bnjob9.gz', 'niriss_subpix_grid_f158m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/70utbxqfmi474hxb34uawjnrujilj6hb.gz', 'niriss_subpix_grid_f200w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/jorfqdq56u73wlnj9nk0r34o36ruc8ky.gz', 'niriss_subpix_grid_f277w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/edafbfzxc4iijr5rzfkziasu64quh6lb.gz', 'niriss_subpix_grid_f356w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/oqsriubvc0knwtrsoavxj8gi7psz2yck.gz', 'niriss_subpix_grid_f380m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/i6c28jii139x8dnzxy6bp3fnm25npnvw.gz', 'niriss_subpix_grid_f430m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/fjep4n3dhw2uavt0uk07dfk65dww1zp8.gz', 'niriss_subpix_grid_f444w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/3cg3397siwiirv64hpez5uc9oyaey5d8.gz', 'niriss_subpix_grid_f480m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/rk38t0psx4kmqx5wxqsmlrntzusm4aod.gz', 'niriss_nrm_subpix_grid_f277w_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/x2c99ivjzze0ixdywtoczoyi438mw76m.gz', 'niriss_nrm_subpix_grid_f380m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/lwwei3atsbo64iz10c3blru5fnbof69u.gz', 'niriss_nrm_subpix_grid_f430m_webbpsf_library.tar.gz'),
-                              ('https://stsci.box.com/shared/static/7mxdonrlx9qz1mxmfgjzfg6bqwc5fzi3.gz', 'niriss_nrm_subpix_grid_f480m_webbpsf_library.tar.gz')]
+# Gridded PSF libraries
+NIRCAM_GRIDDED_PSF_URLS = [('https://stsci.box.com/shared/static/xbhu3e51khqvedmfk9y8s1rh4gtij0xd.gz', 'nircam_psf_wings_library.tar.gz'),
+                           ('https://stsci.box.com/shared/static/yqakoo0wmdzl7um7jpvirtvol5zykq3u.gz', 'nircam_Amodule_det12_gridded_psf_library.tar.gz'),
+                           ('https://stsci.box.com/shared/static/0klcoelor6ev0wbr4avctv4o3oqnmgj3.gz', 'nircam_Amodule_det345_gridded_psf_library.tar.gz'),
+                           ('https://stsci.box.com/shared/static/c075c704h52laxoxtlrz8m85l6uhx4ab.gz', 'nircam_Bmodule_det12_gridded_psf_library.tar.gz'),
+                           ('https://stsci.box.com/shared/static/x7mvscfq6zs013e0a7n3ee9nlfa4fxi7.gz', 'nircam_Bmodule_det345_gridded_psf_library.tar.gz'),
+                           ]
+NIRISS_GRIDDED_PSF_URLS = [('https://stsci.box.com/shared/static/0s7n77myr4ki1vkiy847edzf2ho594o3.gz', 'niriss_gridded_psf_library.tar.gz')]
+FGS_GRIDDED_PSF_URLS = [('https://stsci.box.com/shared/static/mckrhsu52hw6oxc994nuaxg8aj6i7az8.gz', 'fgs_gridded_psf_library.tar.gz')]
 
-FGS_INDIVIDUAL_PSF_URLS = [('https://stsci.box.com/shared/static/3g8f3i0w24l4yqu0bpin5uei7e5or9uh.gz', 'fgs_subpix_grid_webbpsf_library.tar.gz')]
-
-NIRCAM_GRIDDED_PSF_URLS = []
-NIRISS_GRIDDED_PSF_URLS = []
-FGS_GRIDDED_PSF_URLS = []
-
+# Dark current files
 NIRCAM_RAW_DARK_URLS = [('https://stsci.box.com/shared/static/pctjgthruh86ctr6ww9bgzccjlzc0xt3.gz', 'NRCNRCA1-DARK-60082202011_1_481_SE_2016-01-09T00h03m58_level1b_uncal.fits.gz'),
                         ('https://stsci.box.com/shared/static/df2bxy3iwenot0ykti06xqwnn1j9k0ii.gz', 'NRCNRCA1-DARK-60090213141_1_481_SE_2016-01-09T02h53m12_level1b_uncal.fits.gz'),
                         ('https://stsci.box.com/shared/static/rv8x4snxwqznymy92h40c70f7c7k8zh7.gz', 'NRCNRCA1-DARK-60090604481_1_481_SE_2016-01-09T06h52m47_level1b_uncal.fits.gz'),
@@ -241,7 +216,7 @@ def download_file(url, file_name, output_directory='./'):
     return download_filename
 
 
-def download_reffiles(directory, instrument='all', psf_version='subpix', dark_type='linearized'):
+def download_reffiles(directory, instrument='all', dark_type='linearized'):
     """Download tarred and gzipped reference files. Expand, unzip and
     organize into the necessary directory structure such that Mirage
     can use them.
@@ -253,12 +228,16 @@ def download_reffiles(directory, instrument='all', psf_version='subpix', dark_ty
         be the directory set to the MIRAGE_DATA environment variable
 
     instrument : str
-        If ``all``: download all files. If the name of an individual
-        instrument, download only the data for that instrument
+        Instruments for which to download data. Single string with
+        comma-separated instrument names.
 
-    psf_version : str
-        If ``gridded``: download new PSf library
-        If ``something else``: download old PSF library
+        If ``all``: download files for NIRCam, NIRISS, and FGS.
+
+        If the name of an individual instrument (e.g. 'nircam'),
+        download only the data for that instrument.
+
+        If a list of instrument names, (e.g. 'nircam, niriss') download
+        all data for those instruments.
 
     dark_type : str
         Type of dark current files to download. Options are:
@@ -266,7 +245,8 @@ def download_reffiles(directory, instrument='all', psf_version='subpix', dark_ty
         'raw': download raw dark current ramps
         'both': download both raw and linearized dark current ramps
     """
-    file_list = get_file_list(instrument.lower(), psf_version.lower(), dark_type.lower())
+    # Be sure the input instrument is a list
+    file_list = get_file_list(instrument.lower(), dark_type.lower())
 
     # Download everything first
     for file_info in file_list:
@@ -275,7 +255,7 @@ def download_reffiles(directory, instrument='all', psf_version='subpix', dark_ty
         local_file = os.path.join(directory, filename)
 
     # Now untar/organize. This way if the download is interrupted, it can
-    # pixk up where it left off, since no downloaded files will have been
+    # pick up where it left off, since no downloaded files will have been
     # moved yet.
     for file_info in file_list:
         file_url, filename = file_info
@@ -332,7 +312,7 @@ def download_reffiles(directory, instrument='all', psf_version='subpix', dark_ty
     print('export MIRAGE_DATA="{}"'.format(os.path.join(directory, 'mirage_data')))
 
 
-def get_file_list(instruments, library_version, dark_current):
+def get_file_list(instruments, dark_current):
     """Collect the list of URLs corresponding to the Mirage reference
     files to be downloaded
 
@@ -340,12 +320,6 @@ def get_file_list(instruments, library_version, dark_current):
     ----------
     instruments : list
         List of instrument names for which to download data
-
-    library_version : str
-        Version of the PSF librarry to download.
-        If ``gridded``: download PSf library that uses griddedPSFModels
-        If ``something else``: download PSF library composed of
-        individual fits files
 
     dark_current : str
         Type of dark current files to download. Options are:
@@ -368,13 +342,8 @@ def get_file_list(instruments, library_version, dark_current):
     for instrument_name in instrument_names:
         # NIRCam
         if instrument_name.lower() == 'nircam':
-            urls.extend(NIRCAM_REFFILES_URL)
             urls.extend(NIRCAM_CR_LIBRARY_URL)
-
-            if library_version == 'gridded':
-                urls.extend(NIRCAM_GRIDDED_PSF_URLS)
-            else:
-                urls.extend(NIRCAM_INDIVIDUAL_PSF_URLS)
+            urls.extend(NIRCAM_GRIDDED_PSF_URLS)
 
             if dark_current in ['linearized', 'both']:
                 urls.extend(NIRCAM_LINEARIZED_DARK_URLS)
@@ -383,13 +352,8 @@ def get_file_list(instruments, library_version, dark_current):
 
         # NIRISS
         elif instrument_name.lower() == 'niriss':
-            urls.extend(NIRISS_REFFILES_URL)
             urls.extend(NIRISS_CR_LIBRARY_URL)
-
-            if library_version == 'gridded':
-                urls.extend(NIRISS_GRIDDED_PSF_URLS)
-            else:
-                urls.extend(NIRISS_INDIVIDUAL_PSF_URLS)
+            urls.extend(NIRISS_GRIDDED_PSF_URLS)
 
             if dark_current in ['linearized', 'both']:
                 urls.extend(NIRISS_LINEARIZED_DARK_URLS)
@@ -398,13 +362,8 @@ def get_file_list(instruments, library_version, dark_current):
 
         # FGS
         elif instrument_name.lower() == 'fgs':
-            urls.extend(NIRISS_REFFILES_URL)
             urls.extend(NIRISS_CR_LIBRARY_URL)
-
-            if library_version == 'gridded':
-                urls.extend(FGS_GRIDDED_PSF_URLS)
-            else:
-                urls.extend(FGS_INDIVIDUAL_PSF_URLS)
+            urls.extend(FGS_GRIDDED_PSF_URLS)
 
             if dark_current in ['linearized', 'both']:
                 urls.extend(FGS_LINEARIZED_DARK_URLS)
