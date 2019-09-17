@@ -17,11 +17,19 @@ import numpy as np
 import os
 
 from astropy.io import ascii
+import pytest
 
 from mirage.catalogs import catalog_generator
 from mirage.catalogs import create_catalog
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
+
+# Determine if tests are being run on Travis
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
+
+if not ON_TRAVIS:
+    orig_mirage_data = os.environ['MIRAGE_DATA']
+os.environ['MIRAGE_DATA'] = '/test/'
 
 
 def test_ptsrc_catalog_creation():
@@ -105,6 +113,7 @@ def test_catalog_combination():
                        'nircam_f480m_magnitude', 'niriss_f200w_magnitude']
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_besancon_generation():
     """Test the creation of a catalog from a Besancon query
     """
@@ -115,6 +124,7 @@ def test_besancon_generation():
                                     'besancon_l_magnitude']
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_2mass_plus_besaoncon_convenience_function():
     """Test the convenience function that queries 2MASS and Besancon
     and combines the two catalogs
@@ -125,6 +135,7 @@ def test_2mass_plus_besaoncon_convenience_function():
     assert len(twomass.table) < len(both.table)
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_for_proposal():
     """Test the creation of source catalogs from a proposal"""
     xml = os.path.join(TEST_DATA_DIR, 'NIRCam/targets_with_large_separation.xml')
@@ -140,13 +151,13 @@ def test_for_proposal():
                                                                              besancon_seed=2345,
                                                                              galaxy_seed=2346)
 
-    ptsrc_map = {'1': 'ptsrc_for_targets_with_large_separation_observations_1.cat',
-                 '2': 'ptsrc_for_targets_with_large_separation_observations_2.cat',
-                 '3': 'ptsrc_for_targets_with_large_separation_observations_3.cat'}
+    ptsrc_map = {'001': 'ptsrc_for_targets_with_large_separation_observations_001.cat',
+                 '002': 'ptsrc_for_targets_with_large_separation_observations_002.cat',
+                 '003': 'ptsrc_for_targets_with_large_separation_observations_003.cat'}
 
-    galaxy_map = {'1': 'galaxies_for_targets_with_large_separation_observations_1.cat',
-                  '2': 'galaxies_for_targets_with_large_separation_observations_2.cat',
-                  '3': 'galaxies_for_targets_with_large_separation_observations_3.cat'}
+    galaxy_map = {'001': 'galaxies_for_targets_with_large_separation_observations_001.cat',
+                  '002': 'galaxies_for_targets_with_large_separation_observations_002.cat',
+                  '003': 'galaxies_for_targets_with_large_separation_observations_003.cat'}
 
     ptsrc_name = []
     galaxy_name = []
@@ -190,13 +201,14 @@ def test_for_proposal():
         os.remove(os.path.join(output_directory, del_galaxy))
         cwd = os.getcwd()
         try:
-            os.remove(ps.path.join(cwd, 'observation_list.yaml'))
-            os.remove(ps.path.join(cwd, 'expand_for_detectors.csv'))
-            os.remove(ps.path.join(cwd, 'Observation_table_for_targets_with_large_separation.csv'))
+            os.remove(os.path.join(cwd, 'observation_list.yaml'))
+            os.remove(os.path.join(cwd, 'expand_for_detectors.csv'))
+            os.remove(os.path.join(cwd, 'Observation_table_for_targets_with_large_separation.csv'))
         except:
             pass
 
 
+@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
@@ -214,7 +226,11 @@ def test_get_all_catalogs():
     # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
     # fail without there being a problem with Mirage.
     for col in cat.table.colnames:
-        assert all(cat.table[col].data == comparison_data[col].data)
+        try:
+            assert all(cat.table[col].data == comparison_data[col].data), \
+                "Retrieved catalog does not match expected."
+        except TypeError:
+            assert False, "Retrieved catalog does not match expected."
 
 
 def test_gaia_query():
@@ -262,3 +278,6 @@ def test_cat_from_file():
         cat_path = os.path.join(data_path, cat_name)
         cat_object = catalog_generator.cat_from_file(cat_path, catalogs[cat_name][0])
         assert isinstance(cat_object, catalogs[cat_name][1])
+
+if not ON_TRAVIS:
+    os.environ['MIRAGE_DATA'] = orig_mirage_data

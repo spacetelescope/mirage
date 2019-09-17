@@ -22,23 +22,22 @@ import numpy as np
 
 from mirage.yaml import generate_observationlist, yaml_generator
 from mirage.apt.read_apt_xml import ReadAPTXML
-# for debugging
-# from mirage.apt import read_apt_xml, apt_inputs
-# from mirage.utils import siaf_interface
-# import importlib
-# importlib.reload( yaml_generator )
-# importlib.reload( generate_observationlist )
-# importlib.reload( read_apt_xml )
-# importlib.reload( apt_inputs )
-# importlib.reload( siaf_interface )
-# from mirage.yaml import generate_observationlist, yaml_generator
+from mirage.utils.utils import ensure_dir_exists
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
-# @pytest.fixture(scope="module")
+# Determine if tests are being run on Travis
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
+
+if not ON_TRAVIS:
+    orig_mirage_data = os.environ['MIRAGE_DATA']
+os.environ['MIRAGE_DATA'] = '/test/'
+
+
+@pytest.fixture(scope="module")
 def temporary_directory(test_dir=TEMPORARY_DIR):
-    """Create a test directory for permission management.
+    """Create a temporary directory for testing.
 
     Parameters
     ----------
@@ -50,17 +49,16 @@ def temporary_directory(test_dir=TEMPORARY_DIR):
     test_dir : str
         Path to directory used for testing
     """
+    # Create directory and yield its name
+    ensure_dir_exists(test_dir)  # creates directory with default mode=511
+    yield test_dir
+
+    # Remove directory
     if os.path.isdir(test_dir):
         shutil.rmtree(test_dir)
-        os.mkdir(test_dir)  # creates directory with default mode=511
-    else:
-        os.mkdir(test_dir)
 
 
-def test_observation_list_generation_minimal():
-
-    # generate output directory
-    temporary_directory()
+def test_observation_list_generation_minimal(temporary_directory):
 
     instrument = 'NIRISS'
 
@@ -72,31 +70,26 @@ def test_observation_list_generation_minimal():
         catalogs[instrument.lower()] = source_list_file_name
 
     # Write observationlist.yaml
-    observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(instrument.lower()))
+    observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(instrument.lower()))
     apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
     outputs = generate_observationlist.get_observation_dict(apt_file_xml, observation_list_file, catalogs)
 
     assert os.path.isfile(observation_list_file)
 
 
-def test_complete_input_generation():
+@pytest.mark.skipif(ON_TRAVIS,
+                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+def test_complete_input_generation(temporary_directory):
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
-
-    # generate output directory
-    temporary_directory()
 
     for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
-            apt_file_seeds = ['1087_minimal', '1088', '1087', 'm31_field_test_observation']
-            # apt_file_seeds = ['1087']
-            # apt_file_seeds = ['1087_minimal']
+            apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
+            # apt_file_seeds = ['com1093']
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
-            # apt_file_seeds = ['NIRCamTest']
-            # apt_file_seeds = ['1069']
-            # apt_file_seeds = ['1144-OTE-10']
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
@@ -132,28 +125,23 @@ def test_complete_input_generation():
             if skip_bool:
                 continue
 
-            obs_yaml_files = glob.glob(os.path.join(TEMPORARY_DIR, 'jw*.yaml'))
+            obs_yaml_files = glob.glob(os.path.join(temporary_directory, 'jw*.yaml'))
             for file in obs_yaml_files:
                 os.remove(file)
 
             if '.xml' in apt_file_seed:
                 apt_file_xml = os.path.join(apt_dir, apt_file_seed[1:])
                 apt_file_pointing = os.path.join(apt_dir, apt_file_seed[1:].replace('.xml', '.pointing'))
-                observation_list_file = os.path.join(TEMPORARY_DIR,
-                                                     '{}_observation_list.yaml'.format(apt_file_seed.replace('/', '_').split('.')[0]))
-
             else:
-                observation_list_file = os.path.join(TEMPORARY_DIR, '{}_observation_list.yaml'.format(apt_file_seed))
                 apt_file_xml = os.path.join(apt_dir, '{}.xml'.format(apt_file_seed))
                 apt_file_pointing = os.path.join(apt_dir, '{}.pointing'.format(apt_file_seed))
 
             print('Processing program {}'.format(apt_file_xml))
 
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                          catalogs=catalogs, observation_list_file=observation_list_file,
-                                          verbose=True, output_dir=TEMPORARY_DIR, simdata_output_dir=TEMPORARY_DIR,
+                                          catalogs=catalogs, verbose=True, output_dir=TEMPORARY_DIR,
+                                          simdata_output_dir=TEMPORARY_DIR,
                                           offline=True)
-
             try:
                 yam.create_inputs()
             except RuntimeError as e:
@@ -253,7 +241,7 @@ def test_xml_reader():
                                                                                    comparison_dict[col].data)
 
 
-# for debugging
-if __name__ == '__main__':
-    test_complete_input_generation()
-    #test_xml_reader()
+# Return environment variable to original value. This is helpful when
+# calling many tests at once, some of which need the real value.
+if not ON_TRAVIS:
+    os.environ['MIRAGE_DATA'] = orig_mirage_data

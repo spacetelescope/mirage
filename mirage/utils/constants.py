@@ -15,6 +15,15 @@ instrument_abbreviations = {'nircam': 'NRC',
                             'nirspec': 'NRS',
                             'miri': 'MIR'}
 
+EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
+                       "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
+            "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
+                        "wfss": "NIS_WFSS"},
+            "fgs": {"imaging": "FGS_IMAGE"}}
+
+NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
+NIRISS_PUPIL_WHEEL_FILTERS = ['F090W', 'F115W', 'F158M', 'F140M', 'F150W', 'F200W']
+
 FLAMBDA_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.AA
 FLAMBDA_MKS_UNITS = u.watt / u.meter**2 / u.micron
 FNU_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.Hz
@@ -23,6 +32,14 @@ FNU_MKS_UNITS = u.watt / u.m**2 / u.Hz
 CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
                         'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
 
+CRDS_FILE_TYPES = {'badpixmask': 'mask',
+                   'astrometric': 'distortion',
+                   'gain': 'gain',
+                   'ipc': 'ipc',
+                   'linearity': 'linearity',
+                   'pixelAreaMap': 'area',
+                   'saturation': 'saturation',
+                   'superbias': 'superbias'}
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when

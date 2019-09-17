@@ -3,6 +3,7 @@
 Authors
 -------
     - Lauren Chambers
+    - Bryan Hilbert
 
 Use
 ---
@@ -23,6 +24,8 @@ import os
 import re
 
 from astropy.io import ascii as asc
+
+from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS
 
 
 def append_dictionary(base_dictionary, added_dictionary, braid=False):
@@ -150,6 +153,51 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
+def check_niriss_filter(oldfilter,oldpupil):
+    """
+    This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
+    filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and
+    pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil
+    parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a
+    parameter file with FILTER = F277W and PUPIL = CLEAR or FILTER = F090W and PUPIL = CLEAR for imaging and either will
+    produce the desired result although the actual pairings would be F277W/CLEARP and CLEAR/F090W respectively.
+
+    The code also corrects CLEARP to CLEAR if needed.
+
+    Parameters:
+
+    oldfilter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
+
+    oldpupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+
+    Return values:
+
+    newfilter:   a string value, the proper FILTER parameter for the requested NIRISS filter name
+
+    newpupil:    a string value, the proper PUPIL parameter for the requested NIRISS filter name
+
+    Note that this routine should only be called when the instrument is NIRISS.
+    """
+    str1 = oldfilter
+    str2 = oldpupil
+    if oldfilter in NIRISS_PUPIL_WHEEL_FILTERS:
+        newfilter = str2
+        newpupil = str1
+        if newfilter == 'CLEARP':
+            newfilter = 'CLEAR'
+    if oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
+        if oldpupil == 'CLEAR':
+            newpupil = 'CLEARP'
+        else:
+            newpupil = oldpupil
+        newfilter = oldfilter
+    else:
+        # Case where oldfilter is an optic other than a filter (e.g. a grism)
+        newfilter = oldfilter
+        newpupil = oldpupil
+    return newfilter, newpupil
+
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
@@ -184,6 +232,132 @@ def expand_environment_variable(variable_name, offline=False):
                                      "environment variable: {} does not exist or "
                                      "is not accessible.".format(variable_name, variable_directory)))
     return variable_directory
+
+
+def full_paths(params, module_path, crds_dictionary, offline=False):
+    """Expand the relevant input paths from the input yaml file to be full
+    paths.
+
+    Parameters
+    ----------
+    params : dict
+        Nested dictionary read in from an input yaml file
+
+    module_path : str
+        Path to the Mirage module
+
+    crds_dictionary : dict
+        Dictionary of basic observation metadata that is used by CRDS to
+        select appropriate reference files.
+
+    offline : bool
+        Set to True in order to skip downloading reference files from CRDS
+        and instead only return the dictionary of reference file names.
+
+    Returns
+    -------
+    params : dict
+        Modified nested dictionary including full paths
+    """
+    # Place import statement here in order to avoid circular import
+    # with crd_tools
+    from mirage.reference_files import crds_tools
+    pathdict = {'Reffiles': ['dark', 'linearized_darkfile', 'badpixmask',
+                             'superbias', 'linearity', 'saturation', 'gain',
+                             'pixelflat', 'illumflat', 'ipc', 'astrometric',
+                             'crosstalk', 'occult', 'pixelAreaMap',
+                             'subarray_defs', 'filtpupilcombo',
+                             'flux_cal', 'readpattdefs', 'filter_throughput'],
+                'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
+                               'extended', 'movingTargetList', 'movingTargetSersic',
+                               'movingTargetExtended', 'movingTargetToTrack',
+                               'psf_wing_threshold_file', 'zodiacal', 'scattered'],
+                'cosmicRay': ['path'],
+                'newRamp': ['dq_configfile', 'sat_configfile', 'superbias_configfile',
+                            'refpix_configfile', 'linear_configfile'],
+                'Output': ['file', 'directory']}
+
+    all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
+                                   'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
+                                   'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
+                                   'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
+                                   'Reffiles-filter_throughput': 'placeholder.txt',
+                                   'Reffiles-filtpupilcombo': 'nircam_filter_pupil_pairings.list',
+                                   'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt',
+                                   'newRamp-dq_configfile': 'dq_init.cfg',
+                                   'newRamp-sat_configfile': 'saturation.cfg',
+                                   'newRamp-superbias_configfile': 'superbias.cfg',
+                                   'newRamp-refpix_configfile': 'refpix.cfg',
+                                   'newRamp-linear_configfile': 'linearity.cfg'},
+                        'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
+                                   'Reffiles-flux_cal': 'niriss_zeropoints.list',
+                                   'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
+                                   'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
+                                   'Reffiles-filter_throughput': 'placeholder.txt',
+                                   'Reffiles-filtpupilcombo': 'niriss_dual_wheel_list.txt',
+                                   'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt',
+                                   'newRamp-dq_configfile': 'dq_init.cfg',
+                                   'newRamp-sat_configfile': 'saturation.cfg',
+                                   'newRamp-superbias_configfile': 'superbias.cfg',
+                                   'newRamp-refpix_configfile': 'refpix.cfg',
+                                   'newRamp-linear_configfile': 'linearity.cfg'},
+                        'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
+                                'Reffiles-flux_cal': 'guider_zeropoints.list',
+                                'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
+                                'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
+                                'Reffiles-filter_throughput': 'placeholder.txt',
+                                'Reffiles-filtpupilcombo': 'guider_filter_dummy.list',
+                                'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt',
+                                'newRamp-dq_configfile': 'dq_init.cfg',
+                                'newRamp-sat_configfile': 'saturation.cfg',
+                                'newRamp-superbias_configfile': 'superbias.cfg',
+                                'newRamp-refpix_configfile': 'refpix.cfg',
+                                'newRamp-linear_configfile': 'linearity.cfg'}}
+    config_files = all_config_files[params['Inst']['instrument'].lower()]
+
+    for key1 in pathdict:
+        for key2 in pathdict[key1]:
+            if params[key1][key2].lower() not in ['none', 'config', 'crds']:
+                params[key1][key2] = os.path.abspath(os.path.expandvars(params[key1][key2]))
+            elif params[key1][key2].lower() == 'config':
+                cfile = config_files['{}-{}'.format(key1, key2)]
+                fpath = os.path.join(module_path, 'config', cfile)
+                params[key1][key2] = fpath
+                print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
+            elif key2 in CRDS_FILE_TYPES.keys() and params[key1][key2].lower() == 'crds':
+                # 'crds' set for one of the reference files means to
+                # search for the best reference file currently in CRDS
+                # and download if it is not already present in
+                # self.crds_datadir
+                mapping = crds_tools.get_reffiles(crds_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
+                params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
+                print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+
+                # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
+                if key2 == 'ipc':
+                    ipc_path, ipc_file = os.path.split(mapping['ipc'])
+                    inverted_kernel_file = os.path.join(ipc_path, 'Kernel_to_add_IPC_effects_from_{}'.format(ipc_file))
+                    # Check to see if the version of the IPC file with an
+                    # inverted kernel already exists.
+                    if os.path.isfile(inverted_kernel_file):
+                        print("Found an existing inverted kernel for this IPC file: {}".format(inverted_kernel_file))
+                        params[key1][key2] = inverted_kernel_file
+                        params['Reffiles']['invertIPC'] = False
+                    else:
+                        print("No inverted IPC kernel file found. Kernel will be inverted prior to use.")
+                        params['Reffiles']['invertIPC'] = True
+    return params
+
+
+def get_all_reffiles(param_dict):
+    """
+    """
+    # Place import statement here in order to avoid circular import
+    # with crd_tools
+    from mirage.reference_files import crds_tools
+
+    mapping = crds_tools.get_reffiles(param_dict, list(CRDS_FILE_TYPES.values()))
+    return mapping
 
 
 def get_siaf():

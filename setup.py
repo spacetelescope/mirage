@@ -68,20 +68,6 @@ except ImportError:
             exit(1)
 
 
-class PyTest(TestCommand):
-    def finalize_options(self):
-        TestCommand.finalize_options(self)
-        # self.test_args = ['tests']
-        self.test_args = ['tests/test_apt_interface.py', 'tests/test_apt.py', 'tests/test_siaf_interface.py']
-        self.test_suite = True
-
-    def run_tests(self):
-        # import here, cause outside the eggs aren't loaded
-        import pytest
-        errno = pytest.main(self.test_args)
-        sys.exit(errno)
-
-
 # make sure jwst is available
 try:
     import jwst
@@ -127,17 +113,17 @@ setup(
                              'config/*.*']
                   },
     install_requires=[
-        'astropy>=1.2',
-        'numpy<=1.15',
-        'matplotlib>=1.4.3',
-        'lxml>=3.6.4',
         'asdf>=1.2.0',
-        'scipy>=0.17',
+        'astropy>=3.2.1',
+        'jwst-backgrounds>=1.1.1',
+        'lxml>=3.6.4',
+        'matplotlib>=1.4.3',
+        'numpy',
         'photutils>=0.4.0',
         'pysiaf>=0.1.11'
+        'scipy>=0.17',
     ],
     include_package_data=True,
     cmdclass={
-        'test': PyTest,
         'build_sphinx': BuildSphinx
     },)

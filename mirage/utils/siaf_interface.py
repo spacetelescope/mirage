@@ -71,7 +71,7 @@ def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, 
         Dec value of pointing in degrees
 
     telescope_roll : float
-        Position angle of the telescope in degrees
+        PA_V3, Position angle of the telescope in degrees
 
     v2_arcsec : float
         The V2 value in arcseconds of the reference location for the
@@ -170,6 +170,11 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     # determine parent aperture, i.e. the underlying full frame SCA aperture
     index = siaf_aperture_definitions['AperName'].tolist().index(aperture_name)
     aperture._parent_apertures = siaf_aperture_definitions['parent_apertures'][index]
+
+    # If multiuple apertures are listed as parents keep only the first
+    if ';' in aperture._parent_apertures:
+        print('Multiple parent apertures: {}'.format(aperture._parent_apertures))
+        aperture._parent_apertures = aperture._parent_apertures.split(';')[0]
 
     if aperture_name in master_aperture_names:
         # if master aperture, use it directly to transform to science frame

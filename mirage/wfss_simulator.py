@@ -161,12 +161,13 @@ class WFSSSim():
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             background_file = ("{}_{}_back.fits"
                                .format(self.crossing_filter, dmode))
-            orders = ["+1", "+2"]
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
             print('Background file is {}'.format(background_file))
-            orders = None
+
+        # Default to extracting all orders
+        orders = None
 
         # Create dispersed seed image from the direct images
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
@@ -174,6 +175,7 @@ class WFSSSim():
                                extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
                                SBE_save=self.source_stamps_file)
         disp_seed.observation(orders=orders)
+        disp_seed.disperse(orders=orders)
         disp_seed.finalize(Back=background_file)
 
         # Get gain map
@@ -322,7 +324,7 @@ class WFSSSim():
                 if self.instrument == 'niriss':
                     self.module = None
                 elif self.instrument == 'nircam':
-                    self.module = params['Inst']['array_name'][3]
+                    self.module = params['Readout']['array_name'][3]
 
             if params['Inst']['mode'].lower() == 'wfss':
                 self.wfss_yaml = copy.deepcopy(pfile)
@@ -333,7 +335,7 @@ class WFSSSim():
                     raise ValueError("WARNING: only one of the parameter files can be WFSS mode.")
                 filter_name = params['Readout']['filter']
                 pupil_name = params['Readout']['pupil']
-                dispname = ('{}_dispsersed_seed_image.fits'.format(params['Output']['file'].split('.fits')[0]))
+                dispname = ('{}_dispersed_seed_image.fits'.format(params['Output']['file'].split('.fits')[0]))
                 self.default_dispersed_filename = os.path.join(params['Output']['directory'], dispname)
 
                 # In reality, the grism elements are in NIRCam's pupil wheel, and NIRISS's
@@ -344,7 +346,7 @@ class WFSSSim():
                 if self.instrument == 'niriss':
                     self.crossing_filter = pupil_name.upper()
                     self.dispersion_direction = filter_name[-1].upper()
-                elif slf.instrument == 'nircam':
+                elif self.instrument == 'nircam':
                     self.crossing_filter = filter_name.upper()
                     self.dispersion_direction = pupil_name[-1].upper()
                 yamls_to_disperse.append(pfile)

@@ -36,11 +36,11 @@ See the `notebooks <https://github.com/spacetelescope/mirage/tree/master/example
     `WFSS simulator example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRISS_WFSS_data_creation_example.ipynb>`_
     `Moving Target notebook <https://github.com/spacetelescope/mirage/blob/master/examples/MovingTarget_simulator_use_examples.ipynb>`_
 
-and for more advanced use:
+and for use with APT programs:
 
 .. parsed-literal::
 
-    `Commissionning data generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/OTECommissioning_simulator_use_examples.ipynb>`_
+    `APT program data generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/APTProgram_simulator_use_examples.ipynb>`_
 
 
 Under the Hood

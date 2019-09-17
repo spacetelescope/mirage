@@ -93,8 +93,10 @@ History
 import sys
 import os
 import argparse
+from copy import deepcopy
 from glob import glob
 from copy import deepcopy
+import datetime
 
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
@@ -104,17 +106,21 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
+from ..reference_files import crds_tools
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
+from ..utils.constants import CRDS_FILE_TYPES
+from ..utils import utils
 
 ENV_VAR = 'MIRAGE_DATA'
 
 
 class SimInput:
-    def __init__(self, input_xml=None, pointing_file=None, datatype='linear',
-                 use_JWST_pipeline=True, catalogs=None, observation_list_file=None, verbose=False,
-                 output_dir='./', simdata_output_dir='./', parameter_defaults=None, offline=False):
+    def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
+                 reffile_overrides=None, use_JWST_pipeline=True, catalogs=None,
+                 observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
+                 parameter_defaults=None, offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -131,7 +137,48 @@ class SimInput:
         parameter_defaults : dict
             Default values of parameters like roll angle (PAV3) to pass on to observation list
             generator
+
+        reffile_defaults : str
+            Controls how the CRDS reference file entries are presented in
+            the yaml file.
+
+            'crds' - The string 'crds' is used for all entries, and CRDS
+                     will be queried at run-time and appropriate files
+                     downloaded if they are not already present.
+
+            'crds_full_name' - CRDS will be queried before creating the
+                               yaml files, and actual filenames will be
+                               placed into the yaml files.
+
+
+        reffile_overrides : dict
+            If the user provides a dictionary of reference file names,
+            then the yaml file will be populated with these names. Any
+            needed instrument/detector options not present in the
+            dictionary will default to ``reffile_defaults``
+            With this option, users can use their own, non-CRDS
+            reference files, if desired.
+
+            The dictionary structure has many layers of nesting that are
+            instrument and reference file type dependent.
+
+            r_dict = {'nircam': {'bad_pix_mask': {'nrca1': 'bpm_a1.fits',
+                                                      'nrca2': 'bpm_a2.fits',
+                                                      'nrca3': 'crds_full_name'},
+                                     'distortion': {'nrca1': {'f070w': 'dist_a1.asdf', 'f090w': 'dist_a1.asdf'},
+                                                    'nrca2': {'f070w': 'dist_a2.asdf', 'f090w': 'dist_a2.asdf'}
+                                                   }
+                                    }
+                                    This format seems easiest assuming users
+                                    are overriding only one/few types of reference
+                                    files at a time.
         """
+        # If no catalogs are given, then set up some dummy defaults
+        if catalogs is None:
+            catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
+                        'niriss': 'none',
+                        'fgs': 'none'}
+
         self.info = {}
         self.input_xml = input_xml
         self.pointing_file = pointing_file
@@ -142,29 +189,29 @@ class SimInput:
         self.verbose = verbose
         self.output_dir = output_dir
         self.simdata_output_dir = simdata_output_dir
+        if reffile_defaults in ['crds', 'crds_full_name']:
+            self.reffile_defaults = reffile_defaults
+        else:
+            raise ValueError("reffile_defaults must be 'crds' or 'crds_full_name'")
+        self.reffile_overrides = reffile_overrides
 
         self.table_file = None
         self.use_nonstsci_names = False
-        # self.subarray_def_file = 'config'
-        # self.readpatt_def_file = 'config'
-        # self.crosstalk = 'config'
-        # self.filtpupil_pairs = 'config'
-        # self.fluxcal = 'config'
-        # self.dq_init_config = 'config'
-        # self.saturation_config = 'config'
-        # self.superbias_config = 'config'
-        # self.refpix_config = 'config'
-        # self.linearity_config = 'config'
-        # self.filter_throughput = 'config'
-        # self.observation_list_file = None
         self.use_linearized_darks = True
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
         self.tracking = 'sidereal'
+        self.psf_paths = None
+        self.expand_catalog_for_segments = False
+        self.add_psf_wings = True
+        self.offline = offline
 
         # Expand the MIRAGE_DATA environment variable
-        self.datadir = expand_environment_variable(ENV_VAR, offline=offline)
+        self.datadir = expand_environment_variable(ENV_VAR, offline=self.offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.env_variables()
 
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -172,29 +219,32 @@ class SimInput:
         self.set_global_definitions()
         self.path_defs()
 
-        if (input_xml is not None) and (catalogs is not None):
+        if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
             self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
                                                      verbose=self.verbose, parameter_defaults=parameter_defaults)
+        else:
+            print('No input xml file provided. Observation dictionary not constructed.')
 
-        self.reffile_setup(offline=offline)
+        self.reffile_setup()
 
     def add_catalogs(self):
         """
         Add list(s) of source catalogs to the table containing the
         observation information
         """
-        self.info['point_source'] = [None] * len(self.info['Module'])
-        self.info['galaxyListFile'] = [None] * len(self.info['Module'])
-        self.info['extended'] = [None] * len(self.info['Module'])
-        self.info['convolveExtended'] = [False] * len(self.info['Module'])
-        self.info['movingTarg'] = [None] * len(self.info['Module'])
-        self.info['movingTargSersic'] = [None] * len(self.info['Module'])
-        self.info['movingTargExtended'] = [None] * len(self.info['Module'])
-        self.info['movingTargToTrack'] = [None] * len(self.info['Module'])
+        n_exposures = len(self.info['Module'])
+        self.info['point_source'] = [None] * n_exposures
+        self.info['galaxyListFile'] = [None] * n_exposures
+        self.info['extended'] = [None] * n_exposures
+        self.info['convolveExtended'] = [False] * n_exposures
+        self.info['movingTarg'] = [None] * n_exposures
+        self.info['movingTargSersic'] = [None] * n_exposures
+        self.info['movingTargExtended'] = [None] * n_exposures
+        self.info['movingTargToTrack'] = [None] * n_exposures
 
-        for i in range(len(self.info['ShortFilter'])):
+        for i in range(n_exposures):
             if np.int(self.info['detector'][i][-1]) < 5:
                 filtkey = 'ShortFilter'
                 pupilkey = 'ShortPupil'
@@ -242,7 +292,152 @@ class SimInput:
             else:
                 self.info['movingTargToTrack'][i] = None
         if self.convolveExtended is True:
-            self.info['convolveExtended'] = [True] * len(self.info['Module'])
+            self.info['convolveExtended'] = [True] * n_exposures
+
+    def add_crds_reffile_names(self):
+        """Add specific reference file names to self.info. This should be
+        done if self.reffile_defaults is set to 'crds_full_name'. For each
+        instrument configuration and observing mode, query CRDS for the
+        best reference files. Identify which exposures in self.info
+        match the observing configuration, and add the reference file
+        names to their records in self.info.
+        """
+        all_obs_info, unique_obs_info = self.info_for_all_observations()
+
+        # Add empty placeholders for reference file entries
+        empty_col = np.array([' ' * 500] * len(self.info['Instrument']))
+        superbias_arr = deepcopy(empty_col)
+        linearity_arr = deepcopy(empty_col)
+        saturation_arr = deepcopy(empty_col)
+        gain_arr = deepcopy(empty_col)
+        distortion_arr = deepcopy(empty_col)
+        ipc_arr = deepcopy(empty_col)
+        ipc_invert = np.array([True] * len(self.info['Instrument']))
+        pixelAreaMap_arr = deepcopy(empty_col)
+        badpixmask_arr = deepcopy(empty_col)
+
+        # Loop over combinations, create metadata dict, and get reffiles
+        for status in unique_obs_info:
+            (instrument, detector, filtername, pupilname, readpattern, exptype) = status
+
+            # Create metadata dictionary
+            date = datetime.date.today().isoformat()
+            current_date = datetime.datetime.now()
+            time = current_date.time().isoformat()
+            status_dict = {'INSTRUME': instrument, 'DETECTOR': detector,
+                           'FILTER': filtername, 'PUPIL': pupilname,
+                           'READPATT': readpattern, 'EXP_TYPE': exptype,
+                           'DATE-OBS': date, 'TIME-OBS': time,
+                           'SUBARRAY': 'FULL'}
+            if instrument == 'NIRCAM':
+                if detector in ['NRCA5', 'NRCB5', 'NRCALONG', 'NRCBLONG', 'A5', 'B5']:
+                    status_dict['CHANNEL'] = 'LONG'
+                else:
+                    status_dict['CHANNEL'] = 'SHORT'
+
+            # Query CRDS
+            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
+                                               download=not self.offline)
+
+            # If the user entered reference files in self.reffile_defaults
+            # use those over what comes from the CRDS query
+            if self.reffile_overrides is not None:
+                manual_reffiles = self.reffiles_from_dict(status)
+
+                for key in manual_reffiles:
+                    if manual_reffiles[key] != 'none':
+                        if key == 'badpixmask':
+                            crds_key = 'mask'
+                        else:
+                            crds_key = key
+                        reffiles[crds_key] = manual_reffiles[key]
+
+            # Check to see if a version of the inverted IPC kernel file
+            # exists already in the same directory. If so, use that and
+            # avoid having to invert the kernel at run time.
+            inverted_file, must_invert = SimInput.inverted_ipc_kernel_check(reffiles['ipc'])
+            if not must_invert:
+                reffiles['ipc'] = inverted_file
+            reffiles['invert_ipc'] = must_invert
+
+            # Identify entries in the original list that use this combination
+            match = [i for i, item in enumerate(all_obs_info) if item==status]
+
+            # Populate the reference file names for the matching entries
+            superbias_arr[match] = reffiles['superbias']
+            linearity_arr[match] = reffiles['linearity']
+            saturation_arr[match] = reffiles['saturation']
+            gain_arr[match] = reffiles['gain']
+            distortion_arr[match] = reffiles['distortion']
+            ipc_arr[match] = reffiles['ipc']
+            ipc_invert[match] = reffiles['invert_ipc']
+            pixelAreaMap_arr[match] = reffiles['area']
+            badpixmask_arr[match] = reffiles['mask']
+
+        self.info['superbias'] = list(superbias_arr)
+        self.info['linearity'] = list(linearity_arr)
+        self.info['saturation'] = list(saturation_arr)
+        self.info['gain'] = list(gain_arr)
+        self.info['astrometric'] = list(distortion_arr)
+        self.info['ipc'] = list(ipc_arr)
+        self.info['invert_ipc'] = list(ipc_invert)
+        self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['badpixmask'] = list(badpixmask_arr)
+
+    def add_reffile_overrides(self):
+        """If the user provides a nested dictionary in
+        self.reffile_overrides, search through the dictionary, identify
+        exposures that match the observing mode and instrument config
+        for each dictionary entry, and populate the reference file
+        entries in self.info with the file names from
+        self.reffile_overrides.
+        """
+        all_obs_info, unique_obs_info = self.info_for_all_observations()
+
+        # Add empty placeholders for reference file entries
+        empty_col = np.array([' ' * 500] * len(self.info['Instrument']))
+        superbias_arr = deepcopy(empty_col)
+        linearity_arr = deepcopy(empty_col)
+        saturation_arr = deepcopy(empty_col)
+        gain_arr = deepcopy(empty_col)
+        distortion_arr = deepcopy(empty_col)
+        ipc_arr = deepcopy(empty_col)
+        pixelAreaMap_arr = deepcopy(empty_col)
+        badpixmask_arr = deepcopy(empty_col)
+
+        # Loop over combinations, create metadata dict, and get reffiles
+        for status in unique_obs_info:
+            (instrument, detector, filtername, pupilname, readpattern, exptype) = status
+
+            # If the user entered reference files in self.reffile_defaults
+            # use those over what comes from the CRDS query
+            #sbias, lin, sat, gainfile, dist, ipcfile, pam = self.reffiles_from_dict(status)
+            manual_reffiles = self.reffiles_from_dict(status)
+            for key in manual_reffiles:
+                if manual_reffiles[key] == 'none':
+                    manual_reffiles[key] = 'crds'
+
+            # Identify entries in the original list that use this combination
+            match = [i for i, item in enumerate(all_obs_info) if item==status]
+
+            # Populate the reference file names for the matching entries
+            superbias_arr[match] = manual_reffiles['superbias']
+            linearity_arr[match] = manual_reffiles['linearity']
+            saturation_arr[match] = manual_reffiles['saturation']
+            gain_arr[match] = manual_reffiles['gain']
+            distortion_arr[match] = manual_reffiles['distortion']
+            ipc_arr[match] = manual_reffiles['ipc']
+            pixelAreaMap_arr[match] = manual_reffiles['area']
+            badpixmask_arr[match] = manual_reffiles['badpixmask']
+
+        self.info['superbias'] = list(superbias_arr)
+        self.info['linearity'] = list(linearity_arr)
+        self.info['saturation'] = list(saturation_arr)
+        self.info['gain'] = list(gain_arr)
+        self.info['astrometric'] = list(distortion_arr)
+        self.info['ipc'] = list(ipc_arr)
+        self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['badpixmask'] = list(badpixmask_arr)
 
     def catalog_match(self, filter, pupil, catalog_list, cattype):
         """
@@ -328,32 +523,50 @@ class SimInput:
                                      " or xml and pointing files from APT plus the observation list file."
                                      "Aborting."))
 
-        # For each element in the lists below, use the detector name to
-        # find the appropriate reference files. Create lists, and add
-        # these lists to the dictionary
+        # If self.reffile_defaults is set to 'crds' then print the
+        # string 'crds' in the entry for all reference files. The
+        # actual reference file names will then be identified by
+        # querying CRDS at run-time. In this way, once a yaml
+        # file has been generated, it will effectively always be
+        # up to date, even as reference files change.
+        if self.reffile_defaults == 'crds':
+            column_data = ['crds'] * len(self.info['Instrument'])
+            self.info['superbias'] = column_data
+            self.info['linearity'] = column_data
+            self.info['saturation'] = column_data
+            self.info['gain'] = column_data
+            self.info['astrometric'] = column_data
+            self.info['ipc'] = column_data
+            self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
+            self.info['pixelAreaMap'] = column_data
+            self.info['badpixmask'] = column_data
+
+            # If the user provided a dictionary of reference files to
+            # override some/all of those from CRDS, then enter those
+            # into the correct locations in self.info
+            if self.reffile_overrides is not None:
+                self.add_reffile_overrides()
+
+        # If self.reffile_defaults is set to 'crds_full_name' then
+        # we query CRDS now, and add the reference file names to the
+        # yaml files. This allows for easier tracing of what
+        # reference files were used to create a particular exposure.
+        # (Although that info is always saved in the header of the
+        # exposure itself, as well.)
+        elif self.reffile_defaults == 'crds_full_name':
+            self.add_crds_reffile_names()
+
+        else:
+            raise ValueError(("self.reffile_defaults is not equal to 'crds' "
+                              "nor 'crds_full_name'. Unable to proceed."))
+
+        # Get the list of dark current files to use
         darks = []
         lindarks = []
-        superbias = []
-        linearity = []
-        saturation = []
-        gain = []
-        astrometric = []
-        ipc = []
-        pam = []
-
-        # detector_labels = self.info['detector']
-        # for det in detector_labels:
         for instrument, det in zip([s.lower() for s in self.info['Instrument']], self.info['detector']):
             instrument = instrument.lower()
             darks.append(self.get_dark(instrument, det))
             lindarks.append(self.get_lindark(instrument, det))
-            superbias.append(self.get_reffile(self.superbias_list[instrument], det))
-            linearity.append(self.get_reffile(self.linearity_list[instrument], det))
-            saturation.append(self.get_reffile(self.saturation_list[instrument], det))
-            gain.append(self.get_reffile(self.gain_list[instrument], det))
-            astrometric.append(self.get_reffile(self.astrometric_list[instrument], det))
-            ipc.append(self.get_reffile(self.ipc_list[instrument], det))
-            pam.append(self.get_reffile(self.pam_list[instrument], det))
 
         self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
@@ -363,13 +576,6 @@ class SimInput:
         else:
             self.info['dark'] = darks
             self.info['lindark'] = [None] * len(lindarks)
-        self.info['superbias'] = superbias
-        self.info['linearity'] = linearity
-        self.info['saturation'] = saturation
-        self.info['gain'] = gain
-        self.info['astrometric'] = astrometric
-        self.info['ipc'] = ipc
-        self.info['pixelAreaMap'] = pam
 
         # Add setting describing whether JWST pipeline will be used
         self.info['use_JWST_pipeline'] = [self.use_JWST_pipeline] * len(darks)
@@ -402,16 +608,12 @@ class SimInput:
             if par.lower() == 'false':
                 seq.append('1')
         self.info['sequence_id'] = seq
-        # self.info['obs_template'] = ['NIRCam Imaging'] * len(self.info['Mode'])
 
-        # write out the updated table, including yaml filenames
-        # start times, and reference files
-        #if 0: #for debugging
-        #    for key in self.info.keys():
-        #        print('{:>40} has {:>3} entries'.format(key, len(self.info[key])))
+        # Deal with user-provided PSFs that differ across observations/visits/exposures
+        self.info['psfpath'] = self.get_psf_path()
+
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
-        # ascii.write(Table(self.info), final_file, format='csv', overwrite=True)
         print('Updated observation table file saved to {}'.format(final_file))
 
         # Now go through the lists one element at a time
@@ -419,7 +621,8 @@ class SimInput:
         yamls = []
         # for i in range(len(detector_labels)):
         for i, instrument in enumerate(self.info['Instrument']):
-            if instrument.lower() not in 'fgs nircam niriss'.split():
+            instrument = instrument.lower()
+            if instrument not in 'fgs nircam niriss'.split():
                 # do not write files for MIRI and NIRSpec
                 continue
             file_dict = {}
@@ -443,12 +646,12 @@ class SimInput:
             file_dict['primary_dither_num'] = np.int(primary_dither)
             subpix_dither = (tot_dith-1) % subpixtot
             file_dict['subpix_dither_num'] = subpix_dither + 1
-            file_dict['subarray_def_file'] = self.global_subarray_definition_files[self.info['Instrument'][i].lower()]
-            file_dict['readpatt_def_file'] = self.global_readout_pattern_files[self.info['Instrument'][i].lower()]
-            file_dict['crosstalk_file'] = self.global_crosstalk_files[self.info['Instrument'][i].lower()]
-            file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[self.info['Instrument'][i].lower()]
-            file_dict['flux_cal_file'] = self.global_flux_cal_files[self.info['Instrument'][i].lower()]
-            file_dict['psfpath'] = self.global_psfpath[self.info['Instrument'][i].lower()]
+            file_dict['subarray_def_file'] = self.global_subarray_definition_files[instrument]
+            file_dict['readpatt_def_file'] = self.global_readout_pattern_files[instrument]
+            file_dict['crosstalk_file'] = self.global_crosstalk_files[instrument]
+            file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
+            file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
+            file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
 
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
@@ -462,12 +665,17 @@ class SimInput:
 
         total_exposures = 0
         for obs in obs_ids:
-            visit_list = list(set([m[10:] for m in mosaic_numbers if m[7:10] == obs]))
+            visit_list = list(set([m[10:] for m in mosaic_numbers
+                                   if m[7:10] == obs]))
             n_visits = len(visit_list)
-            exposure_list = list(set([vf[20:25] for vf in self.info['yamlfile'] if vf[7:10] == obs and vf[10:13] in visit_list]))
-            n_exposures = len(exposure_list)
+            activity_list = list(set([vf[17:29] for vf in self.info['yamlfile']
+                                      if vf[7:10] == obs]))
+            n_activities = len(activity_list)
+            exposure_list = list(set([vf[20:25] for vf in self.info['yamlfile']
+                                      if vf[7:10] == obs]))
+            n_exposures = len(exposure_list) * n_activities
             total_exposures += n_exposures
-            all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs and m[10:13] in visit_list]
+            all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs]
             total_files = len(all_obs_files)
 
             obs_id_int = np.array([np.int(ele) for ele in self.info['ObservationID']])
@@ -510,10 +718,11 @@ class SimInput:
             print('Observation {}:'.format(obs))
             print(instrument_string)
             print('    {} visit(s)'.format(n_visits))
+            print('    {} activitiy(ies)'.format(n_activities))
             print('    {} exposure(s)'.format(n_exposures))
-            print('    {} file(s)'.format(total_files))
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
                 print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
+            print('    {} file(s)'.format(total_files))
 
         print('\n{} exposures total.'.format(total_exposures))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
@@ -676,9 +885,83 @@ class SimInput:
         sub = ascii.read(self.subarray_def_file)
         return sub
 
-    def make_output_names(self):
+    def info_for_all_observations(self):
+        """For a given dictionary of observation information, pull out the
+        information needed by CRDS from each exposure, and save it as a
+        tuple. Place the tuples in a list. Also, return a list of only the
+        unique combinations of observation information.
+
+        Returns
+        -------
+        all_combinations : list
+            List of tuples. Each tuple contains the instrument, detector,
+            filer, pupil, readout pattern, and exposure type for one exposure.
+
+        unique_combinations : list
+            List of tuples similar to ``all_combinations``, but containing
+            only one copy of each unique tuple.
         """
-        Create output yaml file names to go with all of the
+        # Get all combinations of instrument, detector, filter, exp_type,
+        all_combinations = []
+        for i in range(len(self.info['Instrument'])):
+            # Get instrument information for the exposure
+            instrument = self.info['Instrument'][i]
+            detector = self.info['detector'][i]
+            if instrument == 'NIRCAM':
+                detector = 'NRC{}'.format(detector)
+                if '5' in detector:
+                    filtername = self.info['LongFilter'][i]
+                    pupilname = self.info['LongPupil'][i]
+                    detector = detector.replace('5', 'LONG')
+                else:
+                    filtername = self.info['ShortFilter'][i]
+                    pupilname = self.info['ShortPupil'][i]
+            elif instrument == 'NIRISS':
+                filtername = self.info['ShortFilter'][i]
+                pupilname = self.info['ShortPupil'][i]
+            elif instrument == 'FGS':
+                filtername = 'N/A'
+                pupilname = 'N/A'
+            readpattern = self.info['ReadoutPattern'][i]
+
+            if instrument == 'NIRCAM':
+                exptype = 'NRC_IMAGE'
+            elif instrument == 'NIRISS':
+                exptype = 'NIS_IMAGE'
+            elif instrument == 'FGS':
+                exptype = 'FGS_IMAGE'
+
+            entry = (instrument, detector, filtername, pupilname, readpattern, exptype)
+            all_combinations.append(entry)
+        unique_combinations = list(set(all_combinations))
+        return all_combinations, unique_combinations
+
+    @staticmethod
+    def inverted_ipc_kernel_check(filename):
+        """Given a CRDS-named IPC reference file, check for the
+        existence of a file containing the inverse kernel, which
+        is what Mirage really needs. This is based solely on filename,
+        using the prefix that Mirage prepends to a kernel filename.
+
+        Parameters
+        ----------
+        filename : str
+            Fits file containing IPC correction kernel
+
+        Returns
+        -------
+        inverted_filename : str
+            Name of fits file containing the inverted IPC kernel
+
+        exists : bool
+            True if the file already exists, False if not
+        """
+        dirname, basename = os.path.split(filename)
+        inverted_name = os.path.join(dirname, "Kernel_to_add_IPC_effects_from_{}".format(basename))
+        return inverted_name, not os.path.isfile(inverted_name)
+
+    def make_output_names(self):
+        """Create output yaml file names to go with all of the
         entries in the dictionary
         """
         yaml_names = []
@@ -715,9 +998,13 @@ class SimInput:
 
         self.info['yamlfile'] = yaml_names
         self.info['outputfits'] = fits_names
+        # Table([self.info['yamlfile']]).pprint()
 
     def set_global_definitions(self):
-        """Store the subarray defnitions of all supported instruments."""
+        """Store the subarray definitions of all supported instruments."""
+        # TODO: Investigate how this could be combined with the creation of
+        #  self.configfiles in reffile_setup()
+
         self.global_subarray_definitions = {}
         self.global_readout_patterns = {}
         self.global_subarray_definition_files = {}
@@ -726,6 +1013,7 @@ class SimInput:
         self.global_crosstalk_files = {}
         self.global_filtpupilcombo_files = {}
         self.global_flux_cal_files = {}
+        self.global_psf_wing_threshold_file = {}
         self.global_psfpath = {}
         # self.global_filter_throughput_files = {} ?
 
@@ -736,27 +1024,31 @@ class SimInput:
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
-                psfpath = os.path.join(self.datadir, 'niriss/webbpsf_library')
+                psf_wing_threshold_file = 'niriss_psf_wing_rate_thresholds.txt'
+                psfpath = os.path.join(self.datadir, 'niriss/gridded_psf_library')
             elif instrument.lower() == 'fgs':
                 readout_pattern_file = 'guider_readout_pattern.txt'
                 subarray_def_file = 'guider_subarrays.list'
                 crosstalk_file = 'guider_xtalk_zeros.txt'
                 filtpupilcombo_file = 'guider_filter_dummy.list'
                 flux_cal_file = 'guider_zeropoints.list'
-                psfpath = os.path.join(self.datadir, 'fgs/webbpsf_library')
+                psf_wing_threshold_file = 'fgs_psf_wing_rate_thresholds.txt'
+                psfpath = os.path.join(self.datadir, 'fgs/gridded_psf_library')
             elif instrument.lower() == 'nircam':
                 readout_pattern_file = 'nircam_read_pattern_definitions.list'
                 subarray_def_file = 'NIRCam_subarray_definitions.list'
                 crosstalk_file = 'xtalk20150303g0.errorcut.txt'
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
                 flux_cal_file = 'NIRCam_zeropoints.list'
-                psfpath = os.path.join(self.datadir, 'nircam/webbpsf_library')
+                psf_wing_threshold_file = 'nircam_psf_wing_rate_thresholds.txt'
+                psfpath = os.path.join(self.datadir, 'nircam/gridded_psf_library')
             else:
                 readout_pattern_file = 'N/A'
                 subarray_def_file = 'N/A'
                 crosstalk_file = 'N/A'
                 filtpupilcombo_file = 'N/A'
                 flux_cal_file = 'N/A'
+                psf_wing_threshold_file = 'N/A'
                 psfpath = 'N/A'
             if instrument in 'niriss fgs nircam'.split():
                 self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
@@ -766,7 +1058,56 @@ class SimInput:
             self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
             self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
             self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
+            self.global_psf_wing_threshold_file[instrument] = os.path.join(self.modpath, 'config', psf_wing_threshold_file)
             self.global_psfpath[instrument] = psfpath
+
+    def lowercase_dict_keys(self):
+        """To make reference file override dictionary creation easier for
+        users, allow the input keys to be case insensitive. Take the user
+        input dictionary and translate all the keys to be lower case.
+        """
+        for key in self.reffile_overrides:
+            if key.lower() != key:
+                newkey = key.lower()
+                self.reffile_overrides[newkey] = self.reffile_overrides.pop(key)
+            else:
+                newkey = key
+            if isinstance(self.reffile_overrides[newkey], dict):
+                for key2 in self.reffile_overrides[newkey]:
+                    if (key2.lower() != key2):
+                        newkey2 = key2.lower()
+                        self.reffile_overrides[newkey][newkey2] = self.reffile_overrides[newkey].pop(key2)
+                    else:
+                        newkey2 = key2
+                    if isinstance(self.reffile_overrides[newkey][newkey2], dict):
+                        for key3 in self.reffile_overrides[newkey][newkey2]:
+                            if (key3.lower() != key3):
+                                newkey3 = key3.lower()
+                                self.reffile_overrides[newkey][newkey2][newkey3] = self.reffile_overrides[newkey][newkey2].pop(key3)
+                            else:
+                                newkey3 = key3
+                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3], dict):
+                                for key4 in self.reffile_overrides[newkey][newkey2][newkey3]:
+                                    if (key4.lower() != key4):
+                                        newkey4 = key4.lower()
+                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4] = self.reffile_overrides[newkey][newkey2][newkey3].pop(key4)
+                                    else:
+                                        newkey4 = key4
+                                    if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4], dict):
+                                        for key5 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4]:
+                                            if (key5.lower() != key5):
+                                                newkey5 = key5.lower()
+                                                self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4].pop(key5)
+                                            else:
+                                                newkey5 = key5
+                                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5], dict):
+                                                for key6 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5]:
+                                                    if (key6.lower() != key6):
+                                                        newkey6 = key6.lower()
+                                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5][newkey6] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5].pop(key6)
+                                                    else:
+                                                        newkey6 = key6
+
 
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
@@ -987,8 +1328,10 @@ class SimInput:
 
     def path_defs(self):
         """Expand input files to have full paths"""
-        self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
-        self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
+        if self.input_xml is not None:
+            self.input_xml = os.path.abspath(os.path.expandvars(self.input_xml))
+        if self.pointing_file is not None:
+            self.pointing_file = os.path.abspath(os.path.expandvars(self.pointing_file))
         self.output_dir = os.path.abspath(os.path.expandvars(self.output_dir))
         self.simdata_output_dir = os.path.abspath(os.path.expandvars(self.simdata_output_dir))
         if self.table_file is not None:
@@ -1015,7 +1358,7 @@ class SimInput:
         # elif self.crosstalk == 'config':
         #     self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
-    def reffile_setup(self, offline=False):
+    def reffile_setup(self):
         """Create lists of reference files associate with each detector.
 
         Parameters
@@ -1023,9 +1366,6 @@ class SimInput:
         instrument : str
             Name of instrument
         """
-
-        # self.instrument = instrument.lower()
-
         # Prepare to find files listed as 'config'
         # and set up PSF path
 
@@ -1038,38 +1378,19 @@ class SimInput:
 
         for instrument in 'nircam niriss fgs'.split():
             self.configfiles[instrument] = {}
-            self.psfpath[instrument] = os.path.join(self.datadir, instrument, 'webbpsf_library')
+            self.psfpath[instrument] = os.path.join(self.datadir, instrument, 'gridded_psf_library')
             self.psfbasename[instrument] = instrument
             self.reference_file_dir[instrument] = os.path.join(self.datadir, instrument, 'reference_files')
 
+            # Set instrument-specific file paths
             if instrument == 'nircam':
                 self.psfpixfrac[instrument] = 0.25
-                self.configfiles[instrument]['subarray_def_file'] = 'NIRCam_subarray_definitions.list'
-                self.configfiles[instrument]['fluxcal'] = 'NIRCam_zeropoints.list'
-                self.configfiles[instrument]['filtpupil_pairs'] = 'nircam_filter_pupil_pairings.list'
-                self.configfiles[instrument]['readpatt_def_file'] = 'nircam_read_pattern_definitions.list'
-                self.configfiles[instrument]['crosstalk'] = 'xtalk20150303g0.errorcut.txt'
             elif instrument == 'niriss':
                 self.psfpixfrac[instrument] = 0.1
-                self.configfiles[instrument]['subarray_def_file'] = 'niriss_subarrays.list'
-                self.configfiles[instrument]['fluxcal'] = 'niriss_zeropoints.list'
-                self.configfiles[instrument]['filtpupil_pairs'] = 'niriss_dual_wheel_list.txt'
-                self.configfiles[instrument]['readpatt_def_file'] = 'niriss_readout_pattern.txt'
-                self.configfiles[instrument]['crosstalk'] = 'niriss_xtalk_zeros.txt'
             elif instrument == 'fgs':
                 self.psfpixfrac[instrument] = 0.1
-                self.configfiles[instrument]['subarray_def_file'] = 'guider_subarrays.list'
-                self.configfiles[instrument]['fluxcal'] = 'guider_zeropoints.list'
-                self.configfiles[instrument]['filtpupil_pairs'] = 'guider_filter_dummy.txt'
-                self.configfiles[instrument]['readpatt_def_file'] = 'guider_readout_pattern.txt'
-                self.configfiles[instrument]['crosstalk'] = 'guider_xtalk_zeros.txt'
 
-            # self.configfiles[instrument]['dq_init_config'] = 'dq_init.cfg'
-            # self.configfiles[instrument]['saturation_config'] = 'saturation.cfg'
-            # self.configfiles[instrument]['superbias_config'] = 'superbias.cfg'
-            # self.configfiles[instrument]['refpix_config'] = 'refpix.cfg'
-            # self.configfiles[instrument]['linearity_config'] = 'linearity.cfg'
-            # self.configfiles[instrument]['filter_throughput'] = 'placeholder.txt'
+            # Set global file paths
             self.configfiles[instrument]['dq_init_config'] = os.path.join(self.modpath, 'config', 'dq_init.cfg')
             self.configfiles[instrument]['saturation_config'] = os.path.join(self.modpath, 'config', 'saturation.cfg')
             self.configfiles[instrument]['superbias_config'] = os.path.join(self.modpath, 'config', 'superbias.cfg')
@@ -1098,7 +1419,7 @@ class SimInput:
             for list_name in list_names:
                 getattr(self, '{}_list'.format(list_name))[instrument] = {}
 
-            if offline:
+            if self.offline:
                 # no access to central store. Set all files to none.
                 for list_name in list_names:
                     if list_name in 'dark lindark'.split():
@@ -1109,39 +1430,9 @@ class SimInput:
                         getattr(self, '{}_list'.format(list_name))[instrument][det] = default_value
 
             elif instrument == 'nircam':
-                sb_dir = os.path.join(self.datadir, 'nircam/reference_files/superbias')
-                lin_dir = os.path.join(self.datadir, 'nircam/reference_files/linearity')
-                gain_dir = os.path.join(self.datadir, 'nircam/reference_files/gain')
-                sat_dir = os.path.join(self.datadir, 'nircam/reference_files/saturation')
-                ipc_dir = os.path.join(self.datadir, 'nircam/reference_files/ipc')
-                dist_dir = os.path.join(self.datadir, 'nircam/reference_files/distortion')
-                pam_dir = os.path.join(self.datadir, 'nircam/reference_files/pam')
                 rawdark_dir = os.path.join(self.datadir, 'nircam/darks/raw')
                 lindark_dir = os.path.join(self.datadir, 'nircam/darks/linearized')
                 for det in self.det_list[instrument]:
-                    sbfiles = glob(os.path.join(sb_dir, '*fits'))
-                    self.superbias_list[instrument][det] = [d for d in sbfiles if 'NRC' + det in d][0]
-                    linfiles = glob(os.path.join(lin_dir, '*fits'))
-                    longdet = deepcopy(det)
-                    if '5' in det:
-                        longdet = det.replace('5', 'LONG')
-                    self.linearity_list[instrument][det] = [d for d in linfiles if 'NRC' + longdet in d][0]
-
-                    gainfiles = glob(os.path.join(gain_dir, '*fits'))
-                    self.gain_list[instrument][det] = [d for d in gainfiles if 'NRC' + det in d][0]
-
-                    satfiles = glob(os.path.join(sat_dir, '*fits'))
-                    self.saturation_list[instrument][det] = [d for d in satfiles if 'NRC' + det in d][0]
-
-                    ipcfiles = glob(os.path.join(ipc_dir, 'Kernel_to_add_IPC*fits'))
-                    self.ipc_list[instrument][det] = [d for d in ipcfiles if 'NRC' + det in d][0]
-
-                    distfiles = glob(os.path.join(dist_dir, '*asdf'))
-                    self.astrometric_list[instrument][det] = [d for d in distfiles if 'NRC' + det in d][0]
-
-                    pamfiles = glob(os.path.join(pam_dir, '*fits'))
-                    self.pam_list[instrument][det] = [d for d in pamfiles if det in d][0]
-
                     self.dark_list[instrument][det] = glob(os.path.join(rawdark_dir, det, '*.fits'))
                     self.lindark_list[instrument][det] = glob(os.path.join(lindark_dir, det, '*.fits'))
 
@@ -1158,42 +1449,20 @@ class SimInput:
             else:  # niriss and fgs
                 for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                               '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
-                        self.astrometric_list[instrument][det] = glob(
-                            os.path.join(self.reference_file_dir[instrument],
-                                         'distortion/*distortion_0004.asdf'))[0]
-                        self.lindark_list[instrument][det] = [None]
+                                                                            '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
 
                     elif det == 'G2':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                               '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
-                        self.astrometric_list[instrument][det] = glob(
-                            os.path.join(self.reference_file_dir[instrument],
-                                         'distortion/*distortion_0003.asdf'))[0]
-                        self.lindark_list[instrument][det] = [None]
+                                                                            '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
 
                     elif det == 'NIS':
-                        self.ipc_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument],
-                                                                           'ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits'))[0]
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
                                                                             '*uncal.fits'))
                         self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/linearized',
                                                                                '*linear_dark_prep_object.fits'))
-                        self.astrometric_list[instrument][det] = glob(
-                            os.path.join(self.reference_file_dir[instrument],
-                                         'distortion/*distortion*.asdf'))[0]
-                    self.superbias_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'superbias/*superbias*.fits'))[0]
-                    self.linearity_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'linearity/*linearity*.fits'))[0]
-                    self.gain_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'gain/*gain*.fits'))[0]
-                    self.saturation_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'saturation/*saturation*.fits'))[0]
-
-                    # suspecting that the FGS wcs reference file has a problem
-                    # self.astrometric_list[instrument][det] = 'none'
-
-                    self.pam_list[instrument][det] = glob(os.path.join(self.reference_file_dir[instrument], 'pam/*area*.fits'))[0]
 
     def set_config(self, file, prop):
         """
@@ -1218,6 +1487,189 @@ class SimInput:
         elif file.lower() == 'config':
             file = os.path.join(self.modpath, 'config', self.configfiles[prop])
         return file
+
+    def get_psf_path(self):
+        """ Create a list of the path to the PSF library directory for
+        each observation/visit/exposure in the APT program.
+
+        Parameters:
+        -----------
+        psf_paths : list, str, or None
+            Either a list of the paths to the PSF library(ies), with a
+            length equal to the number of activities in the APT program,
+            a string containing the path to one PSF library,
+            or None. If a list, each path will be written
+            chronologically into each yaml file. If a string, that path
+            will be written into every yaml file. If None, the
+            default PSF library path will be used for all yamls.
+
+        Returns:
+        --------
+        paths_out : list
+            The list of paths to the PSF library(ies), with a length
+            equal to the number of activities in the APT program.
+        """
+        act_ids = sorted(list(set(self.info['act_id'])))
+        act_id_indices = []
+        for act_id in self.info['act_id']:
+            act_id_indices.append(act_ids.index(act_id))
+        n_activities = len(act_ids)
+
+        # If no path explicitly provided, use the default path.
+        if self.psf_paths is None:
+            print('No PSF path provided. Using default path as PSF path for all yamls.')
+            paths_out = []
+            for instrument in self.info['Instrument']:
+                default_path = self.global_psfpath[instrument.lower()]
+                # default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
+                paths_out.append(default_path)
+            return paths_out
+
+        elif isinstance(self.psf_paths, str):
+            print('Using provided PSF path.')
+            paths_out = [self.psf_paths] * len(self.info['act_id'])
+            return paths_out
+
+        elif isinstance(self.psf_paths, list) and len(self.psf_paths) != n_activities:
+            raise ValueError('Invalid PSF paths parameter provided. Please '
+                             'provide the psf_paths in the form of a list of '
+                             'strings with a length equal to the number of '
+                             'activities in the APT program ({}), not equal to {}.'
+                             .format(n_activities, len(self.psf_paths)))
+
+        elif isinstance(self.psf_paths, list):
+            print('Using provided PSF paths.')
+            paths_out = [sorted(self.psf_paths)[i] for i in act_id_indices]  # Why is this sorted..?? Seg number?
+            return paths_out
+
+        elif not isinstance(self.psf_paths, list) or not isinstance(self.psf_paths, str):
+            raise TypeError('Invalid PSF paths parameter provided. Please '
+                            'provide the psf_paths in the form of a list or string, not'
+                            '{}'.format(type(self.psf_paths)))
+
+    def reffiles_from_dict(self, obs_params):
+        """For a given set of observing parameters (instrument, detector,
+        filter, etc), check to see if the user has provided any reference
+        files to use. These will override the results of the CRDS query.
+
+        Parameters
+        ----------
+        obs_params : tup
+            (instrument, detector, filter, pupil, readpattern, exptype)
+
+        Returns
+        -------
+        files : dict
+            Dictionary containing the reference files that match the
+            observing parameters
+        """
+        files = {}
+        (instrument, detector, filtername, pupilname, readpattern, exptype) = obs_params
+        instrument = instrument.lower()
+        detector = detector.lower()
+        filtername = filtername.lower()
+        pupilname = pupilname.lower()
+        readpattern = readpattern.lower()
+        exptype = exptype.lower()
+
+        # Make all of the nested dictionaries such that they have case-
+        # insensitive keys. This will allow the user to use upper or lower
+        # case for keys in their input dictionaries.
+        self.lowercase_dict_keys()
+
+        # CRDS uses NRCALONG rather than NRCA5.
+        if 'long' in detector:
+            detector = detector.replace('long', '5')
+
+        # For NIRISS, set filter and pupil names according to where they
+        # really are.
+        if instrument == 'niriss':
+            if filtername.upper() in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                temp = deepcopy(filtername)
+                filtername = deepcopy(pupilname)
+                pupilname = temp
+                if pupilname == 'clear':
+                    pupilname = 'clearp'
+
+        # superbias
+        try:
+            if instrument in ['nircam', 'fgs']:
+                files['superbias'] = self.reffile_overrides[instrument]['superbias'][detector][readpattern]
+            elif instrument == 'niriss':
+                files['superbias'] = self.reffile_overrides[instrument]['superbias'][readpattern]
+        except KeyError:
+            files['superbias'] = 'none'
+
+        # linearity
+        try:
+            if instrument in ['nircam', 'fgs']:
+                files['linearity'] = self.reffile_overrides[instrument]['linearity'][detector]
+            elif instrument == 'niriss':
+                files['linearity'] = self.reffile_overrides[instrument]['linearity']
+        except KeyError:
+            files['linearity'] = 'none'
+
+        # saturation
+        try:
+            if instrument in ['nircam', 'fgs']:
+                files['saturation'] = self.reffile_overrides[instrument]['saturation'][detector]
+            elif instrument == 'niriss':
+                files['saturation'] = self.reffile_overrides[instrument]['saturation']
+        except KeyError:
+            files['saturation'] = 'none'
+
+        # gain
+        try:
+            if instrument in ['nircam', 'fgs']:
+                files['gain'] = self.reffile_overrides[instrument]['gain'][detector]
+            elif instrument == 'niriss':
+                files['gain'] = self.reffile_overrides[instrument]['gain']
+        except KeyError:
+            files['gain'] = 'none'
+
+        # distortion
+        try:
+            if instrument == 'nircam':
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][filtername][exptype]
+            elif instrument == 'niriss':
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][pupilname][exptype]
+            elif instrument == 'fgs':
+                files['distortion'] = self.reffile_overrides[instrument]['distortion'][detector][exptype]
+        except KeyError:
+            files['distortion'] = 'none'
+
+        # ipc
+        try:
+            if instrument in ['nircam', 'fgs']:
+                files['ipc'] = self.reffile_overrides[instrument]['ipc'][detector]
+            elif instrument == 'niriss':
+                files['ipc'] = self.reffile_overrides[instrument]['ipc']
+        except KeyError:
+            files['ipc'] = 'none'
+
+        # pixel area map
+        try:
+            if instrument == 'nircam':
+                files['area'] = self.reffile_overrides[instrument]['area'][detector][filtername][pupilname][exptype]
+            elif instrument == 'niriss':
+                files['area'] = self.reffile_overrides[instrument]['area'][filtername][pupilname][exptype]
+            elif instrument == 'fgs':
+                files['area'] = self.reffile_overrides[instrument]['area'][detector]
+        except KeyError:
+            files['area'] = 'none'
+
+        # bad pixel map
+        try:
+            if instrument == 'nircam':
+                files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector]
+            elif instrument == 'niriss':
+                files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask']
+            elif instrument == 'fgs':
+                files['badpixmask'] = self.reffile_overrides[instrument]['badpixmask'][detector][exptype]
+        except KeyError:
+            files['badpixmask'] = 'none'
+
+        return files
 
     def table_to_dict(self, tab):
         """
@@ -1255,7 +1707,11 @@ class SimInput:
             filtkey = 'FilterWheel'
             pupilkey = 'PupilWheel'
             # set the FilterWheel and PupilWheel for NIRISS
-            if input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
+            if input['APTTemplate'] in ['NirissAmi']:
+                filter_name = input['Filter']
+                input[filtkey] = filter_name
+                input[pupilkey] = 'NRM'
+            elif input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
                 filter_name = input['Filter']
                 if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
                     input[pupilkey] = filter_name
@@ -1310,12 +1766,12 @@ class SimInput:
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
-            config = self.global_subarray_definitions[instrument.lower()]
+            subarray_definitions = self.global_subarray_definitions[instrument.lower()]
 
 
-            if full_ap not in config['AperName']:
+            if full_ap not in subarray_definitions['AperName']:
                 full_ap_new = [apername for apername, name in
-                               np.array(config['AperName', 'Name']) if
+                               np.array(subarray_definitions['AperName', 'Name']) if
                                (full_ap in apername) or (full_ap in name)]
                 if len(full_ap_new) > 1 or len(full_ap_new) == 0:
                     raise ValueError('Cannot match {} with valid aperture name for observation {}.'
@@ -1330,7 +1786,7 @@ class SimInput:
             f.write('Reffiles:                                 # Set to None or leave blank if you wish to skip that step\n')
             f.write('  dark: {}   # Dark current integration used as the base\n'.format(input['dark']))
             f.write('  linearized_darkfile: {}   # Linearized dark ramp to use as input. Supercedes dark above\n'.format(input['lindark']))
-            f.write('  badpixmask: None   # If linearized dark is used, populate output DQ extensions using this file\n')
+            f.write('  badpixmask: {}   # If linearized dark is used, populate output DQ extensions using this file\n'.format(input['badpixmask']))
             f.write('  superbias: {}     # Superbias file. Set to None or leave blank if not using\n'.format(input['superbias']))
             f.write('  linearity: {}    # linearity correction coefficients\n'.format(input['linearity']))
             f.write('  saturation: {}    # well depth reference files\n'.format(input['saturation']))
@@ -1340,7 +1796,7 @@ class SimInput:
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
             f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
-                     'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(False)))
+                     'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(input['invert_ipc'])))
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
                      .format(input['pixelAreaMap'])))
@@ -1364,8 +1820,8 @@ class SimInput:
             f.write('cosmicRay:\n')
             cosmic_ray_path = os.path.join(self.datadir, instrument.lower(), 'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
-            f.write('  library: SUNMIN    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
-            f.write('  scale: 1.5     # Cosmic ray scaling factor\n')
+            f.write('  library: SUNMAX    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
+            f.write('  scale: 1.0     # Cosmic ray scaling factor\n')
             # temporary tweak here to make it work with NIRISS
             detector_label = input['detector']
 
@@ -1413,10 +1869,10 @@ class SimInput:
 
             f.write(('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'
                      .format(PointSourceCatalog)))
+            f.write('  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.\n')
+            f.write('  psf_wing_threshold_file: {}   # File defining PSF sizes versus magnitude\n'.format(input['psf_wing_threshold_file']))
+            f.write('  add_psf_wings: {}  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.\n'.format(self.add_psf_wings))
             f.write('  psfpath: {}   #Path to PSF library\n'.format(input['psfpath']))
-            f.write('  psfbasename: {}      #Basename of the files in the psf library\n'.format(instrument.lower()))
-            f.write(('  psfpixfrac: {}       #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for '
-                     'PSF centered at 0.1 pixel intervals within pixel)\n'.format(self.psfpixfrac[instrument.lower()])))
             f.write('  psfwfe: {}   #PSF WFE value (predicted or requirements)\n'.format(self.psfwfe))
             f.write('  psfwfegroup: {}      #WFE realization group (0 to 4)\n'.format(self.psfwfegroup))
             f.write(('  galaxyListFile: {}    #File containing a list of positions/ellipticities/magnitudes of galaxies '
@@ -1448,6 +1904,9 @@ class SimInput:
                      .format(np.random.randint(1, 2**32-2))))
             f.write('  photonyield: True                         #Apply photon yield in simulation\n')
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
+            f.write('  expand_catalog_for_segments: {}                     # Expand catalog for 18 segments and use distinct PSFs\n'
+                .format(self.expand_catalog_for_segments))
+
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
@@ -1456,7 +1915,7 @@ class SimInput:
                 pav3_value = input['pav3']
             else:
                 pav3_value = input['PAV3']
-            f.write('  rotation: {}                    # y axis rotation (degrees E of N)\n'.format(pav3_value))
+            f.write('  rotation: {}                    # PA_V3 in degrees, i.e. the position angle of the V3 axis at V1 (V2=0, V3=0) measured from N to E.\n'.format(pav3_value))
             f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
             f.write('\n')
             f.write('newRamp:\n')
@@ -1543,7 +2002,7 @@ class SimInput:
         parser.add_argument("--use_linearized_darks", help='True/False', action='store_true')
         parser.add_argument("--simdata_output_dir", help='Output directory for simulated exposure files', default='./')
         parser.add_argument("--psfpath", help='Directory containing PSF library',
-                            default=os.path.join(self.datadir,'webbpsf_library'))
+                            default=os.path.join(self.datadir, 'gridded_psf_library'))
         parser.add_argument("--psfbasename", help="Basename of the files in the PSF library", default='nircam')
         parser.add_argument("--psfpixfrac", help="Subpixel centering resolution of files in PSF library", default=0.25)
         parser.add_argument("--psfwfe", help="Wavefront error value to use for PSFs", default='predicted')

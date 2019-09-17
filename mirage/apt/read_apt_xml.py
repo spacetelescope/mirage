@@ -162,7 +162,7 @@ class ReadAPTXML():
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
                                    'NircamEngineeringImaging', 'WfscGlobalAlignment',
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
-                                   'NirissExternalCalibration', 'NirissWfss',  # NIRISS
+                                   'NirissExternalCalibration', 'NirissWfss', 'NirissAmi',  # NIRISS
                                    'NirspecImaging', 'NirspecInternalLamp',  # NIRSpec
                                    'MiriMRS',  # MIRI
                                    'FgsExternalCalibration',  # FGS
@@ -225,7 +225,7 @@ class ReadAPTXML():
                                              }
 
             if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration',
-                                 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
+                                 'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration', 'NirissAmi']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs,
                                                                           proposal_parameter_dictionary,
                                                                           verbose=verbose)
@@ -334,7 +334,6 @@ class ReadAPTXML():
         if verbose:
             print('Finished reading APT xml file.')
             print('+'*100)
-
         # Temporary for creating truth tables to use in tests
         #bool_cols = ['ParallelInstrument']
         #int_cols = ['Groups', 'Integrations']
@@ -461,9 +460,12 @@ class ReadAPTXML():
             dither_key_name = 'ImageDithers'
 
         # number of dithers defaults to 1
+        number_of_dithers = 1
+        number_of_subpixel_positions = 1
+
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
-
+      
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
 
@@ -489,6 +491,10 @@ class ReadAPTXML():
 
                 if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
+
+                # Special case for 8NIRSPEC dither pattern
+                if number_of_primary_dithers == '8NIRSPEC':
+                    number_of_primary_dithers = '8'
 
             else:
                 print('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
@@ -605,16 +611,17 @@ class ReadAPTXML():
 
             for element in template:
                 element_tag_stripped = element.tag.split(ns)[1]
-                # if verbose:
-                #     print('{} {}'.format(element_tag_stripped, element.text))
 
                 # loop through exposures and collect dither parameters
                 if element_tag_stripped == 'DitherPatternType':
                     DitherPatternType = element.text
                 elif element_tag_stripped == 'ImageDithers':
                     number_of_primary_dithers = int(element.text)
+                elif element_tag_stripped == 'SubpixelPositions':
+                    if element.text != 'NONE':
+                        number_of_subpixel_positions = np.int(element.text)
                 elif element_tag_stripped == 'PrimaryDithers':
-                    if element.text is not None:
+                    if (element.text is not None) & (element.text != 'NONE'):
                         number_of_primary_dithers = int(element.text)
                 elif element_tag_stripped == 'Dithers':
                     DitherPatternType = element.find(ns + 'MrsDitherSpecification').find(ns + 'DitherType').text
@@ -622,6 +629,15 @@ class ReadAPTXML():
                 elif element_tag_stripped == 'SubpixelDithers':
                     if element.text is not None:
                         number_of_subpixel_dithers = int(element.text)
+
+
+                # handle the NIRISS AMI case
+                if number_of_subpixel_positions > number_of_subpixel_dithers:
+                    number_of_subpixel_dithers = np.copy(number_of_subpixel_positions)
+
+                # Determine if there is an aperture override
+                override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+                FiducialPointOverride = True if override is not None else False
 
                 # To reduce confusion, if this is the parallel instrument,
                 # set the number of dithers to zero, since the prime
@@ -633,6 +649,7 @@ class ReadAPTXML():
                 # Combine primary and subpixel dithers
                 number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
 
+                
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower() == 'niriss') and (element_tag_stripped == 'ExposureList')) | \
                         ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
@@ -643,6 +660,10 @@ class ReadAPTXML():
 
                         # Load dither information into dictionary
                         exposure_dict['DitherPatternType'] = DitherPatternType
+                        
+                        if (number_of_dithers is None) | (number_of_dithers == 'NONE'):
+                            number_of_dithers = 1 * number_of_subpixel_positions
+
                         exposure_dict[dither_key_name] = np.int(number_of_dithers)
                         exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
 
@@ -672,8 +693,11 @@ class ReadAPTXML():
                             if (key in ['PrimaryDithers', 'ImageDithers']) and (str(value) == 'None'):
                                 value = '1'
 
-                            if (key == 'Mode'):# and (template_name in ['NirissExternalCalibration', 'FgsExternalCalibration']):
-                                value = 'imaging'
+                            if (key == 'Mode'):
+                                if template_name not in ['NirissAmi']:
+                                    value = 'imaging'
+                                else:
+                                    value = 'ami'
 
                             exposures_dictionary[key].append(value)
 

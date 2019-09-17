@@ -23,8 +23,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   gain: $MIRAGE_DATA/nircam/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
-  distortion_coeffs: $MIRAGE_DATA/nircam/reference_files/SIAF/NIRCam_SIAF_2018-01-08.csv        #CSV file containing distortion coefficients
+  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_from_pysiaf_distortion.asdf  #Astrometric distortion file (asdf)
   ipc: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
@@ -50,8 +49,11 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: imaging_example_data/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: $MIRAGE_DATA/nircam/webbpsf_library/        #Path to PSF library
+  pointsource: movingtarget_example_data/sidereal_point_sources.cat #File containing a list of point sources to add (x,y locations and magnitudes)
+  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
+  psf_wing_threshold_file: config   # File defining PSF sizes versus magnitude
+  add_psf_wings: True  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
+  psfpath: $MIRAGE_DATA/nircam/gridded_psf_library/        #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
@@ -74,6 +76,7 @@ simSignals:
   poissonseed: 2012872553                  #Random number generator seed for Poisson simulation)
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
+  expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
 
 Telescope:
   ra: 53.1                     #RA of simulated pointing

@@ -51,7 +51,10 @@ cosmicRay:
 
 simSignals:
   pointsource: imaging_example_data/seed_im_from_catalog_test_ptsrc_catalog.list #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: $MIRAGE_DATA/nircam/webbpsf_library/        #Path to PSF library
+  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
+  psf_wing_threshold_file: config   # File defining PSF sizes versus magnitude
+  add_psf_wings: True  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
+  psfpath: $MIRAGE_DATA/nircam/gridded_psf_library/  #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
@@ -74,6 +77,7 @@ simSignals:
   poissonseed: 2012872553                  #Random number generator seed for Poisson simulation)
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
+  expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
 
 Telescope:
   ra: 53.1                     #RA of simulated pointing

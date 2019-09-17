@@ -1,0 +1,473 @@
+# APT Output Product
+# 
+# APT Version: Version 26.0.2  JWST PRD: PRDOPSSOC-H-015 
+# Date: Wed Sep 05 00:58:41 GMT 2018
+
+JWST Pointing Report for JWST Approved Proposal 1134 (Unsaved)
+
+========================================
+* Central (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781   +0.000   +0.000  -53.666 -107.128  +53.359 -599.689  -53.666 -107.128 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781   +0.000   +0.000  +56.779 -105.511  -57.089 -598.288  +56.780 -105.511 TILE       SCIENCE        0      0 110.457          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781   +0.000   +0.000  +55.223   +0.809  -55.741 -491.966  +55.223   +0.809 TILE       SCIENCE        0      0 106.331          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781   +0.000   +0.000  -55.223   -0.809  +54.707 -493.366  -55.223   -0.809 TILE       SCIENCE        0      0 110.457          
+** Visit 1:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781   +0.000   +0.000  -56.779 +105.511  +56.055 -387.043  -56.779 +105.511 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781   +0.000   +0.000  +53.666 +107.128  -54.393 -385.643  +53.666 +107.128 TILE       SCIENCE        0      0 110.457          
+
+========================================
+* W (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -101.105 -639.536 -888.159 -1133.934 +888.899 -639.523 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +9.341 -637.918 -998.605 -1132.531 +999.343 -637.903 TILE       SCIENCE        0      0 110.454          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +7.784 -531.599 -997.256 -1026.210 +997.785 -531.586 TILE       SCIENCE        0      0 106.329          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -102.661 -533.216 -886.810 -1027.613 +887.341 -533.205 TILE       SCIENCE        0      0 110.454          
+** Visit 2:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -104.218 -426.896 -885.460 -921.292 +885.783 -426.887 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -105.775 -320.576 -884.111 -814.971 +884.226 -320.569 TILE       SCIENCE        0      0 106.330          
+  1    7   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +4.670 -318.959 -994.558 -813.568 +994.669 -318.950 TILE       SCIENCE        0      0 110.455          
+  1    8   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +6.227 -425.279 -995.907 -919.889 +996.227 -425.268 TILE       SCIENCE        0      0 106.330          
+** Visit 2:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    9   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +116.672 -423.662 -1106.353 -918.487 +1106.670 -423.648 TILE       SCIENCE        0      0  0.000 (base)
+  1   10   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +115.115 -317.342 -1105.004 -812.166 +1105.112 -317.330 TILE       SCIENCE        0      0 106.329          
+** Visit 2:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   11   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +118.229 -529.982 -1107.702 -1024.807 +1108.228 -529.966 TILE       SCIENCE        0      0  0.000 (base)
+  1   12   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +119.786 -636.301 -1109.052 -1131.127 +1109.786 -636.283 TILE       SCIENCE        0      0 106.329          
+** Visit 2:5
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   13   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +108.888 +107.937 -1099.607 -386.882 +1098.880 +107.942 TILE       SCIENCE        0      0  0.000 (base)
+  1   14   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +110.445   +1.617 -1100.956 -493.203 +1100.438   +1.624 TILE       SCIENCE        0      0 106.330          
+** Visit 2:6
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   15   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +113.559 -211.022 -1103.655 -705.845 +1103.554 -211.012 TILE       SCIENCE        0      0  0.000 (base)
+  1   16   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +112.002 -104.703 -1102.305 -599.524 +1101.996 -104.694 TILE       SCIENCE        0      0 106.330          
+  1   17   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +1.557 -106.320 -991.860 -600.926 +991.553 -106.313 TILE       SCIENCE        0      0 110.454          
+  1   18   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +3.114 -212.639 -993.209 -707.247 +993.111 -212.631 TILE       SCIENCE        0      0 106.330          
+** Visit 2:7
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   19   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -107.332 -214.257 -882.762 -708.649 +882.668 -214.250 TILE       SCIENCE        0      0  0.000 (base)
+  1   20   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -108.888 -107.937 -881.413 -602.328 +881.110 -107.931 TILE       SCIENCE        0      0 106.330          
+** Visit 2:8
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   21   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -110.445   -1.617 -880.064 -496.006 +879.552   -1.613 TILE       SCIENCE        0      0  0.000 (base)
+  1   22   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   +0.000   +0.000 -990.511 -494.605 +989.995   +0.006 TILE       SCIENCE        0      0 110.455          
+  1   23   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   -1.557 +106.320 -989.161 -388.283 +988.437 +106.324 TILE       SCIENCE        0      0 106.330          
+  1   24   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -112.002 +104.703 -878.715 -389.684 +877.994 +104.706 TILE       SCIENCE        0      0 110.455          
+** Visit 2:9
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   25   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -113.559 +211.022 -877.366 -283.363 +876.436 +211.025 TILE       SCIENCE        0      0  0.000 (base)
+  1   26   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -115.115 +317.342 -876.017 -177.041 +874.879 +317.343 TILE       SCIENCE        0      0 106.330          
+  1   27   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   -4.670 +318.959 -986.463 -175.641 +985.321 +318.961 TILE       SCIENCE        0      0 110.455          
+  1   28   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   -3.114 +212.639 -987.812 -281.962 +986.879 +212.643 TILE       SCIENCE        0      0 106.330          
+** Visit 2:10
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   29   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +107.332 +214.257 -1098.258 -280.561 +1097.322 +214.261 TILE       SCIENCE        0      0  0.000 (base)
+  1   30   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +105.775 +320.576 -1096.908 -174.240 +1095.764 +320.579 TILE       SCIENCE        0      0 106.329          
+** Visit 2:11
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   31   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +104.218 +426.896 -1095.559  -67.919 +1094.206 +426.896 TILE       SCIENCE        0      0  0.000 (base)
+  1   32   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +102.661 +533.216 -1094.210  +38.401 +1092.647 +533.214 TILE       SCIENCE        0      0 106.329          
+  1   33   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   -7.784 +531.599 -983.765  +37.001 +982.206 +531.597 TILE       SCIENCE        0      0 110.454          
+  1   34   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   -6.227 +425.279 -985.114  -69.320 +983.763 +425.279 TILE       SCIENCE        0      0 106.329          
+** Visit 2:12
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   35   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -116.672 +423.662 -874.668  -70.720 +873.321 +423.662 TILE       SCIENCE        0      0  0.000 (base)
+  1   36   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -118.229 +529.982 -873.319  +35.601 +871.763 +529.980 TILE       SCIENCE        0      0 106.330          
+** Visit 2:13
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   37   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 -119.786 +636.301 -871.970 +141.922 +870.205 +636.298 TILE       SCIENCE        0      0  0.000 (base)
+  1   38   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000   -9.341 +637.918 -982.416 +143.322 +980.648 +637.915 TILE       SCIENCE        0      0 110.454          
+** Visit 2:14
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   39   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +990.000   +0.000 +101.105 +639.536 -1092.861 +144.722 +1091.089 +639.532 TILE       SCIENCE        0      0  0.000 (base)
+
+========================================
+* E (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -101.105 -639.536 +1091.842 -1130.040 -1091.106 -639.518 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +9.341 -637.918 +981.396 -1128.642 -980.662 -637.904 TILE       SCIENCE        0      0 110.454          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +7.784 -531.599 +982.743 -1022.322 -982.218 -531.586 TILE       SCIENCE        0      0 106.329          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -102.661 -533.216 +1093.189 -1023.719 -1092.661 -533.200 TILE       SCIENCE        0      0 110.454          
+** Visit 3:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -104.218 -426.896 +1094.535 -917.399 -1094.216 -426.883 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -105.775 -320.576 +1095.882 -811.078 -1095.772 -320.565 TILE       SCIENCE        0      0 106.329          
+  1    7   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +4.670 -318.959 +985.436 -809.680 -985.329 -318.950 TILE       SCIENCE        0      0 110.454          
+  1    8   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +6.227 -425.279 +984.089 -916.001 -983.773 -425.268 TILE       SCIENCE        0      0 106.330          
+** Visit 3:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    9   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +116.672 -423.662 +873.643 -914.603 -873.329 -423.653 TILE       SCIENCE        0      0  0.000 (base)
+  1   10   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +115.115 -317.342 +874.989 -808.282 -874.885 -317.335 TILE       SCIENCE        0      0 106.330          
+** Visit 3:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   11   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +118.229 -529.982 +872.296 -1020.924 -871.774 -529.971 TILE       SCIENCE        0      0  0.000 (base)
+  1   12   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +119.786 -636.301 +870.949 -1127.245 -870.218 -636.289 TILE       SCIENCE        0      0 106.329          
+** Visit 3:5
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   13   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +108.888 +107.937 +880.377 -382.995 -881.108 +107.940 TILE       SCIENCE        0      0  0.000 (base)
+  1   14   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +110.445   +1.617 +879.030 -489.317 -879.552   +1.622 TILE       SCIENCE        0      0 106.330          
+** Visit 3:6
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   15   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +113.559 -211.022 +876.336 -701.960 -876.441 -211.016 TILE       SCIENCE        0      0  0.000 (base)
+  1   16   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +112.002 -104.703 +877.683 -595.639 -877.996 -104.697 TILE       SCIENCE        0      0 106.330          
+  1   17   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +1.557 -106.320 +988.129 -597.037 -988.440 -106.313 TILE       SCIENCE        0      0 110.455          
+  1   18   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +3.114 -212.639 +986.783 -703.359 -986.884 -212.631 TILE       SCIENCE        0      0 106.330          
+** Visit 3:7
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   19   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -107.332 -214.257 +1097.229 -704.757 -1097.327 -214.247 TILE       SCIENCE        0      0  0.000 (base)
+  1   20   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -108.888 -107.937 +1098.575 -598.436 -1098.882 -107.928 TILE       SCIENCE        0      0 106.330          
+** Visit 3:8
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   21   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -110.445   -1.617 +1099.922 -492.115 -1100.438   -1.610 TILE       SCIENCE        0      0  0.000 (base)
+  1   22   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   +0.000   +0.000 +989.476 -490.716 -989.995   +0.006 TILE       SCIENCE        0      0 110.454          
+  1   23   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   -1.557 +106.320 +990.823 -384.395 -991.551 +106.324 TILE       SCIENCE        0      0 106.330          
+  1   24   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -112.002 +104.703 +1101.268 -385.794 -1101.993 +104.708 TILE       SCIENCE        0      0 110.454          
+** Visit 3:9
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   25   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -113.559 +211.022 +1102.615 -279.473 -1103.549 +211.026 TILE       SCIENCE        0      0  0.000 (base)
+  1   26   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -115.115 +317.342 +1103.961 -173.152 -1105.104 +317.344 TILE       SCIENCE        0      0 106.329          
+  1   27   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   -4.670 +318.959 +993.516 -171.752 -994.662 +318.961 TILE       SCIENCE        0      0 110.454          
+  1   28   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   -3.114 +212.639 +992.169 -278.073 -993.106 +212.643 TILE       SCIENCE        0      0 106.330          
+** Visit 3:10
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   29   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +107.332 +214.257 +881.724 -276.674 -882.663 +214.259 TILE       SCIENCE        0      0  0.000 (base)
+  1   30   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +105.775 +320.576 +883.070 -170.352 -884.219 +320.578 TILE       SCIENCE        0      0 106.330          
+** Visit 3:11
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   31   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +104.218 +426.896 +884.417  -64.031 -885.775 +426.896 TILE       SCIENCE        0      0  0.000 (base)
+  1   32   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +102.661 +533.216 +885.764  +42.290 -887.330 +533.214 TILE       SCIENCE        0      0 106.330          
+  1   33   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   -7.784 +531.599 +996.210  +40.890 -997.773 +531.597 TILE       SCIENCE        0      0 110.454          
+  1   34   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   -6.227 +425.279 +994.863  -65.431 -996.217 +425.279 TILE       SCIENCE        0      0 106.329          
+** Visit 3:12
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   35   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -116.672 +423.662 +1105.308  -66.831 -1106.659 +423.662 TILE       SCIENCE        0      0  0.000 (base)
+  1   36   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -118.229 +529.982 +1106.654  +39.489 -1108.215 +529.980 TILE       SCIENCE        0      0 106.329          
+** Visit 3:13
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   37   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 -119.786 +636.301 +1108.001 +145.810 -1109.770 +636.297 TILE       SCIENCE        0      0  0.000 (base)
+  1   38   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000   -9.341 +637.918 +997.556 +147.210 -999.328 +637.915 TILE       SCIENCE        0      0 110.454          
+** Visit 3:14
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   39   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -990.000   +0.000 +101.105 +639.536 +887.111 +148.611 -888.886 +639.532 TILE       SCIENCE        0      0  0.000 (base)
+
+========================================
+* NW (Obs 4)
+** Visit 4:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -438.667 -219.108 -128.304 +247.973 +126.332 +740.889 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -328.222 -217.491 -238.752 +249.373 +236.777 +742.506 TILE       SCIENCE        0      0 110.456          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -329.779 -111.171 -237.403 +355.694 +235.220 +848.824 TILE       SCIENCE        0      0 106.329          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -440.224 -112.788 -126.956 +354.294 +124.775 +847.207 TILE       SCIENCE        0      0 110.456          
+** Visit 4:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -441.780   -6.469 -125.608 +460.615 +123.219 +953.524 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -443.337  +99.851 -124.260 +566.935 +121.662 +1059.842 TILE       SCIENCE        0      0 106.329          
+  1    7   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -332.892 +101.468 -234.707 +568.335 +232.106 +1061.459 TILE       SCIENCE        0      0 110.455          
+  1    8   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -331.335   -4.851 -236.055 +462.015 +233.663 +955.141 TILE       SCIENCE        0      0 106.329          
+** Visit 4:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    9   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -220.890   -3.234 -346.502 +463.415 +344.107 +956.758 TILE       SCIENCE        0      0  0.000 (base)
+  1   10   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -222.447 +103.085 -345.154 +569.734 +342.549 +1063.075 TILE       SCIENCE        0      0 106.328          
+  1   11   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -112.002 +104.703 -455.600 +571.134 +452.993 +1064.692 TILE       SCIENCE        0      0 110.455          
+  1   12   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -110.445   -1.617 -456.949 +464.814 +454.550 +958.375 TILE       SCIENCE        0      0 106.328          
+** Visit 4:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   13   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -108.888 -107.937 -458.297 +358.494 +456.108 +852.057 TILE       SCIENCE        0      0  0.000 (base)
+  1   14   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -219.333 -109.554 -347.851 +357.094 +345.664 +850.441 TILE       SCIENCE        0      0 110.456          
+  1   15   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -217.777 -215.874 -349.199 +250.773 +347.221 +744.123 TILE       SCIENCE        0      0 106.329          
+  1   16   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -107.332 -214.257 -459.646 +252.173 +457.665 +745.739 TILE       SCIENCE        0      0 110.456          
+** Visit 4:5
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   17   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000   +3.114 -212.639 -570.093 +253.573 +568.109 +747.356 TILE       SCIENCE        0      0  0.000 (base)
+  1   18   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000   +1.557 -106.320 -568.744 +359.894 +566.551 +853.674 TILE       SCIENCE        0      0 106.329          
+  1   19   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +112.002 -104.703 -679.190 +361.293 +676.995 +855.291 TILE       SCIENCE        0      0 110.455          
+  1   20   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +113.559 -211.022 -680.539 +254.973 +678.552 +748.973 TILE       SCIENCE        0      0 106.329          
+** Visit 4:6
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   21   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +224.004 -209.405 -790.985 +256.373 +788.995 +750.590 TILE       SCIENCE        0      0  0.000 (base)
+  1   22   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +334.449 -207.788 -901.431 +257.772 +899.438 +752.206 TILE       SCIENCE        0      0 110.454          
+  1   23   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +332.892 -101.468 -900.082 +364.092 +897.880 +858.523 TILE       SCIENCE        0      0 106.329          
+  1   24   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +222.447 -103.085 -789.636 +362.693 +787.438 +856.907 TILE       SCIENCE        0      0 110.454          
+** Visit 4:7
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   25   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +220.890   +3.234 -788.287 +469.013 +785.880 +963.224 TILE       SCIENCE        0      0  0.000 (base)
+  1   26   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +331.335   +4.851 -898.733 +470.412 +896.322 +964.840 TILE       SCIENCE        0      0 110.454          
+  1   27   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +329.779 +111.171 -897.384 +576.731 +894.764 +1071.156 TILE       SCIENCE        0      0 106.328          
+  1   28   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +219.333 +109.554 -786.938 +575.332 +784.322 +1069.540 TILE       SCIENCE        0      0 110.454          
+** Visit 4:8
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   29   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +108.888 +107.937 -676.493 +573.933 +673.880 +1067.924 TILE       SCIENCE        0      0  0.000 (base)
+  1   30   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +110.445   +1.617 -677.842 +467.613 +675.437 +961.608 TILE       SCIENCE        0      0 106.328          
+  1   31   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000   +0.000   -0.000 -567.395 +466.214 +564.994 +959.991 TILE       SCIENCE        0      0 110.455          
+  1   32   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000   -1.557 +106.320 -566.047 +572.534 +563.436 +1066.308 TILE       SCIENCE        0      0 106.328          
+** Visit 4:9
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   33   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000   -3.114 +212.639 -564.698 +678.853 +561.879 +1172.624 TILE       SCIENCE        0      0  0.000 (base)
+  1   34   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +107.332 +214.257 -675.144 +680.252 +672.322 +1174.240 TILE       SCIENCE        0      0 110.454          
+** Visit 4:10
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   35   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +217.777 +215.874 -785.590 +681.651 +782.765 +1175.856 TILE       SCIENCE        0      0  0.000 (base)
+  1   36   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +328.222 +217.491 -896.035 +683.049 +893.207 +1177.472 TILE       SCIENCE        0      0 110.453          
+** Visit 4:11
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   37   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -113.559 +211.022 -454.252 +677.453 +451.436 +1171.008 TILE       SCIENCE        0      0  0.000 (base)
+  1   38   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -224.004 +209.405 -343.805 +676.054 +340.992 +1169.392 TILE       SCIENCE        0      0 110.455          
+** Visit 4:12
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   39   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -334.449 +207.788 -233.359 +674.654 +230.549 +1167.775 TILE       SCIENCE        0      0  0.000 (base)
+  1   40   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 -444.894 +206.171 -122.912 +673.254 +120.105 +1166.158 TILE       SCIENCE        0      0 110.455          
+** Visit 4:13
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   41   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +438.667 +219.108 -1006.479 +684.448 +1003.648 +1179.087 TILE       SCIENCE        0      0  0.000 (base)
+  1   42   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +440.224 +112.788 -1007.828 +578.130 +1005.206 +1072.772 TILE       SCIENCE        0      0 106.327          
+** Visit 4:14
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   43   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +441.780   +6.469 -1009.177 +471.811 +1006.764 +966.456 TILE       SCIENCE        0      0  0.000 (base)
+  1   44   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +443.337  -99.851 -1010.526 +365.492 +1008.322 +860.140 TILE       SCIENCE        0      0 106.328          
+** Visit 4:15
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   45   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 +960.000 +444.894 -206.171 -1011.876 +259.172 +1009.880 +753.823 TILE       SCIENCE        0      0  0.000 (base)
+
+========================================
+* NE (Obs 5)
+** Visit 5:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -438.667 -219.108 +1001.679 +250.189 -1003.653 +740.886 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -328.222 -217.491 +891.234 +251.590 -893.211 +742.503 TILE       SCIENCE        0      0 110.454          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -329.779 -111.171 +892.581 +357.910 -894.767 +848.821 TILE       SCIENCE        0      0 106.329          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -440.224 -112.788 +1003.026 +356.509 -1005.209 +847.203 TILE       SCIENCE        0      0 110.454          
+** Visit 5:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -441.780   -6.469 +1004.372 +462.829 -1006.764 +953.519 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -443.337  +99.851 +1005.719 +569.147 -1008.320 +1059.835 TILE       SCIENCE        0      0 106.327          
+  1    7   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -332.892 +101.468 +895.274 +570.549 -897.878 +1061.453 TILE       SCIENCE        0      0 110.453          
+  1    8   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -331.335   -4.851 +893.928 +464.230 -896.322 +955.137 TILE       SCIENCE        0      0 106.328          
+** Visit 5:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    9   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -220.890   -3.234 +783.482 +465.631 -785.880 +956.755 TILE       SCIENCE        0      0  0.000 (base)
+  1   10   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -222.447 +103.085 +784.829 +571.950 -787.436 +1063.072 TILE       SCIENCE        0      0 106.328          
+  1   11   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -112.002 +104.703 +674.384 +573.352 -676.993 +1064.690 TILE       SCIENCE        0      0 110.454          
+  1   12   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -110.445   -1.617 +673.036 +467.032 -675.437 +958.373 TILE       SCIENCE        0      0 106.328          
+** Visit 5:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   13   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -108.888 -107.937 +671.689 +360.712 -673.881 +852.056 TILE       SCIENCE        0      0  0.000 (base)
+  1   14   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -219.333 -109.554 +782.135 +359.311 -784.324 +850.439 TILE       SCIENCE        0      0 110.455          
+  1   15   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -217.777 -215.874 +780.788 +252.991 -782.768 +744.121 TILE       SCIENCE        0      0 106.329          
+  1   16   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -107.332 -214.257 +670.342 +254.392 -672.325 +745.739 TILE       SCIENCE        0      0 110.455          
+** Visit 5:5
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   17   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000   +3.114 -212.639 +559.896 +255.792 -561.882 +747.356 TILE       SCIENCE        0      0  0.000 (base)
+  1   18   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000   +1.557 -106.320 +561.243 +362.113 -563.438 +853.674 TILE       SCIENCE        0      0 106.329          
+  1   19   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +112.002 -104.703 +450.796 +363.514 -452.994 +855.292 TILE       SCIENCE        0      0 110.455          
+  1   20   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +113.559 -211.022 +449.449 +257.193 -451.438 +748.974 TILE       SCIENCE        0      0 106.329          
+** Visit 5:6
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   21   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +224.004 -209.405 +339.002 +258.593 -340.994 +750.591 TILE       SCIENCE        0      0  0.000 (base)
+  1   22   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +334.449 -207.788 +228.555 +259.994 -230.550 +752.208 TILE       SCIENCE        0      0 110.456          
+  1   23   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +332.892 -101.468 +229.902 +366.315 -232.106 +858.527 TILE       SCIENCE        0      0 106.329          
+  1   24   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +222.447 -103.085 +340.350 +364.914 -342.550 +856.909 TILE       SCIENCE        0      0 110.456          
+** Visit 5:7
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   25   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +220.890   +3.234 +341.697 +471.235 -344.107 +963.227 TILE       SCIENCE        0      0  0.000 (base)
+  1   26   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +331.335   +4.851 +231.250 +472.635 -233.663 +964.844 TILE       SCIENCE        0      0 110.456          
+  1   27   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +329.779 +111.171 +232.598 +578.955 -235.219 +1071.161 TILE       SCIENCE        0      0 106.328          
+  1   28   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +219.333 +109.554 +343.045 +577.555 -345.663 +1069.544 TILE       SCIENCE        0      0 110.455          
+** Visit 5:8
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   29   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +108.888 +107.937 +453.491 +576.154 -456.107 +1067.926 TILE       SCIENCE        0      0  0.000 (base)
+  1   30   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +110.445   +1.617 +452.144 +469.834 -454.550 +961.609 TILE       SCIENCE        0      0 106.328          
+  1   31   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000   +0.000   -0.000 +562.590 +468.433 -564.994 +959.991 TILE       SCIENCE        0      0 110.455          
+  1   32   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000   -1.557 +106.320 +563.937 +574.753 -566.550 +1066.308 TILE       SCIENCE        0      0 106.328          
+** Visit 5:9
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   33   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000   -3.114 +212.639 +565.285 +681.072 -568.106 +1172.624 TILE       SCIENCE        0      0  0.000 (base)
+  1   34   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +107.332 +214.257 +454.839 +682.473 -457.663 +1174.242 TILE       SCIENCE        0      0 110.454          
+** Visit 5:10
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   35   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +217.777 +215.874 +344.392 +683.874 -347.219 +1175.860 TILE       SCIENCE        0      0  0.000 (base)
+  1   36   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +328.222 +217.491 +233.945 +685.275 -236.776 +1177.478 TILE       SCIENCE        0      0 110.455          
+** Visit 5:11
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   37   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -113.559 +211.022 +675.731 +679.671 -678.549 +1171.006 TILE       SCIENCE        0      0  0.000 (base)
+  1   38   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -224.004 +209.405 +786.176 +678.269 -788.991 +1169.388 TILE       SCIENCE        0      0 110.454          
+** Visit 5:12
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   39   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -334.449 +207.788 +896.621 +676.867 -899.434 +1167.769 TILE       SCIENCE        0      0  0.000 (base)
+  1   40   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 -444.894 +206.171 +1007.066 +675.465 -1009.875 +1166.150 TILE       SCIENCE        0      0 110.453          
+** Visit 5:13
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   41   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +438.667 +219.108 +123.499 +686.675 -126.332 +1179.095 TILE       SCIENCE        0      0  0.000 (base)
+  1   42   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +440.224 +112.788 +122.151 +580.356 -124.775 +1072.779 TILE       SCIENCE        0      0 106.328          
+** Visit 5:14
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   43   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +441.780   +6.469 +120.803 +474.036 -123.219 +966.461 TILE       SCIENCE        0      0  0.000 (base)
+  1   44   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +443.337  -99.851 +119.455 +367.715 -121.662 +860.144 TILE       SCIENCE        0      0 106.329          
+** Visit 5:15
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   45   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 +960.000 +444.894 -206.171 +118.107 +261.394 -120.105 +753.826 TILE       SCIENCE        0      0  0.000 (base)
+
+========================================
+* SW (Obs 6)
+** Visit 6:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -438.667 -219.108 -124.536 -1672.007 +126.335 -1179.095 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -328.222 -217.491 -234.986 -1670.606 +236.782 -1177.477 TILE       SCIENCE        0      0 110.455          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -329.779 -111.171 -233.638 -1564.286 +235.225 -1071.161 TILE       SCIENCE        0      0 106.328          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -440.224 -112.788 -123.188 -1565.687 +124.778 -1072.778 TILE       SCIENCE        0      0 110.455          
+** Visit 6:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -441.780   -6.469 -121.840 -1459.367 +123.221 -966.461 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -443.337  +99.851 -120.492 -1353.047 +121.664 -860.144 TILE       SCIENCE        0      0 106.329          
+  1    7   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -332.892 +101.468 -230.941 -1351.646 +232.111 -858.526 TILE       SCIENCE        0      0 110.456          
+  1    8   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -331.335   -4.851 -232.290 -1457.966 +233.668 -964.844 TILE       SCIENCE        0      0 106.329          
+** Visit 6:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    9   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -220.890   -3.234 -342.739 -1456.565 +344.114 -963.225 TILE       SCIENCE        0      0  0.000 (base)
+  1   10   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -222.447 +103.085 -341.391 -1350.245 +342.557 -856.908 TILE       SCIENCE        0      0 106.329          
+  1   11   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -112.002 +104.703 -451.840 -1348.843 +453.003 -855.289 TILE       SCIENCE        0      0 110.456          
+  1   12   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -110.445   -1.617 -453.188 -1455.163 +454.560 -961.607 TILE       SCIENCE        0      0 106.329          
+** Visit 6:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   13   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -108.888 -107.937 -454.537 -1561.483 +456.118 -1067.924 TILE       SCIENCE        0      0  0.000 (base)
+  1   14   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -219.333 -109.554 -344.087 -1562.885 +345.671 -1069.542 TILE       SCIENCE        0      0 110.455          
+  1   15   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -217.777 -215.874 -345.436 -1669.204 +347.229 -1175.859 TILE       SCIENCE        0      0 106.328          
+  1   16   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -107.332 -214.257 -455.885 -1667.802 +457.675 -1174.240 TILE       SCIENCE        0      0 110.455          
+** Visit 6:5
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   17   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000   +3.114 -212.639 -566.334 -1666.400 +568.121 -1172.621 TILE       SCIENCE        0      0  0.000 (base)
+  1   18   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000   +1.557 -106.320 -564.986 -1560.081 +566.564 -1066.304 TILE       SCIENCE        0      0 106.328          
+  1   19   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +112.002 -104.703 -675.435 -1558.678 +677.010 -1064.685 TILE       SCIENCE        0      0 110.454          
+  1   20   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +113.559 -211.022 -676.783 -1664.997 +678.567 -1171.001 TILE       SCIENCE        0      0 106.327          
+** Visit 6:6
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   21   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +224.004 -209.405 -787.232 -1663.594 +789.013 -1169.380 TILE       SCIENCE        0      0  0.000 (base)
+  1   22   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +334.449 -207.788 -897.680 -1662.190 +899.458 -1167.760 TILE       SCIENCE        0      0 110.453          
+  1   23   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +332.892 -101.468 -896.331 -1555.871 +897.900 -1061.444 TILE       SCIENCE        0      0 106.327          
+  1   24   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +222.447 -103.085 -785.883 -1557.275 +787.455 -1063.065 TILE       SCIENCE        0      0 110.454          
+** Visit 6:7
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   25   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +220.890   +3.234 -784.534 -1450.956 +785.897 -956.748 TILE       SCIENCE        0      0  0.000 (base)
+  1   26   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +331.335   +4.851 -894.982 -1449.552 +896.342 -955.128 TILE       SCIENCE        0      0 110.454          
+  1   27   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +329.779 +111.171 -893.633 -1343.233 +894.784 -848.811 TILE       SCIENCE        0      0 106.328          
+  1   28   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +219.333 +109.554 -783.185 -1344.636 +784.340 -850.431 TILE       SCIENCE        0      0 110.454          
+** Visit 6:8
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   29   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +108.888 +107.937 -672.737 -1346.039 +673.895 -852.051 TILE       SCIENCE        0      0  0.000 (base)
+  1   30   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +110.445   +1.617 -674.086 -1452.359 +675.452 -958.368 TILE       SCIENCE        0      0 106.328          
+  1   31   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000   +0.000   -0.000 -563.637 -1453.761 +565.006 -959.988 TILE       SCIENCE        0      0 110.455          
+  1   32   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000   -1.557 +106.320 -562.289 -1347.441 +563.449 -853.670 TILE       SCIENCE        0      0 106.329          
+** Visit 6:9
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   33   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000   -3.114 +212.639 -560.940 -1241.121 +561.892 -747.353 TILE       SCIENCE        0      0  0.000 (base)
+  1   34   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +107.332 +214.257 -671.388 -1239.718 +672.337 -745.734 TILE       SCIENCE        0      0 110.455          
+** Visit 6:10
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   35   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +217.777 +215.874 -781.836 -1238.316 +782.782 -744.114 TILE       SCIENCE        0      0  0.000 (base)
+  1   36   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +328.222 +217.491 -892.284 -1236.913 +893.226 -742.494 TILE       SCIENCE        0      0 110.454          
+** Visit 6:11
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   37   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -113.559 +211.022 -450.491 -1242.523 +451.446 -748.971 TILE       SCIENCE        0      0  0.000 (base)
+  1   38   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -224.004 +209.405 -340.042 -1243.924 +341.000 -750.590 TILE       SCIENCE        0      0 110.456          
+** Visit 6:12
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   39   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -334.449 +207.788 -229.593 -1245.325 +230.554 -752.208 TILE       SCIENCE        0      0  0.000 (base)
+  1   40   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 -444.894 +206.171 -119.144 -1246.726 +120.107 -753.826 TILE       SCIENCE        0      0 110.456          
+** Visit 6:13
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   41   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +438.667 +219.108 -1002.731 -1235.510 +1003.670 -740.874 TILE       SCIENCE        0      0  0.000 (base)
+  1   42   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +440.224 +112.788 -1004.080 -1341.829 +1005.228 -847.191 TILE       SCIENCE        0      0 106.328          
+** Visit 6:14
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   43   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +441.780   +6.469 -1005.429 -1448.149 +1006.786 -953.507 TILE       SCIENCE        0      0  0.000 (base)
+  1   44   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +443.337  -99.851 -1006.778 -1554.467 +1008.344 -1059.823 TILE       SCIENCE        0      0 106.327          
+** Visit 6:15
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   45   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +565.000 -960.000 +444.894 -206.171 -1008.127 -1660.786 +1009.902 -1166.139 TILE       SCIENCE        0      0  0.000 (base)
+
+========================================
+* SE (Obs 7)
+** Visit 7:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -438.667 -219.108 +1005.472 -1669.768 -1003.676 -1179.076 TARGET     SCIENCE        0      0  0.000 (base)
+  1    2   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -328.222 -217.491 +895.025 -1668.372 -893.231 -1177.463 TILE       SCIENCE        0      0 110.453          
+  1    3   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -329.779 -111.171 +896.371 -1562.053 -894.787 -1071.147 TILE       SCIENCE        0      0 106.327          
+  1    4   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -440.224 -112.788 +1006.819 -1563.450 -1005.231 -1072.760 TILE       SCIENCE        0      0 110.453          
+** Visit 7:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    5   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -441.780   -6.469 +1008.165 -1457.131 -1006.787 -966.444 TILE       SCIENCE        0      0  0.000 (base)
+  1    6   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -443.337  +99.851 +1009.512 -1350.812 -1008.342 -860.128 TILE       SCIENCE        0      0 106.328          
+  1    7   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -332.892 +101.468 +899.065 -1349.415 -897.898 -858.514 TILE       SCIENCE        0      0 110.454          
+  1    8   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -331.335   -4.851 +897.718 -1455.734 -896.342 -964.831 TILE       SCIENCE        0      0 106.328          
+** Visit 7:3
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1    9   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -220.890   -3.234 +787.270 -1454.337 -785.897 -963.217 TILE       SCIENCE        0      0  0.000 (base)
+  1   10   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -222.447 +103.085 +788.617 -1348.018 -787.453 -856.900 TILE       SCIENCE        0      0 106.328          
+  1   11   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -112.002 +104.703 +678.169 -1346.620 -677.008 -855.285 TILE       SCIENCE        0      0 110.455          
+  1   12   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -110.445   -1.617 +676.822 -1452.940 -675.452 -961.602 TILE       SCIENCE        0      0 106.329          
+** Visit 7:4
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   13   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -108.888 -107.937 +675.475 -1559.259 -673.896 -1067.919 TILE       SCIENCE        0      0  0.000 (base)
+  1   14   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -219.333 -109.554 +785.923 -1560.657 -784.342 -1069.533 TILE       SCIENCE        0      0 110.454          
+  1   15   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -217.777 -215.874 +784.576 -1666.975 -782.786 -1175.849 TILE       SCIENCE        0      0 106.327          
+  1   16   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -107.332 -214.257 +674.128 -1665.578 -672.340 -1174.235 TILE       SCIENCE        0      0 110.454          
+** Visit 7:5
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   17   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000   +3.114 -212.639 +563.679 -1664.181 -561.894 -1172.621 TILE       SCIENCE        0      0  0.000 (base)
+  1   18   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000   +1.557 -106.320 +565.026 -1557.862 -563.450 -1066.304 TILE       SCIENCE        0      0 106.328          
+  1   19   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +112.002 -104.703 +454.577 -1556.464 -453.004 -1064.689 TILE       SCIENCE        0      0 110.455          
+  1   20   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +113.559 -211.022 +453.230 -1662.783 -451.448 -1171.006 TILE       SCIENCE        0      0 106.328          
+** Visit 7:6
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   21   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +224.004 -209.405 +342.780 -1661.384 -341.002 -1169.390 TILE       SCIENCE        0      0  0.000 (base)
+  1   22   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +334.449 -207.788 +232.331 -1659.985 -230.555 -1167.774 TILE       SCIENCE        0      0 110.455          
+  1   23   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +332.892 -101.468 +233.678 -1553.666 -232.111 -1061.458 TILE       SCIENCE        0      0 106.328          
+  1   24   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +222.447 -103.085 +344.128 -1555.065 -342.558 -1063.074 TILE       SCIENCE        0      0 110.455          
+** Visit 7:7
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   25   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +220.890   +3.234 +345.475 -1448.745 -344.114 -956.757 TILE       SCIENCE        0      0  0.000 (base)
+  1   26   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +331.335   +4.851 +235.026 -1447.346 -233.668 -955.141 TILE       SCIENCE        0      0 110.456          
+  1   27   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +329.779 +111.171 +236.374 -1341.025 -235.224 -848.823 TILE       SCIENCE        0      0 106.329          
+  1   28   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +219.333 +109.554 +346.823 -1342.425 -345.671 -850.439 TILE       SCIENCE        0      0 110.456          
+** Visit 7:8
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   29   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +108.888 +107.937 +457.272 -1343.823 -456.117 -852.055 TILE       SCIENCE        0      0  0.000 (base)
+  1   30   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +110.445   +1.617 +455.925 -1450.144 -454.561 -958.372 TILE       SCIENCE        0      0 106.329          
+  1   31   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000   +0.000   -0.000 +566.374 -1451.542 -565.007 -959.988 TILE       SCIENCE        0      0 110.455          
+  1   32   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000   -1.557 +106.320 +567.721 -1345.222 -566.563 -853.670 TILE       SCIENCE        0      0 106.329          
+** Visit 7:9
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   33   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000   -3.114 +212.639 +569.068 -1238.901 -568.119 -747.353 TILE       SCIENCE        0      0  0.000 (base)
+  1   34   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +107.332 +214.257 +458.619 -1237.503 -457.673 -745.737 TILE       SCIENCE        0      0 110.456          
+** Visit 7:10
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   35   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +217.777 +215.874 +348.171 -1236.104 -347.227 -744.121 TILE       SCIENCE        0      0  0.000 (base)
+  1   36   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +328.222 +217.491 +237.721 -1234.705 -236.781 -742.505 TILE       SCIENCE        0      0 110.456          
+** Visit 7:11
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   37   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -113.559 +211.022 +679.516 -1240.299 -678.564 -748.968 TILE       SCIENCE        0      0  0.000 (base)
+  1   38   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -224.004 +209.405 +789.964 -1241.697 -789.009 -750.582 TILE       SCIENCE        0      0 110.455          
+** Visit 7:12
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   39   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -334.449 +207.788 +900.412 -1243.095 -899.454 -752.197 TILE       SCIENCE        0      0  0.000 (base)
+  1   40   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 -444.894 +206.171 +1010.859 -1244.492 -1009.898 -753.811 TILE       SCIENCE        0      0 110.454          
+** Visit 7:13
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   41   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +438.667 +219.108 +127.272 -1233.305 -126.335 -740.888 TILE       SCIENCE        0      0  0.000 (base)
+  1   42   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +440.224 +112.788 +125.924 -1339.626 -124.778 -847.207 TILE       SCIENCE        0      0 106.330          
+** Visit 7:14
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   43   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +441.780   +6.469 +124.577 -1445.946 -123.221 -953.524 TILE       SCIENCE        0      0  0.000 (base)
+  1   44   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +443.337  -99.851 +123.229 -1552.266 -121.665 -1059.842 TILE       SCIENCE        0      0 106.329          
+** Visit 7:15
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist           
+  1   45   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 -565.000 -960.000 +444.894 -206.171 +121.881 -1658.586 -120.108 -1166.158 TILE       SCIENCE        0      0  0.000 (base)
+
+

@@ -127,8 +127,8 @@ class PointSourceCatalog():
         if instrument == '' or filter_name == '':
             header = 'magnitude'
         else:
-            if 'guider' in instrument.lower():
-                header = '{}_magnitude'.format(instrument)
+            if instrument.lower() in ['fgs1', 'fgs2']:
+                header = '{}_magnitude'.format(instrument.lower())
             else:
                 header = '{}_{}_magnitude'.format(instrument, filter_name)
 
@@ -171,7 +171,7 @@ class PointSourceCatalog():
                 raise ValueError("WARNING: {} is not a valid filter for {}.".format(filt_name,
                                                                                     inst_name.upper()))
         if inst_name == 'fgs':
-            if filt_name not in ['', 'na']:
+            if filt_name.lower() not in ['guider1', 'guider2']:
                 raise ValueError("WARNING: {} is not a valid filter for FGS.".format(filt_name))
 
     def instrument_check(self, inst_name):
