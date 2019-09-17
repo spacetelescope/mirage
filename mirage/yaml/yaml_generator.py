@@ -417,7 +417,7 @@ class SimInput:
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
-        pixelflat_arr = deepcopy(emnpty_col)
+        pixelflat_arr = deepcopy(empty_col)
 
         # Loop over combinations, create metadata dict, and get reffiles
         for status in unique_obs_info:
@@ -453,7 +453,7 @@ class SimInput:
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
-        self.info['pixelflat'] = list(pielflat_arr)
+        self.info['pixelflat'] = list(pixelflat_arr)
 
     def catalog_match(self, filter, pupil, catalog_list, cattype):
         """
