@@ -188,6 +188,9 @@ FGS_LINEARIZED_DARK_URLS = [('https://stsci.box.com/shared/static/6y0rsqgongmyp9
                             ('https://stsci.box.com/shared/static/jq206o2pm5ydud1xidxyurcf74zwuzb2.gz', '30749_1x88_FGSF03881-PAR-5347043800_1_497_SE_2015-12-13T09h02m01_dms_uncal_linearized.fits.gz'),
                             ('https://stsci.box.com/shared/static/kai7ms09pvbfm5zdr079gss27ki3j6qd.gz', '30829_1x88_FGSF037111-G1NRNC-5347151640_1_497_SE_2015-12-13T16h28m38_dms_uncal_linearized.fits.gz')]
 
+DISK_USAGE = {'nircam': {'crs': 1.1, 'psfs': 23, 'raw_darks': 79, 'lin_darks': 319},
+              'niriss': {'crs': 0.26, 'psfs': 0.87, 'raw_darks': 31, 'lin_darks': 121},
+              'fgs': {'crs': 0.31, 'psfs': .04, 'raw_darks': 11, 'lin_darks': 39}}
 
 def download_file(url, file_name, output_directory='./'):
     """Download into the current working directory the
@@ -370,6 +373,7 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
         (URL for downloading, name of file)
     """
     urls = []
+    total_download_size = 0.
     instrument_names = [name.strip().lower() for name in instruments.split(',')]
 
     if 'all' in instrument_names:
@@ -381,43 +385,81 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
 
             if not skip_cosmic_rays:
                 urls.extend(NIRCAM_CR_LIBRARY_URL)
+                added_size = DISK_USAGE['nircam']['crs']
+                total_download_size += added_size
+                print('Size of NIRCam cosmic ray library file: {} Gb'.format(added_size))
 
             if not skip_psfs:
                 urls.extend(NIRCAM_GRIDDED_PSF_URLS)
+                added_size = DISK_USAGE['nircam']['psfs']
+                total_download_size += added_size
+                print('Size of NIRCam PSF library file: {} Gb'.format(added_size))
 
             if not skip_darks:
                 if dark_current in ['linearized', 'both']:
                     urls.extend(NIRCAM_LINEARIZED_DARK_URLS)
+                    added_size = DISK_USAGE['nircam']['lin_darks']
+                    total_download_size += added_size
+                    print('Size of NIRCam linearized dark files: {} Gb'.format(added_size))
                 elif dark_current in ['raw', 'both']:
                     urls.extend(NIRCAM_RAW_DARK_URLS)
+                    added_size = DISK_USAGE['nircam']['raw_darks']
+                    total_download_size += added_size
+                    print('Size of NIRCam raw dark files: {} Gb'.format(added_size))
 
         # NIRISS
         elif instrument_name.lower() == 'niriss':
             if not skip_cosmic_rays:
                 urls.extend(NIRISS_CR_LIBRARY_URL)
+                added_size = DISK_USAGE['niriss']['crs']
+                total_download_size += added_size
+                print('Size of NIRISS cosmic ray library file: {} Gb'.format(added_size))
 
             if not skip_psfs:
                 urls.extend(NIRISS_GRIDDED_PSF_URLS)
+                added_size = DISK_USAGE['niriss']['psfs']
+                total_download_size += added_size
+                print('Size of NIRISS PSF library file: {} Gb'.format(added_size))
 
             if not skip_darks:
                 if dark_current in ['linearized', 'both']:
                     urls.extend(NIRISS_LINEARIZED_DARK_URLS)
+                    added_size = DISK_USAGE['niriss']['lin_darks']
+                    total_download_size += added_size
+                    print('Size of NIRISS linearized dark files: {} Gb'.format(added_size))
                 elif dark_current in ['raw', 'both']:
                     urls.extend(NIRISS_RAW_DARK_URLS)
+                    added_size = DISK_USAGE['niriss']['raw_darks']
+                    total_download_size += added_size
+                    print('Size of NIRISS raw dark files: {} Gb'.format(added_size))
 
         # FGS
         elif instrument_name.lower() == 'fgs':
             if not skip_cosmic_rays:
                 urls.extend(FGS_CR_LIBRARY_URL)
+                added_size = DISK_USAGE['fgs']['crs']
+                total_download_size += added_size
+                print('Size of FGS cosmic ray library file: {} Gb'.format(added_size))
 
             if not skip_psfs:
                 urls.extend(FGS_GRIDDED_PSF_URLS)
+                added_size = DISK_USAGE['fgs']['fgs']
+                total_download_size += added_size
+                print('Size of FGS PSF library file: {} Gb'.format(added_size))
 
             if not skip_darks:
                 if dark_current in ['linearized', 'both']:
                     urls.extend(FGS_LINEARIZED_DARK_URLS)
+                    added_size = DISK_USAGE['fgs']['lin_darks']
+                    total_download_size += added_size
+                    print('Size of FGS linearized dark files: {} Gb'.format(added_size))
                 elif dark_current in ['raw', 'both']:
                     urls.extend(FGS_RAW_DARK_URLS)
+                    added_size = DISK_USAGE['fgs']['raw_darks']
+                    total_download_size += added_size
+                    print('Size of FGS raw dark files: {} Gb'.format(added_size))
+
+    print("Total size of files to be downloaded: {} Gb".format(total_download_size))
     return urls
 
 
