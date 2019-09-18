@@ -204,6 +204,8 @@ def download_file(url, file_name, output_directory='./'):
         Name of the downloaded file
     """
     download_filename = os.path.join(output_directory, file_name)
+
+    # Only download the file if it doesn't already exist
     if not os.path.isfile(download_filename):
         print('Downloading: {}'.format(file_name))
         with requests.get(url, stream=True) as response:
@@ -213,10 +215,14 @@ def download_file(url, file_name, output_directory='./'):
                 for chunk in response.iter_content(chunk_size=2048):
                     if chunk:
                         f.write(chunk)
+        print('Download of {} complete.'.format(file_name))
+    else:
+        print('{} already exists. Skipping download.'.format(file_name))
     return download_filename
 
 
-def download_reffiles(directory, instrument='all', dark_type='linearized'):
+def download_reffiles(directory, instrument='all', dark_type='linearized',
+                      skip_darks=False, skip_cosmic_rays=False, skip_psfs=False):
     """Download tarred and gzipped reference files. Expand, unzip and
     organize into the necessary directory structure such that Mirage
     can use them.
@@ -244,15 +250,30 @@ def download_reffiles(directory, instrument='all', dark_type='linearized'):
         'linearized': download linearize dark current ramps
         'raw': download raw dark current ramps
         'both': download both raw and linearized dark current ramps
+
+    skip_darks : bool
+        If False (default), download the requested darks. If True,
+        do not download the darks
+
+    skip_comsic_rays : bool
+        If False (default), download the requested cosmic ray libraries.
+        If True, do not download the cosmic ray library.
+
+    skip_psfs : bool
+        If False (default), download the requested PSF libraries.
+        If True, do not download the libraries.
     """
     # Be sure the input instrument is a list
-    file_list = get_file_list(instrument.lower(), dark_type.lower())
+    file_list = get_file_list(instrument.lower(), dark_type.lower(),
+                              skip_darks=skip_darks,
+                              skip_cosmic_rays=skip_cosmic_rays,
+                              skip_psfs=skip_psfs)
 
     # Download everything first
     for file_info in file_list:
         file_url, filename = file_info
-        download_file(file_url, filename, directory)
         local_file = os.path.join(directory, filename)
+        download_file(file_url, filename, directory)
 
     # Now untar/organize. This way if the download is interrupted, it can
     # pick up where it left off, since no downloaded files will have been
@@ -279,11 +300,11 @@ def download_reffiles(directory, instrument='all', dark_type='linearized'):
                     det_str.replace('LONG', '5')
                 darks_dir = os.path.join(directory, 'mirage_data', 'nircam', 'darks')
                 sub_directory = os.path.join(darks_dir, cal, det_str)
-            elif 'niriss' in filename.lower():
+            elif 'NIRISS' in filename.lower():
                 darks_dir = os.path.join(directory, 'mirage_data', 'niriss', 'darks')
                 sub_directory = os.path.join(darks_dir, cal)
                 #sub_directory = os.path.join(directory, 'mirage_data', 'niriss', 'darks', cal)
-            elif 'fgs' in filename:
+            elif 'FGS' in filename:
                 darks_dir = os.path.join(directory, 'mirage_data', 'fgs', 'darks')
                 sub_directory = os.path.join(darks_dir, cal)
 
@@ -302,17 +323,20 @@ def download_reffiles(directory, instrument='all', dark_type='linearized'):
             # Unzip
             unzipped_filename = final_location.replace('.gz', '')
             if not os.path.isfile(unzipped_filename):
-                print('Unzipping {}'.format(filename))
                 unzip_file(final_location)
+            else:
+                print('Unzipped file {} already exists. Skipping unzip.'.format(unzipped_filename))
 
-    print(('Mirage reference files downloaded and extracted. Before '
+    full_dir = os.path.abspath(directory)
+    print(('Mirage reference files downloaded and extracted. \nBefore '
            'using Mirage, be sure to set the MIRAGE_DATA environment '
-           'variable to point to {}/mirage_data'.format(directory)))
-    print('\n In bash: ')
-    print('export MIRAGE_DATA="{}"'.format(os.path.join(directory, 'mirage_data')))
+           'variable to point to:\n{}/mirage_data'.format(full_dir)))
+    print('In bash: ')
+    print('export MIRAGE_DATA="{}"'.format(os.path.join(full_dir, 'mirage_data')))
 
 
-def get_file_list(instruments, dark_current):
+def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=False,
+                  skip_psfs=False):
     """Collect the list of URLs corresponding to the Mirage reference
     files to be downloaded
 
@@ -326,6 +350,18 @@ def get_file_list(instruments, dark_current):
         'linearized': download linearize dark current ramps
         'raw': download raw dark current ramps
         'both': download both raw and linearized dark current ramps
+
+    skip_darks : bool
+        If False (default), include the requested darks. If True,
+        do not include the darks
+
+    skip_comsic_rays : bool
+        If False (default), include the requested cosmic ray libraries.
+        If True, do not include the cosmic ray library.
+
+    skip_psfs : bool
+        If False (default), include the requested PSF libraries.
+        If True, do not include the libraries.
 
     Returns
     -------
@@ -342,33 +378,46 @@ def get_file_list(instruments, dark_current):
     for instrument_name in instrument_names:
         # NIRCam
         if instrument_name.lower() == 'nircam':
-            urls.extend(NIRCAM_CR_LIBRARY_URL)
-            urls.extend(NIRCAM_GRIDDED_PSF_URLS)
 
-            if dark_current in ['linearized', 'both']:
-                urls.extend(NIRCAM_LINEARIZED_DARK_URLS)
-            elif dark_current in ['raw', 'both']:
-                urls.extend(NIRCAM_RAW_DARK_URLS)
+            if not skip_cosmic_rays:
+                urls.extend(NIRCAM_CR_LIBRARY_URL)
+
+            if not skip_psfs:
+                urls.extend(NIRCAM_GRIDDED_PSF_URLS)
+
+            if not skip_darks:
+                if dark_current in ['linearized', 'both']:
+                    urls.extend(NIRCAM_LINEARIZED_DARK_URLS)
+                elif dark_current in ['raw', 'both']:
+                    urls.extend(NIRCAM_RAW_DARK_URLS)
 
         # NIRISS
         elif instrument_name.lower() == 'niriss':
-            urls.extend(NIRISS_CR_LIBRARY_URL)
-            urls.extend(NIRISS_GRIDDED_PSF_URLS)
+            if not skip_cosmic_rays:
+                urls.extend(NIRISS_CR_LIBRARY_URL)
 
-            if dark_current in ['linearized', 'both']:
-                urls.extend(NIRISS_LINEARIZED_DARK_URLS)
-            elif dark_current in ['raw', 'both']:
-                urls.extend(NIRISS_RAW_DARK_URLS)
+            if not skip_psfs:
+                urls.extend(NIRISS_GRIDDED_PSF_URLS)
+
+            if not skip_darks:
+                if dark_current in ['linearized', 'both']:
+                    urls.extend(NIRISS_LINEARIZED_DARK_URLS)
+                elif dark_current in ['raw', 'both']:
+                    urls.extend(NIRISS_RAW_DARK_URLS)
 
         # FGS
         elif instrument_name.lower() == 'fgs':
-            urls.extend(NIRISS_CR_LIBRARY_URL)
-            urls.extend(FGS_GRIDDED_PSF_URLS)
+            if not skip_cosmic_rays:
+                urls.extend(FGS_CR_LIBRARY_URL)
 
-            if dark_current in ['linearized', 'both']:
-                urls.extend(FGS_LINEARIZED_DARK_URLS)
-            elif dark_current in ['raw', 'both']:
-                urls.extend(FGS_RAW_DARK_URLS)
+            if not skip_psfs:
+                urls.extend(FGS_GRIDDED_PSF_URLS)
+
+            if not skip_darks:
+                if dark_current in ['linearized', 'both']:
+                    urls.extend(FGS_LINEARIZED_DARK_URLS)
+                elif dark_current in ['raw', 'both']:
+                    urls.extend(FGS_RAW_DARK_URLS)
     return urls
 
 
@@ -385,7 +434,16 @@ def unzip_file(filename):
     """
     if not os.path.isfile(filename):
         print('File {} does not exist.'.format(filename))
+    print('Unzipping {}'.format(filename))
     with gzip.open(filename, 'rb') as file_in:
         unzipped_name = filename.replace('.gz', '')
         with open(unzipped_name, 'wb') as file_out:
             shutil.copyfileobj(file_in, file_out)
+
+
+#if __name__ == '__main__':
+#      params = parse_args()
+#
+#      download_reffiles(directory, instrument=instrument, dark_type=dark_type,
+#                        skip_darks=skip_darks, skip_cosmic_rays=skip_cosmic_rays,
+#                        skip_psfs=skip_psfs)
