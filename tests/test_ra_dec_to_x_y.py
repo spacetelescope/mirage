@@ -309,7 +309,7 @@ def test_locations():
         dec_list.append(dec_entry)
 
     xy_vals = {}
-    instrument_list = ['nircam', 'niriss', 'fgs']
+    instrument_list = ['niriss', 'fgs']
 
     for instrument in instrument_list:
         siaf = siaf_interface.get_instance(instrument)
