@@ -34,10 +34,15 @@ For example:
 CRDS Environment Variables
 --------------------------
 
-In addition to the MIRAGE_DATA environment variable, there are two env
+In addition to the MIRAGE_DATA environment variable, there are two environment variables required by the `Calibration References Data System <https://hst-crds.stsci.edu/static/users_guide/overview.html>`_ (CRDS) that should be set. These will be used when Mirage queries CRDS for the appropriate JWST calibration reference files for the observations being simulated. While setting these environment variables before running Mirage is not strictly required, it is recommended in order to avoid confusion when CRDS is queried. The two environment variables are `CRDS_PATH <https://hst-crds.stsci.edu/static/users_guide/environment.html?#user-local-crds-path>`_ and `CRDS_SERVER_URL <https://hst-crds.stsci.edu/static/users_guide/environment.html?#jwst-ops-server>`_. CRDS_PATH should be set to the directory where you would like JWST calibration reference files to be stored. If not set, Mirage will set this to the CRDS default location of $HOME/crds_cache. CRDS_SERVER_URL must be set to the value below.
+
+::
+
+  export CRDS_PATH=$HOME/crds_cache
+  export CRDS_SERVER_URL=https://jwst-crds.stsci.edu
 
 
 Reference File Contents
 -----------------------
 
-There are four main groups of reference files for each instrument: dark current exposures, a PSF library, a cosmic ray library. Note that users are able to run Mirage with alternate reference files. For example, if a specific science case requires larger PSFs, the user can create a new PSF library and replace the downloaded PSF library, or simply update the ``psf_path`` entry in their Mirage input yaml files to point to the new library.
+There are three main groups of reference files for each instrument: dark current exposures, a PSF library, a cosmic ray library. Note that users can run Mirage with alternate reference files. For example, if a specific science case requires larger PSFs, the user can create a new PSF library and replace the downloaded PSF library, or simply update the ``psf_path`` entry in their Mirage input yaml files to point to the new library. Similarly, to use a non-standard JWST calibration reference file, the appropriate entry in the yaml input file can be changed to point to the new reference file.

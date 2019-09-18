@@ -14,9 +14,9 @@ The first task performed in the observation generator is to translate the seed i
 Add Cosmic Rays
 ---------------
 
-Cosmic rays are then added to the seed exposure. Cosmic ray details are controlled through the entries in the `cosmicRay` section of the input yaml file. The user must provide a pointer to the location of the cosmic ray library. The cosmic ray libraries that are included in *Mirage's* :ref:`reference files <>` are based on the cosmic ray library created by Massimo Robberto, which is detailed in his `2009 technical report <https://jwst.stsci.edu/files/live/sites/jwst/files/home/instrumentation/technical%20documents/JWST-STScI-001928.pdf>`_.
+Cosmic rays are then added to the seed exposure. Cosmic ray details are controlled through the entries in the `cosmicRay` section of the input yaml file. The user must provide a pointer to the location of the cosmic ray library. The cosmic ray libraries that are included in *Mirage's* :ref:`reference files <reference_files>` are based on the cosmic ray library created by Massimo Robberto, which is detailed in his `2009 technical report <https://jwst.stsci.edu/files/live/sites/jwst/files/home/instrumentation/technical%20documents/JWST-STScI-001928.pdf>`_.
 
-Three separate cosmic ray libraries are provided in the reference file collection. These libraries are accessed using the :ref:`cosmicRay:library <cr_library>` yaml file entry. The three options are **SUNMIN**, **SUNMAX**, and **FLARE**. Each library has an associated cosmic ray rate, shown below. Users can modify these rates through the multiplicative factor specified in the `cosmicRay:scale` entry.
+Three separate cosmic ray libraries are provided in the reference file collection. These libraries are accessed using the :ref:`cosmicRay:library <library>` yaml file entry. The three options are **SUNMIN**, **SUNMAX**, and **FLARE**. Each library has an associated cosmic ray rate, shown below. Users can modify these rates through the multiplicative factor specified in the `cosmicRay:scale` entry.
 
 Default cosmic ray rates (cosmic rays / pixel / second):
 
