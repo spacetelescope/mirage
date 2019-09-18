@@ -23,7 +23,7 @@ import numpy as np
 
 import pysiaf
 from pysiaf import iando
-from pysiaf.constants import JWST_DELIVERY_DATA_ROOT
+#from pysiaf.constants import JWST_DELIVERY_DATA_ROOT
 from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
@@ -41,14 +41,15 @@ def get_instance(instrument):
     siaf : pysiaf.Siaf
         Siaf object for the requested instrument
     """
-    if instrument.lower() == 'nircam':
-        print("NOTE: Using pre-delivery SIAF data for {}".format(instrument))
-        siaf_instrument = 'NIRCam'
-        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
-        siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)
-    else:
-        siaf_instrument = instrument
-        siaf = pysiaf.Siaf(siaf_instrument)
+    #if instrument.lower() == 'nircam':
+    #    print("NOTE: Using pre-delivery SIAF data for {}".format(instrument))
+    #    siaf_instrument = 'NIRCam'
+    #    pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
+    #    siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)
+    #else:
+    #    siaf_instrument = instrument
+    #    siaf = pysiaf.Siaf(siaf_instrument)
+    siaf = pysiaf.Siaf(instrument)
     return siaf
 
 
@@ -152,7 +153,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     """
     # get SIAF
     if siaf is None:
-        siaf = pysiaf.Siaf(instrument)
+        siaf = get_instance(instrument)
 
     # get master aperture names
     siaf_detector_layout = iando.read.read_siaf_detector_layout()
