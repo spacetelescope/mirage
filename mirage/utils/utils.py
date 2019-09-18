@@ -25,7 +25,7 @@ import re
 
 from astropy.io import ascii as asc
 
-from mirage.utils.constants import CRDS_FILE_TYPES
+from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS
 
 
 def append_dictionary(base_dictionary, added_dictionary, braid=False):
@@ -152,6 +152,51 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
 
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
+
+def check_niriss_filter(oldfilter,oldpupil):
+    """
+    This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
+    filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and
+    pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil
+    parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a
+    parameter file with FILTER = F277W and PUPIL = CLEAR or FILTER = F090W and PUPIL = CLEAR for imaging and either will
+    produce the desired result although the actual pairings would be F277W/CLEARP and CLEAR/F090W respectively.
+
+    The code also corrects CLEARP to CLEAR if needed.
+
+    Parameters:
+
+    oldfilter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
+
+    oldpupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+
+    Return values:
+
+    newfilter:   a string value, the proper FILTER parameter for the requested NIRISS filter name
+
+    newpupil:    a string value, the proper PUPIL parameter for the requested NIRISS filter name
+
+    Note that this routine should only be called when the instrument is NIRISS.
+    """
+    str1 = oldfilter
+    str2 = oldpupil
+    if oldfilter in NIRISS_PUPIL_WHEEL_FILTERS:
+        newfilter = str2
+        newpupil = str1
+        if newfilter == 'CLEARP':
+            newfilter = 'CLEAR'
+    if oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
+        if oldpupil == 'CLEAR':
+            newpupil = 'CLEARP'
+        else:
+            newpupil = oldpupil
+        newfilter = oldfilter
+    else:
+        # Case where oldfilter is an optic other than a filter (e.g. a grism)
+        newfilter = oldfilter
+        newpupil = oldpupil
+    return newfilter, newpupil
 
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
