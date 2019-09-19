@@ -1557,7 +1557,11 @@ class ReadAPTXML():
             sdither_type_grism = 'None'
             sdither_grism = '1'
             # Dither size can be SMALL, MEDIUM, LARGE. Only look for this if NIRISS is prime
-            pdither_type_grism = template.find(ns + 'DitherSize').text
+            #pdither_type_grism = template.find(ns + 'DitherSize').text
+            try:
+                pdither_type_grism = template.find(ns + 'PrimaryDitherType').text
+            except AttributeError:
+                pdither_type_grism = 'None'
 
             # Can be various types
             # WFSS stand-alone observation or WFSS as parallel to NIRCam prime imaging:

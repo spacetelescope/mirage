@@ -7,6 +7,42 @@ The easiest way to simulate a large amount of obsrvtions using Mirage is to begi
 
 Examples of this functionality are shown in the `notebooks <https://github.com/spacetelescope/mirage/tree/master/examples>`_ in the *Mirage* repository. Below are step-by-step instructions explaining how to create *Mirage* input yaml files from an APT file.
 
+
+.. important::
+
+    Currently Mirage is able to parse the following APT templates. Mirage will fail if your APT file contains observations using a template not on this list.
+
+    +---------------------------------------------------------------+
+    |                            NIRCAM                             |
+    +===============================================================+
+    |NircamImaging, NircamWfss, NircamEngineeringImaging, NircamDark|
+    +---------------------------------------------------------------+
+
+    +---------------------------------------------------------------+
+    |NIRISS                                                         |
+    +===============================================================+
+    |NirissExternalCalibration, NirissWfss, NirissAmi, NirissDark   |
+    +---------------------------------------------------------------+
+
+    +---------------------------------------------------------------+
+    |FGS                                                            |
+    +===============================================================+
+    |FgsExternalCalibration                                         |
+    +---------------------------------------------------------------+
+
+    +---------------------------------------------------------------+
+    |Other Instruments (for proposals with parallel observations)   |
+    +===============================================================+
+    |NirspecImaging, NirspecInternalLamp, MiriMRS                   |
+    +---------------------------------------------------------------+
+
+    +--------------------------------------------------------------------------+
+    |Wavefront Sensing and Control                                             |
+    +==========================================================================+
+    |WfscCommissioning, WfscGlobalAlignment, WfscCoarsePhasing, WfscFinePhasing|
+    +--------------------------------------------------------------------------+
+
+
 Export XML and Pointing files from APT
 --------------------------------------
 Open the proposal within APT and under the File menu, choose Export, and select the xml and pointing files. Only one file at a time can be exported, so the process must be repeated for each.

@@ -33,6 +33,7 @@ import random
 import copy
 from math import radians
 import datetime
+import warnings
 
 import yaml
 import pkg_resources
@@ -2085,7 +2086,13 @@ class Observation():
         compcode = 0
         comptext = 'Normal Completion'
         numgap = 0
-        baseday = Time('2000-01-01T00:00:00')
+
+        # Ignore warnings as astropy.time.Time will give a warning
+        # related to unknown leap seconds if the date is too far in
+        # the future.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            baseday = Time('2020-01-01T00:00:00')
 
         # Integration start times
         rampdelta = TimeDelta(ramptime, format='sec')
@@ -2477,9 +2484,14 @@ class Observation():
         dims = outModel.data.shape
         dtor = radians(1.)
 
-        current_time = datetime.datetime.utcnow()
-        start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
-        ct = Time(start_time_string)
+        # Ignore warnings as astropy.time.Time will give a warning
+        # related to unknown leap seconds if the date is too far in
+        # the future.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            current_time = datetime.datetime.utcnow()
+            start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
+            ct = Time(start_time_string)
 
         outModel.meta.date = start_time_string
         outModel.meta.telescope = 'JWST'
@@ -2643,8 +2655,10 @@ class Observation():
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel.data.shape
-        outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, rampexptime,
-                                                   n_int, n_group, n_y, n_x)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, rampexptime,
+                                                       n_int, n_group, n_y, n_x)
 
         outModel.save(filename)
 
@@ -2751,9 +2765,14 @@ class Observation():
         dims = outModel[1].data.shape
         dtor = radians(1.)
 
-        current_time = datetime.datetime.utcnow()
-        start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
-        ct = Time(start_time_string)
+        # Ignore warnings as astropy.time.Time will give a warning
+        # related to unknown leap seconds if the date is too far in
+        # the future.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            current_time = datetime.datetime.utcnow()
+            start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
+            ct = Time(start_time_string)
 
         outModel[0].header['DATE'] = start_time_string
         outModel[0].header['TELESCOP'] = 'JWST'
@@ -2919,8 +2938,10 @@ class Observation():
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
-        outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], rampexptime,
-                                                               n_int, n_group, n_y, n_x)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], rampexptime,
+                                                                   n_int, n_group, n_y, n_x)
         outModel.writeto(filename, overwrite=True)
         return filename
 
