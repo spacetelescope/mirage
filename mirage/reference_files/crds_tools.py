@@ -180,6 +180,8 @@ def get_reffiles(parameter_dict, reffile_types, download=True):
         except CrdsLookupError as e:
             raise ValueError("ERROR: CRDSLookupError when trying to find reference files for parameters: {}".format(parameter_dict))
         for key, value in reffile_mapping.items():
+            if "NOT FOUND" in value:
+                raise ValueError("ERROR: No {} reference file found when using parameter dictionary: {}".format(key, parameter_dict))
             instrument = value.split('_')[1]
             reffile_mapping[key] = os.path.join(crds_path, 'references/jwst', instrument, value)
 

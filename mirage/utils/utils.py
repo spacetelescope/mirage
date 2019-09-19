@@ -193,7 +193,7 @@ def check_niriss_filter(oldfilter,oldpupil):
         newpupil = str1
         if newfilter == 'CLEARP':
             newfilter = 'CLEAR'
-    if oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
+    elif oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
         if oldpupil == 'CLEAR':
             newpupil = 'CLEARP'
         else:

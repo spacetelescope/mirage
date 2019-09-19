@@ -134,6 +134,7 @@ def test_reffile_crds_full_name():
                                              'nrcb4': {'f150w': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.fits'}}}},
                                     'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                                    'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
+                                    'pixelflat': {'nrcb5': {'f322w2': {'clear': 'my_reffiles/my_flatfield_for_b5.fits'}}}
                                     },
                          'niriss': {'superbias': {'nisrapid': 'my_niriss_supebias.fits'},
                                     'linearity': 'my_niriss_linearity,fits',
@@ -141,7 +142,8 @@ def test_reffile_crds_full_name():
                                     'gain': 'my_niriss_gain.fits',
                                     'distortion': {'F115W': {'nis_image': 'my_niriss_disotrtion.asdf'}},
                                     'area': {'clear': {'f115w': {'nis_image': 'my_niriss_area.fits'}}},
-                                    'badpixmask': 'my_niriss_badpixmask.fits'
+                                    'badpixmask': 'my_niriss_badpixmask.fits',
+                                    'pixelflat': {'clear': {'f115w': 'my_niriss_flatfield.fits'}}
                                     }
                          }
 
@@ -178,10 +180,12 @@ def test_reffile_crds_full_name():
     match_nrc_lw_common = np.where(detectors == 'B5')[0]
     match_nrc_sw_distortion_area = np.where((sw_filternames == 'F150W') & (detectors == 'B4') & (sw_pupilnames == 'CLEAR'))[0]
     match_nrc_lw_distortion_area = np.where((lw_filternames == 'F322W2') & (detectors == 'B5') & (lw_pupilnames == 'CLEAR'))[0]
+    match_nrc_lw_flat = np.where((lw_filternames == 'F322W2') & (detectors == 'B5') & (lw_pupilnames == 'CLEAR'))[0]
 
     match_nis_superbias = np.where(read_patterns == 'NISRAPID')[0]
     match_nis_common = np.where(instruments == 'NIRISS')[0]
     match_nis_distortion_area = np.where((pupilnames == 'F115W') & (instruments == 'NIRISS') & (filternames == 'CLEAR'))[0]
+    match_nis_flat = np.where((pupilnames == 'F115W') & (instruments == 'NIRISS') & (filternames == 'CLEAR'))[0]
 
     # Check that reference files that are covered by reffile_overrides
     # are equal to the override values.
@@ -205,6 +209,8 @@ def test_reffile_crds_full_name():
     for index in match_nrc_lw_distortion_area:
         assert yam.info['astrometric'][index] == 'my_reffiles/my_distortion_for_b5.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_reffiles/my_pam_for_b5.fits'
+    for index in match_nrc_lw_flat:
+        assert yam.info['pixelflat'][index] == 'my_reffiles/my_flatfield_for_b5.fits'
 
     for index in match_nis_superbias:
         assert yam.info['superbias'][index] == 'my_niriss_supebias.fits'
@@ -216,6 +222,8 @@ def test_reffile_crds_full_name():
     for info in match_nis_distortion_area:
         assert yam.info['astrometric'][index] == 'my_niriss_disotrtion.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_niriss_area.fits'
+    for info in match_nis_flat:
+        assert yam.info['pixelflat'][index] == 'my_niriss_flatfield.fits'
 
     # Check that reference files covered by reffile_overrides contain
     # the CRDS_PATH, which here has been set to the temp directory

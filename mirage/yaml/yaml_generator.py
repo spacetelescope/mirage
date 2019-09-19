@@ -1691,7 +1691,7 @@ class SimInput:
             if instrument == 'nircam':
                 files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][detector][filtername][pupilname]
             elif instrument == 'niriss':
-                files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][detector][filtername][pupilname]
+                files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][filtername][pupilname]
             elif instrument == 'fgs':
                 files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][detector][exptype]
         except KeyError:
