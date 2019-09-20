@@ -15,15 +15,15 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    reference_files.rst
    catalogs.rst
    catalog_creation.rst
+   yaml_generator.rst
+   example_yaml.rst
+   imaging_simulations.rst
+   wfss_simulations.rst
    three_steps.rst
    seed_images.rst
    dark_preparation.rst
    observation_generator.rst
-   yaml_generator.rst
-   example_yaml.rst
-   wfss_simulations.rst
-   quickstart.ipynb
-   api.rst
+..   api.rst
 
 
 Contributors
