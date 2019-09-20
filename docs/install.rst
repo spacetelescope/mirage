@@ -107,7 +107,7 @@ Reference Files and MIRAGE_DATA Environment Variable
 ----------------------------------------------------
 
 In addition to the code itself, there is a set of reference files that accompany Mirage, and are necessary for Mirage to function. These
-files include dark current ramps, grism throughput curves, cosmic ray and PSF libraries.
+files include dark current ramps and cosmic ray and PSF libraries.
 
 Instructions for downloading the reference files are provided on the :ref:`reference files <reference_files>` page.
 
