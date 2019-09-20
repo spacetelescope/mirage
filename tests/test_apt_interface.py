@@ -67,7 +67,8 @@ def test_observation_list_generation_minimal(temporary_directory):
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         apt_file_seed = '1087_minimal'
         source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
-        catalogs[instrument.lower()] = source_list_file_name
+        catalogs = {}
+        catalogs['point_source'] = source_list_file_name
 
     # Write observationlist.yaml
     observation_list_file = os.path.join(temporary_directory, '{}_observation_list.yaml'.format(instrument.lower()))
@@ -86,37 +87,47 @@ def test_complete_input_generation(temporary_directory):
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['com1093', '1087_minimal', '1088', '1087', 'm31_field_test_observation']
-            # apt_file_seeds = ['com1093']
+            #targets = [need target list]
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'NIRCam':
             apt_file_seeds = ['1069', '1144-OTE-10', 'NIRCamTest']
+            #targets = [need target list]
             source_list_file_name = os.path.join(apt_dir, 'seed_im_from_catalog_test_ptsrc_catalog.list')
         elif instrument == 'NIRSpec':
             apt_file_seeds = ['1164']
+            #targets = [need target list]
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'MIRI':
             apt_file_seeds = ['1171']
+            #targets = [need target list]
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
         elif instrument == 'FGS':
             apt_file_seeds = ['MIRAGE-test']
+            #targets = [need target list]
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
         elif instrument == 'misc':
             apt_xml_files = glob.glob(os.path.join(apt_dir, '*/*.xml'))
             apt_file_seeds = [f.split(apt_dir)[1] for f in apt_xml_files]
+            #targets = [need target list]
             source_list_file_name = os.path.join(apt_dir, 'niriss_point_sources.list')
 
-        catalogs = {}
-        for instrument_name in 'fgs nircam niriss miri nirspec'.split():
-            if instrument_name.lower() == 'nircam':
-                catalogs[instrument_name.lower()] = {}
-                catalogs[instrument_name.lower()]['sw'] = source_list_file_name
-                catalogs[instrument_name.lower()]['lw'] = source_list_file_name
-            else:
-                catalogs[instrument_name.lower()] = source_list_file_name
+        #catalogs = {}
+        #for instrument_name in 'fgs nircam niriss miri nirspec'.split():
+        #    if instrument_name.lower() == 'nircam':
+        #        catalogs[instrument_name.lower()] = {}
+        #        catalogs[instrument_name.lower()]['sw'] = source_list_file_name
+        #        catalogs[instrument_name.lower()]['lw'] = source_list_file_name
+        #    else:
+        #        catalogs[instrument_name.lower()] = source_list_file_name
 
         for i, apt_file_seed in enumerate(apt_file_seeds):
             print('\n\n' + '=' * 100 + '\n')
+
+            #target = targets[i]
+            #catalogs = {}
+            #catalogs[target]['point_source'] = source_list_file_name
+            catalogs = None
 
             # For the moment, skip tests that contain NirissImaging observations
             # or that take too long for Travis
@@ -197,7 +208,13 @@ def test_xml_reader():
 
     for program in programs_to_test:
         apt_dir = os.path.join(TEST_DATA_DIR, 'misc/{}'.format(program))
-        xml_filename = glob.glob(os.path.join(apt_dir, '*.xml'))[0]
+        if program == '54321':
+            xml_filename = '54321_niriss_wfss_prime_nircam_imaging_parallel.xml'
+        elif program == '12345':
+            xml_filename = '12345_nircam_imaging_prime_niriss_wfss_parallel.xml'
+        elif program == '08888':
+            xml_filename = '08888_niriss_nircam_wfss.xml'
+        xml_filename = os.path.join(apt_dir, xml_filename)
         comp_file = xml_filename.replace('.xml', '.txt')
 
         # Create a new exposure dictionary. Compare to the truth version

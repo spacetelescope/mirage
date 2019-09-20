@@ -33,21 +33,21 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  filter_: F250M           #Filter of simulated data (F090W, F322W2, etc)
 	  pupil_: CLEAR            #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
-	Reffiles_:                 #Set to None or leave blank if you wish to skip that step
-	  dark_: None              #Dark current integration used as the base
+	Reffiles_:                   #Set to None or leave blank if you wish to skip that step
+	  dark_: None                #Dark current integration used as the base
 	  linearized_darkfile_: $MIRAGE_DATA/nircam/darks/linearized/B5/Linearized_Dark_and_SBRefpix_NRCNRCBLONG-DARK-60090141241_1_490_SE_2016-01-09T02h46m50_uncal.fits # Linearized dark ramp to use as input. Supercedes dark above
-	  badpixmask_: $MIRAGE_DATA/nircam/reference_files/badpix/NRCB5_17161_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits # If linearized dark is used, populate output DQ extensions using this file
-	  superbias_: $MIRAGE_DATA/nircam/reference_files/superbias/NRCB5_superbias_from_list_of_biasfiles.list.fits  #Superbias file. Set to None or leave blank if not using
-	  linearity_: $MIRAGE_DATA/nircam/reference_files/linearity/NRCBLONG_17161_LinearityCoeff_ADU0_2016-05-22_ssblinearity_v2_DMSorient.fits    #linearity correction coefficients
-	  saturation_: $MIRAGE_DATA/nircam/reference_files/saturation/NRCB5_17161_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
-	  gain_: $MIRAGE_DATA/nircam/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
+	  badpixmask_: crds          # If linearized dark is used, populate output DQ extensions using this file
+	  superbias_: crds           #Superbias file. Set to None or leave blank if not using
+	  linearity_: crds           #linearity correction coefficients
+	  saturation_: crds          #well depth reference files
+	  gain_: crds                #Gain map
 	  pixelflat_: None
-	  illumflat_: None                               #Illumination flat field file
-	  astrometric_: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_distortion.asdf  #Astrometric distortion file (asdf)
-	  ipc_: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
-	  invertIPC_: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
+	  illumflat_: None           #Illumination flat field file
+	  astrometric_: crds         #Astrometric distortion file (asdf)
+	  ipc_: crds                 #File containing IPC kernel to apply
+	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
-	  pixelAreaMap_: $MIRAGE_DATA/nircam/reference_files/pam/NIRCam_B5_PAM_imaging.fits #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+	  pixelAreaMap_: crds        #Pixel area map for the detector. Used to introduce distortion into the output ramp.
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
 	  crosstalk_:       config   #File containing crosstalk coefficients
@@ -69,7 +69,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 
 	simSignals_:
 	  pointsource_: my_point_sources.cat               #File containing a list of point sources to add (x,y locations and magnitudes)
-	  psfpath_: $MIRAGE_DATA/nircam/webbpsf_library/   #Path to PSF library
+	  psfpath_: $MIRAGE_DATA/nircam/gridded_psf_library/   #Path to PSF library
 	  gridded_psf_library_row_padding_: 4              # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
   	  psf_wing_threshold_file_: config                 # File defining PSF sizes versus magnitude
   	  add_psf_wings_: True                             # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
@@ -93,11 +93,13 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  poissonseed_: 2012872553                        #Random number generator seed for Poisson simulation)
 	  photonyield_: True                              #Apply photon yield in simulation
 	  pymethod_: True                                 #Use double Poisson simulation for photon yield
+	  expand_catalog_for_segments_: False             # Expand catalog for 18 segments and use distinct PSFs
 
 	Telescope_:
 	  ra_: 53.1                     #RA of simulated pointing
 	  dec_: -27.8                   #Dec of simulated pointing
 	  rotation_: 0.0                #y axis rotation (degrees E of N)
+	  tracking_: sidereal           #sidereal or non-sidereal
 
 	newRamp_:
 	  dq_configfile_: config          #config file used by JWST pipeline
@@ -107,7 +109,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  linear_configfile_: config      #config file used by JWST pipeline
 
 	Output_:
-	  file_: jw42424024002_0112o_NRCB5_uncal.fits   # Output filename
+	  file_: jw42424024002_01101_00001_nrcb5_uncal.fits   # Output filename
 	  directory_: ./                                # Directory in which to place output files
 	  datatype_: linear,raw                         # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
 	  format_: DMS                                  # Output file format Options: DMS, SSR(not yet implemented)
@@ -125,10 +127,10 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  visit_number_: '024'                          # Visit Number
 	  visit_group_: '01'                            # Visit Group
 	  visit_id_: '42424024002'                      # Visit ID
-	  sequence_id_: '2'                             # Sequence ID
-	  activity_id_: '2o'                            # Activity ID. Increment with each exposure.
+	  sequence_id_: '1'                             # Sequence ID
+	  activity_id_: '01'                            # Activity ID. Increment with each exposure.
 	  exposure_number_: '00001'                     # Exposure Number
-	  obs_id_: 'V42424024002P000000000112o'         # Observation ID number
+	  obs_id_: 'V42424024002P0000000001101'         # Observation ID number
 	  date_obs_: '2019-10-15'                       # Date of observation
 	  time_obs_: '06:29:11.852'                     # Time of observation
 	  obs_template_: 'NIRCam Imaging'               # Observation template
@@ -303,7 +305,7 @@ Bad pixel mask
 If a linearized dark current file is to be used and a linearized output file is requested, this optional bad pixel mask can be used to populate the data quality array in the output simulated data file. The file must be in the `format for JWST bad pixel masks <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html>`_ that is used by the JWST calibration pipeline.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of bad pixel masks that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _superbias:
 
@@ -315,7 +317,7 @@ Superbias
 The superbias reference file for the detector of the simulation. This file must match the `format of the JWST pipeline superbias reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html>`_. If the input dark current integration is a raw file then this superbias file is used to subtract the superbias from the dark. If the input dark is already linearized, this superbias file is not used.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of superbias files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _linearity:
 
@@ -329,7 +331,7 @@ Name of the reference file containing the linearity correction coefficients. Thi
 In addition, the coefficients in this file are used to linearize the values in the saturation reference file, such that saturated signals in the linear simulated exposure can be found.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of linearity coefficient files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _saturation:
 
@@ -343,7 +345,7 @@ Name of the reference file containing a map of the saturation signal level for a
 This saturation map, after being linearized, is also used to search for saturated signal values in the combined dark current/simulated source exposure prior to unlinearizing.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of saturation map files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _gain:
 
@@ -355,7 +357,7 @@ Gain
 Name of the file containing the gain map appropriate for the detector being used. The gain is used to translate the cosmic rays, which are in units of electrons, to units of ADU prior to adding them to the simulated data. The `format of the gain file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_ must match that used by the JWST calibration pipeline.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of gain map files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _pixelflat:
 
@@ -387,7 +389,7 @@ Astrometric distortion file
 Name of the astrometric distortion reference file to use for including the effects of distortion in the simulated data.  This file is used to translate input source locations between RA and Dec coordinates and pixel x and y coordinates, and vice versa. This file must be in `asdf format and match that expected by the calibration pipeline <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reference-file>`_.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of distortion reference files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _ipc:
 
@@ -399,7 +401,7 @@ Interpixel capacitance (IPC)
 File containing the interpixel capacitance (IPC) kernel to apply to the simulated data in order to introduce IPC effects. After all simulated objects have been added to a count rate image, the image is convolved with the IPC kernel. The IPC file must be a fits file with the IPC kernel located in the first (rather than 0th) extension. Typical JWST IPC reference file kernels are a 3x3 array, but Mirage supports kernels of any odd-numbered size, as well as 4-dimensional kernels, where there is a separate 2-dimensional kernel for each pixel. In order to introduce, rather than remove, IPC effects, the kernel must be normalized and have a value in the central pixel which is less than 1.0. This is the inverse of the kernel used in the JWST calibration pipeline IPC removal step, where the central pixel has a value greater than 1.0, and negative values in surrounding pixels. For the simulator, the user can specify a `JWST calibration pipeline-formatted kernel file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html>`_, and then set the **invertIPC** flag below to True, in which case the kernel will be inverted before using.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of IPC kernel files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _invertIPC:
 
@@ -429,7 +431,7 @@ Pixel area map
 Fits file containing the pixel area map for the detector to be simulated. If provided, the pixel area map is multiplied into the seed image at a point when the seed image contains only extended sources. Point sources have the pixel area map applied to them at the time the PSF libraries were created via `webbpsf <https://webbpsf.readthedocs.io/en/stable/>`_. The pixel area map file must be in the format of the `JWST pixel area map reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/photom/reference_files.html#area-reference-file>`_.
 
 .. hint::
-	The collection of :ref:`reference files <reference_files>` associated with Mirage contains a library of pixel area map files that can be used.
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _subarray_defs:
 
@@ -836,6 +838,17 @@ Photon yield method
 
 This keyword is currently not used. T/F. Whether or not to use the double photon method when applying photon yield.
 
+.. _expand_catalog_for_segments:
+
+Expand catalog for segments
++++++++++++++++++++++++++++
+
+*simSignals:expand_catalog_for_segments*
+
+This entry controls whether Mirage will look for a separate point source library for each of the mirror segments on the telescope. This
+mode is only used for certain wavefront sensing and control observations and should normally be set to False.
+
+
 .. _Telescope:
 
 Telescope section
@@ -869,6 +882,16 @@ Rotation
 *Telescope:rotation*
 
 Rotation of the y-axis in degrees East of North. Currently this rotation is defined around the reference location of the chosen subarray.
+
+.. _tracking:
+
+Telescope tracking
+++++++++++++++++++
+
+*Telescope:tracking*
+
+Either 'sidereal' or 'non-sidereal' depending on the type of exposure. If it is set to non-sidereal then the exposure will be created as if JWST is
+tracking on the source in the :ref:`movingTargetToTrack <movingTargetToTrack>` catalog. Sources in the :ref:`pointsource <pointsource>`, :ref:`galaxyListFile <galaxyListFile>`, and :ref:`extended <extended>` catalogs will trail across the field of view over the course of the exposure.
 
 .. _newRamp:
 

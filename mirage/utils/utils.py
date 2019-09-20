@@ -165,28 +165,35 @@ def check_niriss_filter(oldfilter,oldpupil):
 
     The code also corrects CLEARP to CLEAR if needed.
 
-    Parameters:
+    Parameters
+    ----------
 
-    oldfilter:   a string variable, assumed to be the self.params['Readout']['filter'] value from the .yaml file
+    oldfilter :  str
+        Assumed to be the self.params['Readout']['filter'] value from the .yaml file
 
-    oldpupil:    a string varialbe, assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+    oldpupil :  str
+        Assumed to be the self.params['Readout']['pupil'] value from the .yaml file
 
-    Return values:
+    Returns
+    -------
 
-    newfilter:   a string value, the proper FILTER parameter for the requested NIRISS filter name
+    newfilter : str
+        The proper FILTER parameter for the requested NIRISS filter name
 
-    newpupil:    a string value, the proper PUPIL parameter for the requested NIRISS filter name
+    newpupil : str
+        The proper PUPIL parameter for the requested NIRISS filter name
 
     Note that this routine should only be called when the instrument is NIRISS.
     """
     str1 = oldfilter
     str2 = oldpupil
+
     if oldfilter in NIRISS_PUPIL_WHEEL_FILTERS:
         newfilter = str2
         newpupil = str1
         if newfilter == 'CLEARP':
             newfilter = 'CLEAR'
-    if oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
+    elif oldfilter in NIRISS_FILTER_WHEEL_FILTERS:
         if oldpupil == 'CLEAR':
             newpupil = 'CLEARP'
         else:

@@ -7,6 +7,42 @@ The easiest way to simulate a large amount of obsrvtions using Mirage is to begi
 
 Examples of this functionality are shown in the `notebooks <https://github.com/spacetelescope/mirage/tree/master/examples>`_ in the *Mirage* repository. Below are step-by-step instructions explaining how to create *Mirage* input yaml files from an APT file.
 
+
+.. important::
+
+    Currently Mirage is able to parse the following APT templates. Mirage will fail if your APT file contains observations using a template not on this list.
+
+    +---------------------------------------------------------------+
+    |                            NIRCAM                             |
+    +===============================================================+
+    |NircamImaging, NircamWfss, NircamEngineeringImaging, NircamDark|
+    +---------------------------------------------------------------+
+
+    +---------------------------------------------------------------+
+    |NIRISS                                                         |
+    +===============================================================+
+    |NirissExternalCalibration, NirissWfss, NirissAmi, NirissDark   |
+    +---------------------------------------------------------------+
+
+    +---------------------------------------------------------------+
+    |FGS                                                            |
+    +===============================================================+
+    |FgsExternalCalibration                                         |
+    +---------------------------------------------------------------+
+
+    +---------------------------------------------------------------+
+    |Other Instruments (for proposals with parallel observations)   |
+    +===============================================================+
+    |NirspecImaging, NirspecInternalLamp, MiriMRS                   |
+    +---------------------------------------------------------------+
+
+    +--------------------------------------------------------------------------+
+    |Wavefront Sensing and Control                                             |
+    +==========================================================================+
+    |WfscCommissioning, WfscGlobalAlignment, WfscCoarsePhasing, WfscFinePhasing|
+    +--------------------------------------------------------------------------+
+
+
 Export XML and Pointing files from APT
 --------------------------------------
 Open the proposal within APT and under the File menu, choose Export, and select the xml and pointing files. Only one file at a time can be exported, so the process must be repeated for each.
@@ -16,69 +52,247 @@ Open the proposal within APT and under the File menu, choose Export, and select 
 Additional Yaml Generator Inputs
 --------------------------------
 
-In addition to the xml and pointing files, there are several user-inputs needed by the yaml generator.
+In addition to the xml and pointing files, there are several user-inputs needed by the yaml generator. Examples shown below are python statements.
+
+.. _yam_gen_cat_inputs:
 
 Source catalogs
 +++++++++++++++
 
-The user must specify source catalogs for each instrument and observation. This is done using a nested dictionary following the form shown below. Catalogs for NIRCam are broken down by channel (SW, LW). In each case, the entry can be a list of catalogs, in which case there must be one catalog in the list for each observation in the program that uses the instrument. For example, in an APT file containing 5 observations, if NIRCam is used in observations 1, 2, and 4, and NIRISS in observations 3 and 5, then the NIRCam catalog lists should have a list of three catalogs, and the NIRISS entry should have a list of 2 catalogs. The code assumes that the catalogs are listed in the same order of the observations in the APT file.
+The user must specify source catalogs for each instrument and target in the proposal. This is done using one of several possible input formats, as shown below.
 
-Alternatively, the user may provide a string containing a single catalog name, rather than a list. In this case, *Mirage* assumes that the same catalog will be used in all observations.
+If you do not wish to specify catalogs, and want to leave all catalog inputs as 'none', set your catalogs variable to None, or omit completely:
 
 ::
 
-    catalogs = {'nircam': {'sw': {ptsrc: [list of catalogs], 'galaxy': [list of catalogs]}
-                           'lw' : {ptsrc: [list of catalogs], 'galaxy': [list of catalogs]}
-                'niriss': {'ptsrc': [list of catalogs], 'galaxy': [list of catalogs]}
-               }
+    catalogs = None
+
+To use the same catalogs for all instruments in a given target, create a nested dictionary where the top-level keys exactly match the target names in the APT file. In the second level of the dictionary,
+specify catalog filenames for each type of catalog. Note that you only need to include the catalog types that you want to use for your data. All 7 catalog types are shown here for completeness, but
+in most cases you will only specify 1-3 catalog types.
+
+::
+
+    catalogs = {'NGC4242': {'point_source': 'target1_ptsrc.cat',
+                            'galaxy': 'target1_galaxies.cat',
+                            'extended': 'target1_ext.cat',
+                            'moving_pointsource': 'target1_mt_ptsrc.cat',
+                            'moving_sersic': 'target1_mt_gal.cat',
+                            'moving_extended': 'target1_mt_ext.cat',
+                            'moving_target_to_track': 'target1_mt_track.cat'
+                            },
+                'LMC': {'point_source': 'lmc_ptsrc.cat',
+                        'galaxy': 'lmc_galaxy.cat',
+                        'extended': 'lmc_ex.cat',
+                        'moving_pointsource': 'lmc_mt_ptsrc.cat',
+                        'moving_sersic': 'lmc_mt_gal.cat',
+                        'moving_extended': 'lmc_mt_ext.cat',
+                        'moving_target_to_track': 'lmc_mt_track.cat'
+                          }
+                }
+
+For more fine-grained control, you can also specify catalogs for each instrument and target. This adds another level to the input dictionary. Again, note that the example below shows all three instruments
+for completeness. You only need to include the instruments used in the proposal. Instrument and catalog type dictionary keys are case-insensitive. Target name keys must match exactly those in the APT file.
+The dictionary currently does not break out separate catalogs for NIRCam shortwave and longwave channels. Note that Mirage contains :ref:`catalog tools <catalog_generation>` that can be used to combine catalogs.
+See the `Catalog Generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ for examples.
+
+::
+
+    catalogs = {'NGC1234': {'nircam': {'point_source': 'ngc1234_ptsrc_nrc.cat',
+                                       'galaxy': 'ngc1234_galaxy_nrc.cat',
+                                       'extended': 'ngc1234_ex_nrc.cat',
+                                       'moving_pointsource': 'ngc1234_mt_ptsrc_nrc.cat',
+                                       'moving_sersic': 'ngc1234_mt_gal_nrc.cat',
+                                       'moving_extended': 'ngc1234_mt_ext_nrc.cat',
+                                       'moving_target_to_track': 'ngc1234_mt_track_nrc.cat'
+                                       },
+                            'niriss': {'point_source': 'ngc1234_ptsrc_nis.cat',
+                                      'galaxy': 'ngc1234_galaxy_nis.cat',
+                                      'extended': 'ngc1234_ex_nis.cat',
+                                      'moving_pointsource': 'ngc1234_mt_ptsrc_nis.cat',
+                                      'moving_sersic': 'ngc1234_mt_gal_nis.cat',
+                                      'moving_extended': 'ngc1234_mt_ext_nis.cat',
+                                      'moving_target_to_track': 'ngc1234_mt_track_nis.cat'
+                                      }
+                           },
+                'LMC': {'nircam': {'point_source': 'lmc_ptsrc_nrc.cat',
+                                     'galaxy': 'lmc_galaxy_nrc.cat',
+                                     'extended': 'lmc_ex_nrc.cat',
+                                     'moving_pointsource': 'lmc_mt_ptsrc_nrc.cat',
+                                     'moving_sersic': 'lmc_mt_gal_nrc.cat',
+                                     'moving_extended': 'lmc_mt_ext_nrc.cat',
+                                     'moving_target_to_track': 'lmc_mt_track_nrc.cat'
+                                     },
+                        'niriss': {'point_source': 'lmc_ptsrc_nis.cat',
+                                     'galaxy': 'lmc_galaxy_nis.cat',
+                                     'extended': 'lmc_ex_nis.cat',
+                                     'moving_pointsource': 'lmc_mt_ptsrc_nis.cat',
+                                     'moving_sersic': 'lmc_mt_gal_nis.cat',
+                                     'moving_extended': 'lmc_mt_ext_nis.cat',
+                                     'moving_target_to_track': 'lmc_mt_track_nis.cat'
+                                     }
+                          },
+                }
+
+.. _yam_gen_background_inputs:
+
+Background Specification
+++++++++++++++++++++++++
+
+Users may also supply information on the background levels to use for each instrument and observation. Allowed values for the background parameter are described in :ref:`bkgdrate <bkgdrate>` section of the Input Yaml Parameters page.
+As with the catalogs above, there are several formats that can be used to supply the background information. Examples are shown below.
+
+To use the default value for background, either omit this parameter altogether, or set background equal to None.
+
+::
+
+    background = None
+
+To specify a single value for background to be used across all observations and instruments, you may supply a single string ('high', 'medium', or 'low') or a single number. The strings correspond to the background levels from the `JWST ETC <https://jwst.etc.stsci.edu/>`_ and are detailed in the :ref:`bkgdrate <bkgdrate>` section of the Input Yaml Parameters page.
+If a single number is provided, it is interpreted as the background signal in units of DN/sec/pixel. This signal will be uniform across all pixels.
+
+::
+
+    background = 'high'
+    background = 22.2
+
+In order to use a different background in each observation of the proposal (if for example, your proposal will be broken into multiple epochs observed at different times of year), you can use a dictionary. The keys are the observation
+numbers in the proposal file. Note that these are three-character strings. The values can then be the same strings or numbers described above.
+
+::
+
+    background = {'001': 'high', '002': 'medium', '003': 22.3}
+
+For finer control, you can use a nested dictionary to specify the background signal in each instrument and observation. The top level keys of the dictionary are the observation numbers from the APT file (again, as 3-character strings).
+The values are then instrument names, which are keys into the second level of the dictionary. The values for these keys can be strings or numbers, as above, or in the case of NIRCam, a further nested dictionary that breaks out the
+background level by `channel <https://jwst-docs.stsci.edu/near-infrared-camera/nircam-overview#NIRCamOverview-Channels>`_ (shortwave detectors versus longwave detectors).
+
+::
+
+    background = {'001': {'nircam': {'sw': 0.2, 'lw': 0.3},
+                          'niriss': 0.4},
+                          'fgs': 0.2},
+                  '002': {'nircam': {'sw': 'medium', 'lw': 'high'},
+                          'niriss': 'low'},
+                          'fgs': 'high'},
+                  '003': {'nircam': {'sw': 0.75, 'lw': 'high'},
+                          'niriss': 0.2}}
+                          'fgs': 0.1}}
 
 
-Note that currently this format is used for point source catalogs only. Other types of catalogs are limited to a single entry in a separate parameter dictionary as shown in the :ref:`Other Parameters section <other_params>`. Catalog entries will be made more consistent in a future update. In the meantime, the easiest way to get the proper (non-point-source) catalogs into the yaml files is to use a single catalog for all observations and instruments. This is easily done by adding all necessary magnitude columns into a single catalog, or by combining existing *Mirage* catalogs. See the `Catalog Generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Catalog_Generation_Tools.ipynb>`_ for examples.
+.. _yam_gen_pav3_inputs:
+
+Roll Angle
+++++++++++
+
+Another optional user input to the *yaml_generator* is the `roll angle <https://jwst-docs.stsci.edu/observatory-functionality/jwst-position-angles-ranges-and-offsets#JWSTPositionAngles,Ranges,andOffsets-Referenceangledefinitions>`_ of the telescope. This is often referred to as PAV3 (or V3PA) as it is the position angle of the V3 axis in degrees east of north. We include this as a tunable parameter in Mirage to allow users to explore different orientations for their data, including the use of different roll angles for different observations within their proposals in order to simulate epochs.
+
+In order to use the Mirage default value (roll angle = 0), simply do not provide a roll angle input to the yaml_generator, or explicitly set it to None.
+
+::
+
+    pav3 = None
+
+To specify a single roll angle to be used in all observations, supply a single number.
+
+::
+
+    pav3 = 34.5
+
+In order to simulate epochs and break up your observations, supply a dictionary where the keys are the (3-character string) observation numbers from your APT file, and the values are the roll angles to use for those observations.
+
+::
+
+    pav3 = {'001': 34.5, '002': 154.5, '003': 37.8}
 
 
-.. Background Specification
-.. ++++++++++++++++++++++++
+.. _yam_gen_date_inputs:
 
-.. The user must also supply a nested dictionary containing the background levels to use for each instrument and observation. Allowed values for the background parameter are described in :ref:`bkgdrate <bkgdrate>` section of the Input Yaml Parameters page.
+Observation Dates
++++++++++++++++++
 
-.. ::
+You may also specify the observation date for each observation in your APT file. This may be used along with roll angle to help define epochs in your observations, or simply
+to associate a given dataset with a date. **Note that Mirage does not pay attention to dates in any way** other than to save them into the *date-obs* header keyword in the output
+files. Mirage does not check that a given roll angle and pointing are physically realizable on a given date. It is up to you to provide realistic values for these paramters
+if they are important to you. The `JWST Target Visibility Tools <http://www.stsci.edu/jwst/science-planning/proposal-planning-toolbox/target-visibility-tools>`_ (TVT) are
+useful for this. Note that in all cases below, Mirage will use the entered date (along with a default time) as the starting time of the first exposure in the observation.
+Mirage keeps track of exposure times and makes some guesses about overheads, and increments the observation time and date for each exposure.
 
-..     backgrounds = {'nircam': {'sw': [low, medium], 'lw': [low, medium]},
-                   'niriss': [low, medium]
-                  }
+To use the Mirage default for observation date (arbitrarily set to 2021-10-04), you can either not supply any date information, or explicitly use None.
 
-.. Similar to the case above for the catalog inputs, the given background values can be a list, in which case there must be one entry for each observation, or a string, in which case the value is applied to all observations.
+::
 
-.. _other_params:
+    dates = None
 
-Other Parameters
+To use a single date for all observations, you can give a date string.
+
+::
+
+    dates = '2022-5-25'
+
+To specify a different date for each observation, use a dictionary where the keys are the (3-character string) observation numbers from your APT file, and the values are
+the date strings for each.
+
+::
+
+    dates = {'001': '2022-06-25', '002': '2022-11-15', '003': '2023-03-14'}
+
+
+.. _yam_gen_cr_inputs:
+
+Cosmic Ray Rates
 ++++++++++++++++
 
-There are currently a number of parameters which can only be set using the ``parameter_defaults`` keyword in the yaml_generator.  These parameters are currently limited in that only a single value is accepted for each, and applied to all observations in a proposal. An update to allow different values to different observations will be made soon. For the moment, the list of parameters that can be set with this method are shown below. The values are the defaults used by *Mirage* if the user does not enter their own values.
+You may also customize the cosmic ray rates applied to Mirage's outputs. There are two aspects of the cosmic ray behavior that can be controlled. The first is the name
+of the library of cosmic ray stamp images to use, and the second is a scaling factor that can be applied to that library. The three library options, in are **SUNMAX**,
+**SUNMIN**, and **FLARE**. Each library contains a different collection of cosmic ray images, and each has a default cosmic ray rate (cosmic rays per pixel per second)
+associated with it. The SUNMIN and SUNMAX labels refer to the solar activity, and the galactic cosmic ray contribution at L2 is reduced at solar maximum compared to solar
+minimum.  The FLARE case is for the largest solar flare event on record and corresponds to conditions under which JWST would presumably not be
+operating. The table below give the cosmic ray probabilities for the three libraries. The cosmic ray libraries and default probabilties were taken from
+`Robberto 2009 <http://www.stsci.edu/files/live/sites/www/files/home/jwst/documentation/technical-documents/_documents/JWST-STScI-001928.pdf>`_.
+
++-----------+------------------------+
+| *Library* |*Cosmic Ray Probability*|
++-----------+------------------------+
+|  SUNMAX   |      5.762e-06         |
++-----------+------------------------+
+|  SUNMIN   |      1.587e-05         |
++-----------+------------------------+
+|  FLARE    |      0.0098729         |
++-----------+------------------------+
+
+The second configurable aspect of the cosmic ray rate is a scaling factor. This is a multiplicative factor that will be applied to the probability from the selected
+library in order to determine the final cosmic ray probability.
+
+To use Mirage's default values of the SUNMAX library and a scaling factor of 1.0, simply do not provide any input, or explicitly set the cosmic ray rate to None.
 
 ::
 
-    param_values['Date'] = '2019-07-04'
-    param_values['PAV3'] = '111.'
-    param_values['GalaxyCatalog'] = 'None'
-    param_values['ExtendedCatalog'] = 'None'
-    param_values['ExtendedScale'] = '1.0'
-    param_values['ExtendedCenter'] = '1024,1024'
-    param_values['MovingTargetList'] = 'None'
-    param_values['MovingTargetSersic'] = 'None'
-    param_values['MovingTargetExtended'] = 'None'
-    param_values['MovingTargetConvolveExtended'] = 'True'
-    param_values['MovingTargetToTrack'] = 'None'
-    param_values['BackgroundRate_sw'] = 'low'
-    param_values['BackgroundRate_lw'] = 'low'
-    param_values['BackgroundRate'] = '0.5'
+    cr = None
+
+To specify a different library and scale from the default, and apply those to all observations in your proposal, provide a dictionary with 'library' and 'scale' keys
+set to your desired values.
+
+::
+
+    cr = {'library': 'FLARE', 'scale': 44.0}
+
+In order to use a different cosmic ray library and scaling factor for each observation, create a nested dictionary where the top-level keys are the (3-character string)
+observation numbers from your APT file. Each entry should then contain a dictionary with 'library' and 'scale' values.
+
+::
+
+    cr = {'001': {'library': 'FLARE', 'scale': 1.2},
+          '002': {'library': 'SUNMIN', 'scale': 5.5},
+          '003': {'library': 'SUNMAX', 'scale': 0.1}}
+
 
 .. _override_reffiles:
 
 JWST Calibration Reference Files
 ++++++++++++++++++++++++++++++++
 
-Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, and `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ files.
+Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ and `pixel to pixel flat field <https://jwst-pipeline.readthedocs.io/en/stable/jwst/flatfield/reference_files.html#flat-reference-file>`_ files.
 
 Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.html>`_ package from STScI to identify the appropriate reference files for a given exposure. These files are automatically downloaded to the user's machine at one of two times:
 
@@ -121,7 +335,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
                            'ipc':        {detector_name: 'reffile_name.fits'},
                            'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
-                           'badpixmask': {detector_name: 'reffile_name.fits'}
+                           'badpixmask': {detector_name: 'reffile_name.fits'},
+                           'pixelflat':  {detector_name: {filter: {pupil: 'reffile_name.fits'}}}
                            },
                 'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
                            'linearity':  'reffile_name.fits',
@@ -130,7 +345,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {pupil: {exposure_type: 'reffile_name.fits'}},
                            'ipc':        'reffile_name.fits',
                            'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
-                           'badpixmask': 'reffile_name.fits'
+                           'badpixmask': 'reffile_name.fits',
+                           'pixelflat':  {filter: {pupil: 'reffile_name.fits'}}
                            },
                 'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
                            'linearity':  {detector_name: 'reffile_name.fits'},
@@ -139,7 +355,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {detector_name: {exposure_type: 'reffile_name.fits'}},
                            'ipc':        {detector_name: 'reffile_name.fits'},
                            'area':       {detector_name: 'reffile_name.asdf'},
-                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}}
+                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'pixelflat':  {detector_name: {exposure_type: 'reffile_name.fits'}}
                            }
 
 
@@ -167,6 +384,13 @@ Here we show an example dictionary for a particular set of observations.
                                           'nrcb4': {'f444w':  {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.asdf'}}}},
                            'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                           'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
+                           'pixelflat':  {'nrcb5': {'f322w2': {'clear': 'my_favorites/lw_flat.fits',
+                                                               'grismr': 'my_favorites/lwR_flat.fits',
+                                                               'grismc': 'my_favorites/lwC_flat.fits'
+                                                               }
+                                                    },
+                                          'nrcb4': {'f070w': {'clear': 'my_SW_favs/sw_flat.fits'}}
+                                          }
                             }
                 }
 
@@ -198,7 +422,8 @@ Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
     yam = yaml_generator.SimInput(xml_file, pointing_file, catalogs=catalogs, verbose=True,
                                   output_dir='/location/to/place/yaml_files',
                                   simdata_output_dir='/location/to/place/simulated_data',
-                                  parameter_defaults=param_values, datatype='raw',
+                                  cosmic_rays=crs, background=background, roll_angle=pav3,
+                                  dates=dates, datatype='raw',
                                   reffile_defaults='crds', reffile_overrides=reffile_overrides)
     yam.use_linearized_darks = True
     yam.create_inputs()
