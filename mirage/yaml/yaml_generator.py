@@ -320,10 +320,16 @@ class SimInput:
         ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
+        pixelflat_arr = deepcopy(empty_col)
 
         # Loop over combinations, create metadata dict, and get reffiles
         for status in unique_obs_info:
+            updated_status = deepcopy(status)
             (instrument, detector, filtername, pupilname, readpattern, exptype) = status
+
+            # Make sure NIRISS filter and pupil values are in the correct wheels
+            if instrument == 'NIRISS':
+                filtername, pupilname = utils.check_niriss_filter(filtername, pupilname)
 
             # Create metadata dictionary
             date = datetime.date.today().isoformat()
@@ -339,6 +345,11 @@ class SimInput:
                     status_dict['CHANNEL'] = 'LONG'
                 else:
                     status_dict['CHANNEL'] = 'SHORT'
+            if instrument == 'FGS':
+                if detector in ['G1', 'G2']:
+                    detector = detector.replace('G', 'GUIDER')
+                    status_dict['DETECTOR'] = detector
+                    updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # Query CRDS
             reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
@@ -347,12 +358,18 @@ class SimInput:
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
             if self.reffile_overrides is not None:
-                manual_reffiles = self.reffiles_from_dict(status)
+                manual_reffiles = self.reffiles_from_dict(updated_status)
 
                 for key in manual_reffiles:
                     if manual_reffiles[key] != 'none':
                         if key == 'badpixmask':
                             crds_key = 'mask'
+                        elif key == 'pixelflat':
+                            crds_key = 'flat'
+                        elif key == 'astrometric':
+                            crds_key = 'distortion'
+                        elif key == 'pixelAreaMap':
+                            crds_key = 'area'
                         else:
                             crds_key = key
                         reffiles[crds_key] = manual_reffiles[key]
@@ -378,6 +395,7 @@ class SimInput:
             ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
             badpixmask_arr[match] = reffiles['mask']
+            pixelflat_arr[match] = reffiles['flat']
 
         self.info['superbias'] = list(superbias_arr)
         self.info['linearity'] = list(linearity_arr)
@@ -388,6 +406,7 @@ class SimInput:
         self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
+        self.info['pixelflat'] = list(pixelflat_arr)
 
     def add_reffile_overrides(self):
         """If the user provides a nested dictionary in
@@ -409,15 +428,22 @@ class SimInput:
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
+        pixelflat_arr = deepcopy(empty_col)
 
         # Loop over combinations, create metadata dict, and get reffiles
         for status in unique_obs_info:
+            updated_status = deepcopy(status)
             (instrument, detector, filtername, pupilname, readpattern, exptype) = status
+
+            if instrument == 'FGS':
+                if detector in ['G1', 'G2']:
+                    detector = detector.replace('G', 'GUIDER')
+                    updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
             #sbias, lin, sat, gainfile, dist, ipcfile, pam = self.reffiles_from_dict(status)
-            manual_reffiles = self.reffiles_from_dict(status)
+            manual_reffiles = self.reffiles_from_dict(updated_status)
             for key in manual_reffiles:
                 if manual_reffiles[key] == 'none':
                     manual_reffiles[key] = 'crds'
@@ -434,6 +460,7 @@ class SimInput:
             ipc_arr[match] = manual_reffiles['ipc']
             pixelAreaMap_arr[match] = manual_reffiles['area']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
+            pixelflat_arr[match] = manual_reffiles['pixelflat']
 
         self.info['superbias'] = list(superbias_arr)
         self.info['linearity'] = list(linearity_arr)
@@ -443,6 +470,7 @@ class SimInput:
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
+        self.info['pixelflat'] = list(pixelflat_arr)
 
     def catalog_match(self, filter, pupil, catalog_list, cattype):
         """
@@ -550,6 +578,7 @@ class SimInput:
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
             self.info['badpixmask'] = column_data
+            self.info['pixelflat'] = column_data
 
             # If the user provided a dictionary of reference files to
             # override some/all of those from CRDS, then enter those
@@ -1684,6 +1713,17 @@ class SimInput:
         except KeyError:
             files['badpixmask'] = 'none'
 
+        # flat field file
+        try:
+            if instrument == 'nircam':
+                files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][detector][filtername][pupilname]
+            elif instrument == 'niriss':
+                files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][filtername][pupilname]
+            elif instrument == 'fgs':
+                files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][detector][exptype]
+        except KeyError:
+            files['pixelflat'] = 'none'
+
         return files
 
     def table_to_dict(self, tab):
@@ -1806,7 +1846,7 @@ class SimInput:
             f.write('  linearity: {}    # linearity correction coefficients\n'.format(input['linearity']))
             f.write('  saturation: {}    # well depth reference files\n'.format(input['saturation']))
             f.write('  gain: {} # Gain map\n'.format(input['gain']))
-            f.write('  pixelflat: None \n')
+            f.write('  pixelflat: {}    # Flat field file to use for un-flattening output\n'.format(input['pixelflat']))
             f.write('  illumflat: None                               # Illumination flat field file\n')
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))

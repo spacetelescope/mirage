@@ -39,7 +39,8 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'linearity': 'linearity',
                    'pixelAreaMap': 'area',
                    'saturation': 'saturation',
-                   'superbias': 'superbias'}
+                   'superbias': 'superbias',
+                   'pixelflat': 'flat'}
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when

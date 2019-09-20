@@ -292,7 +292,7 @@ observation numbers from your APT file. Each entry should then contain a diction
 JWST Calibration Reference Files
 ++++++++++++++++++++++++++++++++
 
-Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, and `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ files.
+Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ and `pixel to pixel flat field <https://jwst-pipeline.readthedocs.io/en/stable/jwst/flatfield/reference_files.html#flat-reference-file>`_ files.
 
 Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.html>`_ package from STScI to identify the appropriate reference files for a given exposure. These files are automatically downloaded to the user's machine at one of two times:
 
@@ -335,7 +335,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
                            'ipc':        {detector_name: 'reffile_name.fits'},
                            'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
-                           'badpixmask': {detector_name: 'reffile_name.fits'}
+                           'badpixmask': {detector_name: 'reffile_name.fits'},
+                           'pixelflat':  {detector_name: {filter: {pupil: 'reffile_name.fits'}}}
                            },
                 'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
                            'linearity':  'reffile_name.fits',
@@ -344,7 +345,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {pupil: {exposure_type: 'reffile_name.fits'}},
                            'ipc':        'reffile_name.fits',
                            'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
-                           'badpixmask': 'reffile_name.fits'
+                           'badpixmask': 'reffile_name.fits',
+                           'pixelflat':  {filter: {pupil: 'reffile_name.fits'}}
                            },
                 'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
                            'linearity':  {detector_name: 'reffile_name.fits'},
@@ -353,7 +355,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {detector_name: {exposure_type: 'reffile_name.fits'}},
                            'ipc':        {detector_name: 'reffile_name.fits'},
                            'area':       {detector_name: 'reffile_name.asdf'},
-                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}}
+                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'pixelflat':  {detector_name: {exposure_type: 'reffile_name.fits'}}
                            }
 
 
@@ -381,6 +384,13 @@ Here we show an example dictionary for a particular set of observations.
                                           'nrcb4': {'f444w':  {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.asdf'}}}},
                            'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                           'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
+                           'pixelflat':  {'nrcb5': {'f322w2': {'clear': 'my_favorites/lw_flat.fits',
+                                                               'grismr': 'my_favorites/lwR_flat.fits',
+                                                               'grismc': 'my_favorites/lwC_flat.fits'
+                                                               }
+                                                    },
+                                          'nrcb4': {'f070w': {'clear': 'my_SW_favs/sw_flat.fits'}}
+                                          }
                             }
                 }
 

@@ -163,21 +163,34 @@ def get_reffiles(parameter_dict, reffile_types, download=True):
     # IMPORTANT: Import of crds package must be done AFTER the environment
     # variables are set in the functions above
     import crds
+    from crds import CrdsLookupError
 
     if download:
-        reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
+        try:
+            reffile_mapping = crds.getreferences(parameter_dict, reftypes=reffile_types)
+        except CrdsLookupError as e:
+            raise ValueError("ERROR: CRDSLookupError when trying to find reference files for parameters: {}".format(parameter_dict))
+
+        # Check for missing files
+        for key, value in reffile_mapping.items():
+            if "NOT FOUND" in value:
+                raise ValueError("ERROR: No {} reference file found when using parameter dictionary: {}".format(key, parameter_dict))
     else:
         # If the files will not be downloaded, still return the same local
         # paths that are returned when the files are downloaded. Note that
         # this follows the directory structure currently assumed by CRDS.
         crds_path = os.environ.get('CRDS_PATH')
-        reffile_mapping = crds.getrecommendations(parameter_dict, reftypes=reffile_types)
+        try:
+            reffile_mapping = crds.getrecommendations(parameter_dict, reftypes=reffile_types)
+        except CrdsLookupError as e:
+            raise ValueError("ERROR: CRDSLookupError when trying to find reference files for parameters: {}".format(parameter_dict))
         for key, value in reffile_mapping.items():
+
+            # Check for NOT FOUND must be done here because the following
+            # line will raise an exception if NOT FOUND is present
+            if "NOT FOUND" in value:
+                raise ValueError("ERROR: No {} reference file found when using parameter dictionary: {}".format(key, parameter_dict))
             instrument = value.split('_')[1]
             reffile_mapping[key] = os.path.join(crds_path, 'references/jwst', instrument, value)
 
-    # Will we ever come across a case where no reference file is found?
-    for key, value in reffile_mapping.items():
-        if value == 'N/A':
-            reffile_mapping[key] = None
     return reffile_mapping
