@@ -319,6 +319,7 @@ class SimInput:
 
         # Loop over combinations, create metadata dict, and get reffiles
         for status in unique_obs_info:
+            updated_status = deepcopy(status)
             (instrument, detector, filtername, pupilname, readpattern, exptype) = status
 
             # Make sure NIRISS filter and pupil values are in the correct wheels
@@ -339,6 +340,11 @@ class SimInput:
                     status_dict['CHANNEL'] = 'LONG'
                 else:
                     status_dict['CHANNEL'] = 'SHORT'
+            if instrument == 'FGS':
+                if detector in ['G1', 'G2']:
+                    detector = detector.replace('G', 'GUIDER')
+                    status_dict['DETECTOR'] = detector
+                    updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # Query CRDS
             reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
@@ -347,7 +353,7 @@ class SimInput:
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
             if self.reffile_overrides is not None:
-                manual_reffiles = self.reffiles_from_dict(status)
+                manual_reffiles = self.reffiles_from_dict(updated_status)
 
                 for key in manual_reffiles:
                     if manual_reffiles[key] != 'none':
@@ -421,12 +427,18 @@ class SimInput:
 
         # Loop over combinations, create metadata dict, and get reffiles
         for status in unique_obs_info:
+            updated_status = deepcopy(status)
             (instrument, detector, filtername, pupilname, readpattern, exptype) = status
+
+            if instrument == 'FGS':
+                if detector in ['G1', 'G2']:
+                    detector = detector.replace('G', 'GUIDER')
+                    updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
             #sbias, lin, sat, gainfile, dist, ipcfile, pam = self.reffiles_from_dict(status)
-            manual_reffiles = self.reffiles_from_dict(status)
+            manual_reffiles = self.reffiles_from_dict(updated_status)
             for key in manual_reffiles:
                 if manual_reffiles[key] == 'none':
                     manual_reffiles[key] = 'crds'
