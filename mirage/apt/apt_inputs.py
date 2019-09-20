@@ -130,7 +130,7 @@ class AptInput:
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
                                   'MovingTargetSersic MovingTargetExtended ' \
                                   'MovingTargetConvolveExtended MovingTargetToTrack ' \
-                                  'BackgroundRate DitherIndex'.split()
+                                  'BackgroundRate DitherIndex CosmicRayLibrary CosmicRayScale'.split()
 
         nircam_mapping = {'ptsrc': 'PointSourceCatalog',
                           'galcat': 'GalaxyCatalog',
@@ -167,9 +167,7 @@ class AptInput:
             if instrument == 'nircam':
                 # keep the number of entries in the dictionary consistent
                 for key in OBSERVATION_LIST_FIELDS:
-                    if key == 'Date':
-                        value = entry[key].strftime('%Y-%m-%d')
-                    elif key in ['PAV3', 'Instrument']:
+                    if key in ['Date', 'PAV3', 'Instrument', 'CosmicRayLibrary', 'CosmicRayScale']:
                         value = str(entry[key])
                     else:
                         value = str(None)
@@ -186,11 +184,15 @@ class AptInput:
 
             else:
                 for key in OBSERVATION_LIST_FIELDS:
-                    if key == 'Date':
-                        value = entry[key].strftime('%Y-%m-%d')
-                    else:
-                        value = str(entry[key])
+                    value = str(entry[key])
 
+                    # Expand catalog names to contain full paths
+                    catalog_names = 'PointSourceCatalog GalaxyCatalog ' \
+                                    'ExtendedCatalog MovingTargetList ' \
+                                    'MovingTargetSersic MovingTargetExtended ' \
+                                    'MovingTargetToTrack'.split()
+                    if key in catalog_names:
+                        value = self.full_path(value)
                     intab[key].append(value)
 
                 # keep the number of entries in the dictionary consistent
@@ -201,7 +203,6 @@ class AptInput:
                             intab[key].append(str(None))
 
         intab['epoch_start_date'] = intab['Date']
-
         return intab
 
     def base36encode(self, integer):

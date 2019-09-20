@@ -97,6 +97,7 @@ from copy import deepcopy
 from glob import glob
 from copy import deepcopy
 import datetime
+import warnings
 
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
@@ -118,9 +119,10 @@ ENV_VAR = 'MIRAGE_DATA'
 
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
-                 reffile_overrides=None, use_JWST_pipeline=True, catalogs=None,
+                 reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
+                 background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
-                 parameter_defaults=None, offline=False):
+                 offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -174,17 +176,19 @@ class SimInput:
                                     files at a time.
         """
         # If no catalogs are given, then set up some dummy defaults
-        if catalogs is None:
-            catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
-                        'niriss': 'none',
-                        'fgs': 'none'}
+        #if catalogs is None:
+        #    catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
+        #                'niriss': 'none',
+        #                'fgs': 'none'}
+
+        parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
+                               'dates': dates}
 
         self.info = {}
         self.input_xml = input_xml
         self.pointing_file = pointing_file
         self.datatype = datatype
         self.use_JWST_pipeline = use_JWST_pipeline
-        self.catalogs = catalogs
         self.observation_list_file = observation_list_file
         self.verbose = verbose
         self.output_dir = output_dir
@@ -222,8 +226,9 @@ class SimInput:
         if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, self.catalogs,
-                                                     verbose=self.verbose, parameter_defaults=parameter_defaults)
+            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
+                                                     verbose=self.verbose,
+                                                     parameter_overrides=parameter_overrides)
         else:
             print('No input xml file provided. Observation dictionary not constructed.')
 
@@ -534,8 +539,13 @@ class SimInput:
 
             self.info = apt.exposure_tab
 
-            # Add start time info to each element
-            self.make_start_times()
+            # Add start time info to each element.
+            # Ignore warnings as astropy.time.Time will give a warning
+            # related to unknown leap seconds if the date is too far in
+            # the future.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.make_start_times()
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
@@ -681,7 +691,6 @@ class SimInput:
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
             file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
-
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
 
@@ -1137,7 +1146,6 @@ class SimInput:
                                                     else:
                                                         newkey6 = key6
 
-
     def make_start_times(self):
         """Create exposure start times for each entry in the observation dictionary."""
         date_obs = []
@@ -1162,7 +1170,8 @@ class SimInput:
         act_overhead = 90  # seconds. (filter change)
         visit_overhead = 600  # seconds. (slew)
 
-        # Get visit, activity_id info for first exposure
+        # Get visit, activity_id, dither_id info for first exposure
+        ditherid = self.info['dither'][0]
         actid = self.info['act_id'][0]
         visit = self.info['visit_num'][0]
         # obsname = self.info['obs_label'][0]
@@ -1176,6 +1185,7 @@ class SimInput:
             next_actid = self.info['act_id'][i]
             next_visit = self.info['visit_num'][i]
             next_obsname = self.info['obs_label'][i]
+            next_ditherid = self.info['dither'][i]
 
             # Find the readpattern of the file
             readpatt = self.info['ReadoutPattern'][i]
@@ -1214,21 +1224,11 @@ class SimInput:
                 # for observations using all 4 shortwave B detectors. In that case,
                 # we need to build the aperture name from the combination of detector
                 # and subarray name.
-                # if np.all(np.unique(self.info['Instrument']) == 'NIRISS'):
-                #     # aperture = self.info['aperture']
-                #
-                # elif np.all(np.unique(self.info['Instrument']) == 'NIRCAM'):
-                #     sub = self.info['Subarray'][i]
-                #     det = 'NRC' + self.info['detector'][i]
-                #     aperture = det + '_' + sub
-
                 aperture = self.info['aperture'][i]
                 if 'NRC' == aperture[0:3]:
                     sub = self.info['Subarray'][i]
                     det = 'NRC' + self.info['detector'][i]
                     aperture = det + '_' + sub
-
-
 
                 # Get the number of amps from the subarray definition file
                 match = aperture == subarray_def['AperName']
@@ -1251,15 +1251,22 @@ class SimInput:
                 namp.append(amp)
 
                 # same activity ID
-                if next_actid == actid:
-                    # in this case, the start time should remain the same
-                    date_obs.append(base_date)
-                    time_obs.append(base_time)
-                    expstart.append(base.mjd)
-                    continue
+                # Remove this for now, since Mirage was not correctly
+                # specifying activities. At the moment all exposures have
+                # the same activity ID, which means we must allow the
+                # the epoch_start_date to change even if the activity ID
+                # does not. This will change back in the future when we
+                # figure out more realistic activity ID values.
+                #if next_actid == actid:
+                #    # in this case, the start time should remain the same
+                #    date_obs.append(base_date)
+                #    time_obs.append(base_time)
+                #    expstart.append(base.mjd)
+                #    continue
 
                 epoch_date = self.info['epoch_start_date'][i]
                 epoch_time = deepcopy(epoch_base_time0)
+
                 # new epoch - update the base time
                 if epoch_date != epoch_base_date:
                     epoch_base_date = deepcopy(epoch_date)
@@ -1278,12 +1285,19 @@ class SimInput:
                 if next_visit != visit:
                     # visit break. Larger overhead
                     overhead = visit_overhead
+
+                # This block should be updated when we have more realistic
+                # activity IDs
                 elif ((next_actid > actid) & (next_visit == visit)):
                     # same visit, new activity. Smaller overhead
                     overhead = act_overhead
+                elif ((next_ditherid != ditherid) & (next_visit == visit)):
+                    # same visit, new dither position. Smaller overhead
+                    overhead = act_overhead
                 else:
-                    # should never get in here
-                    raise NotImplementedError()
+                    # same observation, activity, dither. Filter changes
+                    # will still fall in here, which is not accurate
+                    overhead = 10.
 
                 # For cases where the base time needs to change
                 # continue down here
@@ -1313,6 +1327,7 @@ class SimInput:
                 actid = deepcopy(next_actid)
                 visit = deepcopy(next_visit)
                 obsname = deepcopy(next_obsname)
+                ditherid = deepcopy(next_ditherid)
 
         self.info['date_obs'] = date_obs
         self.info['time_obs'] = time_obs
@@ -1860,8 +1875,8 @@ class SimInput:
             f.write('cosmicRay:\n')
             cosmic_ray_path = os.path.join(self.datadir, instrument.lower(), 'cosmic_ray_library')
             f.write('  path: {}               # Path to CR library\n'.format(cosmic_ray_path))
-            f.write('  library: SUNMAX    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n')
-            f.write('  scale: 1.0     # Cosmic ray scaling factor\n')
+            f.write('  library: {}    # Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)\n'.format(input['CosmicRayLibrary']))
+            f.write('  scale: {}     # Cosmic ray scaling factor\n'.format(input['CosmicRayScale']))
             # temporary tweak here to make it work with NIRISS
             detector_label = input['detector']
 
