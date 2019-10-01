@@ -25,4 +25,4 @@ dependencies:
 - pip:
     - jwst-backgrounds>=1.1.1
     - pysiaf==0.3.0
-    - git+https://github.com/spacetelescope/jwst@9d5eb8c#egg=jwst
+    - git+https://github.com/spacetelescope/jwst@0.13.8
