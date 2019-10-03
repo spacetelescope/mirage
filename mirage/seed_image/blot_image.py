@@ -270,7 +270,11 @@ class Blot():
         blot_to.meta.wcsinfo.v3yangle = self.siaf.V3SciYAngle
         blot_to.meta.wcsinfo.vparity = self.siaf.VIdlParity
         blot_to.meta.instrument.channel = 'SHORT'
-        blot_to.meta.instrument.detector = detector_name
+        if '5' not in detector_name:
+            blot_to.meta.instrument.detector = detector_name
+        else:
+            blot_to.meta.instrument.detector = detector_name.replace('5', 'LONG')
+
         blot_to.meta.instrument.filter = filter_element
         blot_to.meta.instrument.module = detector_name[0]
         blot_to.meta.instrument.name = 'NIRCAM'

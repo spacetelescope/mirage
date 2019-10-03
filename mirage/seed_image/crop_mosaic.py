@@ -63,6 +63,9 @@ class Extraction():
 
         # Assume the input mosaic has been drizzled, so remove
         # any SIP coefficients that may be present
+        print('\n\n******************************************************************')
+        print('Assuming input files have been drizzled. Removing SIP coefficients')
+        print('******************************************************************\n\n')
         mosaic_wcs.sip = None
 
         radec = np.array([[self.center_ra, self.center_dec]])
