@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-'''
+"""
 Create a mirage-format seed image from
 an input fits file. This fits file must contain a
 valid WCS, and be distortion-free.
@@ -10,9 +10,9 @@ fits file. The subimage is centered at the input
 RA and Dec (crop_center_ra, crop_center_dec) and
 its size is determined by the aperture input.
 
-The extracted sub-image is then blotted onto the
-requested NIRCam detector's FOV, including the
-distortion model.
+The extracted sub-image is then blotted (resampled)
+onto the requested NIRCam detector's FOV, including
+the distortion model.
 
 The resulting image is then saved in such a format
 that it can be used as input in the obs_generator.py,
@@ -113,30 +113,9 @@ the seed image is dispersed by a call to the
 disperser software.
 
 Example calls:
-
-1. Using parameter file
-s = fits_seed_image.ImgSeed('fits_seed_image_test.yaml')
-s.mosaicfile = 'large_distortionFree_mosaic_drz.fits'
-s.crop_and_blot()
-
-2. Manual inputs
-s = fits_seed_image.ImgSeed()
-s.mosaicfile = 'large_distortionFree_mosaic_drz.fits'
-s.aperture = 'NRCB5_FULL'
-s.crop_center_ra = 53.1
-s.crop_center_dec = -27.8
-s.blot_center_ra = 53.1
-s.blot_center_de = -27.8
-s.blot_pav3 = 0.
-s.subarray_defs = 'config'
-s.flux_cal_file = 'config'
-s.filter = 'F250M'
-s.pupil = 'CLEAR'
-s.grism_source_image = False
-s.outfile = 'test_mosaic_seed.fits'
-s.outdir = '/my/simulation/outputs/'
-s.crop_and_blot()
-'''
+See the Simulated_data_from_mosaic_image.ipynb notebook
+in the examples directory
+"""
 import argparse
 import datetime
 import os
@@ -163,6 +142,26 @@ config_files = {'nircam': {'flux_cal':'NIRCam_zeropoints.list'},
 
 class ImgSeed:
     def __init__(self, paramfile=None, mosaicfile=None, cropped_file='cropped_image.fits', outdir=None, blotted_file=None):
+        """Create a seed image from a distortionless input mosaic
+
+        Parameters
+        ----------
+            paramfile : str
+                Name of Mirage yaml input file used to supply instrument info
+
+            mosaicfile : str
+                Name of the fits file containing the mosaic file to use
+
+            cropped_file : str
+                Name of the file to save the cropped image into. If None,
+                the cropped image is not saved
+
+            outdir : str
+                Name of the output directory to save the output files into
+
+            blotted_file : str
+                Name of fits file to save resampled image into
+        """
         self.mosaicfile = mosaicfile
         self.data_extension_number = 0.
         self.wcs_extension_number = 0.
@@ -471,9 +470,6 @@ class ImgSeed:
         # expand the region to be blotted
         if self.params['Output']['grism_source_image']:
             self.grism_coord_adjust()
-
-        #if self.blotted_file is None:
-        #    self.blotted_file = self.params['Output']['file'].replace('.fits', '_seed_image.fits')
 
         if self.outdir is None:
             self.outdir = self.params['Output']['directory']

@@ -23,42 +23,39 @@ from ..utils.siaf_interface import get_instance
 
 
 class Blot():
-
-    """Blot (i.e. resample) the given image to be centered on the input
-    list of RA, Dec, pav3 values using the appropriate instrument/aperture
-    distortion.
-
-    Parameters
-    ----------
-    instrument : str
-        JWST instrument name
-
-    aperture : str
-        Aperture describing the subarray to use. (e.g. 'NRCA1_FULL')
-
-    ra : float or list
-        List of RA values in decimal degrees, describing the locations
-        of the centers of the blotted images
-
-    dec : float or list
-        List of Declination values in decimal degress, describing the
-        locations of the centers of the blotted images
-
-    pav3 : float or list
-        List of PAV3 values in decimal degrees, describing the locations
-        of the centers of the blotted images
-
-    output_file : str
-        Not currently used
-
-    distortion_file : str
-        Name of a CRDS distortion reference file to be used when running
-        the assign_wcs pipeline step on the blotted data
-
-    """
-
     def __init__(self, instrument=None, aperture=None, ra=None, dec=None,
                  pav3=None, output_file=None, blotfile=None, distortion_file=None):
+        """Blot (i.e. resample) the given image to be centered on the input
+        list of RA, Dec, pav3 values using the appropriate instrument/aperture
+        distortion.
+
+        Parameters
+        ----------
+        instrument : str
+            JWST instrument name
+
+        aperture : str
+            Aperture describing the subarray to use. (e.g. 'NRCA1_FULL')
+
+        ra : float or list
+            List of RA values in decimal degrees, describing the locations
+            of the centers of the blotted images
+
+        dec : float or list
+            List of Declination values in decimal degress, describing the
+            locations of the centers of the blotted images
+
+        pav3 : float or list
+            List of PAV3 values in decimal degrees, describing the locations
+            of the centers of the blotted images
+
+        output_file : str
+            Not currently used
+
+        distortion_file : str
+            Name of a CRDS distortion reference file to be used when running
+            the assign_wcs pipeline step on the blotted data
+        """
         if isinstance(ra, float):
             self.center_ra = [ra]
         else:
@@ -102,11 +99,6 @@ class Blot():
             input_mod = datamodels.ImageModel(self.blotfile)
             outbase = self.blotfile
 
-            # Create a GWCS object from the input file's header
-            #input_header = fits.getheader(self.blotfile)
-            #transform = gwcs.utils.make_fitswcs_transform(header)
-            #input_mod.meta.wcs = gwcs.WCS(transform)
-
         elif type(self.blotfile) == datamodels.image.ImageModel:
             # Not a great solution at the moment. Save
             # imagemodel instance so that you have a fits
@@ -131,7 +123,7 @@ class Blot():
         except:
             pupil = 'CLEAR'
 
-        # get position angle of input data
+        # Get position angle of input data
         input_pav3 = input_mod.meta.wcsinfo.roll_ref
 
         # Name of temporary file output for set_telescope_pointing
@@ -145,15 +137,10 @@ class Blot():
             self.siaf = get_instance(self.instrument)[aper]
 
             # Create datamodel with appropriate metadata
-            #bmodel = self.make_model(det, ra, dec, v2ref, v3ref, v3ang, parity, input_pav3, filtername, pupil)
             bmodel = self.make_model(det, ra, dec, input_pav3, filtername, pupil)
-            #shellname = 'wcs_model_to_blot_to_{}_{}_{}_{}.fits'.format(det,ra,dec,roll)
             bmodel.save(shellname, overwrite=True)
 
-            #tmpname = 'wcs_model_to_blot_to_BASEMODEL_{}_{}_{}_{}.fits'.format(det,ra,dec,roll)
-            #bmodel.save(tmpname,overwrite=True)
-
-            # use set_telescope_pointing to compute local roll
+            # Use set_telescope_pointing to compute local roll
             # angle and PC matrix
             stp.add_wcs(shellname, roll=roll)
 
@@ -166,29 +153,18 @@ class Blot():
             else:
                 bmodel = AssignWcsStep.call(bmodel)
 
-            #tmpname = 'wcs_model_to_blot_to_ASSIGNWCS_{}_{}_{}_{}.fits'.format(det,ra,dec,roll)
-            #bmodel.save(tmpname,overwrite=True)
-
             # Add to the list of data model instances to blot to
             blist.append(bmodel)
 
-        #place the model instances to blot to in a ModelContainer
+        # Place the model instances to blot to in a ModelContainer
         blot_list = container.ModelContainer(blist)
 
-        #blot the image to each of the WCSs in the blot_list
-        pars = {'sinscl':1.0, 'interp':'poly5'}
+        # Blot the image to each of the WCSs in the blot_list
+        pars = {'sinscl': 1.0, 'interp': 'poly5'}
         reffiles = {}
         blotter = outlier_detection.OutlierDetection(blot_list, reffiles=reffiles, **pars)
         blotter.input_models = blot_list
-        self.blotted_datamodels = blotter.blot_median(input_mod) #, blot_list, **mm.outlierpars)
-
-        #for (bltted,det,ra,dec,roll) in \
-        #    zip(blotted_datamodels,self.detector,self.center_ra,\
-        #        self.center_dec,self.pav3):
-        #    if self.outfile is None:
-        #        self.outfile = 'blotted_from_{}_to_{}_{}_{}_{}.fits'.format(outbase,det,ra,dec,roll)
-        #    bltted.save(self.outfile)
-
+        self.blotted_datamodels = blotter.blot_median(input_mod)
 
     def get_siaf_info(self, instrument_name, aperture_name):
         """Get v2,v3 reference values and y3yangle for a given aperture
@@ -200,24 +176,8 @@ class Blot():
 
         aperture_name : str
             Aperture name to use in pysiaf (e.g. 'NRCA1_FULL')
-
-        Returns
-        -------
-        v2_refpos : float
-            V2 of the reference location of the aperture (arcsec)
-
-        v3_refpos : float
-            V3 of the reference location of the aperture (arcsec
-
-        v3_yangle : float
-            Angle between V3 axis and Y axis of the detector
         """
         self.siaf = pysiaf.Siaf(instrument_name)[aperture_name]
-        #v2_refpos = siaf.V2Ref
-        #v3_refpos = siaf.V3Ref
-        #v3_yangle = siaf.V3SciYAngle
-        #return v2_refpos, v3_refpos, v3_yangle
-
 
     def make_model(self, detector_name, ra_val, dec_val, roll_val,
                    filter_element, pupil_element):
@@ -249,8 +209,6 @@ class Blot():
             Empty ImageModel instance with WCS values populated
         """
         blot_to = datamodels.ImageModel((2048,2048))
-        #blot_to.meta.wcsinfo.cdelt1 = self.nrc_scale[detector_name][0] / 3600.
-        #blot_to.meta.wcsinfo.cdelt2 = self.nrc_scale[detector_name][1] / 3600.
         blot_to.meta.wcsinfo.cdelt1 = self.siaf.XSciScale * 3600.
         blot_to.meta.wcsinfo.cdelt2 = self.siaf.YSciScale * 3600.
         blot_to.meta.wcsinfo.crpix1 = 1024.5
@@ -287,20 +245,16 @@ class Blot():
         blot_to.meta.target.dec = dec_val
         return blot_to
 
-
     def add_options(self,parser=None,usage=None):
         if parser is None:
             parser = argparse.ArgumentParser(usage=usage,description='Extract SCA-sized area from moasic')
-        parser.add_argument("blotfile",help="Filename or model instance name of fits file containing mosaic.")
-        #parser.add_argument("--blotmodel",help="Datamodel containing array to blot",default=None)
-        mirage_data = os.path.abspath(os.path.expandvars(self.env_var))
-        distortion_default = os.path.join(mirage_data, 'reference_files/distortion/')
-        parser.add_argument("--distortion_dir", help="Directory containing distortion reference files for the appropriate instrument.", default=distortion_default)
-        parser.add_argument("--detector",help="NIRCam detectors to blot to. Multiple inputs ok. (e.g. A1 A5)",nargs='*')
-        parser.add_argument("center_ra",help="RA at the center of the extracted area",type=np.float,nargs='*')
-        parser.add_argument("center_dec",help="Dec at the center of the extracted area",type=np.float,nargs='*')
-        parser.add_argument("pav3",help="Position angle for outputs to use when blotting",nargs='*')
-        parser.add_argument("--outfile",help="Name of output fits file containing extracted image",default=None,nargs='*')
+        parser.add_argument("--instrument", help="JWST instrument name to which image will be resampled")
+        parser.add_argument("--aperture", help="Instrument aperture to which image will be resampled")
+        parser.add_argument("--blotfile", help="Filename or model instance name of fits file containing mosaic.")
+        parser.add_argument("--ra", help="RA at the center of the resampled area", type=np.float,nargs='*')
+        parser.add_argument("--dec", help="Dec at the center of the resampled area", type=np.float,nargs='*')
+        parser.add_argument("--pav3", help="Position angle for outputs to use when blotting", nargs='*')
+        parser.add_argument("--output_file", help="Name of output fits file containing extracted image", default=None,nargs='*')
         return parser
 
 
