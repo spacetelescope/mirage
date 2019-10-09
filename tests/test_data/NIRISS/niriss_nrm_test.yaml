@@ -17,12 +17,12 @@ Reffiles:                                 #Set to None or leave blank if you wis
   linearized_darkfile: None # Linearized dark ramp to use as input. Supercedes dark above
   badpixmask: $MIRAGE_DATA/niriss/reference_files/badpix/jwst_niriss_mask_0008.fits # If linearized dark is used, populate output DQ extensions using this file
   superbias: $MIRAGE_DATA/niriss/reference_files/superbias/jwst_niriss_superbias_0080.fits #Superbias file. Set to None or leave blank if not using
-  linearity: $MIRAGE_DATA/niriss/reference_files/linearity/jwst_niriss_linearity_0010.fits #linearity correction coefficients
+  linearity: $MIRAGE_DATA/niriss/reference_files/linearity/jwst_niriss_linearity_0011.fits #linearity correction coefficients
   saturation: $MIRAGE_DATA/niriss/reference_files/saturation/jwst_niriss_saturation_0010.fits #well depth reference files
   gain: $MIRAGE_DATA/niriss/reference_files/gain/jwst_niriss_gain_0005.fits
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/niriss/reference_files/distortion/jwst_niriss_distortion_0008.asdf #Astrometric distortion file (asdf)
+  astrometric: $MIRAGE_DATA/niriss/reference_files/distortion/jwst_niriss_distortion_0010.asdf #Astrometric distortion file (asdf)
   distortion_coeffs: $MIRAGE_DATA/niriss/reference_files/SIAF/NIRISS_SIAF_09-28-2017.csv        #CSV file containing distortion coefficients
   ipc: $MIRAGE_DATA/niriss/reference_files/ipc/Kernel_to_add_IPC_effects_from_jwst_niriss_ipc_0007.fits  #File containing IPC kernel to apply
   invertIPC: False      #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
