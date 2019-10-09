@@ -337,7 +337,7 @@ def ensure_lower_case_catalogs_keys(dictionary):
         for key2, value2 in targ_dict.items():
             if isinstance(value2, collections.Mapping):
                 new_dict[target_name][key2.lower()] = {}
-                for key3, value3 in targ_dict[key2][key3]:
+                for key3, value3 in targ_dict[key2].items():
                     new_dict[target_name][key2.lower()][key3.lower()] = value3
             else:
                 new_dict[target_name][key2.lower()] = value2
