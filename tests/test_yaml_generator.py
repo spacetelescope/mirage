@@ -20,6 +20,11 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 
 # Reset the MIRAGE_DATA env variable to be a real location so yaml_generator
 # doesn't croak
+# Determine if tests are being run on Travis
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
+if not ON_TRAVIS:
+    orig_mirage_data = os.environ['MIRAGE_DATA']
+
 os.environ["MIRAGE_DATA"] = __location__
 os.environ["CRDS_PATH"] = os.path.join(__location__, "temp")
 
@@ -499,3 +504,9 @@ def test_reffile_crds_full_name():
 
     # Clean up
     os.system('rm -r {}'.format(temp_output_dir))
+
+
+# Return environment variable to original value. This is helpful when
+# calling many tests at once, some of which need the real value.
+if not ON_TRAVIS:
+    os.environ['MIRAGE_DATA'] = orig_mirage_data
