@@ -257,6 +257,9 @@ class ImgSeed:
                                       jwst_pixel_scale=pixel_scale)
         crop.extract()
 
+        # Convolve the cropped image with the appropriate PSF
+
+
         # Blot
         blot = blot_image.Blot(instrument=self.instrument, aperture=self.aperture,
                                ra=[self.blot_center_ra], dec=[self.blot_center_dec],
