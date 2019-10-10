@@ -377,7 +377,6 @@ class ImgSeed:
         dim = len(self.seed_image.shape)
         if dim == 2:
             units = 'e-/sec'
-            # TODO(eslavich): Where should this come from?
             yd,xd = arrayshape
             tgroup = 0.
         else:
