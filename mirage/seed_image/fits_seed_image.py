@@ -154,6 +154,8 @@ import pkg_resources
 import numpy as np
 from math import radians
 from astropy.io import fits, ascii
+from photutils import detect_sources
+
 
 from . import crop_mosaic, blot_image
 
@@ -483,7 +485,7 @@ if __name__ == '__main__':
 
     usagestring = 'USAGE: fits_seed_image.py inputs.yaml'
 
-    seed = Imgseed()
+    seed = ImgSeed()
     parser = seed.add_options(usage = usagestring)
     args = parser.parse_args(namespace=seed)
     seed.read_param_file(args.paramfile)

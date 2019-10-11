@@ -277,7 +277,7 @@ class WFSSSim():
 
         # ###################Instrument Name##################
         if self.instrument not in ['nircam', 'niriss']:
-            self.invalid('instrument', instrument)
+            self.invalid('instrument', self.instrument)
 
         # ###################Module Name##################
         if self.instrument == 'nircam':

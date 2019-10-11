@@ -15,6 +15,7 @@ import os
 import copy
 import re
 import shutil
+from yaml.scanner import ScannerError
 
 import math
 import yaml
@@ -3350,7 +3351,7 @@ class Catalog_seed():
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
         print('extended position angle:', x_pos_ang)
         print('scipy rotate seems to be failing with no error raised')
-        rotated = rotate(stamp_image, x_pos_angle, mode='nearest')
+        rotated = rotate(stamp_image, x_pos_ang, mode='nearest')
         print('rotated shape: ', rotated.shape)
         return rotated
 

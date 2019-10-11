@@ -1318,7 +1318,7 @@ class ReadAPTXML():
                     exp_seq_dict['ReadoutPattern'] = [grism_readpatt]
                     exp_seq_dict['Groups'] = [grism_groups]
                     exp_seq_dict['Integrations'] = [grism_integrations]
-                    exp_seq_dict['ShortPupil'] = [grism_shoprt_pupil]
+                    exp_seq_dict['ShortPupil'] = [grism_short_pupil]
                     exp_seq_dict['LongPupil'] = [grism_long_pupil]
                     exp_seq_dict['Grism'] = [grism]
                     exp_seq_dict['ObservationID'] = [proposal_param_dict['ObservationID']]
