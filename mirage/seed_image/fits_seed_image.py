@@ -126,10 +126,13 @@ from astropy.io import fits, ascii
 from math import radians
 import numpy as np
 from photutils import detect_sources
+from photutils import TopHatWindow
 import pysiaf
 import yaml
 
 from . import crop_mosaic, blot_image
+from mirage.psf.psf_selection import get_psf_wings
+from mirage.psf import tools
 from mirage.seed_image.save_seed import save
 from mirage.reference_files import crds_tools
 from mirage.utils.constants import EXPTYPES
@@ -141,7 +144,8 @@ config_files = {'nircam': {'flux_cal':'NIRCam_zeropoints.list'},
                 }
 
 class ImgSeed:
-    def __init__(self, paramfile=None, mosaicfile=None, cropped_file='cropped_image.fits', outdir=None, blotted_file=None):
+    def __init__(self, paramfile=None, mosaicfile=None, cropped_file='cropped_image.fits', outdir=None, blotted_file=None,
+                 psf_file=None):
         """Create a seed image from a distortionless input mosaic
 
         Parameters
@@ -182,6 +186,7 @@ class ImgSeed:
         self.blotted_file = blotted_file
         self.outdir = outdir
         self.grism_direct_factor = np.sqrt(2.)
+        self.psf_file = psf_file
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
@@ -245,7 +250,11 @@ class ImgSeed:
             usefilt = self.filter.upper()
         self.fluxcal_info(usefilt, module)
 
-        # Extract
+        # Collect the metadata relating to the mosaic and (optionally) PSF
+        # and read in/create the PSF
+        self.prepare_psf()
+
+        # Crop
         pixel_scale = self.siaf[self.aperture].XSciScale
         crop = crop_mosaic.Extraction(mosaicfile=self.mosaicfile,
                                       data_extension_number=self.data_extension_number,
@@ -258,7 +267,7 @@ class ImgSeed:
         crop.extract()
 
         # Convolve the cropped image with the appropriate PSF
-
+        crop.cropped = self.psf_convolution(crop.cropped)
 
         # Blot
         blot = blot_image.Blot(instrument=self.instrument, aperture=self.aperture,
@@ -266,6 +275,13 @@ class ImgSeed:
                                pav3=[self.blot_pav3], blotfile=crop.cropped,
                                distortion_file=self.distortion_file)
         blot.blot()
+
+        # Blot the PSF associated with the mosaic
+        blot_psf = blot_image.Blot(instrument=self.instrument, aperture=self.aperture,
+                                   ra=[self.blot_center_ra], dec=[self.blot_center_dec],
+                                   pav3=[self.blot_pav3], blotfile=mosaic_psf_model,
+                                   distortion_file=self.distortion_file)
+        blot_psf.blot()
 
         for dm in blot.blotted_datamodels:
             # Create segmentation map
@@ -388,6 +404,9 @@ class ImgSeed:
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
 
+    def get_mosaic_info(self, ):
+      pixel scale from model.meta.wcsinfo.cdelt1
+
     def grism_coord_adjust(self):
         """Calculate the factors by which to expand the
         output array size, as well as the coordinate
@@ -438,6 +457,148 @@ class ImgSeed:
       elif self.instrument == 'FGS':
           module = 'G'
       return module
+
+    def prepare_psf(self):
+        """Get metadata relevant to the instrument/detector as well as the
+        pixel scale from either the mosaic file, the PSF file, or both.
+        Read in or create the PSF that is representative of the mosaic
+        data.
+        """
+        # Get information on the instrument used to create the mosaic
+        self.mosaic_metadata = tools.get_psf_metadata(self.mosaic_file)
+
+        # Get the PSF associated with the mosaic
+        if self.psf_file is None:
+
+            # If no PSF file is given and there is no pixel scale listed in
+            # the mosaic file, then we cannot continue
+            if self.mosaic_metadata['pix_scale1'] is None:
+                raise ValueError(("ERROR: pixel scale value not present in mosaic file "
+                                  "(in CD1_1 header keyword). This information is needed "
+                                  "to be able to convolve the mosaic with the proper PSF "
+                                  "kernel."))
+
+            # If the mosaic is one of our special cases, then use the
+            # appropriate function to construct a PSF
+            if self.mosaic_metadata['telescope'] == 'HST':
+                self.mosaic_psf = tools.get_HST_PSF(self.mosaic_metadata)
+            elif self.mosaic_psf_metadata['telescope'] == 'JWST':
+                self.mosaic_psf = tools.get_JWST_PSF(self.mosaic_metadata)
+            elif self.mosaic_psf_metadata['instrument'] == 'IRAC':
+                self.mosaic_psf = tools.get_IRAC_PSF(self.mosaic_metadata)
+            else:
+                raise ValueError(("For non-(HST, JWST, IRAC) mosaics, you must also provide a "
+                                  "representative PSF in order to convolve the mosaic with the "
+                                  "proper PSF kernal to transform it to JWST PSF profiles."))
+        else:
+            # If a PSF file is provided, check for any metadata. Metadata
+            # from the mosaic takes precidence over metadata in the PSF file.
+            psf_metadata = tools.get_psf_metadata(psf_filename)
+
+            # If the mosaic has no pixel scale info but the PSF file does,
+            # use the value from the PSF file.
+            if self.mosaic_metadata['pix_scale1'] is None:
+                if psf_metadata['pix_scale1'] is not None:
+                    self.mosaic_metadata['pix_scale1'] = psf_metadata['pix_scale1']
+                else:
+                    raise ValueError(("ERROR: no pixel scale value present in mosaic file nor PSF "
+                                      "file metadata (in CD1_1 header keyword). This information is "
+                                      "needed to be able to convolve the mosaic with the proper PSF "
+                                      "kernel."))
+
+    def psf_convolution(self, model):
+      """Convolve the cropped image with the appropriate PSF for the
+      JWST detector being simulated.
+
+      Parameters
+      ----------
+      model : jwst.datamodels.ImageModel
+          Data model instance containing the cropped image
+
+      mosiac_psf : numpy.ndarray
+          2D array of the PSF corresponding to that in the original
+          mosaic image
+
+      mosaic_psf_scale : float
+          Pixel scale (arcsec/pixel) of the PSF in the original
+          mosaic image
+
+      Returns
+      -------
+      model : jwst.datamodels.ImageModel
+          Data model with image convolved by the PSF
+      """
+      # Identify the correct PSF for the JWST instrument/detector
+      # Let's just read in the psf_wings file, which contains the PSF
+      # at the center of the detector. It doesn't make much sense to
+      # worry about spatially-dependent PSFs in this case
+      jwst_psf = get_psf_wings(self.instrument, self.detector, self.filter, self.pupil,
+                               self.params['simSignals']['psfwfe'],
+                               self.params['simSignals']['psfwfegroup'],
+                               os.path.join(self.params['simSignals']['psfpath'], 'psf_wings'))
+
+      # The jwst_psf and the mosaic_psf must have the same array size
+      # and the same pixel scale. First deal with the pixel scale.
+      meta_output = {}
+      meta_output['instrument'] = self.instrument
+      outscale1, outscale2 = tools.get_JWST_pixel_scale(meta_output, aperture=self.aperture)
+
+      # Rescale one of the PSFs if necessary, in order to get metching pixel scales.
+      # Since the matching kernel is going to be convolved with the mosaic image,
+      # then it seems like we should match the PSFs at the mosaic pixel scale.
+      if not np.isclose(outscale1, self.mosaic_metadata['pix_scale1'], atol=0., rtol=0.01):
+          jwst_psf = resize_psf(jwst_psf, outscale1, self.mosaic_metadata['pix_scale1'], order=3)
+
+      # Now we make a matching kernel. The mosaic can then be
+      # convolved with this kernel in order to adjust the PSFs to match
+      # those from JWST.
+      kernel = matching_kernel(self.mosaic_psf, jwst_psf, window_type='TopHatWindow', alpha=0.35, beta=0.35)
+      convolved_mosaic = convolve(model.data, kernel)
+      model.data = convolved_mosaic
+      return model
+
+    @staticmethod
+    def matching_kernel(psf1, psf2, window_type='TopHatWindow', alpha=None, beta=None):
+        """Use photutils to create a matching kernel given two PSFs and
+        the window type and parameters
+
+        Parameters
+        ----------
+        psf1 : numpy.ndarray
+            2D array containing the first PSF
+
+        psf2 : numpy.ndarray
+            2D array containing the second PSF
+
+        window_type : str
+            Name of the window function to use when filtering the matching kernel
+
+        alpha : float
+            Optional input for some of the window functions
+
+        beta : float
+            Optional input for some of the window functions
+        """
+        # Create the filtering window
+        orig_window_type = copy.deepcopy(window_type)
+        window_type = window_type.lower()
+        if window_type == 'tophatwindow':
+            window = TopHatWindow(beta=beta)
+        elif window_type == 'cosinebellwindow':
+            window = CosineBellWindow(alpha=alpha)
+        elif window_type == 'splitcosinebellwindow':
+            window = SplitCosineBellWindow(alpha=alpha, beta=beta)
+        elif window_type == 'tukeywindow':
+            window = TukeyWindow(alpha=alpha)
+        elif window_type == 'hanningwindow':
+            window = HanningWindow()
+        else:
+            raise ValueError("ERROR: Unrecognized window_type: {}".format(orig_window_type))
+
+        # Create the matching kernel
+        matching_kernel = create_matching_kernel(psf1, psf2, window=window)
+
+        return matching_kernel
 
     def read_param_file(self, file):
         """Read the input yaml file into a nested dictionary
@@ -496,6 +657,9 @@ class ImgSeed:
         parser.add_argument("aperture",help="Aperture to use. (e.g. NRCA1_FULL)")
         parser.add_argument("subarray_defs",help="Ascii file containing subarray definitions")
         return parser
+
+
+
 
 
 if __name__ == '__main__':

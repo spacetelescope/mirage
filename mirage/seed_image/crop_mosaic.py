@@ -69,6 +69,10 @@ class Extraction():
         mosaic = fits.open(self.mosaicfile)
         mosaic_wcs = wcs.WCS(mosaic[0].header)
         mosaic_shape = mosaic[0].data.shape
+        try:
+            self.instrument = mosaic[0].header['INSTRUME']
+        except KeyError:
+            self.instrument = 'NA'
 
         # Assume the input mosaic has been drizzled, so remove
         # any SIP coefficients that may be present
@@ -197,6 +201,7 @@ class Extraction():
         h1 = fits.ImageHDU()
         h1.data = array
 
+        h1.header['INSTRUME'] = self.instrument
         h1.header['CDELT1'] = self.mosaic_scale_x / 3600.
         h1.header['CDELT2'] = self.mosaic_scale_y / 3600.
         h1.header['CRPIX1'] = self.crpix1
