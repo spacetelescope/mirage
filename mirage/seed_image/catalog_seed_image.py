@@ -257,11 +257,33 @@ class Catalog_seed():
            (aperture_suffix not in ['FULL', 'CEN'])):
             self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
 
-        # Save the combined static + moving targets ramp
-        self.saveSeedImage()
-
+        # For NIRISS POM data, extract the central 2048x2048
         if self.params['Inst']['mode'] in ["pom"]:
             self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
+
+        # MASK IMAGE
+        # Create a mask so that we don't add signal to masked pixels
+        # Initially this includes only the reference pixels
+        # Keep the mask image equal to the true subarray size, since this
+        # won't be used to make a requested grism source image
+        if self.params['Inst']['mode'] not in ['wfss']:
+            maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+            maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
+
+            # crop the mask to match the requested output array
+            ap_suffix = self.params['Readout']['array_name'].split('_')[1]
+            if ap_suffix not in ['FULL', 'CEN']:
+                maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                                      self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
+
+            # Multiply the mask by the seed image and segmentation map in
+            # order to reflect the fact that reference pixels have no signal
+            # from external sources
+            self.seedimage *= maskimage
+            self.seed_segmap *= maskimage
+
+        # Save the combined static + moving targets ramp
+        self.saveSeedImage()
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
@@ -1429,19 +1451,6 @@ class Catalog_seed():
 
         # yd, xd = signalimage.shape
         arrayshape = signalimage.shape
-
-        # MASK IMAGE
-        # Create a mask so that we don't add signal to masked pixels
-        # Initially this includes only the reference pixels
-        # Keep the mask image equal to the true subarray size, since this
-        # won't be used to make a requested grism source image
-        maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
-        maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
-
-        # crop the mask to match the requested output array
-        if "FULL" not in self.params['Readout']['array_name']:
-            maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
-                                  self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
 
         # POINT SOURCES
         # Read in the list of point sources to add

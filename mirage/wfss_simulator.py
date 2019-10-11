@@ -182,8 +182,14 @@ class WFSSSim():
         gainfile = cat.params['Reffiles']['gain']
         gain, gainheader = self.read_gain_file(gainfile)
 
-        # Disperser output is always full frame. Crop to the
-        # requested subarray if necessary
+        # Disperser output is always full frame. Remove the signal from
+        # the refrence pixels now since we know exactly where they are
+        disp_seed.final[0:4, :] = 0.
+        disp_seed.final[2044:, :] = 0.
+        disp_seed.final[:, 0:4] = 0.
+        disp_seed.final[:, 2044:] = 0.
+
+        # Crop to the requested subarray if necessary
         if cat.params['Readout']['array_name'] not in self.fullframe_apertures:
             print("Subarray bounds: {}".format(cat.subarray_bounds))
             print("Dispersed seed image size: {}".format(disp_seed.final.shape))
