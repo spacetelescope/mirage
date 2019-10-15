@@ -14,7 +14,7 @@ import numpy as np
 from jwst import datamodels
 
 class Extraction():
-    def __init__(self, mosaicfile=None, data_extension_number=0,
+    def __init__(self, mosaicfile=None, data_extension_number=0, wcs_extension_number=0,
                  center_ra=None, center_dec=None, outfile=None, dimensions=(0, 0),
                  jwst_pixel_scale=None):
         """
@@ -25,6 +25,10 @@ class Extraction():
 
         data_extension_number : int
             Extension number within the mosaic fits file where the data are stored
+
+        wcs_extension_number : int
+            Extension number within the mosaic fits file where the WCS information
+            are stored
 
         center_ra : float
             RA value in decimal degrees at the cropped image's reference location
@@ -48,6 +52,7 @@ class Extraction():
         """
         self.mosaicfile = mosaicfile
         self.data_extension_number = data_extension_number
+        self.wcs_extension_number = wcs_extension_number
         self.center_ra = center_ra
         self.center_dec = center_dec
         self.outfile = outfile
@@ -67,8 +72,8 @@ class Extraction():
         """
         # Get WCS info from mosaic file
         mosaic = fits.open(self.mosaicfile)
-        mosaic_wcs = wcs.WCS(mosaic[0].header)
-        mosaic_shape = mosaic[0].data.shape
+        mosaic_wcs = wcs.WCS(mosaic[self.wcs_extension_number].header)
+        mosaic_shape = mosaic[self.data_extension_number].data.shape
         try:
             self.instrument = mosaic[0].header['INSTRUME']
         except KeyError:

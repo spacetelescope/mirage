@@ -11,8 +11,44 @@ import numpy as np
 from photutils.datasets import load_irac_psf
 import webbpsf
 
-from mirage.psf_selection import get_psf_wings
+from mirage.psf.psf_selection import get_psf_wings
 from mirage.utils.siaf_interface import get_instance
+
+
+def gaussian_psf(fwhm, xdim, ydim):
+    """Return a 2D Gaussian kernel
+
+    Parameters
+    ----------
+    fwhm : float
+        FWHM of the Gaussian kernel to return
+
+    xdim : int
+        Length of the created PSF in the x-dimension
+
+    ydim : int
+        Length of the created PSF in the y-dimension
+
+    Returns
+    -------
+    kernel : numpy.ndarray
+        2D array containing 2D Gaussian kernel
+    """
+    # Center the PSF in the array
+    xmean = xdim / 2.
+    ymean = ydim / 2.
+
+    # Translate FWHM to standard deviation
+    dev = fwhm / 2.35
+
+    # Create model
+    model = Gaussian2D(amplitude=1., x_mean=xmean, y_mean=ymean, x_stddev=dev, y_stddev=dev)
+
+    # Evalulate model
+    x_grid, y_grid = np.mgrid[0: xdim, 0: ydim]
+    kernel = model.evaluate(x=x_grid, y=y_grid, amplitude=1., x_mean=xmean,
+                            y_mean=ymean, x_stddev=dev, y_stddev=dev, theta=0.)
+    return kernel
 
 
 def get_HST_PSF(meta):
@@ -21,7 +57,7 @@ def get_HST_PSF(meta):
     """
     if meta['instrument'] == 'WFC3':
         if meta['filter'] == 'F160W':
-            grid_size =
+            grid_size = something
             y, x = np.mgrid[0:51, 0:51]
             gm1 = Gaussian2D(100, 25, 25, 3, 3)
 
@@ -59,6 +95,7 @@ def get_IRAC_PSF(meta):
                           "a representative PSF at the desired pixel scale.".format(pixscale)))
 
     return hdu.data
+
 
 def get_JWST_pixel_scale(meta, aperture=None):
     """Use pysiaf to find the nominal pixel scale for a given JWST
@@ -166,8 +203,8 @@ def get_JWST_PSF(meta):
             predicted_opd = [opd for opd in opd_list if 'predicted' in opd][0]
             psf.pupilopd = (predicted_opd, 0)
             oversample = meta['pix_scale1'] / nominal_pix_scale_x
-            something = psf.calc_psf(oversample=oversample, fov_arcsec=)
-
+            something = psf.calc_psf(oversample=oversample, fov_arcsec=999)
+            print('this is not done yet')
 
     return psf_model
 
@@ -190,7 +227,7 @@ def get_psf_metadata(filename):
 
         # We want basic metadata on the instrument. Assume it's in the
         # primary header
-        header = h[0].header
+        header = hdulist[0].header
 
         try:
             telescope = header['TELESCOP'].upper()
@@ -209,8 +246,8 @@ def get_psf_metadata(filename):
                 metadata['detector'] = header['DETECTOR']
                 metadata['filter'] = header['FILTER']
                 metadata['pupil'] = header['PUPIL']
-                metadata['pix_scale1'] = header['CD1_1']
-                metadata['pix_scale2'] = header['CD2_2']
+                metadata['pix_scale1'] = np.abs(header['CD1_1']) * 3600.
+                metadata['pix_scale2'] = np.abs(header['CD2_2']) * 3600.
             except KeyError:
                 metadata['detector'] = None
                 metadata['filter'] = None
@@ -221,8 +258,8 @@ def get_psf_metadata(filename):
                 metadata['detector'] = header['DETECTOR']
                 metadata['filter'] = header['FILTER']
                 metadata['pa'] = header['PA_APER']  # PA of reference aperture center
-                metadata['pix_scale1'] = header['CD1_1']
-                metadata['pix_scale2'] = header['CD2_2']
+                metadata['pix_scale1'] = np.abs(header['CD1_1']) * 3600.
+                metadata['pix_scale2'] = np.abs(header['CD2_2']) * 3600.
             except KeyError:
                 metadata['detector'] = None
                 metadata['filter'] = None
@@ -233,8 +270,8 @@ def get_psf_metadata(filename):
         if instrument == 'IRAC':
             try:
                 metadata['channel'] = int(header['CHNLNUM'])
-                metadata['pix_scale1'] = header['PXSCAL1']
-                metadata['pix_scale2 ']= header['PXSCAL2']
+                metadata['pix_scale1'] = np.abs(header['PXSCAL1'])
+                metadata['pix_scale2'] = np.abs(header['PXSCAL2'])
                 metadata['pa'] = header['PA']  #  [deg] Position angle of axis 2 (E of N)
             except KeyError:
                 metadata['channel'] = None
@@ -244,9 +281,96 @@ def get_psf_metadata(filename):
 
         if telescope not in 'JWST HST SPITZER'.split():
             try:
-                metadata['pix_scale1'] = header['CD1_1']
-                metadata['pix_scale2'] = header['CD2_2']
+                metadata['pix_scale1'] = np.abs(header['CD1_1']) * 3600.
+                metadata['pix_scale2'] = np.abs(header['CD2_2']) * 3600.
             except KeyError:
                 metadata['pix_scale1'] = None
                 metadata['pix_scale2'] = None
     return metadata
+
+
+def same_array_size(array1, array2):
+    """Crop the input arrays such that they are the same size in both
+    dimensions
+
+    Parameters
+    ----------
+    array1 : numpy.ndarray
+        2D array
+
+    array2 : numpy.ndarray
+        2D array
+
+    Returns
+    -------
+    array1 : numpy.ndarray
+        Potentially cropped 2D array
+
+    array2 : numpy.ndarray
+        Potentially cropped 2D array
+
+    """
+    shape1 = array1.shape
+    shape2 = array2.shape
+    miny = min([shape1[0], shape2[0]])
+    minx = min([shape1[1], shape2[1]])
+
+    # Crop y dimension
+    if shape1[0] == miny:
+        smaller = array1
+        larger = array2
+        smaller_shape = shape1
+        larger_shape = shape2
+    else:
+        smaller = array2
+        larger = array1
+        smaller_shape = shape2
+        larger_shape = shape1
+
+    diff = abs(larger_shape[0] - miny)
+    low_delta = diff // 2
+    if diff % 2 == 1:
+        high_delta = low_delta + 1
+    else:
+        high_delta = low_delta
+    larger = larger[low_delta: larger_shape[0]-high_delta, :]
+
+    if shape1[0] == miny:
+        array1 = smaller
+        array2 = larger
+    else:
+        array1 = larger
+        array2 = smaller
+    shape1 = array1.shape
+    shape2 = array2.shape
+
+    # Crop x dimension
+    if shape1[1] == minx:
+        smaller = array1
+        larger = array2
+        smaller_shape = shape1
+        larger_shape = shape2
+    else:
+        smaller = array2
+        larger = array1
+        smaller_shape = shape2
+        larger_shape = shape1
+
+    diff = abs(larger_shape[1] - minx)
+    low_delta = diff // 2
+    if diff % 2 == 1:
+        high_delta = low_delta + 1
+    else:
+        high_delta = low_delta
+    larger = larger[:, low_delta: larger_shape[1]-high_delta]
+
+    if shape1[1] == minx:
+        array1 = smaller
+        array2 = larger
+    else:
+        array1 = larger
+        array2 = smaller
+    shape1 = array1.shape
+    shape2 = array2.shape
+
+    return array1, array2
