@@ -1785,7 +1785,7 @@ class Catalog_seed():
                 pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" % (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts))
 
         self.n_pointsources = len(pointSourceList)
-        print("Number of point sources found within the requested aperture: {}".format(self.n_pointsources))
+        print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
         # close the output file
         pslist.close()
 
@@ -2890,7 +2890,7 @@ class Catalog_seed():
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
-        print(("Number of galaxies found within the requested aperture: {}".format(self.n_galaxies)))
+        print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
 
         if self.n_galaxies == 0:
             if self.n_pointsources == 0:
@@ -3343,7 +3343,7 @@ class Catalog_seed():
             except:
                 # print("ERROR: bad point source line %s. Skipping." % (line))
                 pass
-        print("Number of extended sources found within the requested aperture: {}".format(len(extSourceList)))
+        print("Number of extended sources found within or close to the requested aperture: {}".format(len(extSourceList)))
         # close the output file
         eslist.close()
 
