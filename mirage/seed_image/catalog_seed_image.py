@@ -1069,6 +1069,10 @@ class Catalog_seed():
             eval_psf, minx, miny, wings_added = self.create_psf_stamp(pixelx, pixely, psf_x_dim, psf_x_dim,
                                                                       ignore_detector=True)
 
+            # Skip sources that fall completely off the detector
+            if eval_psf is None:
+                continue
+
             if input_type == 'pointSource':
                 stamp = eval_psf
                 stamp *= rate
@@ -1997,6 +2001,11 @@ class Catalog_seed():
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
                 segment_number=segment_number
             )
+
+            # Skip sources that fall completely off the detector
+            if scaled_psf is None:
+                continue
+
             scaled_psf *= entry['countrate_e/s']
 
             # PSF may not be centered in array now if part of the array falls
@@ -2023,6 +2032,10 @@ class Catalog_seed():
                                                         updated_psf_dimensions,
                                                         stamp_x_loc, stamp_y_loc,
                                                         coord_sys='aperture')
+
+            # Skip sources that fall completely off the detector
+            if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                continue
 
             try:
                 psfimage[j1:j2, i1:i2] += scaled_psf[l1:l2, k1:k2]
@@ -2130,6 +2143,10 @@ class Catalog_seed():
                                                           coord_sys='full_frame',
                                                           ignore_detector=ignore_detector)
 
+            # Skip sources that fall completely off the detector
+            if None in [i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c]:
+                return None, None, None, False
+
             # Step 4
             full_psf = library.evaluate(x=xpts_core, y=ypts_core, flux=1.0,
                                         x_0=xc_core, y_0=yc_core)
@@ -2171,6 +2188,9 @@ class Catalog_seed():
                                                         (psf_dim_y, psf_dim_x), psf_x_loc, psf_y_loc,
                                                         coord_sys='full_frame', ignore_detector=ignore_detector)
 
+            if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                return None, None, None, False
+
             # Step 2
             # If the core of the psf lands at least partially on the detector
             # then we need to evaluate the psf library
@@ -2190,6 +2210,9 @@ class Catalog_seed():
                     (l1c, l2c) = self.create_psf_stamp_coords(x_location, y_location, psf_core_dims,
                                                               psf_core_half_width_x, psf_core_half_width_y,
                                                               coord_sys='full_frame', ignore_detector=ignore_detector)
+
+                if None in [i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c]:
+                    return None, None, None, False
 
                 # Step 4
                 psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=1.,
@@ -2438,6 +2461,7 @@ class Catalog_seed():
 
         i1 = aperture_x - stamp_x
         j1 = aperture_y - stamp_y
+
         if ((i1 > (aperture_x_dim)) or (j1 > (aperture_y_dim))) and not ignore_detector:
             # In this case the stamp does not overlap the aperture at all
             return tuple([None]*8)
@@ -3078,13 +3102,16 @@ class Catalog_seed():
                                  self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
 
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
-                # print('Enlarging galaxy stamp to be the same size or larger than the psf')
                 stamp = self.enlarge_stamp(stamp, psf_shape)
                 galdims = stamp.shape
 
             # Get the PSF which will be convolved with the galaxy profile
             psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                          psf_shape[1], psf_shape[0], ignore_detector=True)
+
+            # Skip sources that fall completely off the detector
+            if psf_image is None:
+                continue
 
             # Normalize the signal in the PSF stamp so that the final galaxy
             # signal will match the requested value
@@ -3404,6 +3431,10 @@ class Catalog_seed():
                 psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                              psf_shape[1], psf_shape[0], ignore_detector=True)
 
+                # Skip sources that fall completely off the detector
+                if psf_image is None:
+                    continue
+
                 # Normalize the PSF so that the final signal in the extended
                 # source mathces the requested signal
                 psf_image = psf_image / np.sum(psf_image)
@@ -3425,6 +3456,9 @@ class Catalog_seed():
                     (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                             stamp_dims, stamp_dims[1] // 2, stamp_dims[0] // 2,
                                                             coord_sys='aperture')
+
+                if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                    continue
 
                 # Convolve the extended image with the stamp image
                 stamp = s1.fftconvolve(stamp, psf_image, mode='same')
@@ -3924,9 +3958,6 @@ class Catalog_seed():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
-
-        print(pth)
-
         c1 = os.path.exists(pth)
         if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "
@@ -3961,40 +3992,6 @@ class Catalog_seed():
             print(("ERROR: {} for {} is not within reasonable bounds. "
                    "Setting to {}".format(value, typ, default)))
             return default
-
-    #def read_subarray_definition_file(self):
-    #    # read in the file that contains a list of subarray names and positions on the detector
-
-    #    try:
-    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-    #    except:
-    #        raise RuntimeError(("Error: could not read in subarray definitions file: {}"
-    #                            .format(self.params['Reffiles']['subarray_defs'])))
-
-    #def get_subarray_info(self):
-    #    # Find aperture-specific information from the subarray information config file
-    #    if self.params['Readout']['array_name'] in self.subdict['AperName']:
-    #        mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
-    #        namps = self.subdict['num_amps'].data[mtch][0]
-    #        if namps != 0:
-    #            self.params['Readout']['namp'] = namps
-    #        else:
-    #            if ((self.params['Readout']['namp'] == 1) or
-    #               (self.params['Readout']['namp'] == 4)):
-    #                print(("CAUTION: Aperture {} can be used with either "
-    #                       "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
-    #                print("or a 4-amp readout. The difference is a factor of 4 in")
-    #                print(("readout time. You have requested {} amps."
-    #                       .format(self.params['Readout']['namp'])))
-    #            else:
-    #                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
-    #                                  "'Readout':'namp' in the input yaml file to one of these values."
-    #                                  .format(self.params['Readout']['array_name'])))
-    #    else:
-    #        raise ValueError(("WARNING: subarray name {} not found in the "
-    #                          "subarray dictionary {}."
-    #                          .format(self.params['Readout']['array_name'],
-    #                                  self.params['Reffiles']['subarray_defs'])))
 
     def read_filter_throughput(self, file):
         '''Read in the ascii file containing the filter
