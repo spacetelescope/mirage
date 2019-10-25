@@ -4,7 +4,7 @@ or as a dependency to another package), we recommend and encourage the following
   This research made use of the open source Python package mirage, the JWST Multi Instrument Ramp
   Generator (Hilbert et al, 2019).
 
-where (hilbert et al, 2019) is a citation of the Zenodo record, e.g.:
+where (Hilbert et al, 2019) is a citation of the Zenodo record, e.g.:
 
 @software{bryan_hilbert_2019_3519262,
   author       = {Bryan Hilbert and
