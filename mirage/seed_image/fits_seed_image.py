@@ -127,7 +127,7 @@ import datetime
 from math import radians
 import numpy as np
 from photutils import detect_sources
-from photutils import TopHatWindow
+from photutils import TukeyWindow
 from photutils.centroids import centroid_2dg
 from photutils.psf import resize_psf
 from photutils.psf.matching import create_matching_kernel
@@ -720,8 +720,8 @@ class ImgSeed:
         # convolved with this kernel in order to adjust the PSFs to match
         # those from JWST.
         print("Create matching kernel")
-        kernel = self.matching_kernel(self.mosaic_psf, self.jwst_psf, window_type='TopHatWindow',
-                                      alpha=0.35, beta=0.35)
+        kernel = self.matching_kernel(self.mosaic_psf, self.jwst_psf, window_type='TukeyWindow',
+                                      alpha=1.5, beta=1.5)
 
         print('Temporarily save JWST psf and matching psf in outgoing_and_matching_kernel.fits')
         ha = fits.PrimaryHDU(orig_jwst)
