@@ -127,7 +127,7 @@ import datetime
 from math import radians
 import numpy as np
 from photutils import detect_sources
-from photutils import TukeyWindow
+from photutils import TopHatWindow, TukeyWindow, CosineBellWindow, SplitCosineBellWindow, HanningWindow
 from photutils.centroids import centroid_2dg
 from photutils.psf import resize_psf
 from photutils.psf.matching import create_matching_kernel
@@ -155,8 +155,18 @@ KNOWN_PSF_TELESCOPES = {"JWST", "HST", "SPITZER"}
 class ImgSeed:
     def __init__(self, paramfile=None, mosaic_file=None, data_extension_number=0, wcs_extension_number=0,
                  cropped_file='cropped_image.fits', outdir=None, blotted_file=None, psf_file=None,
-                 mosaic_fwhm=None, mosaic_fwhm_units='arcsec', gaussian_psf=True):
-        """Create a seed image from a distortionless input mosaic
+                 mosaic_fwhm=None, mosaic_fwhm_units='arcsec', gaussian_psf=True, save_intermediates=False):
+        """Create a seed image from a distortionless input mosaic. The user can supply
+        a PSF associated with the mosaic in the ``psf_file`` parameter. If ``psf_file``
+        is None and ``gaussian_psf`` is True, then astropy's Gaussian2D model will be
+        used to construct a PSF for the mosaic. If ``psf_file`1` is None and ``gaussian_psf``
+        is False, and the mosaic comes from a "known" telescope, then a custom function
+        will be used to construct the PSF. Currently the "known" telescopes include
+        JWST, HST, and Spitzer IRAC.
+
+        Note that this code cannot be used in cases where the mosaic's PSF FWHM is
+        larger than the JWST PSF, as translating the mosaic to the JWST PSF would then
+        be sharpening the image.
 
         Parameters
         ----------
@@ -166,15 +176,51 @@ class ImgSeed:
             mosaic_file : str
                 Name of the fits file containing the mosaic file to use
 
+            data_extension_number : int
+                Extension number within the mosaic FITS file where the data
+                array is located
+
+            wcs_extension_number : int
+                Extension number within the mosaic FITS file where the
+                world coordinate system information is located
+
             cropped_file : str
                 Name of the file to save the cropped image into. If None,
                 the cropped image is not saved
 
             outdir : str
-                Name of the output directory to save the output files into
+                Name of the output directory to save the output files into.
+                If None, the output directory listed in ``paramfile`` will
+                be used.
 
             blotted_file : str
-                Name of fits file to save resampled image into
+                Name of FITS file to save resampled image into
+
+            psf_file : str
+                Name of FITS file containing a PSF corresponding to the mosaic
+                data. This will be used to create a matching kernel to allow
+                convolution of the mosaic data to match the JWST PSF. If None,
+                a PSF will be created using an astropy Gaussian2D model or,
+                in the case of a mosaic from JWST, a webbpsf-generated PSF
+                will be read in.
+
+            mosaic_fwhm : float
+                FWHM of the PSF in the mosaic. Can be in pixels or arcseconds,
+                as specified by the ``mosaic_fwhm_units`` keyword. If None,
+                an astropy Gaussian2D model will be fit to the PSF to estimate
+                the FWHM
+
+            mosaic_fwhm_units : str
+                Units of ``mosaic_fwhm``. Can be 'pixels' or 'arcsec'
+
+            gaussian_psf : bool
+                If ``psf_file`` is None and this is True, the mosaic PSF will
+                be created using an astropy Gaussian2D model.
+
+            save_intermediates : bool
+                If True, intermediate outputs, including the PSFs and the
+                matching PSF kernel, as well as the cropped image after
+                convolution with the matching PSF kernel, will be saved.
         """
         allowed_mosaic_fwhm_units = ['pixels', 'arcsec']
 
@@ -205,6 +251,7 @@ class ImgSeed:
             raise ValueError(("ERROR: mosaic_fwhm_units must be one of: {}"
                               .format(allowed_mosaic_fwhm_units)))
         self.mosaic_fwhm_units = mosaic_fwhm_units
+        self.save_intermediates = save_intermediates
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
@@ -292,11 +339,11 @@ class ImgSeed:
         j_yd, j_xd = self.jwst_psf.shape
         mid_y = j_yd // 2
         mid_x = j_xd // 2
-        box = self.jwst_psf[mid_y-20:mid_y+21, mid_x-20:mid_x+21]
+        box = self.jwst_psf[mid_y-10:mid_y+11, mid_x-10:mid_x+11]
         jwst_x_fwhm, jwst_y_fwhm = tools.measure_fwhm(box)
-        print('JWST FWHM in pix: ', jwst_y_fwhm)
-        print('JWST pixel scale:', self.outscale2)
         jwst_y_fwhm_arcsec = jwst_y_fwhm * self.outscale2
+        print('JWST FWHM in pix: ', jwst_y_fwhm)
+        print('JWST FWHM in arcsec: ', jwst_y_fwhm_arcsec)
 
         # If the FWHM of the mosaic image is larger than that of the JWST
         # PSF, then we cannot continue because we cannot create a matching
@@ -318,6 +365,7 @@ class ImgSeed:
         self.prepare_psf()
 
         # Crop
+        print("Cropping subarray from mosaic")
         pixel_scale = self.siaf[self.aperture].XSciScale
         crop = crop_mosaic.Extraction(mosaicfile=self.mosaic_file,
                                       data_extension_number=self.data_extension_number,
@@ -330,9 +378,11 @@ class ImgSeed:
         crop.extract()
 
         # Convolve the cropped image with the appropriate PSF
+        print("Convolving with PSF kernel")
         crop.cropped = self.psf_convolution(crop.cropped)
 
         # Blot
+        print("Resampling subarray onto JWST pixel grid")
         blot = blot_image.Blot(instrument=self.instrument, aperture=self.aperture,
                                ra=[self.blot_center_ra], dec=[self.blot_center_dec],
                                pav3=[self.blot_pav3], blotfile=crop.cropped,
@@ -475,9 +525,6 @@ class ImgSeed:
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
 
-    def get_mosaic_info(self, ):
-        print('pixel scale from model.meta.wcsinfo.cdelt1')
-
     def grism_coord_adjust(self):
         """Calculate the factors by which to expand the
         output array size, as well as the coordinate
@@ -518,6 +565,54 @@ class ImgSeed:
             map_image = seg_map.data
         return map_image
 
+    @staticmethod
+    def matching_kernel(psf1, psf2, window_type='TukeyWindow', alpha=None, beta=None):
+        """Use photutils to create a matching kernel given two PSFs and
+        the window type and parameters
+
+        Parameters
+        ----------
+        psf1 : numpy.ndarray
+            2D array containing the first PSF
+
+        psf2 : numpy.ndarray
+            2D array containing the second PSF
+
+        window_type : str
+            Name of the window function to use when filtering the matching kernel
+
+        alpha : float
+            Optional input for some of the window functions
+
+        beta : float
+            Optional input for some of the window functions
+
+        Returns
+        -------
+        matched_kernel : numpy.ndarray
+            2D array containing the matching PSF kernel
+        """
+        # Create the filtering window
+        orig_window_type = copy.deepcopy(window_type)
+        window_type = window_type.lower()
+        if window_type == 'tophatwindow':
+            window = TopHatWindow(beta=beta)
+        elif window_type == 'cosinebellwindow':
+            window = CosineBellWindow(alpha=alpha)
+        elif window_type == 'splitcosinebellwindow':
+            window = SplitCosineBellWindow(alpha=alpha, beta=beta)
+        elif window_type == 'tukeywindow':
+            window = TukeyWindow(alpha=alpha)
+        elif window_type == 'hanningwindow':
+            window = HanningWindow()
+        else:
+            raise ValueError("ERROR: Unrecognized window_type: {}".format(orig_window_type))
+
+        # Create the matching kernel
+        matched_kernel = create_matching_kernel(psf1, psf2, window=window)
+
+        return matched_kernel
+
     def module_value(self):
         """Determine the module value based on the instrument and detector
         """
@@ -535,8 +630,6 @@ class ImgSeed:
         Read in or create the PSF that is representative of the mosaic
         data.
         """
-
-        print('PREPARING PSF')
         # Get the PSF associated with the mosaic
         if self.psf_file is None:
 
@@ -594,6 +687,7 @@ class ImgSeed:
                 # construct a PSF
                 if self.mosaic_metadata['telescope'] == 'HST':
                     print('Creating HST PSF, using 2D Gaussian')
+                    print('HST FWHM in arcsec: {}'.format(self.mosaic_fwhm * self.mosaic_metadata['pix_scale2']))
                     self.mosaic_psf = tools.get_HST_PSF(self.mosaic_metadata, self.mosaic_fwhm)
                 elif self.mosaic_psf_metadata['telescope'] == 'JWST':
                     print("Retrieving JWST PSF")
@@ -633,14 +727,6 @@ class ImgSeed:
         model : jwst.datamodels.ImageModel
             Data model instance containing the cropped image
 
-        mosiac_psf : numpy.ndarray
-            2D array of the PSF corresponding to that in the original
-            mosaic image
-
-        mosaic_psf_scale : float
-            Pixel scale (arcsec/pixel) of the PSF in the original
-            mosaic image
-
         Returns
         -------
         model : jwst.datamodels.ImageModel
@@ -653,26 +739,16 @@ class ImgSeed:
         # Since the matching kernel is going to be convolved with the mosaic image,
         # then it seems like we should match the PSFs at the mosaic pixel scale.
         if not np.isclose(self.outscale1, self.mosaic_metadata['pix_scale1'], atol=0., rtol=0.01):
-            print('outscale1: ', self.outscale1)
-            print('self.jwst_psf.shape', self.jwst_psf.shape)
-            print('self.mosaic_metadata[pix_scale1]', self.mosaic_metadata['pix_scale1'])
-
-            print('Before resizing: ')
             orig_jwst = copy.deepcopy(self.jwst_psf)
-            print(self.jwst_psf.shape)
             self.jwst_psf = resize_psf(self.jwst_psf, self.outscale1, self.mosaic_metadata['pix_scale1'], order=3)
-            print('After resizing: ')
-            print(self.jwst_psf.shape)
 
             resized_y_dim, resized_x_dim = self.jwst_psf.shape
             if ((resized_y_dim % 2 == 0) or (resized_x_dim % 2 == 0)):
                 if resized_y_dim % 2 == 0:
-                    print('EVEN NUMBER OF ROWS!!')
                     new_y_dim = resized_y_dim + 1
                 else:
                     new_y_dim = resized_y_dim
                 if resized_x_dim % 2 == 0:
-                    print('EVEN NUMBER OF COLUMNS!!')
                     new_x_dim = resized_x_dim + 1
                 else:
                     new_x_dim = resized_x_dim
@@ -688,21 +764,15 @@ class ImgSeed:
                     jwst_psf_padded[0: resized_y_dim, -1] = self.jwst_psf[:, -1]
                 if ((new_y_dim > resized_y_dim) and (new_x_dim > resized_x_dim)):
                     jwst_psf_padded[-1, -1] = self.jwst_psf[-1, 1]
-                print("Adding col to blind_resized so that it has shape: ", jwst_psf_padded.shape)
 
                 # Shift the source to be centered in the center pixel
                 centerx, centery = centroid_2dg(jwst_psf_padded)
-                print('PSF centroid in padded psf image is: ', centerx, centery)
                 jwst_shifted = shift(jwst_psf_padded, [0.5, 0.5], order=1)
                 centerx, centery = centroid_2dg(jwst_shifted)
-                print('PSF centroid in jwst_shifted image is: ', centerx, centery)
-                print('jwst_shifted shape: ', jwst_shifted.shape)
                 self.jwst_psf = jwst_shifted
             else:
                 jwst_psf_padded = self.jwst_psf
 
-        print("Before cropping, PSF array sizes:")
-        print(self.jwst_psf.shape, self.mosaic_psf.shape)
         jwst_shape = self.jwst_psf.shape
         mosaic_shape = self.mosaic_psf.shape
         if ((jwst_shape[0] % 2 != mosaic_shape[0] % 2) or (jwst_shape[1] % 2 != mosaic_shape[1] % 2)):
@@ -723,17 +793,18 @@ class ImgSeed:
         kernel = self.matching_kernel(self.mosaic_psf, self.jwst_psf, window_type='TukeyWindow',
                                       alpha=1.5, beta=1.5)
 
-        print('Temporarily save JWST psf and matching psf in outgoing_and_matching_kernel.fits')
-        ha = fits.PrimaryHDU(orig_jwst)
-        hb = fits.ImageHDU(jwst_psf_padded)
-        h0 = fits.ImageHDU(self.jwst_psf)
-        #hmy = fits.ImageHDU(jwst_my_shift)
-        h1 = fits.ImageHDU(self.mosaic_psf)
-        h2 = fits.ImageHDU(kernel)
-        hlist = fits.HDUList([ha, hb, h0, h1, h2])
-        hlist.writeto('outgoing_and_matching_kernel.fits', overwrite=True)
+        if self.save_intermediates:
+            print('Save JWST psf and matching psf in outgoing_and_matching_kernel.fits')
+            ha = fits.PrimaryHDU(orig_jwst)
+            h0 = fits.ImageHDU(self.jwst_psf)
+            h1 = fits.ImageHDU(self.mosaic_psf)
+            h2 = fits.ImageHDU(kernel)
+            hlist = fits.HDUList([ha, h0, h1, h2])
+            outfile = os.path.join(self.outdir,
+                                   '{}_outgoing_and_matching_kernel.fits'.format(self.output_base))
+            hlist.writeto(outfile, overwrite=True)
 
-        print('Convolve image cropped from mosaic with the matching kernel')
+        print('Convolve image cropped from mosaic with the matching PSF kernel')
         start_time = datetime.datetime.now()
         convolved_mosaic = fftconvolve(model.data, kernel, mode='same')
         end_time = datetime.datetime.now()
@@ -741,55 +812,15 @@ class ImgSeed:
         print("Convolution took {} seconds".format(delta_time.seconds))
         model.data = convolved_mosaic
 
-        print('saving convolved mosaic as convolved_mosaic.fits')
-        h0 = fits.PrimaryHDU(convolved_mosaic)
-        hlist = fits.HDUList([h0])
-        hlist.writeto('convolved_mosaic.fits', overwrite=True)
+        if self.save_intermediates:
+            print('Saving convolved mosaic as convolved_mosaic.fits')
+            h0 = fits.PrimaryHDU(convolved_mosaic)
+            hlist = fits.HDUList([h0])
+            outfile = os.path.join(self.outdir,
+                                   '{}_convolved_mosaic.fits'.format(self.output_base))
+            hlist.writeto(outfile, overwrite=True)
 
         return model
-
-    @staticmethod
-    def matching_kernel(psf1, psf2, window_type='TopHatWindow', alpha=None, beta=None):
-        """Use photutils to create a matching kernel given two PSFs and
-        the window type and parameters
-
-        Parameters
-        ----------
-        psf1 : numpy.ndarray
-            2D array containing the first PSF
-
-        psf2 : numpy.ndarray
-            2D array containing the second PSF
-
-        window_type : str
-            Name of the window function to use when filtering the matching kernel
-
-        alpha : float
-            Optional input for some of the window functions
-
-        beta : float
-            Optional input for some of the window functions
-        """
-        # Create the filtering window
-        orig_window_type = copy.deepcopy(window_type)
-        window_type = window_type.lower()
-        if window_type == 'tophatwindow':
-            window = TopHatWindow(beta=beta)
-        elif window_type == 'cosinebellwindow':
-            window = CosineBellWindow(alpha=alpha)
-        elif window_type == 'splitcosinebellwindow':
-            window = SplitCosineBellWindow(alpha=alpha, beta=beta)
-        elif window_type == 'tukeywindow':
-            window = TukeyWindow(alpha=alpha)
-        elif window_type == 'hanningwindow':
-            window = HanningWindow()
-        else:
-            raise ValueError("ERROR: Unrecognized window_type: {}".format(orig_window_type))
-
-        # Create the matching kernel
-        matched_kernel = create_matching_kernel(psf1, psf2, window=window)
-
-        return matched_kernel
 
     def read_param_file(self, file):
         """Read the input yaml file into a nested dictionary
@@ -821,6 +852,8 @@ class ImgSeed:
         self.filter = self.params['Readout']['filter']
         self.pupil = self.params['Readout']['pupil']
 
+        self.output_base = self.params['Output']['file']
+
         # If input is to be dispersed later, we need to
         # expand the region to be blotted
         if self.params['Output']['grism_source_image']:
@@ -838,15 +871,16 @@ class ImgSeed:
                                              description='Create seed image via catalogs')
         parser.add_argument("paramfile", help='File describing the input parameters and instrument settings to use. (YAML format).')
         parser.add_argument("mosaic_file", help="Fits file containing the image to create the seed image from")
-        parser.add_argument("crop_center_ra", help="RA of center of the image to crop from mosaicimage")
-        parser.add_argument("crop_center_dec", help="Dec of center of the image to crop from mosaicimage")
-        parser.add_argument("channel", help="NIRCam channel: 'short' or 'long'")
-        parser.add_argument("detector", help="NIRCam detector: e.g. 'A1','B5'")
-        parser.add_argument("blot_center_ra", help="RA of center of the output blotted image")
-        parser.add_argument("blot_center_dec", help="Dec of center of the output blotted image")
-        parser.add_argument("blot_pav3", help="Position angle of the output blotted image")
-        parser.add_argument("aperture", help="Aperture to use. (e.g. NRCA1_FULL)")
-        parser.add_argument("subarray_defs", help="Ascii file containing subarray definitions")
+        parser.add_argument("data_extension_number", help="Extension in fits file that contains mosaic image", default=0)
+        parser.add_argument("wcs_extension_number", help="Extension in mosaic fits file that contains WCS information", default=0)
+        parser.add_argument("cropped_file", help="Filename used to save image cropped from mosaic", default=None)
+        parser.add_argument("blotted_file", help="Filename used to save resampled image", default=None)
+        parser.add_argument("outdir", help="Output directory. If None, the output dir from paramfile is used.", default=None)
+        parser.add_argument("psf_file", help="Name of fits file containing PSF corresponding to mosaic image", default=None)
+        parser.add_argument("mosaic_fwhm", help="FWHM of PSF in mosaic image, in pixels or arcsec", default=None)
+        parser.add_argument("mosaic_fwhm_units", help="Units of PSF FWHM in mosaic image. 'pixels' or 'arcsec'", default='arcsec')
+        parser.add_argument("gaussian_psf", help="If True, create mosaic PSF from Gaussian2D model", default=False, action='store_true')
+        parser.add_argument("save_intermediates", help="If True, save intermediate outputs", default=False, action='store_true')
         return parser
 
 
@@ -857,5 +891,4 @@ if __name__ == '__main__':
     seed = Imgseed()
     parser = seed.add_options(usage=usagestring)
     args = parser.parse_args(namespace=seed)
-    seed.read_param_file(args.paramfile)
     seed.crop_and_blot()

@@ -52,14 +52,20 @@ def gaussian_psf(fwhm, xdim, ydim):
     return kernel
 
 
-def get_HST_PSF(meta, fwhm_pixels):
+def get_HST_PSF(fwhm_pixels):
     """Get a representative PSF for the HST instrument/detector in
     question. Currently this is just a 2D Gaussian of the appropriate
     FWHM.
 
     Parameters
     ----------
-    meta : dict
+    fwhm_pixels : float
+        FWHM of the Gaussian in units of pixels
+
+    Returns
+    -------
+    psf : numpy.ndarray
+        2D array containing PSF
 
     """
     # Set the dimensions of the PSF array to be +/- 50 * FWHM
