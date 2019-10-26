@@ -19,4 +19,4 @@ If you have a fits file containing a dark current exposure that is the proper fo
 
 .. tip::
 
-    For more examples of calling the imaging simulator, see the `Imaging Simulator example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Imaging_simulator_use_examples.ipynb>`_.
+    For more examples of calling the imaging simulator, see the `Imaging Simulator example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Imaging_simulator_use_examples.ipynb>`_, as well as the `Simulations from input mosaic image notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Simulated_data_from_mosaic_image.ipynb>`_.
