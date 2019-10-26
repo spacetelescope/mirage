@@ -60,7 +60,7 @@ def test_filenames(temporary_directory):
             print('Processing program {}'.format(apt_file_xml))
 
             yam = yaml_generator.SimInput(input_xml=apt_file_xml, pointing_file=apt_file_pointing,
-                                          catalogs=catalogs, observation_list_file=observation_list_file,
+                                          observation_list_file=observation_list_file,
                                           verbose=True, output_dir=temporary_directory, simdata_output_dir=temporary_directory,
                                           offline=True)
             try:

@@ -9,7 +9,9 @@ import sys
 import os
 import glob
 from copy import copy
+import argparse
 
+import numpy as np
 import gwcs
 from astropy.io import fits
 from jwst import datamodels
@@ -265,4 +267,3 @@ if __name__ == '__main__':
     parser = b.add_options(usage = usagestring)
     args = parser.parse_args(namespace=b)
     b.blot()
-

@@ -887,7 +887,6 @@ class ImgSeed:
 if __name__ == '__main__':
 
     usagestring = 'USAGE: fits_seed_image.py inputs.yaml'
-
     seed = Imgseed()
     parser = seed.add_options(usage=usagestring)
     args = parser.parse_args(namespace=seed)

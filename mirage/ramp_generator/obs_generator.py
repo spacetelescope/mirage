@@ -34,6 +34,7 @@ import copy
 from math import radians
 import datetime
 import warnings
+import argparse
 
 import yaml
 import pkg_resources
@@ -844,7 +845,7 @@ class Observation():
 
         # Make sure the requested output format is an allowed value
         if self.params['Output']['format'] not in ['DMS']:
-            raise NotImplemmentedError(("WARNING: unsupported output format {} requested. "
+            raise NotImplementedError(("WARNING: unsupported output format {} requested. "
                                         "Possible options are {}."
                                         .format(self.params['Output']['format'], ['DMS'])))
 
