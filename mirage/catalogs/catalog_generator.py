@@ -343,7 +343,7 @@ class ExtendedCatalog(PointSourceCatalog):
         self.table = pad_table_comments(tab)
 
     @property
-    def filenames(self):
+    def filename(self):
         """Return Dec values from catalog"""
         return self._filenames
 

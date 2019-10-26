@@ -1,0 +1,14 @@
+# APT Output Product
+# 
+# APT Version: Version 27.3  JWST PRD: PRDOPSSOC-M-025 
+# Date: Mon Oct 07 20:22:14 GMT 2019
+
+JWST Pointing Report for JWST Draft Proposal (extended_object_test.aptx)
+
+========================================
+* Obs 1 (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCBS_FULL                1 MAIN-TAR  +53.16667  -27.81667   +0.000   +0.000   +0.000   +0.000  -82.287 -496.206   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+

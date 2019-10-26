@@ -27,6 +27,49 @@ from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 
 
+def aperture_ra_dec(siaf_instance, aperture_name, ra, dec, telescope_roll, output_apertures):
+    """For a given aperture with a known RA, Dec, and telescope roll angle,
+    calculate the RA, Dec values at the reference location in a list of
+    other apertures.
+
+    Parameters
+    ----------
+    siaf_instance : pysiaf.Siaf
+        Instance of SIAF for a single instrument
+
+    aperture_name : str
+        Aperture name (e.g. "NRCA1_FULL")
+
+    ra : float
+        RA value of pointing in degrees
+
+    dec : float
+        Dec value of pointing in degrees
+
+    telescope_roll : float
+        PA_V3, Position angle of the telescope in degrees
+
+    output_apertures : list
+        List of aperture names to calculate RA, Dec for
+
+    Returns
+    -------
+    aperture_pointing : dict
+        Dictionary with output_apertures as keys. Values are (ra, dec)
+        tuples
+    """
+    local_roll, att_matrix, fullframesize, subarray_boundaries = get_siaf_information(siaf_instance,
+                                                                                      aperture_name,
+                                                                                      ra, dec,
+                                                                                      telescope_roll)
+    aperture_pointing = {}
+    for aperture in output_apertures:
+        siaf_out = siaf_instance[aperture]
+        out_ra, out_dec = pysiaf.rotations.pointing(att_matrix, siaf_out.V2Ref, siaf_out.V3Ref)
+        aperture_pointing[aperture] = (out_ra, out_dec)
+    return aperture_pointing
+
+
 def get_instance(instrument):
     """Return an instance of a pysiaf.Siaf object for the given instrument
 

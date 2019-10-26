@@ -42,34 +42,7 @@ Another way to create a seed image is through the use of a large field-of-view i
 
 In this case, the portion of the image corresponding to the requested RA, Dec of the simulation is extracted from the input, and some of the JWST calibration pipeline functionality is used to resample it onto the appropriate JWST instrument pixel grid while also introducing the appropriate distortion for the requested detector. This functionality is a new implementation of Astrodrizzle’s `blotting function <https://drizzlepac.readthedocs.io/en/deployment/ablot.html>`_, and works in essentially the same way. For more details on Astrodrizzle, see the `DrizzlePac website <http://drizzlepac.stsci.edu/>`_. The simulator then saves this blotted image in the seed image format used by subsequent steps of MIRAGE.
 
-In order to create a seed image from this input file, the simulator uses the **fits_seed_image.py**, function. For convenience, this function accepts the same yaml input file as the other parts of the simulator. Alternatively, the user has the option of manually specifying the necessary parameters. Below we show an example of how to create a seed image from an input mosaic file using either a yaml file or by setting parameters manually.
+In order to create a seed image from this input file, the simulator uses the **fits_seed_image.py**, function. For convenience, this function accepts the same yaml input file as the other parts of the simulator. To see an example of how to create a seed image from an input mosaic file, see the `Simulated_data_from_mosaic_image.ipynb notebook <https://github.com/spacetelescope/mirage/blob/master/examples/Simulated_data_from_mosaic_image.ipynb>`_ in the `examples directory <https://github.com/spacetelescope/mirage/tree/master/examples>`_ of the Mirage repository.
 
-::
-
-	from mirage.scripts import fits_seed_image
-	# Two input options:
-
-	# 1. a yaml file matching that used by the MIRAGE
-	s = fits_seed_image.ImgSeed('fits_seed_image_test.yaml')
-	s.mosaicfile = 'my_mosaic_drz.fits'
-	s.crop_and_blot()
-
-	#2. set the parameters manually
-	s = fits_seed_image.ImgSeed()
-	s.mosaicfile = 'my_mosaic_drz.fits'
-	s.aperture = 'NRCB5_FULL'
-	s.crop_center_ra = 53.1
-	s.crop_center_dec = -27.8
-	s.blot_center_ra = 53.1
-	s.blot_center_de = -27.8
-	s.blot_pav3 = 0.
-	s.subarray_defs = 'config'
-	s.flux_cal_file = 'config'
-	s.filter = 'F250M'
-	s.pupil = 'CLEAR'
-	s.grism_source_image = False
-	s.outfile = 'test_mosaic_seed.fits'
-	s.outdir = './'
-	s.crop_and_blot()
 
 

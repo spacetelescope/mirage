@@ -1506,14 +1506,14 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                 dec=combined['y_or_Dec'].data,
                                                 ra_velocity=combined['ra_velocity'].data,
                                                 dec_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
+                                                filenames=combined['filename'].data,
                                                 position_angle=combined['pos_angle'].data)
             else:
                 new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
                                                 dec=combined['y_or_Dec'].data,
                                                 x_velocity=combined['ra_velocity'].data,
                                                 y_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
+                                                filenames=combined['filename'].data,
                                                 position_angle=combined['pos_angle'].data)
         else:
             if cat1.velocity_units == 'velocity_RA_Dec':
@@ -1521,14 +1521,14 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                 y=combined['y_or_Dec'].data,
                                                 ra_velocity=combined['ra_velocity'].data,
                                                 dec_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
+                                                filenames=combined['filename'].data,
                                                 position_angle=combined['pos_angle'].data)
             else:
                 new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
                                                 y=combined['y_or_Dec'].data,
                                                 x_velocity=combined['ra_velocity'].data,
                                                 y_velocity=combined['dec_velocity'].data,
-                                                filenames=combined['filenames'].data,
+                                                filenames=combined['filename'].data,
                                                 position_angle=combined['pos_angle'].data)
 
     # --------------------Galaxies------------------------------------
@@ -1558,12 +1558,12 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
         if cat1.location_units == 'position_RA_Dec':
             new_cat = ExtendedCatalog(ra=combined['x_or_RA'].data,
                                       dec=combined['y_or_Dec'].data,
-                                      filenames=combined['filenames'].data,
+                                      filenames=combined['filename'].data,
                                       position_angle=combined['pos_angle'].data)
         else:
             new_cat = ExtendedCatalog(x=combined['x_or_RA'].data,
                                       y=combined['y_or_Dec'].data,
-                                      filenames=combined['filenames'].data,
+                                      filenames=combined['filename'].data,
                                       position_angle=combined['pos_angle'].data)
 
     # -------------Moving Point Sources--------------------------------

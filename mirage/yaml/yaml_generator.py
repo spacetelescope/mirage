@@ -692,6 +692,7 @@ class SimInput:
             file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
+        self.yaml_files = yamls
 
         # Write out summary of all written yaml files
         filenames = [y.split('/')[-1] for y in yamls]
