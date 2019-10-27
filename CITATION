@@ -1,0 +1,28 @@
+If you use `mirage` for work/research presented in a publication (whether directly,
+or as a dependency to another package), we recommend and encourage the following acknowledgment:
+
+  This research made use of the open source Python package mirage, the JWST Multi Instrument Ramp
+  Generator (Hilbert et al, 2019).
+
+where (Hilbert et al, 2019) is a citation of the Zenodo record, e.g.:
+
+@software{bryan_hilbert_2019_3519262,
+  author       = {Bryan Hilbert and
+                  Johannes Sahlmann and
+                  Kevin Volk and
+                  Shannon Osborne and
+                  dthatte and
+                  Marshall Perrin and
+                  Lauren Chambers and
+                  Edward Slavich and
+                  Jo Taylor and
+                  Erik Tollerud and
+                  P. L. Lim},
+  title        = {spacetelescope/mirage: First github release},
+  month        = oct,
+  year         = 2019,
+  publisher    = {Zenodo},
+  version      = {v1.1.1},
+  doi          = {10.5281/zenodo.3519262},
+  url          = {https://doi.org/10.5281/zenodo.3519262}
+}
