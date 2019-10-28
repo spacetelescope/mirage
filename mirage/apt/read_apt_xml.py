@@ -47,16 +47,16 @@ class ReadAPTXML():
                           'SubpixelDitherType', 'CoordinatedParallel', 'ParallelInstrument',
                           'ObservationID', 'TileNumber', 'APTTemplate',
                           'ApertureOverride', 'ObservationName',
-                          'DitherPatternType', 'ImageDithers', # NIRISS
-                          'number_of_dithers', # uniform name across instruments
-                          'FiducialPointOverride', 'TargetID'
+                          'DitherPatternType', 'ImageDithers',  # NIRISS
+                          'number_of_dithers',  # uniform name across instruments
+                          'FiducialPointOverride', 'TargetID', 'TargetRA', 'TargetDec'
                           ]
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
                              'ReadoutPattern', 'Groups', 'Integrations',
-                             'FilterWheel', 'PupilWheel' # for NIRISS
+                             'FilterWheel', 'PupilWheel'  # for NIRISS
                              ]
         OtherParams_keys = ['Mode', 'Grism',
-                            'IntegrationsShort', 'GroupsShort', 'Dither', # MIRI
+                            'IntegrationsShort', 'GroupsShort', 'Dither',  # MIRI
                             'GroupsLong', 'ReadoutPatternShort', 'IntegrationsLong',
                             'Exposures', 'Wavelength', 'ReadoutPatternLong', 'Filter',
                             'EtcIdLong', 'EtcIdShort', 'EtcId',
@@ -143,9 +143,14 @@ class ReadAPTXML():
         # Get target names - - - - - - - - - - - - - - - - - - - - - - - - - -
         targs = tree.find(self.apt + 'Targets')
         target_elements = targs.findall(self.apt + 'Target')
-        self.target_names = []
+        self.target_info = {}
         for target in target_elements:
-            self.target_names.append(target.find(self.apt + 'TargetName').text)
+            t_name = target.find(self.apt + 'TargetName').text
+            t_coords = target.find(self.apt + 'EquatorialCoordinates').items()[0][1]
+            ra_hour, ra_min, ra_sec, dec_deg, dec_arcmin, dec_arcsec = t_coords.split(' ')
+            ra = '{}:{}:{}'.format(ra_hour, ra_min, ra_sec)
+            dec = '{}:{}:{}'.format(dec_deg, dec_arcmin, dec_arcsec)
+            self.target_info[t_name] = (ra, dec)
 
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
@@ -236,7 +241,9 @@ class ReadAPTXML():
                                              'CoordinatedParallel': coordparallel,
                                              'ObservationID': observation_number,
                                              'ObservationName': obs_label,
-                                             'TargetID': targ_name
+                                             'TargetID': targ_name,
+                                             'TargetRA': self.target_info[targ_name][0],
+                                             'TargetDec': self.target_info[targ_name][1]
                                              }
 
             if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration',

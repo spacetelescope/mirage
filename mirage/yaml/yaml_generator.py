@@ -1063,7 +1063,7 @@ class SimInput:
                 subarray_def_file = 'niriss_subarrays.list'
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
-                filter_postion_file = 'niriss_filter_and_pupil_wheel_positions.txt'
+                filter_position_file = 'niriss_filter_and_pupil_wheel_positions.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
                 psf_wing_threshold_file = 'niriss_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'niriss/gridded_psf_library')
@@ -2005,6 +2005,11 @@ class SimInput:
             f.write('  Proposal_category: {}  # Proposal category\n'.format(input['Proposal_category']))
             f.write('  Science_category: {}  # Science category\n'.format(input['Science_category']))
             f.write('  target_name: {}  # Name of target\n'.format(input['TargetID']))
+
+            ra_degrees, dec_degrees = utils.parse_RA_Dec(input['TargetRA'], input['TargetDec'])
+
+            f.write('  target_ra: {}  # RA of the target, from APT file.\n'.format(ra_degrees))
+            f.write('  target_dec: {}  # Dec of the target, from APT file.\n'.format(dec_degrees))
             f.write("  observation_number: '{}'    # Observation Number\n".format(input['obs_num']))
             f.write('  observation_label: {}    # User-generated observation Label\n'.format(input['obs_label'].strip()))
             f.write("  visit_number: '{}'    # Visit Number\n".format(input['visit_num']))

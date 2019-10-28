@@ -874,8 +874,8 @@ class Observation():
                     channel = 'LW'
                 else:
                     channel = 'SW'
-                f_match = self.params['Readout']['filter'] == fw_positions['Name'] and channel == fw_positions['Channel']
-                p_match = self.params['Readout']['pupil'] == fw_positions['Name'] and channel == fw_positions['Channel']
+                f_match = ((self.params['Readout']['filter'] == fw_positions['Name']) & (channel == fw_positions['Channel']))
+                p_match = ((self.params['Readout']['pupil'] == fw_positions['Name']) & (channel == fw_positions['Channel']))
             self.filter_wheel_position = fw_positions['Filter_Resolver_Reading_Wheel_Degrees'][f_match].data[0]
             self.pupil_wheel_position = fw_positions['Pupil_Resolver_Reading_Wheel_Degrees'][p_match].data[0]
         elif self.instrument.upper() == 'FGS':
@@ -2620,8 +2620,9 @@ class Observation():
         # Filter and pupil info
         outModel.meta.instrument.filter = fw
         outModel.meta.instrument.pupil = pw
-        outModel.meta.instrument.filter_position = self.filter_wheel_position
-        outModel.meta.instrument.pupil_position = self.pupil_wheel_position
+        if self.instrument.upper() == 'NIRISS':
+            outModel.meta.instrument.filter_position = self.filter_wheel_position
+            outModel.meta.instrument.pupil_position = self.pupil_wheel_position
 
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
@@ -2840,7 +2841,7 @@ class Observation():
         outModel[0].header['CONT_ID'] = 0
 
         outModel[0].header['TARGNAME'] = 'UNKNOWN'
-        outModel[0].header['TARGNAME'] = self.params['Output']['target_name']
+        outModel[0].header['TARGPROP'] = self.params['Output']['target_name']
         outModel[0].header['TARG_RA'] = self.params['Output']['target_ra']
         outModel[0].header['TARG_DEC'] = self.params['Output']['target_dec']
 
@@ -2908,8 +2909,9 @@ class Observation():
         # Filter and pupil info
         outModel[0].header['FILTER'] = fw
         outModel[0].header['PUPIL'] = pw
-        outModel[0].header['FWCPOS'] = self.filter_wheel_position
-        outModel[0].header['PWCPOS'] = self.pupil_wheel_position
+        if self.instrument.upper() == 'NIRISS':
+            outModel[0].header['FWCPOS'] = self.filter_wheel_position
+            outModel[0].header['PWCPOS'] = self.pupil_wheel_position
 
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']
