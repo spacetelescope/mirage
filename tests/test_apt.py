@@ -66,10 +66,11 @@ def RunAllAPTTemplates(instrument):
     n_obs = len(obs_results)
 
     # Locate catalogs for target(s) (one catalog per observation and channel)
-    sw_cats = [os.path.join(TESTS_DIR, 'test_data', '2MASS_RA273.09deg_Dec65.60deg.list')] * n_obs
-    lw_cats = [os.path.join(TESTS_DIR, 'test_data', 'WISE_RA273.09deg_Dec65.60deg.list')] * n_obs
-    cat_dict = {'nircam': {'lw': lw_cats,
-                           'sw': sw_cats}}
+    #sw_cats = [os.path.join(TESTS_DIR, 'test_data', '2MASS_RA273.09deg_Dec65.60deg.list')] * n_obs
+    #lw_cats = [os.path.join(TESTS_DIR, 'test_data', 'WISE_RA273.09deg_Dec65.60deg.list')] * n_obs
+    #cat_dict = {'nircam': {'lw': lw_cats,
+    #                       'sw': sw_cats}}
+    cat_dict = None
 
     # Point to appropriate output directory
     out_dir = os.path.join(TESTS_DIR, 'test_data',  instrument, 'APT_{}_out'.format(instrument))

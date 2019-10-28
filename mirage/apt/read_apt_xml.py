@@ -224,8 +224,8 @@ class ReadAPTXML():
             try:
                 targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
             except IndexError as e:
-              print("No target ID for observation: {}".format(obs))
-              targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
+                print("No target ID for observation: {}".format(obs))
+                targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
 
             # extract visit numbers
             visit_numbers = [np.int(element.items()[0][1]) for element in obs if

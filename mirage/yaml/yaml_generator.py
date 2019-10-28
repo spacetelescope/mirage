@@ -2006,7 +2006,14 @@ class SimInput:
             f.write('  Science_category: {}  # Science category\n'.format(input['Science_category']))
             f.write('  target_name: {}  # Name of target\n'.format(input['TargetID']))
 
-            ra_degrees, dec_degrees = utils.parse_RA_Dec(input['TargetRA'], input['TargetDec'])
+            # For now, skip populating the target RA and Dec in WFSC data.
+            # The read_xxxxx funtions for these observation types will have
+            # to be updated to make use of the proposal_parameter_dictionary
+            if input['TargetRA'] != '0':
+                ra_degrees, dec_degrees = utils.parse_RA_Dec(input['TargetRA'], input['TargetDec'])
+            else:
+                ra_degrees = 0.
+                dec_degrees = 0.
 
             f.write('  target_ra: {}  # RA of the target, from APT file.\n'.format(ra_degrees))
             f.write('  target_dec: {}  # Dec of the target, from APT file.\n'.format(dec_degrees))
