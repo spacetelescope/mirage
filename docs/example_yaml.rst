@@ -52,6 +52,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
 	  crosstalk_:       config   #File containing crosstalk coefficients
 	  filtpupilcombo_:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
+	  filter_wheel_positions_: config  #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
 	  flux_cal_:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
 
 	nonlin_:
@@ -122,6 +123,9 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  PI_Name_: Doug Adams                          # Proposal PI Name
 	  Proposal_category_: GO                        # Proposal category
 	  Science_category_: Cosmology                  # Science category
+	  target_name_: TARG1                           # Name of target
+	  target_ra_: 53.1001                           # RA of the target, from APT file.
+	  target_dec_: -27.799                          # Dec of the target, from APT file.
 	  observation_number_: '002'                    # Observation Number
 	  observation_label_: Obs2                      # User-generated observation Label
 	  visit_number_: '024'                          # Visit Number
@@ -482,6 +486,18 @@ Name of an ascii file containing a list of the filter and pupil wheel elements i
 
 .. hint::
 	To use the filter and pupil wheel definition files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
+
+.. _filter_wheel_positions:
+
+Filter/Pupil wheel resolver positions for each optical element
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*Reffiles:filter_wheel_positions*
+
+Name of an ascii file containing a list of all filter wheel and pupil wheel elements, along with the nominal wheel resolver positions for each. These values are in degrees. This information is passed directly to the header keywords FWCPOS and PWCPOS in the simulated data FITS files. This information is needed to compute the dispersion solution for NIRISS WFSS. Currently the header keywords are only populated for NIRISS observations.
+
+.. hint::
+	To use the filter and pupil wheel position files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
 
 .. _flux_cal:
 
@@ -1105,7 +1121,7 @@ Proposal category
 
 Proposal category (e.g. GO, GTO). This is placed in the header of the output file in order to match the contents of real observation files.
 
-.. _science_category:
+.. _Science_category:
 
 Science category
 ++++++++++++++++
@@ -1113,6 +1129,33 @@ Science category
 *Output:science_category*
 
 Science category of the proposal, as defined in the APT file. This is placed in the header of the output file in order to match the contents of real observation files.
+
+.. _target_name:
+
+Target Name
++++++++++++
+
+*Output:target_name*
+
+Name of the target. For yaml files constructed from an APT file, this is the name of the target as input by the user. This value will be propagated into the TARGPROP keyword in the simulated data FITS files.
+
+.. _target_ra:
+
+Target RA
++++++++++
+
+*Output:target_ra*
+
+RA of the target. For yaml files constructed from an APT file, this is the RA of the target as input by the user, translated to units of degrees. This value will be propagated into the TARG_RA keyword in the simulated data FITS files.
+
+.. _target_dec:
+
+Target Dec
+++++++++++
+
+*Output:target_dec*
+
+Declination of the target. For yaml files constructed from an APT file, this is the declination of the target as input by the user, translated to units of degrees. This value will be propagated into the TARG_DEC keyword in the simulated data FITS files.
 
 .. _observation_number:
 
