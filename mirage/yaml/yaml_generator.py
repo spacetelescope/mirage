@@ -688,6 +688,7 @@ class SimInput:
             file_dict['readpatt_def_file'] = self.global_readout_pattern_files[instrument]
             file_dict['crosstalk_file'] = self.global_crosstalk_files[instrument]
             file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
+            file_dict['filter_position_file'] = self.global_filter_position_files[instrument]
             file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
             file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
             fname = self.write_yaml(file_dict)
@@ -1050,6 +1051,7 @@ class SimInput:
 
         self.global_crosstalk_files = {}
         self.global_filtpupilcombo_files = {}
+        self.global_filter_position_files = {}
         self.global_flux_cal_files = {}
         self.global_psf_wing_threshold_file = {}
         self.global_psfpath = {}
@@ -1061,6 +1063,7 @@ class SimInput:
                 subarray_def_file = 'niriss_subarrays.list'
                 crosstalk_file = 'niriss_xtalk_zeros.txt'
                 filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
+                filter_position_file = 'niriss_filter_and_pupil_wheel_positions.txt'
                 flux_cal_file = 'niriss_zeropoints.list'
                 psf_wing_threshold_file = 'niriss_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'niriss/gridded_psf_library')
@@ -1069,6 +1072,7 @@ class SimInput:
                 subarray_def_file = 'guider_subarrays.list'
                 crosstalk_file = 'guider_xtalk_zeros.txt'
                 filtpupilcombo_file = 'guider_filter_dummy.list'
+                filter_position_file = 'dummy.txt'
                 flux_cal_file = 'guider_zeropoints.list'
                 psf_wing_threshold_file = 'fgs_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'fgs/gridded_psf_library')
@@ -1077,6 +1081,7 @@ class SimInput:
                 subarray_def_file = 'NIRCam_subarray_definitions.list'
                 crosstalk_file = 'xtalk20150303g0.errorcut.txt'
                 filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
+                filter_position_file = 'nircam_filter_and_pupil_wheel_positions.txt'
                 flux_cal_file = 'NIRCam_zeropoints.list'
                 psf_wing_threshold_file = 'nircam_psf_wing_rate_thresholds.txt'
                 psfpath = os.path.join(self.datadir, 'nircam/gridded_psf_library')
@@ -1085,6 +1090,7 @@ class SimInput:
                 subarray_def_file = 'N/A'
                 crosstalk_file = 'N/A'
                 filtpupilcombo_file = 'N/A'
+                filter_position_file = 'N/A'
                 flux_cal_file = 'N/A'
                 psf_wing_threshold_file = 'N/A'
                 psfpath = 'N/A'
@@ -1095,6 +1101,7 @@ class SimInput:
             self.global_readout_pattern_files[instrument] = os.path.join(self.modpath, 'config', readout_pattern_file)
             self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
             self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
+            self.global_filter_position_files[instrument] = os.path.join(self.modpath, 'config', filter_position_file)
             self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
             self.global_psf_wing_threshold_file[instrument] = os.path.join(self.modpath, 'config', psf_wing_threshold_file)
             self.global_psfpath[instrument] = psfpath
@@ -1862,6 +1869,7 @@ class SimInput:
             f.write('  crosstalk: {}   # File containing crosstalk coefficients\n'.format(input['crosstalk_file']))
             f.write(('  filtpupilcombo: {}   # File that lists the filter wheel element / pupil wheel element combinations. '
                      'Used only in writing output file\n'.format(input['filtpupilcombo_file'])))
+            f.write(('  filter_wheel_positions: {}  # File containing resolver wheel positions for each filter/pupil\n'.format(input['filter_position_file'])))
             f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
                      'used when making direct image outputs to be fed into the grism disperser code.\n'.format(input['flux_cal_file'] )))
             f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.configfiles[instrument.lower()]['filter_throughput']))
@@ -1996,6 +2004,19 @@ class SimInput:
             f.write('  PI_Name: {}  # Proposal PI Name\n'.format(input['PI_Name']))
             f.write('  Proposal_category: {}  # Proposal category\n'.format(input['Proposal_category']))
             f.write('  Science_category: {}  # Science category\n'.format(input['Science_category']))
+            f.write('  target_name: {}  # Name of target\n'.format(input['TargetID']))
+
+            # For now, skip populating the target RA and Dec in WFSC data.
+            # The read_xxxxx funtions for these observation types will have
+            # to be updated to make use of the proposal_parameter_dictionary
+            if input['TargetRA'] != '0':
+                ra_degrees, dec_degrees = utils.parse_RA_Dec(input['TargetRA'], input['TargetDec'])
+            else:
+                ra_degrees = 0.
+                dec_degrees = 0.
+
+            f.write('  target_ra: {}  # RA of the target, from APT file.\n'.format(ra_degrees))
+            f.write('  target_dec: {}  # Dec of the target, from APT file.\n'.format(dec_degrees))
             f.write("  observation_number: '{}'    # Observation Number\n".format(input['obs_num']))
             f.write('  observation_label: {}    # User-generated observation Label\n'.format(input['obs_label'].strip()))
             f.write("  visit_number: '{}'    # Visit Number\n".format(input['visit_num']))

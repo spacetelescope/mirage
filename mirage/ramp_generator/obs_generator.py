@@ -861,6 +861,27 @@ class Observation():
                 print(("WARNING: unable to convert {} to string. "
                        "This is required.".format(self.params['Output'][quality])))
 
+        # Get the filter wheel and pupil wheel resolver positions for the
+        # filter and pupil to use. This information will be placed in the
+        # header of the output file
+        if self.instrument.upper() in ['NIRCAM', 'NIRISS']:
+            fw_positions = ascii.read(self.params['Reffiles']['filter_wheel_positions'])
+            if self.instrument.upper() == 'NIRISS':
+                f_match = self.params['Readout']['filter'] == fw_positions['Name']
+                p_match = self.params['Readout']['pupil'] == fw_positions['Name']
+            elif self.instrument.upper() == 'NIRCAM':
+                if self.detector[-1] == '5':
+                    channel = 'LW'
+                else:
+                    channel = 'SW'
+                f_match = ((self.params['Readout']['filter'] == fw_positions['Name']) & (channel == fw_positions['Channel']))
+                p_match = ((self.params['Readout']['pupil'] == fw_positions['Name']) & (channel == fw_positions['Channel']))
+            self.filter_wheel_position = fw_positions['Filter_Resolver_Reading_Wheel_Degrees'][f_match].data[0]
+            self.pupil_wheel_position = fw_positions['Pupil_Resolver_Reading_Wheel_Degrees'][p_match].data[0]
+        elif self.instrument.upper() == 'FGS':
+            self.filter_wheel_position = 999.
+            self.pupil_wheel_position = 999.
+
     def check_run_step(self, filename):
         """Check to see if a filename exists in the parameter file.
 
@@ -2532,6 +2553,9 @@ class Observation():
         outModel.meta.program.continuation_id = 0
 
         outModel.meta.target.catalog_name = 'UNKNOWN'
+        outModel.meta.target.ra = self.params['Output']['target_ra']
+        outModel.meta.target.dec = self.params['Output']['target_dec']
+        outModel.meta.target.proposer_name = self.params['Output']['target_name']
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
         outModel.meta.wcsinfo.wcsaxes = 2
@@ -2550,8 +2574,6 @@ class Observation():
         outModel.meta.wcsinfo.cdelt1 = self.siaf.XSciScale / 3600.
         outModel.meta.wcsinfo.cdelt2 = self.siaf.YSciScale / 3600.
         outModel.meta.wcsinfo.roll_ref = self.local_roll
-        outModel.meta.target.ra = self.ra
-        outModel.meta.target.dec = self.dec
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         # compute pointing of V1 axis
@@ -2595,8 +2617,12 @@ class Observation():
         if pw == 'NA':
             pw = 'N/A'
 
+        # Filter and pupil info
         outModel.meta.instrument.filter = fw
         outModel.meta.instrument.pupil = pw
+        if self.instrument.upper() == 'NIRISS':
+            outModel.meta.instrument.filter_position = self.filter_wheel_position
+            outModel.meta.instrument.pupil_position = self.pupil_wheel_position
 
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
@@ -2815,6 +2841,9 @@ class Observation():
         outModel[0].header['CONT_ID'] = 0
 
         outModel[0].header['TARGNAME'] = 'UNKNOWN'
+        outModel[0].header['TARGPROP'] = self.params['Output']['target_name']
+        outModel[0].header['TARG_RA'] = self.params['Output']['target_ra']
+        outModel[0].header['TARG_DEC'] = self.params['Output']['target_dec']
 
         outModel[1].header['WCSAXES'] = 2
         outModel[1].header['CRVAL1'] = self.ra
@@ -2832,8 +2861,6 @@ class Observation():
         outModel[1].header['CDELT1'] = self.siaf.XSciScale / 3600.
         outModel[1].header['CDELT2'] = self.siaf.YSciScale / 3600.
         outModel[1].header['ROLL_REF'] = self.local_roll
-        outModel[0].header['TARG_RA'] = self.ra  # not correct
-        outModel[0].header['TARG_DEC'] = self.dec  # not correct
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         # compute pointing of V1 axis
@@ -2879,8 +2906,12 @@ class Observation():
         if pw == 'NA':
             pw = 'N/A'
 
+        # Filter and pupil info
         outModel[0].header['FILTER'] = fw
         outModel[0].header['PUPIL'] = pw
+        if self.instrument.upper() == 'NIRISS':
+            outModel[0].header['FWCPOS'] = self.filter_wheel_position
+            outModel[0].header['PWCPOS'] = self.pupil_wheel_position
 
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']

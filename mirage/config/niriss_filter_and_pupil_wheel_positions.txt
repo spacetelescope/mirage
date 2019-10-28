@@ -1,0 +1,22 @@
+# Resolver readings in degrees for filter and pupil wheel elements.
+# 999 is used as a fill value for elements not in that wheel.
+
+Name    Pupil_Resolver_Reading_Wheel_Degrees   Filter_Resolver_Reading_Wheel_Degrees
+F090W             325.0131                             999
+CLEARP            284.9032                             999
+GR700XD           245.6344                             999
+NRM               204.9813                             999
+F200W             164.8715                             999
+F150W             124.9032                             999
+F140M              84.9007                             999
+F158M              44.9374                             999
+F115W               4.9789                             999
+GR150R            999                                   33.5667
+CLEAR             999                                   74.8667
+F480M             999                                  114.9667
+F380M             999                                  154.8889
+F430M             999                                  194.8111
+F356W             999                                  234.9333
+F444W             999                                  274.9000
+F277W             999                                  314.8667
+GR150C            999                                  354.2111
