@@ -49,10 +49,8 @@ def create_basic_exposure_list(xml_file, pointing_file):
     from mirage.yaml import yaml_generator
     from mirage.apt import apt_inputs
 
-    dummy_catalogs = {'nircam': {'sw': 'dummy.cat', 'lw': 'dummy.cat'},
-                      'niriss': 'dummy.cat', 'fgs': 'dummy.cat'}
     info = yaml_generator.SimInput(input_xml=xml_file, pointing_file=pointing_file,
-                                   catalogs=dummy_catalogs, offline=True)
+                                   offline=True)
 
     apt = apt_inputs.AptInput(input_xml=xml_file, pointing_file=pointing_file)
     apt.observation_list_file = info.observation_list_file
