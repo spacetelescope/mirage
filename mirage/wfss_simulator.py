@@ -169,6 +169,25 @@ class WFSSSim():
         # Default to extracting all orders
         orders = None
 
+
+
+        # Revised way to call the disperser
+        call_jwst_backgrounds_and_create_bkgd_fits_file()
+        t = NIRCAM_Gsim.grism_seed_disperser.Grism_seed(image_seeds,"F356W","modA_R","/Users/npirzkal/Dropbox/GRISMDATA/NIRCAM/")
+        t.observation()
+        t.disperse()
+        bck = t.disperse_background_1D("/Users/npirzkal/Dropbox/NIRCAM/Back/backgrounds.fits")
+        t.finalize(tofits="t.fits",Back=bck,BackLevel=None)
+
+
+
+
+
+
+
+
+
+
         # Create dispersed seed image from the direct images
         disp_seed = Grism_seed(imseeds, self.crossing_filter,
                                dmode, config_path=loc, instrument=self.instrument.upper(),

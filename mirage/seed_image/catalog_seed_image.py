@@ -3781,6 +3781,12 @@ class Catalog_seed():
         # are used
         bkgdrate_options = ['high', 'medium', 'low']
 
+        # For WFSS observations, we want the background in the direct
+        # seed image to be zero. The dispersed background will be created
+        # and added as part of the dispersion process
+        if self.params['Inst']['mode'].lower() == 'wfss':
+            self.params['simSignals']['bkgdrate'] = 0.
+
         if np.isreal(self.params['simSignals']['bkgdrate']):
             self.params['simSignals']['bkgdrate'] = float(self.params['simSignals']['bkgdrate'])
         else:
@@ -3809,9 +3815,14 @@ class Catalog_seed():
                 print(("Using {} filter throughput file for background calculation."
                        .format(filter_file)))
 
-                self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
-                                                                                  filter_file,
-                                                                                  level=self.params['simSignals']['bkgdrate'].lower())
+                if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+                    do_that_here()
+                    need to add code here
+                else:
+                    # Here the background level is based on high/medium/low rather than date
+                    self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
+                                                                                      filter_file,
+                                                                                      level=self.params['simSignals']['bkgdrate'].lower())
                 print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
             else:
                 raise ValueError(("WARNING: unrecognized background rate value. "
@@ -4027,14 +4038,18 @@ class Catalog_seed():
         # all wavelengths, so just use a dummy value of 2.5 microns
         bg = jbt.background(ra, dec, 2.5)
 
-        # Now we need to loop over each day (in the background)
-        # info, convolve the background curve with the filter
-        # throughput curve, and then integrate. THEN, we can
-        # calculate the low/medium/high values.
-        bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
-        for i in range(len(bg.bkg_data['total_bg'][:, 0])):
+        # If the user wants a background signal from a particular day,
+        # then extract that array here
+        if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+            obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
+            obs_dayofyear = obsdate.timetuple().tm_yday
+            if obs_dayofyear not in bg.bkg_data['calendar']:
+                raise ValueError(("ERROR: The requested RA, Dec is not observable on {}. Either "
+                                  "specify a different day, or set simSignals:use_dateobs_for_background "
+                                  "to False.".format(self.params['Output']['date_obs'])))
+            match = obs_dayofyear == bg.bkg_data['calendar']
             back_wave = bg.bkg_data['wave_array']
-            back_sig = bg.bkg_data['total_bg'][i, :]
+            back_sig = bg.bkg_data['total_bg'][match, :]
 
             # Interpolate background to match filter wavelength grid
             bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
@@ -4043,23 +4058,44 @@ class Catalog_seed():
             filt_bkgd = bkgd_interp * filt_thru
 
             # Integrate
-            bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
+            bval = np.trapz(filt_bkgd, x=filt_wav)
 
-        # Now sort and determine the low/medium/high levels
-        x = np.sort(bsigs)
-        y = np.arange(1, len(x) + 1) / len(x)
-
-        if level.lower() == 'low':
-            perc = 0.1
-        elif level.lower() == 'medium':
-            perc = 0.5
-        elif level.lower() == 'high':
-            perc = 0.9
         else:
-            raise ValueError("Unrecognized background level string")
+            # If the user has requested background in terms of low/medium/high,
+            # then we need to examine all the background arrays.
+            # Loop over each day (in the background)
+            # info, convolve the background curve with the filter
+            # throughput curve, and then integrate. THEN, we can
+            # calculate the low/medium/high values.
+            bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
+            for i in range(len(bg.bkg_data['total_bg'][:, 0])):
+                back_wave = bg.bkg_data['wave_array']
+                back_sig = bg.bkg_data['total_bg'][i, :]
 
-        # Interpolate to the requested level
-        bval = np.interp(perc, y, x) * u.MJy / u.steradian
+                # Interpolate background to match filter wavelength grid
+                bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
+
+                # Combine
+                filt_bkgd = bkgd_interp * filt_thru
+
+                # Integrate
+                bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
+
+            # Now sort and determine the low/medium/high levels
+            x = np.sort(bsigs)
+            y = np.arange(1, len(x) + 1) / len(x)
+
+            if level.lower() == 'low':
+                perc = 0.1
+            elif level.lower() == 'medium':
+                perc = 0.5
+            elif level.lower() == 'high':
+                perc = 0.9
+            else:
+                raise ValueError("Unrecognized background level string")
+
+            # Interpolate to the requested level
+            bval = np.interp(perc, y, x) * u.MJy / u.steradian
 
         # Convert from MJy/str to ADU/sec
         # then divide by area of pixel
