@@ -36,10 +36,12 @@ import pysiaf
 from . import moving_targets
 from . import segmentation_map as segmap
 from ..reference_files import crds_tools
+from ..utils.backgrounds import find_low_med_high
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 from ..utils.constants import CRDS_FILE_TYPES
+from ..utils.flux_ca import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
@@ -3678,8 +3680,12 @@ class Catalog_seed():
         if self.params['simSignals']['galaxyListFile'] == 'None':
             print('No galaxy catalog provided in yaml file.')
 
+
+
+        """
         # Read in list of zeropoints/photflam/photfnu
         self.zps = ascii.read(self.params['Reffiles']['flux_cal'])
+        """
 
         # Determine the instrument module and detector from the aperture name
         aper_name = self.params['Readout']['array_name']
@@ -3690,10 +3696,8 @@ class Catalog_seed():
             # module = detector[0]
             detector = aper_name.split('_')[0]
             self.detector = detector
-            shortdetector = detector
             if self.params["Inst"]["instrument"].lower() == 'nircam':
                 module = detector[3]
-                shortdetector = detector[3:]
             elif self.params["Inst"]["instrument"].lower() == 'niriss':
                 module = detector[0]
             elif self.params["Inst"]["instrument"].lower() == 'fgs':
@@ -3702,20 +3706,21 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
+        """
         # In the future we expect zeropoints to be detector dependent, as they
         # currently are for FGS. So if we are working with NIRCAM or NIRISS,
         # manually add a Detector key to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
+        """
 
         if self.params['Inst']['instrument'].lower() == 'niriss':
-            newfilter,newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
+            newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
             self.params['Readout']['filter'] = newfilter
             self.params['Readout']['pupil'] = newpupil
 
         # Make sure the requested filter is allowed. For imaging, all filters
         # are allowed. In the future, other modes will be more restrictive
-
         if self.params['Readout']['pupil'][0].upper() == 'F':
             usefilt = 'pupil'
         else:
@@ -3728,6 +3733,11 @@ class Catalog_seed():
             self.params['Readout']['filter'] = 'NA'
             self.params['Readout']['pupil'] = 'NA'
 
+        # Get basic flux calibration information
+        self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
+            fluxcal_info(self.params, usefilt, detector, module)
+
+        """
         if self.params['Readout'][usefilt] not in self.zps['Filter']:
             raise ValueError(("WARNING: requested filter {} is not in the list of "
                               "possible filters.".format(self.params['Readout'][usefilt])))
@@ -3741,6 +3751,7 @@ class Catalog_seed():
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
         self.photfnu = self.zps['PHOTFNU'][mtch][0]
         self.pivot = self.zps['Pivot_wave'][mtch][0]
+        """
 
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -4082,20 +4093,20 @@ class Catalog_seed():
                 bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
 
             # Now sort and determine the low/medium/high levels
-            x = np.sort(bsigs)
-            y = np.arange(1, len(x) + 1) / len(x)
+            low, medium, high = find_low_med_high(bsigs)
 
-            if level.lower() == 'low':
-                perc = 0.1
-            elif level.lower() == 'medium':
-                perc = 0.5
-            elif level.lower() == 'high':
-                perc = 0.9
+            # Find the value based on the level in the yaml file
+            level = level.lower()
+            if level == "low":
+                bval = low
+            elif level == "medium":
+                bval = medium
+            elif level == "high":
+                bval = high
             else:
-                raise ValueError("Unrecognized background level string")
-
-            # Interpolate to the requested level
-            bval = np.interp(perc, y, x) * u.MJy / u.steradian
+                raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
+                                  .format(level)))
+            bval = bval * u.MJy / u.steradian
 
         # Convert from MJy/str to ADU/sec
         # then divide by area of pixel
