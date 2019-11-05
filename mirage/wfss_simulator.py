@@ -163,13 +163,12 @@ class WFSSSim():
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
-                background_file = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
-                                                                              self.params['Telescope']['dec'],
-                                                                              self.params['Output']['date_obs'])
+                back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
+                                                                                  self.params['Telescope']['dec'],
+                                                                                  self.params['Output']['date_obs'])
             else:
-                background_file = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
-                                                                               self.module)
-                remove_pre_existing_nircam_background_files_from_repo()
+                back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
+                                                                                   self.module)
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
@@ -188,7 +187,7 @@ class WFSSSim():
         disp_seed.observation(orders=orders)
         disp_seed.disperse(orders=orders)
         if self.instrument == 'nircam':
-            background_image = disp_seed.disperse_background_1D(background_file)
+            background_image = disp_seed.disperse_background_1D(background_file) ???
             disp_seed.finalize(Back=background_image, BackLevel=None)
         else:
             # BackLevel is used as such: background / max(background) * BackLevel

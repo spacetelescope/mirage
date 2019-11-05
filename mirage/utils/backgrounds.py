@@ -39,12 +39,19 @@ def day_of_year_background_spectrum(ra, dec, observation_date):
                           "specify a different day, or set simSignals:use_dateobs_for_background "
                           "to False.".format(observation_date)))
 
+    # Extraxct the spectrum for the requested day
+    match = obs_dayofyear == background.bkg_data['calendar']
+    background_waves = background.bkg_data['wave_array']
+    background_signals = background.bkg_data['total_bg'][match, :][0]
+
+    return background_waves, background_signals
+
     # Output file to save background spectrum into
-    background_file = 'background.txt'
-    background = jbt.get_background(ra, dec, 4., plot_background=False, plot_bathtub=False,
-                                    thisday=obs_dayofyear, write_background=True, write_bathtub=False,
-                                    background_file=background_file)
-    return background_file
+    #background_file = 'background.txt'
+    #background = jbt.get_background(ra, dec, 4., plot_background=False, plot_bathtub=False,
+    #                                thisday=obs_dayofyear, write_background=True, write_bathtub=False,
+    #                                background_file=background_file)
+    #return background_file
 
 
 def find_low_med_high(array):
@@ -136,9 +143,70 @@ def low_med_high_background_spectrum(param_dict, detector, module):
     mindiff = np.where(diff == np.min(diff))[0][0]
     background_spec = background.bkg_data['total_bg'][mindiff, :]
 
-    # Will we need to save the background to a file because NIRCam_Gsim
-    # requires it?
-    save_to_ascii_file(background.bkg_data['wave_array'], background_spec)
+    return background.bkg_data['wave_array'], background_spec
+
+
+def low_medium_high_background_value(ra, dec, background_level, filter_waves, filter_throughput):
+    """Calculate the integrated background flux density for a given filter,
+    using the filter's throughput curve and the user-input background level
+    (e.g. "medium")
+
+    Parameters
+    ----------
+    ra : float
+        Right ascention of the pointing. Units are degrees
+
+    dec : float
+        Declineation of the pointing. Units are degrees
+
+    background_level : str
+        "low", "medium", or "high", just as with the ETC
+
+    filter_waves : numpy.ndarray
+        1d array of wavelengths in microns to be used along with
+        ``filter_throughput``
+
+    filter_throughput : numpy.ndarray
+        1d array of filter throughput values to convolve with the background
+        spectrum. Normalized units. 1.0 = 100% transmission.
+
+    Returns
+    -------
+    value : float
+        Background value corresponding to ``background_level``, integrated
+        over the filter bandpass. Background units are MJy/str.
+    """
+    # Get background information
+    bg = jbt.background(ra, dec, 4.)
+    bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
+    for i in range(len(bg.bkg_data['total_bg'][:, 0])):
+        back_wave = bg.bkg_data['wave_array']
+        back_sig = bg.bkg_data['total_bg'][i, :]
+
+        # Interpolate background to match filter wavelength grid
+        bkgd_interp = np.interp(filter_waves, back_wave, back_sig)
+
+        # Combine
+        filt_bkgd = bkgd_interp * filter_throughput
+
+        # Integrate
+        bsigs[i] = np.trapz(filt_bkgd, x=filter_waves)
+
+    # Now sort and determine the low/medium/high levels
+    low, medium, high = find_low_med_high(bsigs)
+
+    # Find the value based on the level in the yaml file
+    background_level = background_level.lower()
+    if background_level == "low":
+        value = low
+    elif background_level == "medium":
+        value = medium
+    elif background_level == "high":
+        value = high
+    else:
+        raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
+                          .format(background_level)))
+    return value
 
 
 def niriss_background_scaling(param_dict, detector, module):

@@ -36,7 +36,7 @@ import pysiaf
 from . import moving_targets
 from . import segmentation_map as segmap
 from ..reference_files import crds_tools
-from ..utils.backgrounds import find_low_med_high
+from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
@@ -3827,8 +3827,23 @@ class Catalog_seed():
                        .format(filter_file)))
 
                 if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
-                    do_that_here()
-                    need to add code here
+                    bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
+                                                                            self.params['Telescope']['dec'],
+                                                                            self.params['Output']['date_obs'])
+                    need more adjustments here
+
+
+
+
+
+
+
+
+
+
+
+
+
                 else:
                     # Here the background level is based on high/medium/low rather than date
                     self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
@@ -4033,7 +4048,7 @@ class Catalog_seed():
         #    coord_transform = self.simple_coord_transform()
         return coord_transform
 
-    def calculate_background(self, ra, dec, ffile, level='medium'):
+    def calculate_background(self, ra, dec, ffile, back_wave=None, back_sig=None, level='medium'):
         '''Use the JWST background calculator to come up with
         an appropriate background level for the observation.
         Options for level include low, medium, high'''
@@ -4044,6 +4059,10 @@ class Catalog_seed():
         # Read in filter throughput file
         filt_wav, filt_thru = self.read_filter_throughput(ffile)
 
+        # If the user wants a background signal from a particular day,
+        # then extract that array here
+        if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+        """
         # Get background information
         # Any wavelength will return the 2D array that includes
         # all wavelengths, so just use a dummy value of 2.5 microns
@@ -4061,6 +4080,7 @@ class Catalog_seed():
             match = obs_dayofyear == bg.bkg_data['calendar']
             back_wave = bg.bkg_data['wave_array']
             back_sig = bg.bkg_data['total_bg'][match, :]
+            """
 
             # Interpolate background to match filter wavelength grid
             bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
@@ -4072,6 +4092,7 @@ class Catalog_seed():
             bval = np.trapz(filt_bkgd, x=filt_wav)
 
         else:
+            """
             # If the user has requested background in terms of low/medium/high,
             # then we need to examine all the background arrays.
             # Loop over each day (in the background)
@@ -4093,7 +4114,7 @@ class Catalog_seed():
                 bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
 
             # Now sort and determine the low/medium/high levels
-            low, medium, high = find_low_med_high(bsigs)
+            low, medium, high = backgrounds.find_low_med_high(bsigs)
 
             # Find the value based on the level in the yaml file
             level = level.lower()
@@ -4106,6 +4127,15 @@ class Catalog_seed():
             else:
                 raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
                                   .format(level)))
+            """
+
+            # If the user has requested background in terms of low/medium/high,
+            # then we need to examine all the background arrays.
+            # Loop over each day (in the background)
+            # info, convolve the background curve with the filter
+            # throughput curve, and then integrate. THEN, we can
+            # calculate the low/medium/high values.
+            bval = backgrounds.low_medium_high_background_value(ra, dec, level, filt_wav, filt_thru)
             bval = bval * u.MJy / u.steradian
 
         # Convert from MJy/str to ADU/sec
