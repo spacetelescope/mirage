@@ -29,7 +29,7 @@ def test_get_filter_info():
                                               4.4212 * u.micron)}
 
     nis = spec.get_filter_info(['niriss_f200w_magnitude'], 'vegamag')
-    assert nis == {'niriss_f200w_magnitude': (2.173398e-20 * FLAMBDA_CGS_UNITS, 2.879494e-31 * FNU_CGS_UNITS,
+    assert nis == {'niriss_f200w_magnitude': (2.173398e-21 * FLAMBDA_CGS_UNITS, 2.879494e-31 * FNU_CGS_UNITS,
                                               26.04898, 1.9930 * u.micron)}
 
     fgs = spec.get_filter_info(['fgs_magnitude'], 'stmag')
