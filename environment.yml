@@ -6,6 +6,7 @@ dependencies:
 - asdf>=2.1.0.dev1+ga161518
 - astropy==3.2.1
 - astroquery>=0.3.8
+- crds>=7.4.1
 - gwcs>=0.10a.dev21+g75e92da
 - healpy>=1.10
 - h5py>=2.8.0
@@ -24,3 +25,4 @@ dependencies:
 - pip:
     - jwst-backgrounds>=1.1.1
     - pysiaf==0.3.0
+    - git+https://github.com/spacetelescope/jwst@0.13.8

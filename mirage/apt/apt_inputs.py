@@ -124,13 +124,13 @@ class AptInput:
 
         """
         with open(self.observation_list_file, 'r') as infile:
-            self.obstab = yaml.load(infile)
+            self.obstab = yaml.safe_load(infile)
 
         OBSERVATION_LIST_FIELDS = 'Date PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
                                   'MovingTargetSersic MovingTargetExtended ' \
                                   'MovingTargetConvolveExtended MovingTargetToTrack ' \
-                                  'BackgroundRate DitherIndex'.split()
+                                  'BackgroundRate DitherIndex CosmicRayLibrary CosmicRayScale'.split()
 
         nircam_mapping = {'ptsrc': 'PointSourceCatalog',
                           'galcat': 'GalaxyCatalog',
@@ -167,9 +167,7 @@ class AptInput:
             if instrument == 'nircam':
                 # keep the number of entries in the dictionary consistent
                 for key in OBSERVATION_LIST_FIELDS:
-                    if key == 'Date':
-                        value = entry[key].strftime('%Y-%m-%d')
-                    elif key in ['PAV3', 'Instrument']:
+                    if key in ['Date', 'PAV3', 'Instrument', 'CosmicRayLibrary', 'CosmicRayScale']:
                         value = str(entry[key])
                     else:
                         value = str(None)
@@ -186,11 +184,15 @@ class AptInput:
 
             else:
                 for key in OBSERVATION_LIST_FIELDS:
-                    if key == 'Date':
-                        value = entry[key].strftime('%Y-%m-%d')
-                    else:
-                        value = str(entry[key])
+                    value = str(entry[key])
 
+                    # Expand catalog names to contain full paths
+                    catalog_names = 'PointSourceCatalog GalaxyCatalog ' \
+                                    'ExtendedCatalog MovingTargetList ' \
+                                    'MovingTargetSersic MovingTargetExtended ' \
+                                    'MovingTargetToTrack'.split()
+                    if key in catalog_names:
+                        value = self.full_path(value)
                     intab[key].append(value)
 
                 # keep the number of entries in the dictionary consistent
@@ -201,7 +203,6 @@ class AptInput:
                             intab[key].append(str(None))
 
         intab['epoch_start_date'] = intab['Date']
-
         return intab
 
     def base36encode(self, integer):
@@ -273,29 +274,6 @@ class AptInput:
 
         if self.apt_xml_dict is None:
             raise RuntimeError('self.apt_xml_dict is not defined')
-            # tab = self.apt_xml_dict
-        # if self.apt_xml_dict is not None:
-        # else:
-        #     tab = self.apt_xml_dict
-        # else:
-        #     # Read in xml file
-        #     readxml_obj = read_apt_xml.ReadAPTXML()
-        #     tab = readxml_obj.read_xml(self.input_xml)
-
-        # This affects on NIRCam exposures (right?)
-        # If the number of dithers is set to '3TIGHT'
-        # (currently only used in NIRCam)
-        # remove 'TIGHT' from the entries and leave
-        # only the number behind
-        # tight = [True if 'TIGHT' in str(val) else False for val in tab['PrimaryDithers']]
-        # if np.any(tight):
-        #     tab = self.tight_dithers(tab)
-
-        # if verbose:
-        # for key in tab.keys():
-        #     print('{:<25}: number of elements is {:>5}'.format(key, len(tab[key])))
-
-        # xmltab = tab
 
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
@@ -309,64 +287,6 @@ class AptInput:
         # Combine the dictionaries
         observation_dictionary = self.combine_dicts(self.apt_xml_dict, pointing_dictionary)
 
-
-
-
-        """
-        if self.pointing_file == '/Users/hilbert/python_repos/mirage/tests/test_data/misc/01148/OTE13-1148.pointing':
-            print('checking dictionary combination in apt_inputs')
-            print(observation_dictionary.keys())
-            print(self.apt_xml_dict.keys())
-            print(pointing_dictionary.keys())
-
-            print(self.apt_xml_dict['ObservationID'])
-            print(observation_dictionary['ObservationID'])
-            print('')
-            print(pointing_dictionary['obs_num'])
-            print(observation_dictionary['obs_num'])
-            print('')
-
-            print(('need to use zfill to add preceding zeros to ObservationID?'
-            'Looks like dictionary is being reordered to increasing ObservationID'
-            'order (even though they are strings????!), but the same is not happening'
-            'for the pointing dictionary.'))
-
-
-
-
-
-            print('dictionary lengths:')
-            print(len(pointing_dictionary['obs_num']))
-            print(len(self.apt_xml_dict['ObservationID']))
-            print(len(observation_dictionary['ObservationID']))
-
-            obs2 = np.where(np.array(pointing_dictionary['obs_num']) == '002')[0]
-            print('obs2 in pointing: {}'.format(obs2))
-            if len(obs2) > 0:
-                for keyname in pointing_dictionary:
-                    print(keyname, pointing_dictionary[keyname][obs2[0]])
-            obs2_xml = np.where(np.array(self.apt_xml_dict['ObservationID']) == '2')[0]
-            print('')
-            print('obs2 in xml: {}'.format(obs2_xml))
-            if len(obs2_xml) > 0:
-                for keyname in self.apt_xml_dict:
-                    print(keyname, self.apt_xml_dict[keyname][obs2_xml[0]])
-            obs2_comb = np.where(np.array(observation_dictionary['obs_num']) == '002')[0]
-            print('')
-            print('obs2 in combined: {}'.format(obs2_comb))
-            if len(obs2_comb) > 0:
-                for keyname in observation_dictionary:
-                    print(keyname, observation_dictionary[keyname][obs2_comb[0]])
-            print('')
-            print('entry {} in xml_dict, for comparison'.format(obs2))
-            for keyname in self.apt_xml_dict:
-                    print(keyname, observation_dictionary[keyname][obs2[0]])
-            """
-
-
-
-
-
         # Add epoch and catalog information
         observation_dictionary = self.add_observation_info(observation_dictionary)
 
@@ -377,16 +297,32 @@ class AptInput:
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
+        # fix data for filename generation
+        # set parallel seq id
+        for j, isparallel in enumerate(self.exposure_tab['ParallelInstrument']):
+            if isparallel:
+                self.exposure_tab['sequence_id'][j] = '2'
+
+        # set exposure number (new sequence for every combination of seq id and act id and observation number and detector)
+        temp_table = Table([self.exposure_tab['sequence_id'], self.exposure_tab['exposure'], self.exposure_tab['act_id'], self.exposure_tab['obs_num'], self.exposure_tab['detector']], names=('sequence_id', 'exposure', 'act_id', 'obs_num', 'detector'))
+
+        for obs_num in np.unique(self.exposure_tab['obs_num']):
+            for act_id in np.unique(temp_table['act_id']):
+                # prime_index = np.where((temp_table['sequence_id'] == '1') & (temp_table['act_id'] == act_id) & (temp_table['obs_num'] == obs_num))[0]
+                # parallel_index = np.where((temp_table['sequence_id'] == '2') & (temp_table['act_id'] == act_id) & (temp_table['obs_num'] == obs_num))[0]
+                for detector in np.unique(temp_table['detector']):
+                    prime_index = np.where((temp_table['sequence_id'] == '1') & (temp_table['act_id'] == act_id) & (temp_table['obs_num'] == obs_num) & (temp_table['detector']==detector))[0]
+                    parallel_index = np.where((temp_table['sequence_id'] == '2') & (temp_table['act_id'] == act_id) & (temp_table['obs_num'] == obs_num) & (temp_table['detector']==detector))[0]
+
+                    temp_table['exposure'][prime_index] = ['{:05d}'.format(n+1) for n in np.arange(len(prime_index))]
+                    temp_table['exposure'][parallel_index] = ['{:05d}'.format(n+1) for n in np.arange(len(parallel_index))]
+        self.exposure_tab['exposure'] = list(temp_table['exposure'])
+
         self.check_aperture_override()
 
         if verbose:
             for key in self.exposure_tab.keys():
                 print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
-
-        #detectors_file = os.path.join(self.output_dir,
-        #                              '{}_expanded_for_detectors.csv'.format(infile.split('.')[0]))
-        #ascii.write(Table(self.exposure_tab), detectors_file, format='csv', overwrite=True)
-        #print('Wrote exposure table to {}'.format(detectors_file))
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
@@ -674,7 +610,7 @@ class AptInput:
                                 skip = True
 
                             if skip:
-                                act_counter += 1
+                                # act_counter += 1
                                 continue
                             act = self.base36encode(act_counter)
                             activity_id.append(act)
@@ -732,7 +668,7 @@ class AptInput:
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.
                             observation_id.append("V{}P{}{}{}{}".format(vid, '00000000', vgrp, seq, act))
-                            act_counter += 1
+                            # act_counter += 1
 
                     except ValueError as e:
                         if verbose:
@@ -850,6 +786,10 @@ def get_filters(pointing_info):
     """Return a dictionary of instruments and filters contained within a
     pointing dictionary from an APT file.
 
+    This function is aware that sometimes filters are installed in pupil wheels,
+    and also that some wheels contain non-filter items such as the NIRCam
+    weak lenses. It will return a list of those items that are indeed spectral bandpass filters.
+
     Parameters
     ----------
     pointing_info : dict
@@ -878,12 +818,18 @@ def get_filters(pointing_info):
 
             filter_list = list(set(short_pupils))
             filter_list.remove('CLEAR')
+            for wfsc_optic in  ['WLP8', 'WLM8', 'GDHS0', 'GDHS60']:
+                if wfsc_optic in filter_list:
+                    filter_list.remove(wfsc_optic)
 
             filter_list.extend(list(set(long_pupils)))
             filter_list.remove('CLEAR')
 
             filter_list.extend(list(set(short_filters[short_filter_only])))
             filter_list.extend(list(set(long_filters[long_filter_only])))
+
+        elif inst.upper() == 'FGS':
+            filter_list = ['guider1', 'guider2']
 
         else:
             short_filters = np.array(pointing_info['FilterWheel'])[good]

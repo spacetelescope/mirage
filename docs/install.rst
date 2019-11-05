@@ -101,14 +101,13 @@ Then install::
     pip install -e NIRCAM_Gsim
     pip install -e GRISMCONF
 
-.. _reference_files:
+.. _ref_file_collection:
 
 Reference Files and MIRAGE_DATA Environment Variable
 ----------------------------------------------------
 
 In addition to the code itself, there is a set of reference files that accompany Mirage, and are necessary for Mirage to function. These
-files include dark current ramps, grism throughput curves, cosmic ray and PSF libraries, as well as more standard
-JWST reference files, such as superbias images, linearity correction coefficients, etc.
+files include dark current ramps and cosmic ray and PSF libraries.
 
 Instructions for downloading the reference files are provided on the :ref:`reference files <reference_files>` page.
 

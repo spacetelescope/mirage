@@ -23,9 +23,51 @@ import numpy as np
 
 import pysiaf
 from pysiaf import iando
-from pysiaf.constants import JWST_DELIVERY_DATA_ROOT
 from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
+
+
+def aperture_ra_dec(siaf_instance, aperture_name, ra, dec, telescope_roll, output_apertures):
+    """For a given aperture with a known RA, Dec, and telescope roll angle,
+    calculate the RA, Dec values at the reference location in a list of
+    other apertures.
+
+    Parameters
+    ----------
+    siaf_instance : pysiaf.Siaf
+        Instance of SIAF for a single instrument
+
+    aperture_name : str
+        Aperture name (e.g. "NRCA1_FULL")
+
+    ra : float
+        RA value of pointing in degrees
+
+    dec : float
+        Dec value of pointing in degrees
+
+    telescope_roll : float
+        PA_V3, Position angle of the telescope in degrees
+
+    output_apertures : list
+        List of aperture names to calculate RA, Dec for
+
+    Returns
+    -------
+    aperture_pointing : dict
+        Dictionary with output_apertures as keys. Values are (ra, dec)
+        tuples
+    """
+    local_roll, att_matrix, fullframesize, subarray_boundaries = get_siaf_information(siaf_instance,
+                                                                                      aperture_name,
+                                                                                      ra, dec,
+                                                                                      telescope_roll)
+    aperture_pointing = {}
+    for aperture in output_apertures:
+        siaf_out = siaf_instance[aperture]
+        out_ra, out_dec = pysiaf.rotations.pointing(att_matrix, siaf_out.V2Ref, siaf_out.V3Ref)
+        aperture_pointing[aperture] = (out_ra, out_dec)
+    return aperture_pointing
 
 
 def get_instance(instrument):
@@ -41,14 +83,7 @@ def get_instance(instrument):
     siaf : pysiaf.Siaf
         Siaf object for the requested instrument
     """
-    if instrument.lower() == 'nircam':
-        print("NOTE: Using pre-delivery SIAF data for {}".format(instrument))
-        siaf_instrument = 'NIRCam'
-        pre_delivery_dir = os.path.join(JWST_DELIVERY_DATA_ROOT, 'NIRCam')
-        siaf = pysiaf.Siaf(siaf_instrument, basepath=pre_delivery_dir)
-    else:
-        siaf_instrument = instrument
-        siaf = pysiaf.Siaf(siaf_instrument)
+    siaf = pysiaf.Siaf(instrument)
     return siaf
 
 
@@ -71,7 +106,7 @@ def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, 
         Dec value of pointing in degrees
 
     telescope_roll : float
-        Position angle of the telescope in degrees
+        PA_V3, Position angle of the telescope in degrees
 
     v2_arcsec : float
         The V2 value in arcseconds of the reference location for the
@@ -152,7 +187,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     """
     # get SIAF
     if siaf is None:
-        siaf = pysiaf.Siaf(instrument)
+        siaf = get_instance(instrument)
 
     # get master aperture names
     siaf_detector_layout = iando.read.read_siaf_detector_layout()
@@ -170,6 +205,11 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     # determine parent aperture, i.e. the underlying full frame SCA aperture
     index = siaf_aperture_definitions['AperName'].tolist().index(aperture_name)
     aperture._parent_apertures = siaf_aperture_definitions['parent_apertures'][index]
+
+    # If multiuple apertures are listed as parents keep only the first
+    if ';' in aperture._parent_apertures:
+        print('Multiple parent apertures: {}'.format(aperture._parent_apertures))
+        aperture._parent_apertures = aperture._parent_apertures.split(';')[0]
 
     if aperture_name in master_aperture_names:
         # if master aperture, use it directly to transform to science frame

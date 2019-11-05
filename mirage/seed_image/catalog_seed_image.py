@@ -15,6 +15,7 @@ import os
 import copy
 import re
 import shutil
+from yaml.scanner import ScannerError
 
 import math
 import yaml
@@ -35,9 +36,11 @@ import pysiaf
 from . import moving_targets
 from . import segmentation_map as segmap
 from mirage.seed_image import tso
+from ..reference_files import crds_tools
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
+from ..utils.constants import CRDS_FILE_TYPES
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
 from mirage.utils.file_splitting import find_file_splits
@@ -73,6 +76,8 @@ class Catalog_seed():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        self.offline = offline
+
         # Locate the module files, so that we know where to look
         # for config subdirectory
         self.modpath = pkg_resources.resource_filename('mirage', '')
@@ -82,6 +87,9 @@ class Catalog_seed():
         # PSF files, etc later
         self.env_var = 'MIRAGE_DATA'
         datadir = utils.expand_environment_variable(self.env_var, offline=offline)
+
+        # Check that CRDS-related environment variables are set correctly
+        self.crds_datadir = crds_tools.env_variables()
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -107,7 +115,12 @@ class Catalog_seed():
         # Read in input parameters and quality check
         self.seed_files = []
         self.readParameterFile()
-        self.fullPaths()
+
+        # Create dictionary to use when looking in CRDS for reference files
+        self.crds_dict = crds_tools.dict_from_yaml(self.params)
+
+        # Expand param entries to full paths where appropriate
+        self.params = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
         self.filecheck()
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
@@ -323,14 +336,37 @@ class Catalog_seed():
             self.part_int_start_number = 0
             self.part_frame_start_number = 0
 
-            # Save the combined static + moving targets ramp
-            self.saveSeedImage()
+        # For NIRISS POM data, extract the central 2048x2048
+        if self.params['Inst']['mode'] in ["pom"]:
+            self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] in ["pom"]:
-                self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
+        # MASK IMAGE
+        # Create a mask so that we don't add signal to masked pixels
+        # Initially this includes only the reference pixels
+        # Keep the mask image equal to the true subarray size, since this
+        # won't be used to make a requested grism source image
+        if self.params['Inst']['mode'] not in ['wfss']:
+            maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+            maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
 
-            # Return info in a tuple
-            # return (self.seedimage, self.seed_segmap, self.seedinfo)
+            # crop the mask to match the requested output array
+            ap_suffix = self.params['Readout']['array_name'].split('_')[1]
+            if ap_suffix not in ['FULL', 'CEN']:
+                maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                                      self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
+
+            # Multiply the mask by the seed image and segmentation map in
+            # order to reflect the fact that reference pixels have no signal
+            # from external sources
+            self.seedimage *= maskimage
+            self.seed_segmap *= maskimage
+
+        # Save the combined static + moving targets ramp
+        self.saveSeedImage()
+
+        # Return info in a tuple
+        # return (self.seedimage, self.seed_segmap, self.seedinfo)
+
 
     def create_tso_seed(self, split_seed=False, integration_splits=-1, frame_splits=-1):
         """Create a seed image for time series or grism time series
@@ -916,52 +952,6 @@ class Catalog_seed():
         print("Seed image, segmentation map, and metadata available as:")
         print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
-    def fullPaths(self):
-        # Expand all input paths to be full paths
-        # This is to allow for easier Condor-ization of
-        # many runs
-        pathdict = {'Reffiles':['dark', 'linearized_darkfile', 'superbias',
-                                'subarray_defs', 'linearity',
-                                'saturation', 'gain', 'pixelflat',
-                                'illumflat', 'ipc', 'astrometric',
-                                'crosstalk', 'occult', 'pixelAreaMap',
-                                'flux_cal', 'readpattdefs', 'filter_throughput'],
-                    'simSignals':['pointsource', 'psfpath', 'galaxyListFile', 'extended',
-                                  'movingTargetList', 'movingTargetSersic',
-                                  'movingTargetExtended', 'movingTargetToTrack',
-                                  'psf_wing_threshold_file'],
-                    'Output':['file', 'directory']}
-
-        all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
-                                       'Reffiles-flux_cal': 'NIRCam_zeropoints.list',
-                                       'Reffiles-crosstalk': 'xtalk20150303g0.errorcut.txt',
-                                       'Reffiles-readpattdefs': 'nircam_read_pattern_definitions.list',
-                                       'Reffiles-filter_throughput': 'placeholder.txt',
-                                       'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt'},
-                            'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
-                                       'Reffiles-flux_cal': 'niriss_zeropoints.list',
-                                       'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
-                                       'Reffiles-readpattdefs': 'niriss_readout_pattern.txt',
-                                       'Reffiles-filter_throughput': 'placeholder.txt',
-                                       'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt'},
-                            'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
-                                    'Reffiles-flux_cal': 'guider_zeropoints.list',
-                                    'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
-                                    'Reffiles-readpattdefs': 'guider_readout_pattern.txt',
-                                    'Reffiles-filter_throughput': 'placeholder.txt',
-                                    'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt'}}
-        config_files = all_config_files[self.params['Inst']['instrument'].lower()]
-
-        for key1 in pathdict:
-            for key2 in pathdict[key1]:
-                if self.params[key1][key2].lower() not in ['none', 'config']:
-                    self.params[key1][key2] = os.path.abspath(os.path.expandvars(self.params[key1][key2]))
-                elif self.params[key1][key2].lower() == 'config':
-                    cfile = config_files['{}-{}'.format(key1, key2)]
-                    fpath = os.path.join(self.modpath, 'config', cfile)
-                    self.params[key1][key2] = fpath
-                    print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
-
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
         countrate image containing the static sources
@@ -1479,6 +1469,10 @@ class Catalog_seed():
             eval_psf, minx, miny, wings_added = self.create_psf_stamp(pixelx, pixely, psf_x_dim, psf_x_dim,
                                                                       ignore_detector=True)
 
+            # Skip sources that fall completely off the detector
+            if eval_psf is None:
+                continue
+
             if input_type == 'pointSource':
                 stamp = eval_psf
                 stamp *= rate
@@ -1863,19 +1857,6 @@ class Catalog_seed():
         # yd, xd = signalimage.shape
         arrayshape = signalimage.shape
 
-        # MASK IMAGE
-        # Create a mask so that we don't add signal to masked pixels
-        # Initially this includes only the reference pixels
-        # Keep the mask image equal to the true subarray size, since this
-        # won't be used to make a requested grism source image
-        maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
-        maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
-
-        # crop the mask to match the requested output array
-        if "FULL" not in self.params['Readout']['array_name']:
-            maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
-                                  self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
-
         # POINT SOURCES
         # Read in the list of point sources to add
         # Adjust point source locations using astrometric distortion
@@ -2229,7 +2210,7 @@ class Catalog_seed():
                              (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts, tso_catalog))
 
         self.n_pointsources = len(pointSourceList)
-        print("Number of point sources found within the requested aperture: {}".format(self.n_pointsources))
+        print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
         # close the output file
         pslist.close()
 
@@ -2337,8 +2318,6 @@ class Catalog_seed():
         """Filter out entries in the source catalog that are located well outside the field of
         view of the detector. This can be a fairly rough cut. We just need to remove sources
         that are very far from the detector.
-
-        CURRENTLY NOT USED
 
         Parameters:
         -----------
@@ -2452,6 +2431,11 @@ class Catalog_seed():
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
                 segment_number=segment_number
             )
+
+            # Skip sources that fall completely off the detector
+            if scaled_psf is None:
+                continue
+
             scaled_psf *= entry['countrate_e/s']
 
             # PSF may not be centered in array now if part of the array falls
@@ -2480,6 +2464,10 @@ class Catalog_seed():
                                                         updated_psf_dimensions,
                                                         stamp_x_loc, stamp_y_loc,
                                                         coord_sys='aperture')
+
+            # Skip sources that fall completely off the detector
+            if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                continue
 
             try:
                 psfimage[j1:j2, i1:i2] += scaled_psf[l1:l2, k1:k2]
@@ -2587,15 +2575,13 @@ class Catalog_seed():
                                                           coord_sys='full_frame',
                                                           ignore_detector=ignore_detector)
 
-            # PSFs in GriddedPSFModel by default have a total signal equal
-            # to the square of the oversampling factor. They must be scaled
-            # down by that factor to be equivalent to the webbpsf output,
-            # where the summed signal is close to 1.0
-            flux_scaling_factor = self.psf_library_oversamp**2
+            # Skip sources that fall completely off the detector
+            if None in [i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c]:
+                return None, None, None, False
 
             # Step 4
-            full_psf = library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
-                                                 x_0=xc_core, y_0=yc_core)
+            full_psf = library.evaluate(x=xpts_core, y=ypts_core, flux=1.0,
+                                        x_0=xc_core, y_0=yc_core)
             k1 = k1c
             l1 = l1c
 
@@ -2634,6 +2620,9 @@ class Catalog_seed():
                                                         (psf_dim_y, psf_dim_x), psf_x_loc, psf_y_loc,
                                                         coord_sys='full_frame', ignore_detector=ignore_detector)
 
+            if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                return None, None, None, False
+
             # Step 2
             # If the core of the psf lands at least partially on the detector
             # then we need to evaluate the psf library
@@ -2654,14 +2643,11 @@ class Catalog_seed():
                                                               psf_core_half_width_x, psf_core_half_width_y,
                                                               coord_sys='full_frame', ignore_detector=ignore_detector)
 
-                # PSFs in GriddedPSFModel by default have a total signal equal
-                # to the square of the oversampling factor. They must be scaled
-                # down by that factor to be equivalent to the webbpsf output,
-                # where the summed signal is close to 1.0
-                flux_scaling_factor = self.psf_library_oversamp**2
+                if None in [i1c, i2c, j1c, j2c, k1c, k2c, l1c, l2c]:
+                    return None, None, None, False
 
                 # Step 4
-                psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=flux_scaling_factor,
+                psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=1.,
                                                 x_0=xc_core, y_0=yc_core)
 
                 # Step 5
@@ -2907,7 +2893,8 @@ class Catalog_seed():
 
         i1 = aperture_x - stamp_x
         j1 = aperture_y - stamp_y
-        if ((i1 > (aperture_x_dim+1)) or (j1 > (aperture_y_dim+1))) and not ignore_detector:
+
+        if ((i1 > (aperture_x_dim)) or (j1 > (aperture_y_dim))) and not ignore_detector:
             # In this case the stamp does not overlap the aperture at all
             return tuple([None]*8)
         delta_i1 = 0
@@ -3117,6 +3104,8 @@ class Catalog_seed():
         if self.coord_transform is not None:
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
+            pixelx -= self.subarray_bounds[0]
+            pixely -= self.subarray_bounds[1]
         else:
             # print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
@@ -3182,6 +3171,8 @@ class Catalog_seed():
             Declination value in DD:MM:SS
         """
         if self.coord_transform is not None:
+            pixelx += self.subarray_bounds[0]
+            pixely += self.subarray_bounds[1]
             loc_v2, loc_v3 = self.coord_transform(pixelx, pixely)
         else:
             # Use SIAF to do the calculations if the distortion reffile is
@@ -3331,7 +3322,7 @@ class Catalog_seed():
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
-        print(("Number of galaxies found within the requested aperture: {}".format(self.n_galaxies)))
+        print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
 
         if self.n_galaxies == 0:
             if self.n_pointsources == 0:
@@ -3492,8 +3483,26 @@ class Catalog_seed():
         segmentation.ydim = yd
         segmentation.initialize_map()
 
+        # Create table of point source countrate versus psf size
+        if self.add_psf_wings is True:
+            self.translate_psf_table(magsys)
+
         # For each entry, create an image, and place it onto the final output image
+        start_time = time.time()
+        times = []
+        time_reported = False
         for entry in galaxylist:
+            # Warn user of how long this calcuation might take...
+            if len(times) < 30:
+                elapsed_time = time.time() - start_time
+                times.append(elapsed_time)
+                start_time = time.time()
+            elif len(times) == 30 and time_reported is False:
+                avg_time = np.mean(times)
+                total_time = len(galaxylist) * avg_time
+                print(("Expected time to process {} sources: {:.2f} seconds "
+                       "({:.2f} minutes)".format(len(galaxylist), total_time, total_time / 60)))
+                time_reported = True
 
             # Get position angle in the correct units. Inputs for each
             # source are degrees east of north. So we need to find the
@@ -3507,7 +3516,7 @@ class Catalog_seed():
 
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
-                                       xposang*np.pi/180., entry['counts_per_frame_e'])
+                                       xposang*np.pi/180., entry['countrate_e/s'])
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -3515,22 +3524,30 @@ class Catalog_seed():
             # produce an output that includes the wings of the PSF
             galdims = stamp.shape
 
-            # *******OR SHOULD WE ALWAYS CONVOLVE WITH A LARGER PSF? IF PSF IS SMALL,
-            # THIS WILL ARTIFICIALLY PUSH SIGNAL TOWARDS THE CORE OF THE GALAXY, I THINK.
-            #psf_dimensions = self.find_psf_size(entry['countrate_e/s'])
-            #psf_shape = np.array([psf_dimensions, psf_dimensions])
-
+            # Using the PSF "core" normalized to 1 will keep more light near
+            # the core of the galaxy, compared to the more rigorous
+            # approach that uses the full convolution including the wings.
+            # Whether this is a problem or not will depend on the relative
+            # sizes of the photometry aperture versus the extended source.
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
             psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
                                  self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
+
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
-                # print('Enlarging galaxy stamp to be the same size or larger than the psf')
                 stamp = self.enlarge_stamp(stamp, psf_shape)
                 galdims = stamp.shape
 
             # Get the PSF which will be convolved with the galaxy profile
             psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                          psf_shape[1], psf_shape[0], ignore_detector=True)
+
+            # Skip sources that fall completely off the detector
+            if psf_image is None:
+                continue
+
+            # Normalize the signal in the PSF stamp so that the final galaxy
+            # signal will match the requested value
+            psf_image = psf_image / np.sum(psf_image)
 
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
@@ -3758,7 +3775,7 @@ class Catalog_seed():
             except:
                 # print("ERROR: bad point source line %s. Skipping." % (line))
                 pass
-        print("Number of extended sources found within the requested aperture: {}".format(len(extSourceList)))
+        print("Number of extended sources found within or close to the requested aperture: {}".format(len(extSourceList)))
         # close the output file
         eslist.close()
 
@@ -3802,7 +3819,7 @@ class Catalog_seed():
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
         print('extended position angle:', x_pos_ang)
         print('scipy rotate seems to be failing with no error raised')
-        rotated = rotate(stamp_image, x_pos_angle, mode='nearest')
+        rotated = rotate(stamp_image, x_pos_ang, mode='nearest')
         print('rotated shape: ', rotated.shape)
         return rotated
 
@@ -3821,7 +3838,7 @@ class Catalog_seed():
         for entry, stamp in zip(extSources, extStamps):
             stamp_dims = stamp.shape
 
-            stamp *= entry['counts_per_frame_e']
+            stamp *= entry['countrate_e/s']
 
             # If the stamp needs to be convolved with the NIRCam PSF,
             # create the correct PSF  here and read it in
@@ -3838,8 +3855,21 @@ class Catalog_seed():
                     stamp_dims = stamp.shape
 
                 # Create the PSF
+                # Using the PSF "core" normalized to 1 will keep more light near
+                # the core of the galaxy, compared to the more rigorous
+                # approach that uses the full convolution including the wings.
+                # Whether this is a problem or not will depend on the relative
+                # sizes of the photometry aperture versus the extended source.
                 psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
                                                                              psf_shape[1], psf_shape[0], ignore_detector=True)
+
+                # Skip sources that fall completely off the detector
+                if psf_image is None:
+                    continue
+
+                # Normalize the PSF so that the final signal in the extended
+                # source mathces the requested signal
+                psf_image = psf_image / np.sum(psf_image)
 
                 # If the source subpixel location is beyond 0.5 (i.e. the edge
                 # of the pixel), then we shift the wing->core offset by 1.
@@ -3858,6 +3888,9 @@ class Catalog_seed():
                     (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                             stamp_dims, stamp_dims[1] // 2, stamp_dims[0] // 2,
                                                             coord_sys='aperture')
+
+                if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                    continue
 
                 # Convolve the extended image with the stamp image
                 stamp = s1.fftconvolve(stamp, psf_image, mode='same')
@@ -3994,7 +4027,7 @@ class Catalog_seed():
         # Load the yaml file
         try:
             with open(self.paramfile, 'r') as infile:
-                self.params = yaml.load(infile)
+                self.params = yaml.safe_load(infile)
         except (ScannerError, FileNotFoundError, IOError) as e:
             print(e)
 
@@ -4106,6 +4139,11 @@ class Catalog_seed():
         # manually add a Detector key to the dictionary as a placeholder.
         if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
             self.zps = self.add_detector_to_zeropoints(detector)
+
+        if self.params['Inst']['instrument'].lower() == 'niriss':
+            newfilter,newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
+            self.params['Readout']['filter'] = newfilter
+            self.params['Readout']['pupil'] = newpupil
 
         # Make sure the requested filter is allowed. For imaging, all filters
         # are allowed. In the future, other modes will be more restrictive
@@ -4386,40 +4424,6 @@ class Catalog_seed():
             print(("ERROR: {} for {} is not within reasonable bounds. "
                    "Setting to {}".format(value, typ, default)))
             return default
-
-    #def read_subarray_definition_file(self):
-    #    # read in the file that contains a list of subarray names and positions on the detector
-
-    #    try:
-    #        self.subdict = ascii.read(self.params['Reffiles']['subarray_defs'], data_start=1, header_start=0)
-    #    except:
-    #        raise RuntimeError(("Error: could not read in subarray definitions file: {}"
-    #                            .format(self.params['Reffiles']['subarray_defs'])))
-
-    #def get_subarray_info(self):
-    #    # Find aperture-specific information from the subarray information config file
-    #    if self.params['Readout']['array_name'] in self.subdict['AperName']:
-    #        mtch = self.params['Readout']['array_name'] == self.subdict['AperName']
-    #        namps = self.subdict['num_amps'].data[mtch][0]
-    #        if namps != 0:
-    #            self.params['Readout']['namp'] = namps
-    #        else:
-    #            if ((self.params['Readout']['namp'] == 1) or
-    #               (self.params['Readout']['namp'] == 4)):
-    #                print(("CAUTION: Aperture {} can be used with either "
-    #                       "a 1-amp".format(self.subdict['AperName'].data[mtch][0])))
-    #                print("or a 4-amp readout. The difference is a factor of 4 in")
-    #                print(("readout time. You have requested {} amps."
-    #                       .format(self.params['Readout']['namp'])))
-    #            else:
-    #                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
-    #                                  "'Readout':'namp' in the input yaml file to one of these values."
-    #                                  .format(self.params['Readout']['array_name'])))
-    #    else:
-    #        raise ValueError(("WARNING: subarray name {} not found in the "
-    #                          "subarray dictionary {}."
-    #                          .format(self.params['Readout']['array_name'],
-    #                                  self.params['Reffiles']['subarray_defs'])))
 
     def read_filter_throughput(self, file):
         '''Read in the ascii file containing the filter

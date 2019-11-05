@@ -31,6 +31,7 @@ Use
 from copy import copy
 from glob import glob
 import os
+import warnings
 
 from astropy.io import fits
 import numpy as np
@@ -262,8 +263,10 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
     # Determine if the PSF path is default or not
     mirage_dir = expand_environment_variable('MIRAGE_DATA')
-    default_psf = library_path == os.path.join(mirage_dir,
-                                               '{}/gridded_psf_library'.format(instrument.lower()))
+    gridded_dir = os.path.join(mirage_dir, '{}/gridded_psf_library'.format(instrument.lower()))
+    if wings:
+        gridded_dir = os.path.join(gridded_dir, 'psf_wings')
+    default_psf = library_path == gridded_dir
 
     # Create a dictionary of header information for all PSF library files
     matches = []
@@ -273,6 +276,9 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     filt = filt.upper()
     pupil = pupil.upper()
     wfe = wfe.lower()
+
+    # set default
+    file_wfe = ''
 
     # handle the NIRISS NRM case
     if pupil == 'NRM':
@@ -287,11 +293,14 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
 
             # Compare the header entries to the user input
             file_inst = header['INSTRUME'].upper()
-            file_det = header['DETECTOR'].upper()
+            try:
+                file_det = header['DETECTOR'].upper()
+            except KeyError:
+                file_det = header['DET_NAME'].upper()
             file_filt = header['FILTER'].upper()
 
             try:
-                file_pupil = header['PUPIL_MASK'].upper()
+                file_pupil = header['PUPIL'].upper()
             except KeyError:
                 # If no pupil mask value is present, then assume the CLEAR is
                 # being used
@@ -340,7 +349,9 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             match = (file_inst == instrument
                      and file_det == detector
                      and file_filt == filt
-                     and file_pupil == pupil)
+                     and file_pupil == pupil
+                     and file_wfe == wfe)
+
             if not wings and segment_id is None and not itm_sim and default_psf:
                 match = match and file_wfe_grp == wfe_group
             if segment_id is not None:
@@ -351,13 +362,17 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             # If so, add to the list of all matches
             if match:
                 matches.append(filename)
-        except KeyError:
+        except KeyError as e:
+            warnings.warn('While searching for PSF file, error raised when examining {}:\n{}\nContinuing.'.format(os.path.basename(filename), e))
             continue
 
     # Find files matching the requested inputs
     if len(matches) == 1:
         return matches[0]
     elif len(matches) == 0:
+        print('Requested parameters:\ninstrument {}\ndetector {}\nfilt {}\npupil {}\nwfe {}\n'
+              'wfe_group {}\nlibrary_path {}\n'.format(instrument, detector, filt, pupil, wfe,
+                                                       wfe_group, library_path))
         raise ValueError("No PSF library file found matching requested parameters.")
     elif len(matches) > 1:
         raise ValueError("More than one PSF library file matches requested parameters: {}".format(matches))

@@ -36,11 +36,11 @@ See the `notebooks <https://github.com/spacetelescope/mirage/tree/master/example
     `WFSS simulator example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRISS_WFSS_data_creation_example.ipynb>`_
     `Moving Target notebook <https://github.com/spacetelescope/mirage/blob/master/examples/MovingTarget_simulator_use_examples.ipynb>`_
 
-and for more advanced use:
+and for use with APT programs:
 
 .. parsed-literal::
 
-    `Commissionning data generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/OTECommissioning_simulator_use_examples.ipynb>`_
+    `APT program data generation notebook <https://github.com/spacetelescope/mirage/blob/master/examples/APTProgram_simulator_use_examples.ipynb>`_
 
 
 Under the Hood
@@ -53,14 +53,13 @@ Limitations
 -----------
 Mirage currently does not simulate coronagraphic observations directly. However the user can input an image of an occulted PSF using the :ref:`extended source catalog <extended_obj>`.
 
-When adding PSFs to simulated data, MIRAGE uses the PSFs in the user-provided library. The libraries currently provided in the Mirage reference files collection contain fits files that are 301x301 pixels. This limited size keeps the file sizes small, but cuts off the wings of the PSFs. For very bright sources, the truncated wings will be visible in the data. In addition, when MIRAGE normalizes a PSF to the requested brightness, signal that should be in the truncated wings will instead be in the central 301x301 pixels of the PSF. The total brightness of the source will be as expected, but the signal will be slightly more concentrated in the center of the PSF than it should be.
+When adding PSFs to simulated data, MIRAGE uses the PSFs from a pre-computed library. The libraries currently provided in the Mirage reference files collection contain fits files that are several hundred pixels on a side. This limited size keeps the file sizes small, but cuts off the wings of the PSFs. For very bright sources, the truncated wings will be visible in the data. In addition, when MIRAGE normalizes a PSF to the requested brightness, signal that should be in the truncated wings will instead be in the pixels of the truncated PSF. The total brightness of the source will be as expected, but the signal will be slightly more concentrated in the center of the PSF than it should be.
 
 When creating data for a target that is moving through the field of view, (e.g. a non-sidereal target in a sidereal observation, or vice versa) the velocity of the target is constant. Speed and direction cannot change within an exposure.
 
 Source brightnesses are constant. There is currently no way to simulate a variable brightness source other than by creating multiple exposures of the same source and varying the source brightness from one exposure to the next.
 
-Tangent plane projection is currently not performed when translating from detector pixel x,y values to RA, Dec values. This leads to small errors in the calculated RA, Dec values. This will be corrected in a future version of MIRAGE.
-
+The *yaml_generator* function currently is only able to parse a subset of all available APT templates. See the :ref:`yaml generator <from_apt>` page for details. If your proposal contains observations that use unsupported APT templates, the easiest work-around at the moment is to make a copy of your APT file and strip out the unsupported observations.
 
 .. admonition:: Getting Help
 

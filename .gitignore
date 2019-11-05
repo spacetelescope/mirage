@@ -37,6 +37,7 @@ htmlcov/*
 # Files #
 #########
 OTECommissioning/*
+examples/apt_data/*
 dev_scripts/*
 *config.json
 mirage.egg-info

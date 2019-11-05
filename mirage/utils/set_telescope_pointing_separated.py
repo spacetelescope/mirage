@@ -71,6 +71,7 @@ import sys
 
 import astropy.io.fits as fits
 import numpy as np
+import pysiaf
 #from jwst.lib.engdb_tools import (
 #    ENGDB_BASE_URL,
 #    ENGDB_Service,
@@ -90,15 +91,23 @@ Pointing_Quaternions = namedtuple(
 )
 
 
-def add_wcs(filename,roll=0.):
-    '''
+def add_wcs(filename, roll=0.):
+    """
     Given the name of a valid partially populated level 1b JWST file,
     determine the simple WCS parameters from the SIAF keywords in that
     file and the engineering parameters that contain information about
     the telescope pointing.
 
     It presumes all the accessed keywords are present (see first block).
-    '''
+
+    Parameters
+    ----------
+    filename : str
+        file name
+    roll : float
+        PA_V3 in degrees
+
+    """
     hdulist = fits.open(filename, 'update')
     pheader = hdulist[0].header
     fheader = hdulist[1].header
@@ -139,9 +148,13 @@ def add_wcs(filename,roll=0.):
 
     local_roll = compute_local_roll(roll, ra, dec, v2ref, v3ref)
     wcsinfo = (ra, dec, local_roll)
-    vinfo = (ra, dec, roll)
     crval1, crval2, pa_aper_deg = wcsinfo
-    v1_ra_deg, v1_dec_deg, v3_pa_deg = vinfo
+
+    # compute pointing of V1 axis
+    attitude_matrix = pysiaf.rotations.attitude(v2ref, v3ref, ra, dec, local_roll)
+    v1_ra_deg, v1_dec_deg = pysiaf.rotations.pointing(attitude_matrix, 0., 0.)
+    v3_pa_deg = roll
+
     pa_aper_deg = local_roll - vparity * v3idlyang
     #else:
     #    # compute relevant WCS information
@@ -490,7 +503,7 @@ def get_pointing_stub(obstart, obsend):
 
 def compute_local_roll(pa_v3, ra_ref, dec_ref, v2_ref, v3_ref):
     """
-    Computes the position angle of V3 (measured N to E) at the center af an aperture.
+    Computes the position angle of V3 (measured N to E) at the reference point of an aperture.
 
     Parameters
     ----------

@@ -47,16 +47,16 @@ class ReadAPTXML():
                           'SubpixelDitherType', 'CoordinatedParallel', 'ParallelInstrument',
                           'ObservationID', 'TileNumber', 'APTTemplate',
                           'ApertureOverride', 'ObservationName',
-                          'DitherPatternType', 'ImageDithers', # NIRISS
-                          'number_of_dithers', # uniform name across instruments
-                          'FiducialPointOverride',
+                          'DitherPatternType', 'ImageDithers',  # NIRISS
+                          'number_of_dithers',  # uniform name across instruments
+                          'FiducialPointOverride', 'TargetID', 'TargetRA', 'TargetDec'
                           ]
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
                              'ReadoutPattern', 'Groups', 'Integrations',
-                             'FilterWheel', 'PupilWheel' # for NIRISS
+                             'FilterWheel', 'PupilWheel'  # for NIRISS
                              ]
         OtherParams_keys = ['Mode', 'Grism',
-                            'IntegrationsShort', 'GroupsShort', 'Dither', # MIRI
+                            'IntegrationsShort', 'GroupsShort', 'Dither',  # MIRI
                             'GroupsLong', 'ReadoutPatternShort', 'IntegrationsLong',
                             'Exposures', 'Wavelength', 'ReadoutPatternLong', 'Filter',
                             'EtcIdLong', 'EtcIdShort', 'EtcId',
@@ -140,6 +140,18 @@ class ReadAPTXML():
         except:
             pi_name = piname_default
 
+        # Get target names - - - - - - - - - - - - - - - - - - - - - - - - - -
+        targs = tree.find(self.apt + 'Targets')
+        target_elements = targs.findall(self.apt + 'Target')
+        self.target_info = {}
+        for target in target_elements:
+            t_name = target.find(self.apt + 'TargetName').text
+            t_coords = target.find(self.apt + 'EquatorialCoordinates').items()[0][1]
+            ra_hour, ra_min, ra_sec, dec_deg, dec_arcmin, dec_arcsec = t_coords.split(' ')
+            ra = '{}:{}:{}'.format(ra_hour, ra_min, ra_sec)
+            dec = '{}:{}:{}'.format(dec_deg, dec_arcmin, dec_arcsec)
+            self.target_info[t_name] = (ra, dec)
+
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
         # Find all observations (but use only those that use NIRCam or are WFSC)
@@ -208,6 +220,13 @@ class ReadAPTXML():
                 # label tag not present
                 obs_label = 'Observation 1'
 
+            # Get target name
+            try:
+                targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
+            except IndexError as e:
+                print("No target ID for observation: {}".format(obs))
+                targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
+
             # extract visit numbers
             visit_numbers = [np.int(element.items()[0][1]) for element in obs if
                              element.tag.split(self.apt)[1] == 'Visit']
@@ -222,6 +241,9 @@ class ReadAPTXML():
                                              'CoordinatedParallel': coordparallel,
                                              'ObservationID': observation_number,
                                              'ObservationName': obs_label,
+                                             'TargetID': targ_name,
+                                             'TargetRA': self.target_info[targ_name][0],
+                                             'TargetDec': self.target_info[targ_name][1]
                                              }
 
             if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration',
@@ -465,7 +487,7 @@ class ReadAPTXML():
 
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
-      
+
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
 
@@ -649,7 +671,7 @@ class ReadAPTXML():
                 # Combine primary and subpixel dithers
                 number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
 
-                
+
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower() == 'niriss') and (element_tag_stripped == 'ExposureList')) | \
                         ((instrument.lower() == 'fgs') and (element_tag_stripped == 'Exposures'))| \
@@ -660,7 +682,7 @@ class ReadAPTXML():
 
                         # Load dither information into dictionary
                         exposure_dict['DitherPatternType'] = DitherPatternType
-                        
+
                         if (number_of_dithers is None) | (number_of_dithers == 'NONE'):
                             number_of_dithers = 1 * number_of_subpixel_positions
 
@@ -1303,7 +1325,7 @@ class ReadAPTXML():
                     exp_seq_dict['ReadoutPattern'] = [grism_readpatt]
                     exp_seq_dict['Groups'] = [grism_groups]
                     exp_seq_dict['Integrations'] = [grism_integrations]
-                    exp_seq_dict['ShortPupil'] = [grism_shoprt_pupil]
+                    exp_seq_dict['ShortPupil'] = [grism_short_pupil]
                     exp_seq_dict['LongPupil'] = [grism_long_pupil]
                     exp_seq_dict['Grism'] = [grism]
                     exp_seq_dict['ObservationID'] = [proposal_param_dict['ObservationID']]
@@ -1542,7 +1564,11 @@ class ReadAPTXML():
             sdither_type_grism = 'None'
             sdither_grism = '1'
             # Dither size can be SMALL, MEDIUM, LARGE. Only look for this if NIRISS is prime
-            pdither_type_grism = template.find(ns + 'DitherSize').text
+            #pdither_type_grism = template.find(ns + 'DitherSize').text
+            try:
+                pdither_type_grism = template.find(ns + 'PrimaryDitherType').text
+            except AttributeError:
+                pdither_type_grism = 'None'
 
             # Can be various types
             # WFSS stand-alone observation or WFSS as parallel to NIRCam prime imaging:

@@ -16,18 +16,18 @@ Readout:
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
   dark: None   #Dark current integration used as the base
   linearized_darkfile: $MIRAGE_DATA/nircam/darks/linearized/B5/Linearized_Dark_and_SBRefpix_NRCNRCBLONG-DARK-60090141241_1_490_SE_2016-01-09T02h46m50_uncal.fits # Linearized dark ramp to use as input. Supercedes dark above
-  badpixmask: $MIRAGE_DATA/nircam/reference_files/badpix/NRCB5_17161_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits # If linearized dark is used, populate output DQ extensions using this file
-  superbias: $MIRAGE_DATA/nircam/reference_files/superbias/NRCB5_superbias_from_list_of_biasfiles.list.fits  #Superbias file. Set to None or leave blank if not using
-  linearity: $MIRAGE_DATA/nircam/reference_files/linearity/NRCBLONG_17161_LinearityCoeff_ADU0_2016-05-22_ssblinearity_v2_DMSorient.fits    #linearity correction coefficients
-  saturation: $MIRAGE_DATA/nircam/reference_files/saturation/NRCB5_17161_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
-  gain: $MIRAGE_DATA/nircam/reference_files/gain/NRCB5_17161_Gain_ISIMCV3_2016-02-25_ssbgain_DMSorient.fits #Gain map
+  badpixmask: crds # If linearized dark is used, populate output DQ extensions using this file
+  superbias: crds  #Superbias file. Set to None or leave blank if not using
+  linearity: crds    #linearity correction coefficients
+  saturation: crds    #well depth reference files
+  gain: crds  #Gain map
   pixelflat: None
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/nircam/reference_files/distortion/NRCB5_FULL_from_pysiaf_distortion.asdf  #Astrometric distortion file (asdf)
-  ipc: $MIRAGE_DATA/nircam/reference_files/ipc/NRCB5_17161_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits #File containing IPC kernel to apply
+  astrometric: crds  #Astrometric distortion file (asdf)
+  ipc: crds #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
-  pixelAreaMap: $MIRAGE_DATA/nircam/reference_files/pam/NIRCam_B5_PAM_imaging.fits #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+  pixelAreaMap: crds  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
   subarray_defs:   config   #File that contains a list of all possible subarray names and coordinates
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
@@ -92,9 +92,9 @@ newRamp:
   linear_configfile: config
 
 Output:
-  file: V12345024002P000000000112o_B5_F250M_movingtarget_uncal.fits   #Output filename
+  file: jw12345024002_01101_00001_ncrb5_uncal.fits   #Output filename
   directory: ./movingtarget_example_data/   # Directory in which to place output files
-  datatype: linear # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
+  datatype: linear, raw # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
   format: DMS          #Output file format Options: DMS, SSR(not yet implemented)
   save_intermediates: False   #Save intermediate products separately (point source image, etc)
   grism_source_image: False   # Create an image to be dispersed?
@@ -110,10 +110,10 @@ Output:
   visit_number: '024'    #Visit Number
   visit_group: '01'    #Visit Group
   visit_id: '12345024002'    #Visit ID
-  sequence_id: '2'    #Sequence ID
-  activity_id: '2o'    #Activity ID. Increment with each exposure.
+  sequence_id: '1'    #Sequence ID
+  activity_id: '01'    #Activity ID. Increment with each exposure.
   exposure_number: '00001'    #Exposure Number
-  obs_id: 'V12345024002P000000000112o'   #Observation ID number
+  obs_id: 'V12345024002P0000000001101'   #Observation ID number
   date_obs: '2019-10-15'  #Date of observation
   time_obs: '06:29:11.852'  #Time of observation
   obs_template: 'NIRCam Imaging'  #Observation template

@@ -41,9 +41,12 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 # Determine if tests are being run on Travis
-ON_TRAVIS =  'travis' in os.path.expanduser('~')
+ON_TRAVIS = 'travis' in os.path.expanduser('~')
 
+if not ON_TRAVIS:
+    orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
+
 
 # @pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
@@ -63,10 +66,11 @@ def RunAllAPTTemplates(instrument):
     n_obs = len(obs_results)
 
     # Locate catalogs for target(s) (one catalog per observation and channel)
-    sw_cats = [os.path.join(TESTS_DIR, 'test_data', '2MASS_RA273.09deg_Dec65.60deg.list')] * n_obs
-    lw_cats = [os.path.join(TESTS_DIR, 'test_data', 'WISE_RA273.09deg_Dec65.60deg.list')] * n_obs
-    cat_dict = {'nircam': {'lw': lw_cats,
-                           'sw': sw_cats}}
+    #sw_cats = [os.path.join(TESTS_DIR, 'test_data', '2MASS_RA273.09deg_Dec65.60deg.list')] * n_obs
+    #lw_cats = [os.path.join(TESTS_DIR, 'test_data', 'WISE_RA273.09deg_Dec65.60deg.list')] * n_obs
+    #cat_dict = {'nircam': {'lw': lw_cats,
+    #                       'sw': sw_cats}}
+    cat_dict = None
 
     # Point to appropriate output directory
     out_dir = os.path.join(TESTS_DIR, 'test_data',  instrument, 'APT_{}_out'.format(instrument))
@@ -111,7 +115,7 @@ def RunAllAPTTemplates(instrument):
 
 
 @pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+                    reason="Cannot access mirage data in the central storage directory from Travis CI.")
 def test_environment_variable():
     '''Ensure the MIRAGE_DATA environment variable has been set
     '''
@@ -132,6 +136,12 @@ def test_RunNIRCamAPTTemplates():
     '''Parse the given APT files and create a set of .yamls for NIRCam
     '''
     RunAllAPTTemplates('NIRCam')
+
+
+# Return environment variable to original value. This is helpful when
+# calling many tests at once, some of which need the real value.
+if not ON_TRAVIS:
+    os.environ['MIRAGE_DATA'] = orig_mirage_data
 
 # for debugging
 # if __name__ == '__main__':

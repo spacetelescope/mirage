@@ -182,8 +182,14 @@ class WFSSSim():
         gainfile = cat.params['Reffiles']['gain']
         gain, gainheader = self.read_gain_file(gainfile)
 
-        # Disperser output is always full frame. Crop to the
-        # requested subarray if necessary
+        # Disperser output is always full frame. Remove the signal from
+        # the refrence pixels now since we know exactly where they are
+        disp_seed.final[0:4, :] = 0.
+        disp_seed.final[2044:, :] = 0.
+        disp_seed.final[:, 0:4] = 0.
+        disp_seed.final[:, 2044:] = 0.
+
+        # Crop to the requested subarray if necessary
         if cat.params['Readout']['array_name'] not in self.fullframe_apertures:
             print("Subarray bounds: {}".format(cat.subarray_bounds))
             print("Dispersed seed image size: {}".format(disp_seed.final.shape))
@@ -277,7 +283,7 @@ class WFSSSim():
 
         # ###################Instrument Name##################
         if self.instrument not in ['nircam', 'niriss']:
-            self.invalid('instrument', instrument)
+            self.invalid('instrument', self.instrument)
 
         # ###################Module Name##################
         if self.instrument == 'nircam':
@@ -313,7 +319,7 @@ class WFSSSim():
         wfss_files_found = 0
         for i, pfile in enumerate(self.paramfiles):
             with open(pfile, 'r') as infile:
-                params = yaml.load(infile)
+                params = yaml.safe_load(infile)
 
             cats = [params['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
             cats = [e for e in cats if e.lower() != 'none']

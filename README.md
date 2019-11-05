@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/pypi/l/Django.svg)](https://github.com/spacetelescope/mirage/blob/master/LICENSE.txt)
 [![Python](https://img.shields.io/badge/Python-3.6-blue.svg)](https://www.python.org/)
 [![STScI](https://img.shields.io/badge/powered%20by-STScI-blue.svg?colorA=707170&colorB=3e8ddd&style=flat)](http://www.stsci.edu)
+[![DOI](https://zenodo.org/badge/109982775.svg)](https://zenodo.org/badge/latestdoi/109982775)
+
 
 This repository contains code that can be used to generate
 simulated NIRCam, NIRISS, or FGS data. These data can be in one
@@ -28,6 +30,11 @@ Please find detailed installation instructions on our [ReadTheDocs](https://mira
 See the notebooks in the `examples` subdirectory. There are notebooks
 for imaging simulations, WFSS simulations, moving target
 (non-sidereal) simulations, and simulations of OTE commissioning.
+
+
+### Citation
+If you find this package useful, please consider citing the Zenodo record using the DOI badge above.
+Please find additional citation instructions in [CITATION](CITATION). 
 
 
 ## Contributing

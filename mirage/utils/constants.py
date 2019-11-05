@@ -15,6 +15,12 @@ instrument_abbreviations = {'nircam': 'NRC',
                             'nirspec': 'NRS',
                             'miri': 'MIR'}
 
+EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
+                       "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
+            "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
+                        "wfss": "NIS_WFSS"},
+            "fgs": {"imaging": "FGS_IMAGE"}}
+
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
 NIRISS_PUPIL_WHEEL_FILTERS = ['F090W', 'F115W', 'F158M', 'F140M', 'F150W', 'F200W']
 
@@ -33,6 +39,15 @@ TSO_MODES = ['ts_imaging', 'ts_grism']
 # containing more pixels than this limit will be split into segment files.
 FILE_SPLITTING_LIMIT = 38. * 2048. * 2048
 
+CRDS_FILE_TYPES = {'badpixmask': 'mask',
+                   'astrometric': 'distortion',
+                   'gain': 'gain',
+                   'ipc': 'ipc',
+                   'linearity': 'linearity',
+                   'pixelAreaMap': 'area',
+                   'saturation': 'saturation',
+                   'superbias': 'superbias',
+                   'pixelflat': 'flat'}
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when

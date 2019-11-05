@@ -171,7 +171,7 @@ class PointSourceCatalog():
                 raise ValueError("WARNING: {} is not a valid filter for {}.".format(filt_name,
                                                                                     inst_name.upper()))
         if inst_name == 'fgs':
-            if filt_name not in ['', 'na']:
+            if filt_name.lower() not in ['guider1', 'guider2']:
                 raise ValueError("WARNING: {} is not a valid filter for FGS.".format(filt_name))
 
     def instrument_check(self, inst_name):
@@ -343,7 +343,7 @@ class ExtendedCatalog(PointSourceCatalog):
         self.table = pad_table_comments(tab)
 
     @property
-    def filenames(self):
+    def filename(self):
         """Return Dec values from catalog"""
         return self._filenames
 
