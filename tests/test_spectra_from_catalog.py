@@ -33,7 +33,7 @@ def test_get_filter_info():
                                               26.04898, 1.9930 * u.micron)}
 
     fgs = spec.get_filter_info(['fgs_magnitude'], 'stmag')
-    assert fgs == {'fgs_magnitude': (1.593395e-21 * FLAMBDA_CGS_UNITS, 3.324736e-32 * FNU_CGS_UNITS, 33.39426,
+    assert fgs == {'fgs_magnitude': (1.593395e-22 * FLAMBDA_CGS_UNITS, 3.324736e-32 * FNU_CGS_UNITS, 33.39426,
                                      2.5011 * u.micron)}
 
 
