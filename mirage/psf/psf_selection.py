@@ -488,7 +488,7 @@ def _load_itm_library(library_file):
         # Convert to HDUList and create library
         phdu = fits.PrimaryHDU(data, hdr)
         hdulist = fits.HDUList(phdu)
-        library = to_griddedpsfmodel(hdulist, ext=0)
+        library = to_griddedpsfmodel(hdulist)
 
         return library
     else:
