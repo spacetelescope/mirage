@@ -468,7 +468,21 @@ class Catalog_seed():
         return padded_seed, padded_seg
 
     def saveSeedImage(self, seed_image, segmentation_map, seed_file_name):
-        # Create the grism direct image or ramp to be saved
+        """Save the seed image and accompanying segmentation map to a
+        fits file.
+
+        Parameters
+        ----------
+        seed_image : numpy.ndarray
+            Array containing the seed image
+
+        segmentation_map : numpy.ndimage
+            Array containing the segmentation map
+
+        seed_file_name : str
+            Name of FITS file to save ``seed_image`` and `segmentation_map``
+            into
+        """
         arrayshape = seed_image.shape
         if len(arrayshape) == 2:
             units = 'ADU/sec'
@@ -1504,15 +1518,6 @@ class Catalog_seed():
 
             ptsrc_segmap = ptsrc_segmap.segmap
 
-            # save the point source image for examination by user
-            #if self.params['Output']['save_intermediates'] is True:
-            #    psf_image_name = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
-            #    h0 = fits.PrimaryHDU(psfimage)
-            #    h1 = fits.ImageHDU(ptsrc_segmap)
-            #    hlist = fits.HDUList([h0, h1])
-            #    hlist.writeto(psf_image_name, overwrite=True)
-            #print("Point source image and segmap saved as {}".format(psf_image_name))
-
             # Add the point source image to the overall image
             signalimage = signalimage + psfimage
             segmentation_map += ptsrc_segmap
@@ -1528,8 +1533,9 @@ class Catalog_seed():
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
             if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
-                (aperture_suffix not in ['FULL', 'CEN'])):
-                self.point_source_seed, self.point_source_seg_map = self.pad_wfss_subarray(self.point_source_seed, self.point_source_seg_map)
+                 (aperture_suffix not in ['FULL', 'CEN'])):
+                self.point_source_seed, self.point_source_seg_map = self.pad_wfss_subarray(self.point_source_seed,
+                                                                                           self.point_source_seg_map)
 
             # Save the point source seed image
             self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
@@ -1561,8 +1567,9 @@ class Catalog_seed():
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
             if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
-                (aperture_suffix not in ['FULL', 'CEN'])):
-                self.galaxy_source_seed, self.galaxy_source_seg_map = self.pad_wfss_subarray(self.galaxy_source_seed, self.galaxy_source_seg_map)
+                 (aperture_suffix not in ['FULL', 'CEN'])):
+                self.galaxy_source_seed, self.galaxy_source_seg_map = self.pad_wfss_subarray(self.galaxy_source_seed,
+                                                                                             self.galaxy_source_seg_map)
 
             # Save the galaxy source seed image
             self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
@@ -1571,15 +1578,6 @@ class Catalog_seed():
 
             # Add galaxy segmentation map to the master copy
             segmentation_map += galaxy_segmap
-
-            # save the galaxy image for examination by the user
-            #if self.params['Output']['save_intermediates'] is True:
-            #    galImageName = self.basename + '_galaxyRateImage_adu_per_sec.fits'
-            #    h0 = fits.PrimaryHDU(galaxyCRImage)
-            #    h1 = fits.ImageHDU(galaxy_segmap)
-            #    hlist = fits.HDUList([h0, h1])
-            #    hlist.writeto(galImageName, overwrite=True)
-            #    # self.saveSingleFits(galaxyCRImage, galImageName)
 
             # add the galaxy image to the signalimage
             signalimage = signalimage + galaxyCRImage
@@ -1610,8 +1608,9 @@ class Catalog_seed():
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
             if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
-                (aperture_suffix not in ['FULL', 'CEN'])):
-                self.extended_source_seed, self.extended_source_seg_map = self.pad_wfss_subarray(self.extended_source_seed, self.extended_source_seg_map)
+                 (aperture_suffix not in ['FULL', 'CEN'])):
+                self.extended_source_seed, self.extended_source_seg_map = self.pad_wfss_subarray(self.extended_source_seed,
+                                                                                                 self.extended_source_seg_map)
 
             # Save the extended source seed image
             self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
@@ -1620,14 +1619,6 @@ class Catalog_seed():
 
             # Add galaxy segmentation map to the master copy
             segmentation_map += ext_segmap
-
-            # Save extended source image and segmap
-            #if self.params['Output']['save_intermediates'] is True:
-            #    extImageName = self.basename + '_extendedObject_adu_per_sec.fits'
-            #    h0 = fits.PrimaryHDU(extimage)
-            #    h1 = fits.ImageHDU(ext_segmap)
-            #    hlist = fits.HDUList([h0, h1])
-            #    hlist.writeto(extImageName, overwrite=True)
 
             # add the extended image to the synthetic signal rate image
             signalimage = signalimage + extimage
