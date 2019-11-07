@@ -25,8 +25,12 @@ def day_of_year_background_spectrum(ra, dec, observation_date):
 
     Returns
     -------
-    background_file : str
-        Name of file into which the background spectrum was saved
+    background_waves : numpy.ndarray
+        1D array with the wavelength values in microns associated with
+        ``background_signals``
+
+    background_sigmals : numpy.ndarray
+        1D array containing background values in MJy/str
     """
     # Generate background spectra for all days
     background = jbt.background(ra, dec, 4.)
@@ -45,13 +49,6 @@ def day_of_year_background_spectrum(ra, dec, observation_date):
     background_signals = background.bkg_data['total_bg'][match, :][0]
 
     return background_waves, background_signals
-
-    # Output file to save background spectrum into
-    #background_file = 'background.txt'
-    #background = jbt.get_background(ra, dec, 4., plot_background=False, plot_bathtub=False,
-    #                                thisday=obs_dayofyear, write_background=True, write_bathtub=False,
-    #                                background_file=background_file)
-    #return background_file
 
 
 def find_low_med_high(array):
@@ -101,8 +98,13 @@ def low_med_high_background_spectrum(param_dict, detector, module):
 
     Returns
     -------
-    background_file : str
-        Name of file into which the background spectrum was saved
+    background_waves : numpy.ndarray
+        1D array with the wavelength values in microns associated with
+        ``background_signals``
+
+    background_spec : numpy.ndarray
+        1D array containing background values in MJy/str
+
     """
     # Generate background spectra for all days
     background = jbt.background(param_dict['Telescope']['ra'], param_dict['Telescope']['dec'], 4.)

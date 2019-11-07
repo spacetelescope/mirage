@@ -169,12 +169,20 @@ class WFSSSim():
             else:
                 back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
                                                                                    self.module)
+            print('back wave: ', back_wave)
+            print('back_sig: ', back_sig)
+
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
                                                                     dmode.lower())
             scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+            print('scaling_factor:', scaling_factor)
         print('Background file is {}'.format(background_file))
+
+        print('make sure env has latest nircam_gsim before running further')
+        stop
+
 
         # Default to extracting all orders
         orders = None
@@ -187,7 +195,8 @@ class WFSSSim():
         disp_seed.observation(orders=orders)
         disp_seed.disperse(orders=orders)
         if self.instrument == 'nircam':
-            background_image = disp_seed.disperse_background_1D(background_file) ???
+            background_image = disp_seed.disperse_background_1D(background_file)
+            print('make sure you are calling the above correctly')
             disp_seed.finalize(Back=background_image, BackLevel=None)
         else:
             # BackLevel is used as such: background / max(background) * BackLevel
