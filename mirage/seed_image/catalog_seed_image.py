@@ -1577,7 +1577,7 @@ class Catalog_seed():
             print("Simulated galaxy image and segmap saved as {}".format(self.galaxy_seed_filename))
 
             # Add galaxy segmentation map to the master copy
-            segmentation_map += galaxy_segmap
+            segmentation_map = self.add_segmentation_maps(segmentation_map, galaxy_segmap)
 
             # add the galaxy image to the signalimage
             signalimage = signalimage + galaxyCRImage
@@ -1618,7 +1618,7 @@ class Catalog_seed():
             print("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
 
             # Add galaxy segmentation map to the master copy
-            segmentation_map += ext_segmap
+            segmentation_map = add_segmentation_maps(segmentation_map, ext_segmap)
 
             # add the extended image to the synthetic signal rate image
             signalimage = signalimage + extimage
@@ -1705,6 +1705,30 @@ class Catalog_seed():
     #    ysciscale = row['YSciScale'].data[0]
 
     #    return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
+
+    @staticmethod
+    def add_segmentation_maps(map1, map2):
+        """Add two segmentation maps together. In the case of overlapping
+        objects, the object in map1 is kept and the object in map2 is
+        ignored.
+
+        Parameters
+        ----------
+        map1 : numpy.ndarray
+            2D segmentation map
+
+        map2 : numpy.ndarray
+            2D segmentation map
+
+        Returns
+        -------
+        combined : numpy.ndarray
+            Summed segmentation map
+        """
+        map1_zeros = map1 == 0
+        combined = copy.deepcopy(map1)
+        combined[map1_zeros] += map2[map1_zeros]
+        return combined
 
     def get_point_source_list(self, filename, segment_offset=None):
         # read in the list of point sources to add, and adjust the
