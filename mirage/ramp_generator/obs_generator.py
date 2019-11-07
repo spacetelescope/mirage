@@ -875,7 +875,7 @@ class Observation():
                 f_match = self.params['Readout']['filter'] == fw_positions['Name']
                 p_match = self.params['Readout']['pupil'] == fw_positions['Name']
             elif self.instrument.upper() == 'NIRCAM':
-                if self.detector[-1] == '5':
+                if '5' in self.detector or 'LONG' in self.detector:
                     channel = 'LW'
                 else:
                     channel = 'SW'
@@ -950,9 +950,12 @@ class Observation():
 
             print('data placed into integration: ', int_counter, int_counter+ints)
             print('                  groups: ', group_counter, group_counter+groups)
+            print(seed_data.shape)
+            print(seed.shape)
+            print(seed[int_counter: int_counter+ints, group_counter: group_counter+groups, :, :].shape)
 
 
-            seed[int_counter:int_counter+ints, group_counter:group_counter+groups, :, :] = seed_data
+            seed[int_counter: int_counter+ints, group_counter: group_counter+groups, :, :] = seed_data
             group_counter += groups
 
             # If the group counter reaches the number of groups expected
@@ -1059,6 +1062,8 @@ class Observation():
 
 
         print('self.linDark:', self.linDark)
+        print('self.seed:', self.seed)
+
 
         # Get the input dark if a filename is supplied
         if self.linDark is None:
@@ -1068,17 +1073,17 @@ class Observation():
             seed_dict = {self.linDark[0]: self.seed}
             print('Reading in dark file from param file: {}'.format(self.linDark))
             self.linear_dark = self.read_dark_file(self.linDark[0])
-        elif isinstance(self.linDark, str):
-            # If a single filename is given, read in the file
-            print('Reading in dark file: {}'.format(self.linDark))
-            self.linDark = [self.linDark]
-            seed_dict = {self.linDark[0]: self.seed}
-            self.linear_dark = self.read_dark_file(self.linDark[0])
         elif isinstance(self.linDark, list):
             # Case where dark is split amongst multiple files due to high
             # data volume
             print('Dark file list: {}'.format(self.linDark))
             seed_dict = self.map_seeds_to_dark()
+            self.linear_dark = self.read_dark_file(self.linDark[0])
+        elif isinstance(self.linDark, str):
+            # If a single filename is given, read in the file
+            print('Reading in dark file: {}'.format(self.linDark))
+            self.linDark = [self.linDark]
+            seed_dict = {self.linDark[0]: self.seed}
             self.linear_dark = self.read_dark_file(self.linDark[0])
         else:
             # Case where user has provided a catalogSeed object
@@ -1218,7 +1223,7 @@ class Observation():
                 if self.seedheader['UNITS'] in ["e-/sec", "e-"]:
                     print(("Seed image is in units of {}. Dividing by gain."
                            .format(self.seedheader['units'])))
-                    self.seed /= self.gainim
+                    self.seed_image /= self.gainim
             else:
                 raise ValueError(("'UNITS' keyword not present in header of "
                                   "seed image. Unable to determine whether the "

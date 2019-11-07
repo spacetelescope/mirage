@@ -90,6 +90,14 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
     seed_segmentation_map : numpy.ndarray
         2D array containing the segmentation map
     """
+    print('seed_segmentation_map type:')
+    print(type(seed_segmentation_map))
+
+
+
+
+
+
     yd, xd = seed_image.shape
     total_exposure_time = exposure_total_frames * frametime
 
@@ -100,7 +108,8 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         raise ValueError("samples_per_frametime must be 2^k + 1 for some integer k.")
 
     # Put seed image in units of counts per frame
-    seed_image *= frametime
+    # seed_image *= frametime
+    seed_image_per_frame = seed_image * frametime
 
     # Frame seed contains only the signal for that particular frame,
     # rather than the cumulative signal since the beginning of the
@@ -118,7 +127,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
 
         # Scale the TSO source's seed image contribution to be for one
         # frametime rather than 1 second
-        psf *= frametime
+        ft_psf = psf * frametime
 
         # Interpolate the lightcurve to prepare for integration
         interp_lightcurve = interpolate_lightcurve(copy.deepcopy(lightcurve), samples_per_frametime, frametime)
@@ -134,11 +143,26 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
             # Normalize the integrated signal by the frametime, as that
             # is the integral of a flat line at 1.0 over one frametime
             relative_signal = romb(interp_lightcurve['fluxes'].value[indexes], dx) / frametime
-            frame_psf = psf * relative_signal
+            frame_psf = ft_psf * relative_signal
+
+            print('\nIntegrating lightcurve signal: ')
+            print(frame_number, frame_index, min_index, indexes)
+            print(relative_signal)
+            tmpy, tmpx = psf.shape
+            print(psf[tmpy // 2 - 5, tmpx // 2])
+            print(ft_psf[tmpy // 2 - 5, tmpx // 2])
+            print(frame_psf[tmpy // 2 - 5, tmpx // 2])
+            print(frame_seed[frame_index, tmpy // 2 - 5, tmpx // 2])
+
             frame_seed[frame_index, :, :] += frame_psf
 
+
+            print(frame_seed[frame_index, tmpy // 2 - 5, tmpx // 2])
+
+
+
         # Add the TSO target to the segmentation map
-        seed_segmentation_map = update_segmentation_map(seed_segmentation_map, seg_map)
+        seed_segmentation_map = update_segmentation_map(seed_segmentation_map, seg_map.segmap)
 
     # Translate the frame-by-frame seed into the final, cumulative seed
     # image. Rearrange into integrations, resetting the signal for each
@@ -162,12 +186,14 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         #print('frame, rel_frame, and int_number:', frame, rel_frame, int_number)
 
         if frame in integration_starts:
-            final_seed[int_number, 0, :, :] = copy.deepcopy(frame_seed[frame-starting_frame, :, :]) + seed_image
+            print('first frame in integration, frame_seed and seed_image:', frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
+            final_seed[int_number, 0, :, :] = copy.deepcopy(frame_seed[frame-starting_frame, :, :]) + seed_image_per_frame
             #print('final_seed[{}, 0, :, :] = frame_seed[{}, :, :]'.format(int_number, frame-starting_frame))
         elif frame not in reset_frames:
             #print('int: {}, rel_frame {}, frame-starting frame {}'.format(int_number, rel_frame, frame-starting_frame))
+            print('intermediate frame in integration, frame_seed and seed_image:', final_seed[int_number, rel_frame-1, 1021, 1026], frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
             final_seed[int_number, rel_frame, :, :] = final_seed[int_number, rel_frame-1, :, :] + \
-                frame_seed[frame-starting_frame, :, :] + seed_image
+                frame_seed[frame-starting_frame, :, :] + seed_image_per_frame
 
     return final_seed, seed_segmentation_map
 
@@ -224,8 +250,9 @@ def check_lightcurve_time(light_curve, exposure_time, frame_time, divisions_per_
     # If the ending time is less than the exposure's total
     # observation time, then add entries with flux=1
     if np.max(times) < exposure_time:
-        print(("Lightcurve time values do not extend long enough to cover the entire exposure. "
-               "Extending to cover the full exposure time with flux = 1."))
+        print(("Lightcurve time values extend only to {} seconds. This is not long enough "
+               "to cover the entire exposure time of {} seconds. Extending to cover the full "
+               "exposure time with flux = 1.".format(np.max(times), exposure_time)))
         times = np.append(times, exposure_time + 5 * frame_time)
         fluxes = np.append(fluxes, 1.)
         adjusted = True
@@ -293,13 +320,16 @@ def update_segmentation_map(segmap, object_map):
 
     Parameters
     ----------
-    segmap :
+    segmap : numpy.ndarray
+        2D segmenatation map of the scene
 
-    object_map :
+    object_map : numpy.ndarray
+        2D segmentation map of object to add to the scene
 
     Returns
     -------
-    segmap :
+    segmap : numpy.ndarray
+        Updated 2D segmentation map of the scene
     """
     obj_pix = object_map != 0
     segmap[obj_pix] = object_map[obj_pix]

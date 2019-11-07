@@ -310,6 +310,21 @@ class Catalog_seed():
                 self.seedimage = self.combineSimulatedDataSources('ramp', self.seedimage, trailed_ramp)
             self.seed_segmap += trailed_segmap
 
+        # MASK IMAGE
+        # Create a mask so that we don't add signal to masked pixels
+        # Initially this includes only the reference pixels
+        # Keep the mask image equal to the true subarray size, since this
+        # won't be used to make a requested grism source image
+        if self.params['Inst']['mode'] not in ['wfss', 'tsgrism']:
+            self.maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+            self.maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
+
+            # crop the mask to match the requested output array
+            ap_suffix = self.params['Readout']['array_name'].split('_')[1]
+            if ap_suffix not in ['FULL', 'CEN']:
+                self.maskimage = self.maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
+                                                self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
+
         # TSO imaging mode here
         if self.params['Inst']['mode'] in ['ts_imaging']:
             self.create_tso_seed(split_seed=split_seed, integration_splits=integration_segment_indexes,
@@ -336,33 +351,20 @@ class Catalog_seed():
             self.part_int_start_number = 0
             self.part_frame_start_number = 0
 
-        # For NIRISS POM data, extract the central 2048x2048
-        if self.params['Inst']['mode'] in ["pom"]:
-            self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
+            # For NIRISS POM data, extract the central 2048x2048
+            if self.params['Inst']['mode'] in ["pom"]:
+                self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-        # MASK IMAGE
-        # Create a mask so that we don't add signal to masked pixels
-        # Initially this includes only the reference pixels
-        # Keep the mask image equal to the true subarray size, since this
-        # won't be used to make a requested grism source image
-        if self.params['Inst']['mode'] not in ['wfss']:
-            maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
-            maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
+            if self.params['Inst']['mode'] not in ['wfss', 'tsgrism']:
+                # Multiply the mask by the seed image and segmentation map in
+                # order to reflect the fact that reference pixels have no signal
+                # from external sources. Seed images to be dispersed do not have
+                # this step applied.
+                self.seedimage *= self.maskimage
+                self.seed_segmap *= self.maskimage
 
-            # crop the mask to match the requested output array
-            ap_suffix = self.params['Readout']['array_name'].split('_')[1]
-            if ap_suffix not in ['FULL', 'CEN']:
-                maskimage = maskimage[self.subarray_bounds[1]:self.subarray_bounds[3] + 1,
-                                      self.subarray_bounds[0]:self.subarray_bounds[2] + 1]
-
-            # Multiply the mask by the seed image and segmentation map in
-            # order to reflect the fact that reference pixels have no signal
-            # from external sources
-            self.seedimage *= maskimage
-            self.seed_segmap *= maskimage
-
-        # Save the combined static + moving targets ramp
-        self.saveSeedImage()
+            # Save the combined static + moving targets ramp
+            self.saveSeedImage()
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
@@ -384,7 +386,7 @@ class Catalog_seed():
         # Read in the TSO catalog. This is only for TSO mode, not
         # grism TSO, which will need a different catalog format.
         if self.params['Inst']['mode'].lower() == 'ts_imaging':
-            tso_cat = self.getPointSourceList(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
+            tso_cat = self.get_point_source_list(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
 
 
             print('TSO CAT')
@@ -402,9 +404,9 @@ class Catalog_seed():
                 t.add_row(source)
 
                 # Create the seed image contribution from each source
-                seed, seg = self.make_point_source_image(t)
-                tso_seeds.append(seed)
-                tso_segs.append(seg)
+                ptsrc_seed, ptsrc_seg = self.make_point_source_image(t)
+                tso_seeds.append(copy.deepcopy(ptsrc_seed))
+                tso_segs.append(copy.deepcopy(ptsrc_seg))
 
                 lightcurve = tso.read_lightcurve(source['lightcurve_file'], source['index'])
                 tso_lightcurves.append(lightcurve)
@@ -425,8 +427,8 @@ class Catalog_seed():
 
                 self.segment_number = 1
                 self.segment_part_number = 1
-                self.segment_frames = self.seedimage.shape[1]
-                self.segment_ints = self.seedimage.shape[0]
+                self.segment_frames = seed.shape[1]
+                self.segment_ints = seed.shape[0]
                 self.segment_frame_start_number = 0
                 self.segment_int_start_number = 0
                 self.part_int_start_number = 0
@@ -435,9 +437,13 @@ class Catalog_seed():
 
                 #print(']\nSeed shape: ', seed.shape)
 
+                # Zero out the reference pixels
+                seed *= self.maskimage
+                segmap *= self.maskimage
 
                 # Save the seed image segment to a file
                 self.saveSeedImage(seed_img=seed, seed_seg=segmap)
+                print('XXXXXXX Calling saveSeedImage   XXXXXXXX')
             else:
                 #print('integration_splits', integration_splits)
                 #print('frame_splits', frame_splits)
@@ -478,6 +484,18 @@ class Catalog_seed():
                         #print('Int/frame information:')
                         #print(i, j, int_start, int_end, frame_start, frame_end, time_start, time_end, total_frames, total_ints)
 
+                        print('xxxxxxxxxxxxxxxxxxxxxxxxx')
+                        print('TSO SEEDS')
+                        print(len(tso_seeds))
+                        tmppy, tmppx = tso_seeds[0].shape
+                        print(tso_seeds[0][tmppy // 2, tmppx // 2])
+                        print('')
+
+
+                        print('\n\nTHERE IS STILL A DISCREPANCY IN THE SIGNAL LEVEL OF THE NON TSO SOURCES BETWEEN THE SEGMENT FILES.')
+
+
+
                         seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap,
                                                                            tso_seeds, tso_segs,
                                                                            tso_lightcurves, self.frametime,
@@ -488,8 +506,23 @@ class Catalog_seed():
                                                                            starting_time=time_start,
                                                                            starting_frame=frame_start,
                                                                            samples_per_frametime=5)
+
+                        print('int_start, int_end, i:', int_start, int_end, i)
+                        print('initial_frame, frame_start, frame_end, total_frames:', initial_frame, frame_start, frame_end, total_frames)
+                        print('max of previous_frame: ', np.max(previous_frame))
+                        print('seed shape:', seed.shape)
+                        print('seed values up the ramp for each integration before adding previous_image:')
+                        for iii in range(seed.shape[0]):
+                            print(seed[iii, :, 1021, 1026])
+
+
                         seed += previous_frame
                         previous_frame = seed[-1, -1, :, :]
+
+
+                        print('seed values up the ramp for each integration after adding previous_image:')
+                        for iii in range(seed.shape[0]):
+                            print(seed[iii, :, 1021, 1026])
 
 
 
@@ -602,6 +635,10 @@ class Catalog_seed():
                         #print("Calculated segment number: ", self.segment_number)
                         #print("Calculated part number: ", self.segment_part_number)
                         #print('\n')
+
+                        # Zero out the reference pixels
+                        seed *= self.maskimage
+                        segmap *= self.maskimage
 
                         # Save the seed image segment to a file
                         self.saveSeedImage(seed_img=seed, seed_seg=segmap)

@@ -758,7 +758,7 @@ class DarkPrep():
             # Generate the list of dark current files to use
             if number_of_ints == 1:
                 use_all_files = False
-                files_to_use = dark_list
+                files_to_use = [dark_list[0]]
             elif number_of_ints > 1 and number_of_ints <= len(dark_list):
                 use_all_files = False
                 try:
