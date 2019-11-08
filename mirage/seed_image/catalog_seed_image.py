@@ -284,7 +284,11 @@ class Catalog_seed():
             self.seed_segmap *= maskimage
 
         # Save the combined static + moving targets ramp
-        self.saveSeedImage()
+        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_seed_image.fits')
+        self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_file)
+        print("Final seed image and segmentation map saved as {}".format(self.seed_file))
+        print("Seed image, segmentation map, and metadata available as:")
+        print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
@@ -463,9 +467,23 @@ class Catalog_seed():
             raise ValueError("Seed image is not 2D or 4D. It should be.")
         return padded_seed, padded_seg
 
-    def saveSeedImage(self):
-        # Create the grism direct image or ramp to be saved
-        arrayshape = self.seedimage.shape
+    def saveSeedImage(self, seed_image, segmentation_map, seed_file_name):
+        """Save the seed image and accompanying segmentation map to a
+        fits file.
+
+        Parameters
+        ----------
+        seed_image : numpy.ndarray
+            Array containing the seed image
+
+        segmentation_map : numpy.ndimage
+            Array containing the segmentation map
+
+        seed_file_name : str
+            Name of FITS file to save ``seed_image`` and `segmentation_map``
+            into
+        """
+        arrayshape = seed_image.shape
         if len(arrayshape) == 2:
             units = 'ADU/sec'
             yd, xd = arrayshape
@@ -490,18 +508,12 @@ class Catalog_seed():
         kw['ycenter'] = ycent_fov
         kw['units'] = units
         kw['TGROUP'] = tgroup
-        if self.params['Readout']['pupil'][0].upper() == 'F':
-            usefilt = 'pupil'
-        else:
-            usefilt = 'filter'
-
-        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] + '_seed_image.fits')
 
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
-        if self.params['Readout'][usefilt] == "NA":
-            self.params['Readout'][usefilt] = "N/A"
-        kw['filter'] = self.params['Readout'][usefilt]
+        if self.params['Readout'][self.usefilt] == "NA":
+            self.params['Readout'][self.usefilt] = "N/A"
+        kw['filter'] = self.params['Readout'][self.usefilt]
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
@@ -547,10 +559,7 @@ class Catalog_seed():
 
         kw['GRISMPAD'] = self.grism_direct_factor
         self.seedinfo = kw
-        self.saveSingleFits(self.seedimage, self.seed_file, key_dict=kw, image2=self.seed_segmap, image2type='SEGMAP')
-        print("Seed image and segmentation map saved as {}".format(self.seed_file))
-        print("Seed image, segmentation map, and metadata available as:")
-        print("self.seedimage, self.seed_segmap, self.seedinfo.")
+        self.saveSingleFits(seed_image, seed_file_name, key_dict=kw, image2=segmentation_map, image2type='SEGMAP')
 
     def combineSimulatedDataSources(self, inputtype, input1, mov_tar_ramp):
         """Combine the exposure containing the trailed sources with the
@@ -1496,7 +1505,7 @@ class Catalog_seed():
                     # Create a point source image, using the specific point
                     # source list and PSF for the given segment
                     seg_psfimage, ptsrc_segmap = self.make_point_source_image(pslist, segment_number=i_segment,
-                                                                           ptsrc_segmap=ptsrc_segmap)
+                                                                              ptsrc_segmap=ptsrc_segmap)
 
                     if self.params['Output']['save_intermediates'] is True:
                         seg_psfImageName = self.basename + '_pointSourceRateImage_seg{:02d}.fits'.format(i_segment)
@@ -1509,18 +1518,34 @@ class Catalog_seed():
 
             ptsrc_segmap = ptsrc_segmap.segmap
 
-            # save the point source image for examination by user
-            if self.params['Output']['save_intermediates'] is True:
-                psf_image_name = self.basename + '_pointSourceRateImage_adu_per_sec.fits'
-                h0 = fits.PrimaryHDU(psfimage)
-                h1 = fits.ImageHDU(ptsrc_segmap)
-                hlist = fits.HDUList([h0, h1])
-                hlist.writeto(psf_image_name, overwrite=True)
-                print("Point source image and segmap saved as {}".format(psf_image_name))
-
             # Add the point source image to the overall image
             signalimage = signalimage + psfimage
             segmentation_map += ptsrc_segmap
+
+            # To avoid problems with overlapping sources between source
+            # types in observations to be dispersed, make the point
+            # source-only segmentation map available as a class variable
+            self.point_source_seed = psfimage
+            self.point_source_seg_map = ptsrc_segmap
+
+            # For seed images to be dispersed in WFSS mode,
+            # embed the seed image in a full frame array. The disperser
+            # tool does not work on subarrays
+            aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+                 (aperture_suffix not in ['FULL', 'CEN'])):
+                self.point_source_seed, self.point_source_seg_map = self.pad_wfss_subarray(self.point_source_seed,
+                                                                                           self.point_source_seg_map)
+
+            # Save the point source seed image
+            self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+            self.saveSeedImage(self.point_source_seed, self.point_source_seg_map, self.ptsrc_seed_filename)
+            print("Point source image and segmap saved as {}".format(self.ptsrc_seed_filename))
+
+        else:
+            self.point_source_seed = None
+            self.point_source_seg_map = None
+            self.point_seed_filename = None
 
         # Simulated galaxies
         # Read in the list of galaxy positions/magnitudes to simulate
@@ -1531,21 +1556,36 @@ class Catalog_seed():
             # Multiply by the pixel area map
             galaxyCRImage *= self.pam
 
-            # Add galaxy segmentation map to the master copy
-            segmentation_map += galaxy_segmap
+            # To avoid problems with overlapping sources between source
+            # types in observations to be dispersed, make the galaxy-
+            # only segmentation map available as a class variable
+            self.galaxy_source_seed = galaxyCRImage
+            self.galaxy_source_seg_map = galaxy_segmap
 
-            # save the galaxy image for examination by the user
-            if self.params['Output']['save_intermediates'] is True:
-                galImageName = self.basename + '_galaxyRateImage_adu_per_sec.fits'
-                h0 = fits.PrimaryHDU(galaxyCRImage)
-                h1 = fits.ImageHDU(galaxy_segmap)
-                hlist = fits.HDUList([h0, h1])
-                hlist.writeto(galImageName, overwrite=True)
-                # self.saveSingleFits(galaxyCRImage, galImageName)
-                print("Simulated galaxy image and segmap saved as {}".format(galImageName))
+            # For seed images to be dispersed in WFSS mode,
+            # embed the seed image in a full frame array. The disperser
+            # tool does not work on subarrays
+            aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+                 (aperture_suffix not in ['FULL', 'CEN'])):
+                self.galaxy_source_seed, self.galaxy_source_seg_map = self.pad_wfss_subarray(self.galaxy_source_seed,
+                                                                                             self.galaxy_source_seg_map)
+
+            # Save the galaxy source seed image
+            self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+            self.saveSeedImage(self.galaxy_source_seed, self.galaxy_source_seg_map, self.galaxy_seed_filename)
+            print("Simulated galaxy image and segmap saved as {}".format(self.galaxy_seed_filename))
+
+            # Add galaxy segmentation map to the master copy
+            segmentation_map = self.add_segmentation_maps(segmentation_map, galaxy_segmap)
 
             # add the galaxy image to the signalimage
             signalimage = signalimage + galaxyCRImage
+
+        else:
+            self.galaxy_source_seed = None
+            self.galaxy_source_seg_map = None
+            self.galaxy_seed_filename = None
 
         # read in extended signal image and add the image to the overall image
         if self.runStep['extendedsource'] is True:
@@ -1557,20 +1597,36 @@ class Catalog_seed():
             # Multiply by the pixel area map
             extimage *= self.pam
 
-            # Add galaxy segmentation map to the master copy
-            segmentation_map += ext_segmap
+            # To avoid problems with overlapping sources between source
+            # types in observations to be dispersed, make the point
+            # source-only segmentation map available as a class variable
+            self.extended_source_seed = extimage
+            self.extended_source_seg_map = ext_segmap
 
-            # Save extended source image and segmap
-            if self.params['Output']['save_intermediates'] is True:
-                extImageName = self.basename + '_extendedObject_adu_per_sec.fits'
-                h0 = fits.PrimaryHDU(extimage)
-                h1 = fits.ImageHDU(ext_segmap)
-                hlist = fits.HDUList([h0, h1])
-                hlist.writeto(extImageName, overwrite=True)
-                print("Extended object image and segmap saved as {}".format(extImageName))
+            # For seed images to be dispersed in WFSS mode,
+            # embed the seed image in a full frame array. The disperser
+            # tool does not work on subarrays
+            aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+                 (aperture_suffix not in ['FULL', 'CEN'])):
+                self.extended_source_seed, self.extended_source_seg_map = self.pad_wfss_subarray(self.extended_source_seed,
+                                                                                                 self.extended_source_seg_map)
+
+            # Save the extended source seed image
+            self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+            self.saveSeedImage(self.extended_source_seed, self.extended_source_seg_map, self.extended_seed_filename)
+            print("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
+
+            # Add galaxy segmentation map to the master copy
+            segmentation_map = add_segmentation_maps(segmentation_map, ext_segmap)
 
             # add the extended image to the synthetic signal rate image
             signalimage = signalimage + extimage
+
+        else:
+            self.extended_source_seed = None
+            self.extended_source_seg_map = None
+            self.extended_seed_filename = None
 
         # ZODIACAL LIGHT
         if self.runStep['zodiacal'] is True:
@@ -1649,6 +1705,30 @@ class Catalog_seed():
     #    ysciscale = row['YSciScale'].data[0]
 
     #    return x_coeffs, y_coeffs, v2ref, v3ref, parity, yang, xsciscale, ysciscale, v3scixang
+
+    @staticmethod
+    def add_segmentation_maps(map1, map2):
+        """Add two segmentation maps together. In the case of overlapping
+        objects, the object in map1 is kept and the object in map2 is
+        ignored.
+
+        Parameters
+        ----------
+        map1 : numpy.ndarray
+            2D segmentation map
+
+        map2 : numpy.ndarray
+            2D segmentation map
+
+        Returns
+        -------
+        combined : numpy.ndarray
+            Summed segmentation map
+        """
+        map1_zeros = map1 == 0
+        combined = copy.deepcopy(map1)
+        combined[map1_zeros] += map2[map1_zeros]
+        return combined
 
     def get_point_source_list(self, filename, segment_offset=None):
         # read in the list of point sources to add, and adjust the
@@ -2590,11 +2670,11 @@ class Catalog_seed():
         """
         # Determine the filter name to look for
         if self.params['Inst']['instrument'].lower() in ['nircam', 'niriss']:
-            if self.params['Readout']['pupil'][0].upper() == 'F':
-                usefilt = 'pupil'
-            else:
-                usefilt = 'filter'
-            filter_name = self.params['Readout'][usefilt].lower()
+        #    if self.params['Readout']['pupil'][0].upper() == 'F':
+        #        usefilt = 'pupil'
+        #    else:
+        #        usefilt = 'filter'
+            filter_name = self.params['Readout'][self.usefilt].lower()
             # Construct the column header to look for
             specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(),
                                                         filter_name)
@@ -3715,11 +3795,10 @@ class Catalog_seed():
 
         # Make sure the requested filter is allowed. For imaging, all filters
         # are allowed. In the future, other modes will be more restrictive
-
         if self.params['Readout']['pupil'][0].upper() == 'F':
-            usefilt = 'pupil'
+            self.usefilt = 'pupil'
         else:
-            usefilt = 'filter'
+            self.usefilt = 'filter'
 
         # If instrument is FGS, then force filter to be 'NA' for the purposes
         # of constructing the correct PSF input path name. Then change to be
@@ -3728,14 +3807,14 @@ class Catalog_seed():
             self.params['Readout']['filter'] = 'NA'
             self.params['Readout']['pupil'] = 'NA'
 
-        if self.params['Readout'][usefilt] not in self.zps['Filter']:
+        if self.params['Readout'][self.usefilt] not in self.zps['Filter']:
             raise ValueError(("WARNING: requested filter {} is not in the list of "
-                              "possible filters.".format(self.params['Readout'][usefilt])))
+                              "possible filters.".format(self.params['Readout'][self.usefilt])))
 
         # Get the photflambda and photfnu values that go with
         # the filter
         mtch = ((self.zps['Detector'] == detector) &
-                (self.zps['Filter'] == self.params['Readout'][usefilt]) &
+                (self.zps['Filter'] == self.params['Readout'][self.usefilt]) &
                 (self.zps['Module'] == module))
         self.vegazeropoint = self.zps['VEGAMAG'][mtch][0]
         self.photflam = self.zps['PHOTFLAM'][mtch][0]
@@ -3793,10 +3872,10 @@ class Catalog_seed():
                     instrm = self.params['Inst']['instrument'].lower()
                     if instrm == 'nircam':
                         filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
-                                       .format(self.params['Readout'][usefilt].upper(), module.lower()))
+                                       .format(self.params['Readout'][self.usefilt].upper(), module.lower()))
                     elif instrm == 'niriss':
                         filter_file = ("{}_niriss_throughput1.txt"
-                                       .format(self.params['Readout'][usefilt].lower()))
+                                       .format(self.params['Readout'][self.usefilt].lower()))
                     elif instrm == 'fgs':
                         # det = self.params['Readout']['array_name'].split('_')[0]
                         filter_file = "{}_throughput_py.txt".format(detector.lower())
