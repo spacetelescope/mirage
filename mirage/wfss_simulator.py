@@ -133,12 +133,18 @@ class WFSSSim():
         # Loop over the yaml files and create
         # a direct seed image for each
         imseeds = []
+        ptsrc_seeds = []
+        galaxy_seeds = []
+        extended_seeds = []
         for pfile in self.paramfiles:
             print('Running catalog_seed_image for {}'.format(pfile))
             cat = catalog_seed_image.Catalog_seed(offline=self.offline)
             cat.paramfile = pfile
             cat.make_seed()
             imseeds.append(cat.seed_file)
+            ptsrc_seeds.append(cat.ptsrc_seed_filename)
+            galaxy_seeds.append(cat.galaxy_seed_filename)
+            extended_seeds.append(cat.extended_seed_filename)
             # If Mirage is going to produce an hdf5 file of spectra,
             # then we only need a single direct seed image. Note that
             # find_param_info() has reordered the list such that the
@@ -188,29 +194,41 @@ class WFSSSim():
 
         # Default to extracting all orders
         orders = None
+        
+        # Call the disperser separately for each type of object: point sources
+        # galaxies, extended objects
+        disp_seed = np.zeros((cat.ffsize, cat.ffsize))
+        background_done = False
+        for seed_files in [ptsrc_seeds, galaxy_seeds, extended_seeds]:
+            if seed_files[0] is not None:
+                dispersed_objtype_seed = Grism_seed(seed_files, self.crossing_filter,
+                                                    dmode, config_path=loc, instrument=self.instrument.upper(),
+                                                    extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
+                                                    SBE_save=self.source_stamps_file)
+                dispersed_objtype_seed.observation(orders=orders)
+                dispersed_objtype_seed.disperse(orders=orders)
+                # Only include the background in one of the object type seed images
+                if not background_done:
+                    if self.instrument == 'nircam':
+                        background_image = disp_seed.disperse_background_1D(background_file)
+                        print('make sure you are calling the above correctly')
+                        disp_seed.finalize(Back=background_image, BackLevel=None)
+                    else:
+                        # BackLevel is used as such: background / max(background) * BackLevel
+                        # So we need to either set BackLevel equal to the requested level
+                        # NOT THE RATIO OF THAT TO MEDIUM, or we need to open the background
+                        # file and multiply it by the ratio of the requested level to medium.
+                        # The former isn't quite correct because it'll be scaling the maximum
+                        # value in the image to "low" or "high", rather than the median
+                        full_background_file = os.path.join(loc, background_file)
+                        background_image = fits.getdata(full_background_file)
+                        background_image *= scaling_factor
+                        disp_seed.finalize(Back=background_image, BackLevel=None)
 
-        # Create dispersed seed image from the direct images
-        disp_seed = Grism_seed(imseeds, self.crossing_filter,
-                               dmode, config_path=loc, instrument=self.instrument.upper(),
-                               extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,
-                               SBE_save=self.source_stamps_file)
-        disp_seed.observation(orders=orders)
-        disp_seed.disperse(orders=orders)
-        if self.instrument == 'nircam':
-            background_image = disp_seed.disperse_background_1D(background_file)
-            print('make sure you are calling the above correctly')
-            disp_seed.finalize(Back=background_image, BackLevel=None)
-        else:
-            # BackLevel is used as such: background / max(background) * BackLevel
-            # So we need to either set BackLevel equal to the requested level
-            # NOT THE RATIO OF THAT TO MEDIUM, or we need to open the background
-            # file and multiply it by the ratio of the requested level to medium.
-            # The former isn't quite correct because it'll be scaling the maximum
-            # value in the image to "low" or "high", rather than the median
-            full_background_file = os.path.join(loc, background_file)
-            background_image = fits.getdata(full_background_file)
-            background_image *= scaling_factor
-            disp_seed.finalize(Back=background_image, BackLevel=None)
+                    background_done = True
+                else:
+                    dispersed_objtype_seed.finalize()
+                disp_seed += dispersed_objtype_seed.final
 
         # Get gain map
         gainfile = cat.params['Reffiles']['gain']
@@ -218,16 +236,16 @@ class WFSSSim():
 
         # Disperser output is always full frame. Remove the signal from
         # the refrence pixels now since we know exactly where they are
-        disp_seed.final[0:4, :] = 0.
-        disp_seed.final[2044:, :] = 0.
-        disp_seed.final[:, 0:4] = 0.
-        disp_seed.final[:, 2044:] = 0.
+        disp_seed[0:4, :] = 0.
+        disp_seed[2044:, :] = 0.
+        disp_seed[:, 0:4] = 0.
+        disp_seed[:, 2044:] = 0.
 
         # Crop to the requested subarray if necessary
         if cat.params['Readout']['array_name'] not in self.fullframe_apertures:
             print("Subarray bounds: {}".format(cat.subarray_bounds))
-            print("Dispersed seed image size: {}".format(disp_seed.final.shape))
-            disp_seed.final = self.crop_to_subarray(disp_seed.final, cat.subarray_bounds)
+            print("Dispersed seed image size: {}".format(disp_seed.shape))
+            disp_seed = self.crop_to_subarray(disp_seed, cat.subarray_bounds)
             gain = self.crop_to_subarray(gain, cat.subarray_bounds)
 
             # Segmentation map will be centered in a frame that is larger
@@ -246,11 +264,11 @@ class WFSSSim():
         # "perfect" noiseless view of the scene that does not depend on
         # detector effects, such as gain.
         if self.save_dispersed_seed:
-            self.save_dispersed_seed_image(disp_seed.final)
+            self.save_dispersed_seed_image(disp_seed)
 
         # Convert seed image to ADU/sec to be consistent
         # with other simulator outputs
-        disp_seed.final /= gain
+        disp_seed /= gain
 
         # Update seed image header to reflect the
         # division by the gain
@@ -289,7 +307,7 @@ class WFSSSim():
         # Combine into final observation
         obs = obs_generator.Observation(offline=self.offline)
         obs.linDark = obslindark
-        obs.seed = disp_seed.final
+        obs.seed = disp_seed
         obs.segmap = cat.seed_segmap
         obs.seedheader = cat.seedinfo
         #obs.paramfile = y.outname
