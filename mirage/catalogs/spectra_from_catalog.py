@@ -287,6 +287,10 @@ def get_filter_info(column_names, magsys):
                 match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
             elif instrument == 'niriss':
                 match = zp_table['Filter'] == filter_name
+
+            if not np.any(match):
+                raise ValueError("ERROR: no filter matching {} in {}.".format(filter_name, zp_file))
+
             zp = zp_table[magsys].data[match][0]
             photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
             photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS

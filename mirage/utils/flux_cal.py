@@ -13,14 +13,18 @@ def add_detector_to_zeropoints(detector, zeropoint_table):
     NIRCam and NIRISS simualtions. This is being done as a placeholder
     for the future, where we expect zeropoints to be detector-dependent.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     detector : str
         Name of detector to add to the table
 
-    Returns:
-    --------
-    Nothing
+    zeropoint_table : astropy.table.Table
+        Table of filter zeropoint information
+
+    Returns
+    -------
+    base_table : astropy.table.Table
+        Copy of ``zeropoint_table`` with Detector column added
     """
     # Add "Detector" to the list of column names
     base_table = copy.deepcopy(zeropoint_table)

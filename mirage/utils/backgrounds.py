@@ -63,6 +63,16 @@ def day_of_year_background_spectrum(ra, dec, observation_date):
 def find_low_med_high(array):
     """Given an array of values, find the value corresponding to the
     Nth percentile.
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        1D array of values
+
+    Returns
+    -------
+    levels : list
+        [low, medium, high] percentile values of array
     """
     levels = []
     for value in [LOW, MEDIUM, HIGH]:
@@ -189,9 +199,9 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
     """
     # Get background information
     bg = jbt.background(ra, dec, 4.)
+    back_wave = bg.bkg_data['wave_array']
     bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
     for i in range(len(bg.bkg_data['total_bg'][:, 0])):
-        back_wave = bg.bkg_data['wave_array']
         back_sig = bg.bkg_data['total_bg'][i, :]
 
         # Interpolate background to match filter wavelength grid

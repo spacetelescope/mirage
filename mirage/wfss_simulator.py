@@ -146,22 +146,6 @@ class WFSSSim():
             galaxy_seeds.append(cat.galaxy_seed_filename)
             extended_seeds.append(cat.extended_seed_filename)
 
-            if cat.ptsrc_seed_filename is not None:
-                h = fits.getdata(cat.ptsrc_seed_filename)
-                print(h.shape)
-                hdulist = fits.open(cat.ptsrc_seed_filename)
-                data1 = hdulist[1].data
-                data2 = hdulist[2].data
-                header2 = hdulist[2].header
-                header1 = hdulist[1].header
-                print(header1)
-                print('Image shape:', data1.shape)
-                print('\n\n\n\n\n')
-                print(header2)
-                print('Seg shape: ', data2.shape)
-                stop
-
-
             # If Mirage is going to produce an hdf5 file of spectra,
             # then we only need a single direct seed image. Note that
             # find_param_info() has reordered the list such that the
@@ -186,7 +170,7 @@ class WFSSSim():
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             if self.params['simSignals']['use_dateobs_for_background']:
-                print("Generating background spectrum for {}".format(self.params['Output']['date_obs']))
+                print("Generating background spectrum for observation date: {}".format(self.params['Output']['date_obs']))
                 back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
                                                                                   self.params['Telescope']['dec'],
                                                                                   self.params['Output']['date_obs'])
@@ -441,10 +425,11 @@ class WFSSSim():
                               "files must be wfss mode in order to define grism and crossing filter."))
         return yamls_to_disperse
 
+    """
     def generate_background_spectrum(self, ra, dec, day_of_year=None):
-        """Call jwst_backgrounds in order to produce an estimate of background
+        Call jwst_backgrounds in order to produce an estimate of background
         versus wavelength for a particular pointing
-        """
+
         background = jbt.background(ra, dec, 4.)
         # If the user wants a background signal from a particular day,
         # then extract that array here
@@ -495,9 +480,8 @@ class WFSSSim():
             mindiff = np.where(diff == np.min(diff))[0][0]
             background_spec = background.bkg_data['total_bg'][mindiff, :]
 
-
-
         return background_file
+    """
 
     def read_param_file(self, file):
         """
