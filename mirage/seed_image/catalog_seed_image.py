@@ -1079,8 +1079,7 @@ class Catalog_seed():
 
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
-                print('Extended source rotations turned off while evaluating rotate bug')
-                #stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
+                stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
 
                 # If no magnitude is given, use the extended image as-is
                 if rate != 1.0:
@@ -3239,110 +3238,107 @@ class Catalog_seed():
         for indexnum, values in zip(indexes, lines):
             if not os.path.isfile(values['filename']):
                 raise FileNotFoundError('{} from extended source catalog does not exist.'.format(values['filename']))
+
+            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
+                                                                          values['y_or_Dec'],
+                                                                          pixelflag, 4096)
+            # Get the input magnitude
             try:
-                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
-                                                                              values['y_or_Dec'],
-                                                                              pixelflag, 4096)
-                # Get the input magnitude
-                try:
-                    mag = float(values[mag_column])
-                except ValueError:
-                    mag = None
+                mag = float(values[mag_column])
+            except ValueError:
+                mag = None
 
-                # Now find out how large the extended source image is, so we
-                # know if all, part, or none of it will fall in the field of view
-                ext_stamp = fits.getdata(values['filename'])
-                if len(ext_stamp.shape) != 2:
-                    ext_stamp = fits.getdata(values['filename'], 1)
+            # Now find out how large the extended source image is, so we
+            # know if all, part, or none of it will fall in the field of view
+            ext_stamp = fits.getdata(values['filename'])
+            if len(ext_stamp.shape) != 2:
+                ext_stamp = fits.getdata(values['filename'], 1)
 
-                # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
-                # print('extended source size:', ext_stamp.shape)
+            # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
+            # print('extended source size:', ext_stamp.shape)
 
-                # Rotate the stamp image if requested
-                print('Extended source rotations turned off while evaluating rotate bug')
-                #ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+            # Rotate the stamp image if requested
+            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
 
-                eshape = np.array(ext_stamp.shape)
-                if len(eshape) == 2:
-                    edgey, edgex = eshape / 2
+            eshape = np.array(ext_stamp.shape)
+            if len(eshape) == 2:
+                edgey, edgex = eshape // 2
+            else:
+                raise ValueError(("WARNING, extended source image {} is not 2D! "
+                                  "This is not supported.".format(values['filename'])))
+
+            # Define the min and max source locations (in pixels) that fall onto the subarray
+            # Inlude the effects of a requested grism_direct image, and also keep sources that
+            # will only partially fall on the subarray
+            # pixel coords here can still be negative and kept if the grism image is being made
+
+            # First, coord limits for just the subarray
+            miny = 0
+            maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
+            minx = 0
+            maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
+
+            # Expand the limits if a grism direct image is being made
+            if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
+                extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
+                miny -= extrapixy
+                maxy += extrapixy
+                extrapixx = np.int((maxx + 1)/2 * (self.coord_adjust['x'] - 1.))
+                minx -= extrapixx
+                maxx += extrapixx
+
+            # Now, expand the dimensions again to include point sources that fall only partially on the
+            # subarray
+            miny -= edgey
+            maxy += edgey
+            minx -= edgex
+            maxx += edgex
+
+            # Keep only sources within the appropriate bounds
+            if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
+
+                # Set up an entry for the output table
+                entry = [indexnum, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
+
+                # save the stamp image after normalizing to a total signal of 1.
+                norm_factor = np.sum(ext_stamp)
+                ext_stamp /= norm_factor
+                all_stamps.append(ext_stamp)
+
+                # If a magnitude is given then adjust the countrate to match it
+                if mag is not None:
+                    # Convert magnitudes to countrate (ADU/sec) and counts per frame
+                    countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
+                                                             photfnu=self.photfnu, photflam=self.photflam,
+                                                             vegamag_zeropoint=self.vegazeropoint)
+                    framecounts = countrate * self.frametime
+                    magwrite = mag
+
                 else:
-                    raise ValueError(("WARNING, extended source image {} is not 2D! "
-                                      "This is not supported.".format(values['filename'])))
+                    # In this case, no magnitude is given in the extended input list
+                    # Assume the input stamp image is in units of e/sec then.
+                    print("No magnitude given for extended source in {}.".format(values['filename']))
+                    print("Assuming the original file is in units of counts per sec.")
+                    print("Multiplying original file values by 'extendedscale'.")
+                    countrate = norm_factor * self.params['simSignals']['extendedscale']
+                    framecounts = countrate * self.frametime
+                    magwrite = 99.99999
 
-                # Define the min and max source locations (in pixels) that fall onto the subarray
-                # Inlude the effects of a requested grism_direct image, and also keep sources that
-                # will only partially fall on the subarray
-                # pixel coords here can still be negative and kept if the grism image is being made
+                # add the countrate and the counts per frame to pointSourceList
+                # since they will be used in future calculations
+                # entry.append(scale)
+                entry.append(countrate)
+                entry.append(framecounts)
 
-                # First, coord limits for just the subarray
-                miny = 0
-                maxy = self.subarray_bounds[3] - self.subarray_bounds[1]
-                minx = 0
-                maxx = self.subarray_bounds[2] - self.subarray_bounds[0]
+                # add the good point source, including location and counts, to the pointSourceList
+                # self.pointSourceList.append(entry)
+                extSourceList.add_row(entry)
 
-                # Expand the limits if a grism direct image is being made
-                if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
-                    extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
-                    miny -= extrapixy
-                    maxy += extrapixy
-                    extrapixx = np.int((maxx + 1)/2 * (self.coord_adjust['x'] - 1.))
-                    minx -= extrapixx
-                    maxx += extrapixx
+                # Write out positions, distances, and counts to the output file
+                eslist.write(("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" %
+                             (indexnum, ra_str, dec_str, ra, dec, pixelx, pixely, magwrite, countrate,
+                              framecounts)))
 
-                # Now, expand the dimensions again to include point sources that fall only partially on the
-                # subarray
-                miny -= edgey
-                maxy += edgey
-                minx -= edgex
-                maxx += edgex
-
-                # Keep only sources within the appropriate bounds
-                if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
-
-                    # Set up an entry for the output table
-                    entry = [indexnum, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
-
-                    # save the stamp image after normalizing to a total signal of 1.
-                    norm_factor = np.sum(ext_stamp)
-                    ext_stamp /= norm_factor
-                    all_stamps.append(ext_stamp)
-
-                    # If a magnitude is given then adjust the countrate to match it
-                    if mag is not None:
-                        # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                        countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
-                                                         photfnu=self.photfnu, photflam=self.photflam,
-                                                         vegamag_zeropoint=self.vegazeropoint)
-                        framecounts = countrate * self.frametime
-                        magwrite = mag
-
-                    else:
-                        # In this case, no magnitude is given in the extended input list
-                        # Assume the input stamp image is in units of e/sec then.
-                        print("No magnitude given for extended source in {}.".format(values['filename']))
-                        print("Assuming the original file is in units of counts per sec.")
-                        print("Multiplying original file values by 'extendedscale'.")
-                        countrate = norm_factor * self.params['simSignals']['extendedscale']
-                        framecounts = countrate * self.frametime
-                        magwrite = 99.99999
-
-                    # add the countrate and the counts per frame to pointSourceList
-                    # since they will be used in future calculations
-                    # entry.append(scale)
-                    entry.append(countrate)
-                    entry.append(framecounts)
-
-                    # add the good point source, including location and counts, to the pointSourceList
-                    # self.pointSourceList.append(entry)
-                    extSourceList.add_row(entry)
-
-                    # Write out positions, distances, and counts to the output file
-                    eslist.write(("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e\n" %
-                                 (indexnum, ra_str, dec_str, ra, dec, pixelx, pixely, magwrite, countrate,
-                                  framecounts)))
-            except:
-                # print("ERROR: bad point source line %s. Skipping." % (line))
-                pass
         print("Number of extended sources found within or close to the requested aperture: {}".format(len(extSourceList)))
         # close the output file
         eslist.close()
@@ -3383,12 +3379,13 @@ class Catalog_seed():
         # Add later: check for WCS and use that
         # if no WCS:
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
-        print('extended v2, v3:', pixelv2, pixelv3)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
-        print('extended position angle:', x_pos_ang)
-        print('scipy rotate seems to be failing with no error raised')
-        rotated = rotate(stamp_image, x_pos_ang, mode='nearest')
-        print('rotated shape: ', rotated.shape)
+
+        # The definition of position angle is different between the galaxy
+        # source inputs and the extended source inputs. calc_x_position_angle
+        # was created for galaxies, so adjust for the different definition here.
+        rotation_angle = x_pos_ang - 2. * self.params['Telescope']['rotation']
+        rotated = rotate(stamp_image, rotation_angle, mode='constant', cval=0.)
         return rotated
 
     def make_extended_source_image(self, extSources, extStamps):
