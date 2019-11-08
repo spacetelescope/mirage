@@ -2,6 +2,10 @@
 information, such as filter-based zeropoints, photflam, photfnu, and
 pivot wavelegth values
 """
+from astropy.io import ascii
+from astropy.table import Column
+import copy
+import numpy as np
 
 
 def add_detector_to_zeropoints(detector, zeropoint_table):
@@ -50,7 +54,7 @@ def fluxcal_info(params, usefilt, detector, module):
     # currently are for FGS. So if we are working with NIRCAM or NIRISS,
     # manually add a Detector key to the dictionary as a placeholder.
     if params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
-        zps = add_detector_to_zeropoints(detector)
+        zps = add_detector_to_zeropoints(detector, zpts)
 
     # Make sure the requested filter is allowed
     if params['Readout'][usefilt] not in zps['Filter']:

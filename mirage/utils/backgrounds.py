@@ -1,4 +1,13 @@
+#! /usr/bin env python
+"""This module contains functions for calculating background signals using
+jwst_backgrounds
+"""
+import datetime
+import numpy as np
 
+from jwst_backgrounds import jbt
+
+from mirage.utils.flux_cal import fluxcal_info
 
 # Percentiles corresponding to "low", "medium", and "high" as used in
 # the ETC

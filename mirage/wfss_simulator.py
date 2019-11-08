@@ -168,7 +168,7 @@ class WFSSSim():
         # orders to disperse.
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
-            if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+            if self.params['simSignals']['use_dateobs_for_background']:
                 print("Generating background spectrum for {}".format(self.params['Output']['date_obs']))
                 back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
                                                                                   self.params['Telescope']['dec'],
@@ -186,15 +186,10 @@ class WFSSSim():
                                                                     dmode.lower())
             scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
             print('scaling_factor:', scaling_factor)
-        print('Background file is {}'.format(background_file))
-
-        print('make sure env has latest nircam_gsim before running further')
-        stop
-
 
         # Default to extracting all orders
         orders = None
-        
+
         # Call the disperser separately for each type of object: point sources
         # galaxies, extended objects
         disp_seed = np.zeros((cat.ffsize, cat.ffsize))
@@ -210,9 +205,8 @@ class WFSSSim():
                 # Only include the background in one of the object type seed images
                 if not background_done:
                     if self.instrument == 'nircam':
-                        background_image = disp_seed.disperse_background_1D(background_file)
-                        print('make sure you are calling the above correctly')
-                        disp_seed.finalize(Back=background_image, BackLevel=None)
+                        background_image = dispersed_objtype_seed.disperse_background_1D([back_wave, back_sig])
+                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
                     else:
                         # BackLevel is used as such: background / max(background) * BackLevel
                         # So we need to either set BackLevel equal to the requested level
@@ -223,7 +217,7 @@ class WFSSSim():
                         full_background_file = os.path.join(loc, background_file)
                         background_image = fits.getdata(full_background_file)
                         background_image *= scaling_factor
-                        disp_seed.finalize(Back=background_image, BackLevel=None)
+                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
 
                     background_done = True
                 else:
@@ -417,7 +411,7 @@ class WFSSSim():
                 # If the other yaml files are for imaging mode, we need to update them to
                 # be wfss mode so that the resulting seed images have the correct dimensions.
                 # Save these modified yaml files to new files.
-                params['Inst']['mode'] = 'imaging'
+                params['Inst']['mode'] = 'wfss'
                 params['Output']['grism_source_image'] = True
                 outdir, basename = os.path.split(pfile)
                 modified_file = os.path.join(outdir, 'tmp_update_to_wfss_mode_{}'.format(basename))
@@ -437,7 +431,7 @@ class WFSSSim():
         background = jbt.background(ra, dec, 4.)
         # If the user wants a background signal from a particular day,
         # then extract that array here
-        if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+        if self.params['simSignals']['use_dateobs_for_background']:
             obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
             obs_dayofyear = obsdate.timetuple().tm_yday
             if obs_dayofyear not in background.bkg_data['calendar']:

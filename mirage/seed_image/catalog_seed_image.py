@@ -41,7 +41,7 @@ from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 from ..utils.constants import CRDS_FILE_TYPES
-from ..utils.flux_ca import fluxcal_info
+from ..utils.flux_cal import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
@@ -3815,7 +3815,7 @@ class Catalog_seed():
 
         # Get basic flux calibration information
         self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
-            fluxcal_info(self.params, usefilt, detector, module)
+            fluxcal_info(self.params, self.usefilt, detector, module)
 
         """
         if self.params['Readout'][self.usefilt] not in self.zps['Filter']:
@@ -3906,29 +3906,21 @@ class Catalog_seed():
                 print(("Using {} filter throughput file for background calculation."
                        .format(filter_file)))
 
-                if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
-                    bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
-                                                                            self.params['Telescope']['dec'],
-                                                                            self.params['Output']['date_obs'])
-                    need more adjustments here
-
-
-
-
-
-
-
-
-
-
-
-
-
+                if self.params['simSignals']['use_dateobs_for_background']:
+                    bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
+                                                                                       self.params['Telescope']['dec'],
+                                                                                       self.params['Output']['date_obs'])
+                    self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
+                                                                                      filter_file,
+                                                                                      back_wave=bkgd_wave,
+                                                                                      back_sig=bkgd_spec)
+                    print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
                 else:
                     # Here the background level is based on high/medium/low rather than date
                     self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
                                                                                       filter_file,
                                                                                       level=self.params['simSignals']['bkgdrate'].lower())
+                    print("Background rate determined using requested level: {}".format(self.params['simSignals']['bkgdrate']))
                 print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
             else:
                 raise ValueError(("WARNING: unrecognized background rate value. "
@@ -4141,25 +4133,25 @@ class Catalog_seed():
 
         # If the user wants a background signal from a particular day,
         # then extract that array here
-        if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
-        """
-        # Get background information
-        # Any wavelength will return the 2D array that includes
-        # all wavelengths, so just use a dummy value of 2.5 microns
-        bg = jbt.background(ra, dec, 2.5)
+        if self.params['simSignals']['use_dateobs_for_background']:
+            """
+            # Get background information
+            # Any wavelength will return the 2D array that includes
+            # all wavelengths, so just use a dummy value of 2.5 microns
+            bg = jbt.background(ra, dec, 2.5)
 
-        # If the user wants a background signal from a particular day,
-        # then extract that array here
-        if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
-            obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
-            obs_dayofyear = obsdate.timetuple().tm_yday
-            if obs_dayofyear not in bg.bkg_data['calendar']:
-                raise ValueError(("ERROR: The requested RA, Dec is not observable on {}. Either "
-                                  "specify a different day, or set simSignals:use_dateobs_for_background "
-                                  "to False.".format(self.params['Output']['date_obs'])))
-            match = obs_dayofyear == bg.bkg_data['calendar']
-            back_wave = bg.bkg_data['wave_array']
-            back_sig = bg.bkg_data['total_bg'][match, :]
+            # If the user wants a background signal from a particular day,
+            # then extract that array here
+            if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+                obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
+                obs_dayofyear = obsdate.timetuple().tm_yday
+                if obs_dayofyear not in bg.bkg_data['calendar']:
+                    raise ValueError(("ERROR: The requested RA, Dec is not observable on {}. Either "
+                                      "specify a different day, or set simSignals:use_dateobs_for_background "
+                                      "to False.".format(self.params['Output']['date_obs'])))
+                match = obs_dayofyear == bg.bkg_data['calendar']
+                back_wave = bg.bkg_data['wave_array']
+                back_sig = bg.bkg_data['total_bg'][match, :]
             """
 
             # Interpolate background to match filter wavelength grid
@@ -4169,7 +4161,7 @@ class Catalog_seed():
             filt_bkgd = bkgd_interp * filt_thru
 
             # Integrate
-            bval = np.trapz(filt_bkgd, x=filt_wav)
+            bval = np.trapz(filt_bkgd, x=filt_wav) * u.MJy / u.steradian
 
         else:
             """
