@@ -145,6 +145,23 @@ class WFSSSim():
             ptsrc_seeds.append(cat.ptsrc_seed_filename)
             galaxy_seeds.append(cat.galaxy_seed_filename)
             extended_seeds.append(cat.extended_seed_filename)
+
+            if cat.ptsrc_seed_filename is not None:
+                h = fits.getdata(cat.ptsrc_seed_filename)
+                print(h.shape)
+                hdulist = fits.open(cat.ptsrc_seed_filename)
+                data1 = hdulist[1].data
+                data2 = hdulist[2].data
+                header2 = hdulist[2].header
+                header1 = hdulist[1].header
+                print(header1)
+                print('Image shape:', data1.shape)
+                print('\n\n\n\n\n')
+                print(header2)
+                print('Seg shape: ', data2.shape)
+                stop
+
+
             # If Mirage is going to produce an hdf5 file of spectra,
             # then we only need a single direct seed image. Note that
             # find_param_info() has reordered the list such that the
