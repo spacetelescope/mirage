@@ -163,10 +163,12 @@ class WFSSSim():
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+                print("Generating background spectrum for {}".format(self.params['Output']['date_obs']))
                 back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
                                                                                   self.params['Telescope']['dec'],
                                                                                   self.params['Output']['date_obs'])
             else:
+                print("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
                 back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
                                                                                    self.module)
             print('back wave: ', back_wave)
