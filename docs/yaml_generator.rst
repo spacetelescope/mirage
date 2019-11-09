@@ -140,9 +140,12 @@ Background Specification
 ++++++++++++++++++++++++
 
 Users may also supply information on the background levels to use for each instrument and observation. Allowed values for the background parameter are described in :ref:`bkgdrate <bkgdrate>` section of the Input Yaml Parameters page.
-As with the catalogs above, there are several formats that can be used to supply the background information. Examples are shown below.
 
-To use the default value for background, either omit this parameter altogether, or set background equal to None.
+If *use_dateobs_for_background* is True, then the background for all exposures will be determined based on the value of the observation date (discussed below). The `JWST backgrounds package <https://github.com/spacetelescope/jwst_backgrounds>`_ will be used, and the background associated with the requested pointing and date will be used.
+
+If *use_dateobs_for_background* is False, then the *background* parameter controls the calculation of the background. As with the catalogs above, there are several formats that can be used to supply the background information. Examples are shown below.
+
+To use the default value for background ("low"), either omit this parameter altogether, or set background equal to None.
 
 ::
 
@@ -423,7 +426,7 @@ Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
                                   output_dir='/location/to/place/yaml_files',
                                   simdata_output_dir='/location/to/place/simulated_data',
                                   cosmic_rays=crs, background=background, roll_angle=pav3,
-                                  dates=dates, datatype='raw',
+                                  dates=dates, datatype='raw', use_dateobs_for_background=False,
                                   reffile_defaults='crds', reffile_overrides=reffile_overrides)
     yam.use_linearized_darks = True
     yam.create_inputs()

@@ -95,6 +95,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  photonyield_: True                              #Apply photon yield in simulation
 	  pymethod_: True                                 #Use double Poisson simulation for photon yield
 	  expand_catalog_for_segments_: False             # Expand catalog for 18 segments and use distinct PSFs
+	  use_dateobs_for_background_: False              # Use date_obs value to determine background. If False, bkgdrate is used.
 
 	Telescope_:
 	  ra_: 53.1                     #RA of simulated pointing
@@ -864,6 +865,14 @@ Expand catalog for segments
 This entry controls whether Mirage will look for a separate point source library for each of the mirror segments on the telescope. This
 mode is only used for certain wavefront sensing and control observations and should normally be set to False.
 
+.. _use_dateobs_for_background:
+
+Use date_obs for background
++++++++++++++++++++++++++++
+
+*simSignals:use_dateobs_for_background*
+
+This entry controls the way the background signal for the observation is calculated. If it is True, then the background value will be created by extracting the background spectrum assoicated with :ref:`date_obs <date_obs>` from the `jwst_backgrounds <https://github.com/spacetelescope/jwst_backgrounds>`_ package. If False, the background will be determined by calculating the background value at a certain percentile of the collection of backgrounds for the given pointing over 365 days. If :ref:`bkgdrate <bkgdrate>` is "low", "medium", "high", then the percentiles used are 10th, 50th, and 90th, respectively. If it is a float, that value (in ADU/sec/pixel) will be added to all pixels.
 
 .. _Telescope:
 

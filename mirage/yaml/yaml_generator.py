@@ -121,7 +121,7 @@ class SimInput:
                  reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
                  background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
-                 offline=False):
+                 dateobs_for_background=False, offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -130,14 +130,12 @@ class SimInput:
         ----------
         input_xml : str
             Filename of xml file exported by APT
+
         pointing_file : str
             Filename of pointing file exported by APT
+
         datatype : str
         use_JWST_pipeline : bool
-
-        parameter_defaults : dict
-            Default values of parameters like roll angle (PAV3) to pass on to observation list
-            generator
 
         reffile_defaults : str
             Controls how the CRDS reference file entries are presented in
@@ -150,7 +148,6 @@ class SimInput:
             'crds_full_name' - CRDS will be queried before creating the
                                yaml files, and actual filenames will be
                                placed into the yaml files.
-
 
         reffile_overrides : dict
             If the user provides a dictionary of reference file names,
@@ -173,13 +170,66 @@ class SimInput:
                                     This format seems easiest assuming users
                                     are overriding only one/few types of reference
                                     files at a time.
-        """
-        # If no catalogs are given, then set up some dummy defaults
-        #if catalogs is None:
-        #    catalogs = {'nircam': {'sw': 'none', 'lw': 'none'},
-        #                'niriss': 'none',
-        #                'fgs': 'none'}
 
+        use_JWST_pipeline : bool
+            Whether or not to use the JWST pipeline when creating data.
+            It is highly recommended to leave this True.
+
+        catalogs : dict
+            Nested dictionary of source catalogs to use for populating
+            the collection of yaml files. See Mirage's online documentation
+            for format and options.
+            https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
+
+        cosmic_rays : dict
+            Nested dictionary specifyig details on the cosmic ray paramters
+            to use. This includes the cosmic ray library and scale to use
+            for each observation. See Mirage's online documentation for
+            details.
+            https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
+
+        background : str or float
+            Background value to use for the simulations. Can be a number,
+            which will be interpreted as a constant ADU/sec per pixel.
+            Can also be one of "low", "medium", "high", with the same
+            definitions as used by the JWST ETC. In this case the background
+            will be calculated using the jwst_backgrounds package,
+            calculating the background value as a certain percentile of
+            the values over the course of a year. If ``dateobs_for_background``
+            is True, then this parameter is ignored.
+
+        roll_angle : float or dict
+            Value of JWST PAV3 for all observations (float) or per observation
+            (dict). See Mirage's online documentation for examples:
+            https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
+
+        dates : str or dict
+            Observation dates assocated with the exposures or program. If
+            ``dateobs_for_background`` is True, the background for each
+            exposure will be calculated based on these dates.
+            See Mirage's onling documentation for examples:
+            https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
+
+        observation_list_file=None
+        verbose : bool
+            Print more information to the screen while running
+
+        output_dir : str
+            Path in which to save the created yaml files
+
+        simdata_output_dir : str
+            Path into which the simulated data will eventually be saved. This
+            value is placed within each yaml file.
+
+        dateobs_for_background : bool
+            If True, the value of ``date_obs`` in the yaml file will be used
+            when calculating the background level for the observation.
+            If False, the value from ``background`` will be used.
+
+        offline : bool
+            Whether the class is being called with or without access to
+            Mirage reference data. Used primarily for testing.
+        """
         parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
                                'dates': dates}
 
@@ -207,6 +257,7 @@ class SimInput:
         self.tracking = 'sidereal'
         self.psf_paths = None
         self.expand_catalog_for_segments = False
+        self.dateobs_for_background = dateobs_for_background
         self.add_psf_wings = True
         self.offline = offline
 
@@ -1968,7 +2019,9 @@ class SimInput:
             f.write('  photonyield: True                         #Apply photon yield in simulation\n')
             f.write('  pymethod: True                            #Use double Poisson simulation for photon yield\n')
             f.write('  expand_catalog_for_segments: {}                     # Expand catalog for 18 segments and use distinct PSFs\n'
-                .format(self.expand_catalog_for_segments))
+                    .format(self.expand_catalog_for_segments))
+            f.write('  use_dateobs_for_background: {}          # Use date_obs below to deternine background. If False, bkgdrate is used.\n'
+                    .format(self.dateobs_for_background))
 
             f.write('\n')
             f.write('Telescope:\n')
