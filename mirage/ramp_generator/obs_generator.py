@@ -54,7 +54,7 @@ from mirage import version
 MIRAGE_VERSION = version.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
-MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_wfss", "ts_grism"],
+MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_grism"],
          "niriss": ["imaging", "ami", "pom", "wfss"],
          "fgs": ["imaging"]}
 
@@ -2776,11 +2776,16 @@ class Observation():
 
         # Grism TSO data have the XREF_SCI and YREF_SCI keywords populated.
         # These are used to describe the location of the source on the detector.
+        print('\n\nPopulating xref_sci in output file:')
+        print(self.seedheader['XREF_SCI'])
+
+
+
         try:
             outModel.meta.wcsinfo.siaf_xref_sci = self.seedheader['XREF_SCI']
             outModel.meta.wcsinfo.siaf_yref_sci = self.seedheader['YREF_SCI']
         except KeyError:
-            pass
+            print('Unable to propagate XREF_SCI, YREF_SCI from seed image to simualted data file.')
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         # compute pointing of V1 axis
@@ -2810,7 +2815,7 @@ class Observation():
 
         # get the proper filter wheel and pupil wheel values for the header
         if ((self.params['Inst']['instrument'].lower() == 'nircam') and
-           (self.params['Inst']['mode'].lower() not in ['wfss', 'ts_wfss'])):
+           (self.params['Inst']['mode'].lower() not in ['wfss', 'ts_grism'])):
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -2832,7 +2837,7 @@ class Observation():
             outModel.meta.instrument.pupil_position = self.pupil_wheel_position
 
         # Specify whether the exposure is part of a TSO observation
-        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_wfss']:
+        if self.params['Inst']['mode'].lower() not in ['ts_imaging', 'ts_grism']:
             outModel.meta.visit.tsovisit = False
         else:
             outModel.meta.visit.tsovisit = True
@@ -3105,7 +3110,7 @@ class Observation():
             fwpw['pupil_wheel'] = self.params['Readout']['pupil']
 
         # get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_wfss']:
+        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_grism']:
             mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
             fw = str(fwpw['filter_wheel'].data[mtch][0])
             pw = str(fwpw['pupil_wheel'].data[mtch][0])
@@ -3127,7 +3132,7 @@ class Observation():
             outModel[0].header['PWCPOS'] = self.pupil_wheel_position
 
         # Specify whether the exposure is part of a TSO observation
-        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_wfss']:
+        if self.params['Inst']['mode'].lower() not in ['ts_imaging', 'ts_grism']:
             outModel[0].header['TSOVISIT'] = False
         else:
             outModel[0].header['TSOVISIT'] = True

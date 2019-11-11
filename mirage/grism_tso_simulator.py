@@ -763,6 +763,7 @@ class GrismTSO():
         siaf = pysiaf.Siaf('nircam')[params['Readout']['array_name']]
         seed_header['XREF_SCI'] = siaf.XSciRef
         seed_header['YREF_SCI'] = siaf.YSciRef
+        seed_header['TSOVISIT'] = True
 
         # Save
         h0 = fits.PrimaryHDU()

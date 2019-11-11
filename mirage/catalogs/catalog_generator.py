@@ -515,18 +515,24 @@ class GrismTSOCatalog(PointSourceCatalog):
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
 
         # Add TSO-specific information
-        self._semimajor_axis = semimajor_axis
-        self._orbital_inclination = orbital_inclination,
-        self._eccentricity = eccentricity
-        self._orb_period = orb_period
-        self._longitude_of_periastron = longitude_of_periastron
-        self._limb_dark_model = limb_dark_model
-        self._limb_dark_coeffs = limb_dark_coeffs
-        self._time_units = time_units
-        self._start_time = start_time
-        self._end_time = end_time
-        self._inferior_conj = inferior_conj
-        self._transmission_spectrum = transmission_spectrum
+        self._semimajor_axis = np.array(semimajor_axis)
+        self._orbital_inclination = np.array(orbital_inclination)
+        self._eccentricity = np.array(eccentricity)
+        self._orbital_period = np.array(orbital_period)
+        self._longitude_of_periastron = np.array(longitude_of_periastron)
+        self._limb_dark_model = np.array(limb_dark_model)
+        self._time_units = np.array(time_units)
+        self._start_time = np.array(start_time)
+        self._end_time = np.array(end_time)
+        self._inferior_conj = np.array(inferior_conj)
+        self._transmission_spectrum = np.array(transmission_spectrum)
+
+        # Limb darkening coefficients should be a string of comma-separated
+        # numbers
+        str_limb_dark_coeffs = []
+        for entry in limb_dark_coeffs:
+            str_limb_dark_coeffs.append(str(entry).replace('[', '').replace(']', ''))
+        self._limb_dark_coeffs = np.array(str_limb_dark_coeffs)
 
     def create_table(self):
         """Create an astropy table containing the catalog
@@ -561,7 +567,7 @@ class GrismTSOCatalog(PointSourceCatalog):
         end_col = Column(self._end_time, name='End_time')
         tab.add_column(end_col, index=11)
 
-        inf_conj_col = Column(self._inferior_conj, name='Inferior_conjunction')
+        inf_conj_col = Column(self._inferior_conj, name='Time_of_inferior_conjunction')
         tab.add_column(inf_conj_col, index=12)
 
         orb_per_col = Column(self._orbital_period, name='Orbital_period')

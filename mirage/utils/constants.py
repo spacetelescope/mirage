@@ -16,9 +16,9 @@ instrument_abbreviations = {'nircam': 'NRC',
                             'miri': 'MIR'}
 
 EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
-                       "wfss": "NRC_WFSS", "ts_wfss": "NRC_TSGRISM"},
+                       "wfss": "NRC_WFSS", "ts_grism": "NRC_TSGRISM"},
             "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
-                        "wfss": "NIS_WFSS"},
+                       "wfss": "NIS_WFSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
 
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
