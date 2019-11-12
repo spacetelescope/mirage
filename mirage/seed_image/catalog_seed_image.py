@@ -492,10 +492,6 @@ class Catalog_seed():
                         print('')
 
 
-                        print('\n\nTHERE IS STILL A DISCREPANCY IN THE SIGNAL LEVEL OF THE NON TSO SOURCES BETWEEN THE SEGMENT FILES.')
-
-
-
                         seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap,
                                                                            tso_seeds, tso_segs,
                                                                            tso_lightcurves, self.frametime,
