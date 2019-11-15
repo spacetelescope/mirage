@@ -955,6 +955,7 @@ class Observation():
             seed[int_start: int_start+ints, grp_start: grp_start+groups, :, :] = seed_data
 
 
+
             print('data placed into integration: ', int_start, int_start+ints)
             print('                  groups: ', grp_start, grp_start+groups)
             print(seed_data.shape)

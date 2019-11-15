@@ -53,7 +53,8 @@ class ReadAPTXML():
                           ]
         FilterParams_keys = ['ShortFilter', 'LongFilter', 'ShortPupil', 'LongPupil',
                              'ReadoutPattern', 'Groups', 'Integrations',
-                             'FilterWheel', 'PupilWheel'  # for NIRISS
+                             'FilterWheel', 'PupilWheel',  # for NIRISS
+                             'NumOutputs'
                              ]
         OtherParams_keys = ['Mode', 'Grism',
                             'IntegrationsShort', 'GroupsShort', 'Dither',  # MIRI
@@ -1168,7 +1169,7 @@ class ReadAPTXML():
 
         return exposures_dictionary, n_tiles_phasing
 
-    def read_nircam_grism_time_series(self, template, template_name, obs, proposal_param_dict):
+    def read_nircam_grism_time_series(self, template, template_name, obs, proposal_parameter_dictionary):
         """Parse a NIRCam Grism Time Series observation template from an APT xml file.
         Produce an exposure dictionary that lists all exposures (excluding dithers)
         from the template
@@ -1191,8 +1192,11 @@ class ReadAPTXML():
         Returns
         -------
         exposures_dictionary : dict
-            Dictionary containing details on all exposures contained within the template. These details
-            include things like filter, pupil, readout pattern, subarray, etc
+            Dictionary containing details on all exposures contained within
+            the template. These details include things like filter, pupil,
+            readout pattern, subarray, etc. Specifically for Grism Time Series,
+            there will be entries for the TA exposure and the Time Series
+            exposure.
         """
         # Dictionary that holds the content of this observation only
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
@@ -1203,75 +1207,75 @@ class ReadAPTXML():
         # Observation-wide info
         instrument = obs.find(self.apt + 'Instrument').text
 
+        # Get target name
+        try:
+            targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
+        except IndexError as e:
+            print("No target ID for observation: {}".format(obs))
+            targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
+
         # Mode specific info, including target acq
-        exposures_dictionary['AcqReadoutPattern'] = template.find(ns + 'AcqReadoutPattern').text
-        exposures_dictionary['AcqGroups'] = template.find(ns + 'AcqGroups').text
-        exposures_dictionary['AcqFilter'] = 'F335M'
-        exposures_dictionary['AcqSubarray'] = 'SUB32TATSGRISM'
-        exposures_dictionary['AcqIntegrations'] = 1
-        exposures_dictionary['Module'] = template.find(ns + 'Module').text
-        exposures_dictionary['Subarray'] = template.find(ns + 'Subarray').text
-        exposures_dictionary['ReadoutPattern'] = template.find(ns + 'ReadoutPattern').text
-        exposures_dictionary['Groups'] = template.find(ns + 'Groups').text
-        exposures_dictionary['Integrations'] = template.find(ns + 'Integrations').text
-        exposures_dictionary['NumExps'] = template.find(ns + 'NumExps').text
-        exposures_dictionary['NumOutputs'] = template.find(ns + 'NumOutputs').text
-        # number of dithers defaults to 1
+        acq_target = template.find(ns + 'AcqTargetID').text
+        if acq_target == 'Same Target as Observation':
+            acq_target = targ_name
+
+        acq_readout_pattern = template.find(ns + 'AcqReadoutPattern').text
+        acq_groups = template.find(ns + 'AcqGroups').text
+        acq_filter = 'F335M'
+        acq_subarray = 'SUB32TATSGRISM'
+        acq_integrations = '1'
+        module = template.find(ns + 'Module').text
+        subarray = template.find(ns + 'Subarray').text
+        readout_pattern = template.find(ns + 'ReadoutPattern').text
+        groups = template.find(ns + 'Groups').text
+        integrations = template.find(ns + 'Integrations').text
+        num_exps = template.find(ns + 'NumExps').text
+        num_outputs = template.find(ns + 'NumOutputs').text  # Number of amplifiers used
+
+        # Neither TA exposures nor Grism Time Series exposures allow dithering
         number_of_dithers = '1'
         number_of_subpixel_positions = '1'
-
         number_of_primary_dithers = '1'
         number_of_subpixel_dithers = '1'
 
         short_pupil_filter = template.find(ns + 'ShortPupilFilter').text
         long_pupil_filter = template.find(ns + 'LongPupilFilter').text
-        ShortPupil, ShortFilter = self.separate_pupil_and_filter(short_pupil_filter)
-        exposures_dictionary['ShortFilter'] = ShortFilter
-        exposures_dictionary['ShortPupil'] = ShortPupil
-        LongPupil, LongFilter = self.separate_pupil_and_filter(long_pupil_filter)
-        exposures_dictionary['LongFilter'] = LongFilter
-        exposures_dictionary['LongPupil'] = LongPupil
+        short_pupil, short_filter = self.separate_pupil_and_filter(short_pupil_filter)
+        long_pupil, long_filter = self.separate_pupil_and_filter(long_pupil_filter)
 
+        # Populate observation dictionary with TA and Time Series exposures
+        exposures_dictionary['Instrument'] = [instrument] * 2
+        exposures_dictionary['Module'] = [module] * 2
+        exposures_dictionary['TargetID'] = [acq_target, targ_name]
+        exposures_dictionary['APTTemplate'] = [template_name] * 2
+        exposures_dictionary['Mode'] = ['imaging', 'ts_grism']
+        exposures_dictionary['Subarray'] = [acq_subarray, subarray]
+        exposures_dictionary['ReadoutPattern'] = [acq_readout_pattern, readout_pattern]
+        exposures_dictionary['Groups'] = [acq_groups, groups]
+        exposures_dictionary['Integrations'] = [acq_integrations, integrations]
+        exposures_dictionary['Exposures'] = ['1', num_exps]
+        exposures_dictionary['NumOutputs'] = ['1', num_outputs]
+        exposures_dictionary['PrimaryDithers'] = [number_of_primary_dithers, number_of_primary_dithers]
+        exposures_dictionary['SubpixelPositions'] = [number_of_subpixel_dithers, number_of_subpixel_dithers]
+        exposures_dictionary['ImageDithers'] = [number_of_dithers, number_of_dithers]
+        exposures_dictionary['number_of_dithers'] = [number_of_dithers, number_of_dithers]
+        exposures_dictionary['ShortFilter'] = [str(None), short_filter]
+        exposures_dictionary['ShortPupil'] = [str(None), short_pupil]
+        exposures_dictionary['LongFilter'] = [acq_filter, long_filter]
+        exposures_dictionary['LongPupil'] = ['CLEAR', long_pupil]
+        exposures_dictionary['FiducialPointOverride'] = [str(False)] * 2
 
-
-        Need to populate the entries from the xml, and populate the rest with None
-        as done in read-generic...
-
+        # Populate other keywords with None
         for key in self.APTObservationParams_keys:
-                    if key in filter_config_dict.keys():
-                        value = filter_config_dict[key]
-                    elif key in observation_dict.keys():
-                        value = observation_dict[key]
-                    elif key in proposal_parameter_dictionary.keys():
-                        value = proposal_parameter_dictionary[key]
-                    elif key == 'Instrument':
-                        value = instrument
-                    elif key == 'ParallelInstrument':
-                        value = parallel_instrument
-                    elif key == 'number_of_dithers':
-                        value = str(number_of_dithers)
-                    elif key == 'FiducialPointOverride':
-                        value = str(FiducialPointOverride)
-                    elif key == 'APTTemplate':
-                        value = template_name
-                    else:
-                        value = str(None)
+            value = 'reset_value'
+            if key in proposal_parameter_dictionary.keys():
+                value = [proposal_parameter_dictionary[key]] * 2
+            elif exposures_dictionary[key] == []:
+                value = [str(None)] * 2
+            if value != 'reset_value':
+                exposures_dictionary[key].extend(value)
 
-                    if (key == 'Mode'):
-                        value = 'ts_grism'
-
-                    exposures_dictionary[key].append(value)
-
-
-        # Add exp_seq_dict to the exposures_dictionary
-        exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
-                                                                   exp_seq_dict,
-                                                                   proposal_param_dict)
-
-
-
-
-
+        return exposures_dictionary
 
     def read_nircam_wfss_template(self, template, template_name, obs, proposal_param_dict):
         """Parse a NIRCam WFSS observation template from an APT xml file. Produce an exposure dictionary
@@ -1865,8 +1869,10 @@ class ReadAPTXML():
         pupil_name : str
             Name of the filter in the pupil wheel
         """
-        if ' + ' in filter_string:
+        if '+' in filter_string:
             pupil_name, filter_name = filter_string.split('+')
+            pupil_name = pupil_name.strip()
+            filter_name = filter_name.strip()
         else:
             pupil_name = 'CLEAR'
             filter_name = filter_string

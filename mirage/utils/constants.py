@@ -49,6 +49,24 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'superbias': 'superbias',
                    'pixelflat': 'flat'}
 
+# Apertures that use fewer than all detectors in the module
+LIMITED_DETECTOR_APERTURES = {'SUBGRISM64': ['NRCA1', 'NRCA3', 'NRCA5', 'NRCB4', 'NRCB2', 'NRCB5'],
+                              'SUBGRISM128': ['NRCA1', 'NRCA3', 'NRCA5', 'NRCB4', 'NRCB2', 'NRCB5'],
+                              'SUBGRISM256': ['NRCA1', 'NRCA3', 'NRCA5', 'NRCB4', 'NRCB2', 'NRCB5'],
+                              'SUB32TATSGRISM': ['NRCA5', 'NRCB5'],
+                              'DHSPIL': ['NRCA3', 'NRCB4'],
+                              'DHSPIL_SUB96': ['NRCA3', 'NRCB4'],
+                              'DHSPIL_WEDGES': ['NRCA3', 'NRCB4'],
+                              'FP1': ['NRCA3', 'NRCB4'],
+                              'FP1_SUB8': ['NRCA3', 'NRCB4'],
+                              'FP1_SUB64': ['NRCA3', 'NRCB4'],
+                              'FP2MIMF': ['NRCA3', 'NRCB4'],
+                              'FP3MIMF': ['NRCA1', 'NRCB2'],
+                              'FP4MIMF': ['NRCA2', 'NRCB1'],
+                              'FP5MIMF': ['NRCA4', 'NRCB3'],
+                              }
+
+
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when
     creating grism simulations compared to direct image simulations
