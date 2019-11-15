@@ -66,7 +66,7 @@ from mirage.dark import dark_prep
 from mirage.ramp_generator import obs_generator
 from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES
-from mirage.utils.file_splitting import find_file_splits
+from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from mirage.utils import utils, file_io
 from mirage.yaml import yaml_update
 
@@ -275,7 +275,10 @@ class GrismTSO():
             print('Dispersed seed images (background sources and TSO source) saved to {}.'
                   .format(disp_filename))
 
-        no_transit_signal = grism_seed_object.final
+        # Crop dispersed seed images to correct final subarray size
+        #no_transit_signal = grism_seed_object.final
+        no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
+        background_dispersed.final = utils.crop_to_subarray(background_dispersed.final, tso_direct.subarray_bounds)
 
         # Calculate file splitting info
         self.file_splitting()
@@ -316,9 +319,41 @@ class GrismTSO():
         self.part_int_start_number = 0
         self.part_frame_start_number = 0
 
+
+
+
+
+
+
+        # Get split files' metadata
+        split_meta = SplitFileMetaData(self.int_segment_indexes, self.grp_segment_indexes,
+                                       self.file_segment_indexes, self.group_segment_indexes_g,
+                                       self.frames_per_int, self.frames_per_group, self.frametime)
+
+
+
+
+
+        print(ints_per_segment)
+        print(groups_per_segment)
+
+        print(self.int_segment_indexes)
+        print(self.grp_segment_indexes)
+        print(self.file_segment_indexes)
+        print(self.group_segment_indexes_g)
+        print(self.frames_per_int)
+        print(self.frames_per_group)
+        print(self.frametime)
+
+
+
+
+
+
         # List of all output seed files
         self.seed_files = []
 
+        counter = 0
         for i, int_dim in enumerate(ints_per_segment):
             int_start = self.int_segment_indexes[i]
             int_end = self.int_segment_indexes[i+1]
@@ -342,6 +377,8 @@ class GrismTSO():
 
 
                     previous_frame = np.zeros(self.seed_dimensions)
+                    #previous_frame = np.zeros_like(background_dispersed.final)
+                    #previous_frame = np.zeros_like(segment_seed[0, 0, :, :])
                     for frame in np.arange(grp_dim):
                         #print('TOTAL FRAME COUNTER: ', total_frame_counter)
                         #print('integ and frame: ', integ, frame)
@@ -362,7 +399,9 @@ class GrismTSO():
                             trans_interp = interp1d(transmission_spectrum['Wavelength'], frame_transmission)
                             for order in self.orders:
                                 grism_seed_object.this_one[order].disperse_all_from_cache(trans_interp)
-                            frame_only_signal = (background_dispersed.final + grism_seed_object.final) * self.frametime
+                            cropped_grism_seed_object = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
+                            #frame_only_signal = (background_dispersed.final + grism_seed_object.final) * self.frametime
+                            frame_only_signal = (background_dispersed.final + cropped_grism_seed_object) * self.frametime
 
                         # Now add the signal from this frame to that in the
                         # previous frame in order to arrive at the total
@@ -377,6 +416,10 @@ class GrismTSO():
                     total_frame_counter += self.numresets
                     #print('RESET FRAME! ', total_frame_counter)
 
+
+                """
+                #####################
+                # OLD CODE
                 # At the end of the segment/part, save the segment_seed
                 # to a fits file.
                 segment_number = np.where(int_end <= self.file_segment_indexes)[0][0]
@@ -397,6 +440,33 @@ class GrismTSO():
                     segment_starting_int_number = copy.deepcopy(int_start)
                     self.segment_ints = int_dim
                     self.segment_frames = grp_dim
+                # END OLD CODE
+                #######################
+                """
+
+
+
+
+
+                # Use the split files' metadata
+                self.segment_number = split_meta.segment_number[counter]
+                self.segment_ints = split_meta.segment_ints[counter]
+                self.segment_frames = split_meta.segment_frames[counter]
+                self.segment_part_number = split_meta.segment_part_number[counter]
+                self.segment_frame_start_number = split_meta.segment_frame_start_number[counter]
+                self.segment_int_start_number = split_meta.segment_int_start_number[counter]
+                self.part_int_start_number = split_meta.part_int_start_number[counter]
+                self.part_frame_start_number = split_meta.part_frame_start_number[counter]
+                counter += 1
+
+
+
+
+
+
+
+
+
 
 
 
@@ -406,11 +476,11 @@ class GrismTSO():
                 #self.part_int_start_number = overall_integration_number - self.segment_int_start_number  # THIS ISNT RIGHT YET- segment_starting_int_number
                 #self.part_frame_start_number = self.grp_segment_indexes[j]
 
-                print('Segment and part numbers: ', segment_number, segment_part_number)
+                #print('Segment and part numbers: ', segment_number, segment_part_number)
                 print('Overall integration number: ', overall_integration_number)
                 segment_file_name = '{}seg{}_part{}_seed_image.fits'.format(segment_file_base,
-                                                                            str(segment_number).zfill(3),
-                                                                            str(segment_part_number).zfill(3))
+                                                                            str(self.segment_number).zfill(3),
+                                                                            str(self.segment_part_number).zfill(3))
 
 
                 print('\n\nSegment int and frame start numbers: {} {}'.format(self.segment_int_start_number, self.segment_frame_start_number))
@@ -447,8 +517,8 @@ class GrismTSO():
                 # Save the seed image. Save in units of ADU/sec
                 print('Saving seed image')
                 tso_seed_header = fits.getheader(tso_direct.seed_file)
-                self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters,
-                               segment_number, segment_part_number)
+                self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters) #,
+                               #segment_number, segment_part_number)
 
         # Prepare dark current exposure if
         # needed.
@@ -489,13 +559,50 @@ class GrismTSO():
         # help align the split files between the seed image and the dark
         # object later (which is split by groups).
         if self.split_seed:
-            split_seed_g, group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.seed_dimensions[1],
+            split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.seed_dimensions[1],
                                                                                                 self.seed_dimensions[0],
                                                                                                 self.numgroups,
                                                                                                 self.numints)
+
+
+
+            # In order to avoid the case of having a single integration
+            # in the final file, which leads to rate rather than rateints
+            # files in the pipeline, check to be sure that the integration
+            # splitting indexes indicate the last split isn't a single
+            # integration
+            if len(self.file_segment_indexes) > 2:
+                delta_int = self.file_segment_indexes[1:] - self.file_segment_indexes[0: -1]
+                if delta_int[-1] == 1 and delta_int[0] != 1:
+                    self.file_segment_indexes[-2] -= 1
+                    print('Adjusted to avoid single integration: ', self.file_segment_indexes)
+
+            # More adjustments related to segment numbers. We need to compare
+            # the integration indexes for the seed images vs those for the final
+            # data and make sure that there are no segments in the final data that
+            # have no corresponding integrations from the seed images
+            # Example: integration_segment_indexes = [0, 7, 8], and
+            # self.file_segment_indexes = [0, 6, 8] - due to applying the adjustment
+            # above. In this case as you step through integration_segment_indexes,
+            # you see that (skipping 0), 7 and 8 both fall in the 6-8 bin in
+            # self.file_segment_indexes. Nothing falls into the 0-7 bin, which
+            # corresponds to segment 1. In this case, we need to adjust
+            # integration_segment_indexes to make sure that all segments have data
+            # associated with them.
+            segnum_check = []
+            for intnum in self.int_segment_indexes[1:]:
+                segnum_check.append(np.where(intnum <= self.file_segment_indexes)[0][0])
+            maxseg = max(segnum_check)
+            for i in range(1, maxseg + 1):
+                if i not in segnum_check:
+                    self.int_segment_indexes = copy.deepcopy(self.file_segment_indexes)
+
         else:
             self.file_segment_indexes = np.array([0, self.numints])
+            self.group_segment_indexes_g = np.array([0, self.numgroups]) # * (self.numframes + self.numskips)])
+
         self.total_seed_segments = len(self.file_segment_indexes) - 1
+        self.total_seed_segments_and_parts = (len(self.int_segment_indexes) - 1) * (len(self.grp_segment_indexes) - 1)
 
     @staticmethod
     def find_transit_frames(lightcurve_collection):
@@ -686,7 +793,7 @@ class GrismTSO():
             disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
 
-    def save_seed(self, seed, segmentation_map, seed_header, params, segment_num, part_num):
+    def save_seed(self, seed, segmentation_map, seed_header, params): #, segment_num, part_num):
         """
         """
         arrayshape = seed.shape
@@ -711,12 +818,12 @@ class GrismTSO():
         else:
             usefilt = 'filter'
 
-        if self.total_seed_segments == 1:
+        if self.total_seed_segments_and_parts == 1:
             self.seed_file = os.path.join(self.basename + '_' + params['Readout'][usefilt] +
                                           '_seed_image.fits')
         else:
-            seg_string = str(segment_num).zfill(3)
-            part_string = str(part_num).zfill(3)
+            seg_string = str(self.segment_number).zfill(3)
+            part_string = str(self.segment_part_number).zfill(3)
             self.seed_file = os.path.join(self.basename + '_' + params['Readout'][usefilt] +
                                           '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
 
@@ -731,12 +838,15 @@ class GrismTSO():
         seed_header['NOMYSTRT'] = 1
         seed_header['NOMYEND'] = seed.shape[0]
 
+
+
+
         # Observations with high data volumes (e.g. moving targets, TSO)
         # can be split into multiple "segments" in order to cap the
         # maximum file size
-        seed_header['EXSEGTOT'] = self.total_seed_segments
-        seed_header['EXSEGNUM'] = segment_num
-        seed_header['PART_NUM'] = part_num
+        seed_header['EXSEGTOT'] = self.total_seed_segments  # Total number of segments in exp
+        seed_header['EXSEGNUM'] = self.segment_number       # Segment number of this file
+        seed_header['PART_NUM'] = self.segment_part_number  # Segment part number of this file
 
         # Total number of integrations and groups in the current segment
         # (combining all parts of the segment)
@@ -748,12 +858,31 @@ class GrismTSO():
         seed_header['EXPGRP'] = params['Readout']['ngroup']
 
         # Indexes of the ints and groups where the data in this file go
+        # Frame and integration indexes of the segment within the exposure
         seed_header['SEGFRMST'] = self.segment_frame_start_number
         seed_header['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         seed_header['SEGINTST'] = self.segment_int_start_number
         seed_header['SEGINTED'] = self.segment_int_start_number + integ - 1
+
+        # Frame and integration indexes of the part within the segment
         seed_header['PTINTSRT'] = self.part_int_start_number
         seed_header['PTFRMSRT'] = self.part_frame_start_number
+
+
+
+
+
+
+
+
+
+
+        # Observations with high data volumes (e.g. moving targets, TSO)
+        # can be split into multiple "segments" in order to cap the
+        # maximum file size
+        #seed_header['EXSEGNUM'] = segment_num
+        #seed_header['PART_NUM'] = part_num
+
 
         # The 1b pipeline adds two header keywords to the data indicating the position
         # of the source on the detector. Currently the pipeline assumes that the

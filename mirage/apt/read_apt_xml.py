@@ -174,6 +174,7 @@ class ReadAPTXML():
             known_APT_templates = ['NircamImaging', 'NircamWfss', 'WfscCommissioning',
                                    'NircamEngineeringImaging', 'WfscGlobalAlignment',
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
+                                   'NircamGrismTimeSeries',
                                    'NirissExternalCalibration', 'NirissWfss', 'NirissAmi',  # NIRISS
                                    'NirspecImaging', 'NirspecInternalLamp',  # NIRSpec
                                    'MiriMRS',  # MIRI
@@ -283,6 +284,11 @@ class ReadAPTXML():
                 exposures_dictionary, n_tiles_phasing = self.read_finephasing_template(template,
                                                                                        template_name, obs,
                                                                                        prop_params)
+
+            # If template is NIRCam Grism Time Series
+            elif template_name == 'NircamGrismTimeSeries':
+                exposures_dictionary = self.read_nircam_grism_time_series(template, template_name, obs,
+                                                                          proposal_parameter_dictionary)
 
             # If template is WFSS
             elif template_name == 'NircamWfss':
@@ -1161,6 +1167,111 @@ class ReadAPTXML():
         n_tiles_phasing = sum(n_dithers) * n_repeats
 
         return exposures_dictionary, n_tiles_phasing
+
+    def read_nircam_grism_time_series(self, template, template_name, obs, proposal_param_dict):
+        """Parse a NIRCam Grism Time Series observation template from an APT xml file.
+        Produce an exposure dictionary that lists all exposures (excluding dithers)
+        from the template
+
+        Parameters
+        ----------
+        template : lxml.etree._Element
+            Template section from APT xml
+
+        template_name : str
+            The type of template (e.g. 'NirissWfss')
+
+        obs : lxml.etree._Element
+            Observation section from APT xml
+
+        proposal_param_dict : dict
+            Dictionary of proposal level information from the xml file
+            (e.g. PI, Science Category, etc)
+
+        Returns
+        -------
+        exposures_dictionary : dict
+            Dictionary containing details on all exposures contained within the template. These details
+            include things like filter, pupil, readout pattern, subarray, etc
+        """
+        # Dictionary that holds the content of this observation only
+        exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
+
+        # Set namespace
+        ns = "{http://www.stsci.edu/JWST/APT/Template/NircamGrismTimeSeries}"
+
+        # Observation-wide info
+        instrument = obs.find(self.apt + 'Instrument').text
+
+        # Mode specific info, including target acq
+        exposures_dictionary['AcqReadoutPattern'] = template.find(ns + 'AcqReadoutPattern').text
+        exposures_dictionary['AcqGroups'] = template.find(ns + 'AcqGroups').text
+        exposures_dictionary['AcqFilter'] = 'F335M'
+        exposures_dictionary['AcqSubarray'] = 'SUB32TATSGRISM'
+        exposures_dictionary['AcqIntegrations'] = 1
+        exposures_dictionary['Module'] = template.find(ns + 'Module').text
+        exposures_dictionary['Subarray'] = template.find(ns + 'Subarray').text
+        exposures_dictionary['ReadoutPattern'] = template.find(ns + 'ReadoutPattern').text
+        exposures_dictionary['Groups'] = template.find(ns + 'Groups').text
+        exposures_dictionary['Integrations'] = template.find(ns + 'Integrations').text
+        exposures_dictionary['NumExps'] = template.find(ns + 'NumExps').text
+        exposures_dictionary['NumOutputs'] = template.find(ns + 'NumOutputs').text
+        # number of dithers defaults to 1
+        number_of_dithers = '1'
+        number_of_subpixel_positions = '1'
+
+        number_of_primary_dithers = '1'
+        number_of_subpixel_dithers = '1'
+
+        short_pupil_filter = template.find(ns + 'ShortPupilFilter').text
+        long_pupil_filter = template.find(ns + 'LongPupilFilter').text
+        ShortPupil, ShortFilter = self.separate_pupil_and_filter(short_pupil_filter)
+        exposures_dictionary['ShortFilter'] = ShortFilter
+        exposures_dictionary['ShortPupil'] = ShortPupil
+        LongPupil, LongFilter = self.separate_pupil_and_filter(long_pupil_filter)
+        exposures_dictionary['LongFilter'] = LongFilter
+        exposures_dictionary['LongPupil'] = LongPupil
+
+
+
+        Need to populate the entries from the xml, and populate the rest with None
+        as done in read-generic...
+
+        for key in self.APTObservationParams_keys:
+                    if key in filter_config_dict.keys():
+                        value = filter_config_dict[key]
+                    elif key in observation_dict.keys():
+                        value = observation_dict[key]
+                    elif key in proposal_parameter_dictionary.keys():
+                        value = proposal_parameter_dictionary[key]
+                    elif key == 'Instrument':
+                        value = instrument
+                    elif key == 'ParallelInstrument':
+                        value = parallel_instrument
+                    elif key == 'number_of_dithers':
+                        value = str(number_of_dithers)
+                    elif key == 'FiducialPointOverride':
+                        value = str(FiducialPointOverride)
+                    elif key == 'APTTemplate':
+                        value = template_name
+                    else:
+                        value = str(None)
+
+                    if (key == 'Mode'):
+                        value = 'ts_grism'
+
+                    exposures_dictionary[key].append(value)
+
+
+        # Add exp_seq_dict to the exposures_dictionary
+        exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
+                                                                   exp_seq_dict,
+                                                                   proposal_param_dict)
+
+
+
+
+
 
     def read_nircam_wfss_template(self, template, template_name, obs, proposal_param_dict):
         """Parse a NIRCam WFSS observation template from an APT xml file. Produce an exposure dictionary

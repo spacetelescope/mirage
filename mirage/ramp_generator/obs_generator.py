@@ -168,7 +168,7 @@ class Observation():
             ngroups = self.params['Readout']['ngroup']
         elif seeddim == 4:
             nint = seed.shape[0]
-            ngroups = seed.shape[1]
+            ngroups = int(seed.shape[1] / (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
 
         sim_exposure = np.zeros((nint, ngroups, yd, xd))
         sim_zero = np.zeros((nint, yd, xd))
@@ -183,6 +183,8 @@ class Observation():
                 ramp, rampzero = self.frame_to_ramp(inseed)
             else:
                 ramp, rampzero = self.frame_to_ramp_no_cr(inseed)
+            print('frame_to_ramp output shape: ', ramp.shape)
+            print('sim_exposure shape: ', sim_exposure.shape)
             sim_exposure[integ, :, :, :] = ramp
             sim_zero[integ, :, :] = rampzero
         return sim_exposure, sim_zero
@@ -922,8 +924,8 @@ class Observation():
 
         header : dict
         """
-        int_counter = 0
-        group_counter = 0
+        #int_counter = 0
+        #group_counter = 0
 
         print("Reconstructing seed image")
 
@@ -941,31 +943,34 @@ class Observation():
             if i == 0:
                 nints = header_data['SEGINT']
                 ngroups = header_data['SEGGROUP']
+
                 print('Final seed image shape: ', nints, ngroups, ydim, xdim)
                 seed = np.zeros((nints, ngroups, ydim, xdim))
                 segmap = seg_data
 
             # Place the data in the reconstructed seed image array based
             # on the integration and group counters
+            int_start = header_data['PTINTSRT']
+            grp_start = header_data['PTFRMSRT']
+            seed[int_start: int_start+ints, grp_start: grp_start+groups, :, :] = seed_data
 
-            print('data placed into integration: ', int_counter, int_counter+ints)
-            print('                  groups: ', group_counter, group_counter+groups)
+
+            print('data placed into integration: ', int_start, int_start+ints)
+            print('                  groups: ', grp_start, grp_start+groups)
             print(seed_data.shape)
             print(seed.shape)
-            print(seed[int_counter: int_counter+ints, group_counter: group_counter+groups, :, :].shape)
 
-
-            seed[int_counter: int_counter+ints, group_counter: group_counter+groups, :, :] = seed_data
-            group_counter += groups
+            #seed[int_counter: int_counter+ints, group_counter: group_counter+groups, :, :] = seed_data
+            #group_counter += groups
 
             # If the group counter reaches the number of groups expected
             # in the seed image, then increment the integration counter
             # and reset the group counter to zero so that the data from
             # the next file will be placed at the beginning of the next
             # integration
-            if group_counter == ngroups:
-                int_counter += 1
-                group_counter = 0
+            #if group_counter == ngroups:
+            #    int_counter += 1
+            #    group_counter = 0
 
         return seed, segmap, header_data
 
@@ -1093,10 +1098,6 @@ class Observation():
             seed_dict = {self.linDark[0]: self.seed}
 
 
-        try:
-            print('seed_dict:', seed_dict)
-        except:
-            pass
         print('self.linear_dark sbAndRefpix shape: ', self.linear_dark.sbAndRefpix.shape)
 
 

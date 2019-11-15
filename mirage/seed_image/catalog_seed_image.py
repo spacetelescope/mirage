@@ -43,7 +43,7 @@ from ..utils import siaf_interface
 from ..utils.constants import CRDS_FILE_TYPES
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
-from mirage.utils.file_splitting import find_file_splits
+from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
 from mirage import version
@@ -186,7 +186,7 @@ class Catalog_seed():
             # help align the split files between the seed image and the dark
             # object later (which is split by groups).
             if split_seed:
-                split_seed_g, group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.output_dims[1],
+                split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.output_dims[1],
                                                                                                     self.output_dims[0],
                                                                                                     self.params['Readout']['ngroup'],
                                                                                                     self.params['Readout']['nint'])
@@ -195,8 +195,48 @@ class Catalog_seed():
                 print('\nOutputs:')
                 print(split_seed, group_segment_indexes, integration_segment_indexes)
                 #print(self.total_seed_segments)
-                print(split_seed_g, group_segment_indexes_g, self.file_segment_indexes)
+                print(split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes)
+                print(self.file_segment_indexes)
                 print('')
+
+                # In order to avoid the case of having a single integration
+                # in the final file, which leads to rate rather than rateints
+                # files in the pipeline, check to be sure that the integration
+                # splitting indexes indicate the last split isn't a single
+                # integration
+                if len(self.file_segment_indexes) > 2:
+                    delta_int = self.file_segment_indexes[1:] - self.file_segment_indexes[0: -1]
+                    if delta_int[-1] == 1 and delta_int[0] != 1:
+                        self.file_segment_indexes[-2] -= 1
+                        print('Adjusted to avoid single integration: ', self.file_segment_indexes)
+
+
+                # More adjustments related to segment numbers. We need to compare
+                # the integration indexes for the seed images vs those for the final
+                # data and make sure that there are no segments in the final data that
+                # have no corresponding integrations from the seed images
+                # Example: integration_segment_indexes = [0, 7, 8], and
+                # self.file_segment_indexes = [0, 6, 8] - due to applying the adjustment
+                # above. In this case as you step through integration_segment_indexes,
+                # you see that (skipping 0), 7 and 8 both fall in the 6-8 bin in
+                # self.file_segment_indexes. Nothing falls into the 0-7 bin, which
+                # corresponds to segment 1. In this case, we need to adjust
+                # integration_segment_indexes to make sure that all segments have data
+                # associated with them.
+                segnum_check = []
+                for intnum in integration_segment_indexes[1:]:
+                    segnum_check.append(np.where(intnum <= self.file_segment_indexes)[0][0])
+                maxseg = max(segnum_check)
+                for i in range(1, maxseg + 1):
+                    if i not in segnum_check:
+                        integration_segment_indexes = copy.deepcopy(self.file_segment_indexes)
+
+
+
+                print(group_segment_indexes, integration_segment_indexes)
+                print(self.group_segment_indexes_g, self.file_segment_indexes)
+
+
             else:
                 self.file_segment_indexes = integration_segment_indexes
 
@@ -211,6 +251,7 @@ class Catalog_seed():
             #integration_segment_indexes_g = [0, 7, 14, 21, 28, 30]
             #use these values to determine the segment number to use in the output filename!!!
         self.total_seed_segments = len(self.file_segment_indexes) - 1
+        self.total_seed_segments_and_parts = (len(integration_segment_indexes) - 1) * (len(group_segment_indexes) - 1)
 
 
         # Read in the pixel area map, which will be needed for certain
@@ -434,9 +475,6 @@ class Catalog_seed():
                 self.part_int_start_number = 0
                 self.part_frame_start_number = 0
 
-
-                #print(']\nSeed shape: ', seed.shape)
-
                 # Zero out the reference pixels
                 seed *= self.maskimage
                 segmap *= self.maskimage
@@ -445,10 +483,68 @@ class Catalog_seed():
                 self.saveSeedImage(seed_img=seed, seed_seg=segmap)
                 print('XXXXXXX Calling saveSeedImage   XXXXXXXX')
             else:
-                #print('integration_splits', integration_splits)
-                #print('frame_splits', frame_splits)
+
+
+                ###############################################
+                # Try using frame splitting metadata class
+                split_meta = SplitFileMetaData(integration_splits, frame_splits,
+                                              self.file_segment_indexes, self.group_segment_indexes_g,
+                                              self.frames_per_integration, self.frames_per_group, self.frametime)
+
+                counter = 0
                 i = 1
-                previous_segment = 1
+                for int_start in integration_splits[:-1]:
+                    int_end = integration_splits[i]
+
+                    j = 1
+                    previous_frame = np.zeros(self.seedimage.shape)
+                    for initial_frame in frame_splits[:-1]:
+                        total_frames = split_meta.total_frames[counter]
+                        total_ints = split_meta.total_ints[counter]
+                        time_start = split_meta.time_start[counter]
+                        frame_start = split_meta.frame_start[counter]
+                        seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap,
+                                                                           tso_seeds, tso_segs,
+                                                                           tso_lightcurves, self.frametime,
+                                                                           total_frames, self.total_frames,
+                                                                           self.frames_per_integration,
+                                                                           total_ints,
+                                                                           self.params['Readout']['resets_bet_ints'],
+                                                                           starting_time=time_start,
+                                                                           starting_frame=frame_start,
+                                                                           samples_per_frametime=5)
+                        seed += previous_frame
+                        previous_frame = seed[-1, -1, :, :]
+
+                        # Zero out the reference pixels
+                        seed *= self.maskimage
+                        segmap *= self.maskimage
+
+                        # Get metadata values to save in seed image header
+                        self.segment_number = split_meta.segment_number[counter]
+                        self.segment_ints = split_meta.segment_ints[counter]
+                        self.segment_frames = split_meta.segment_frames[counter]
+                        self.segment_part_number = split_meta.segment_part_number[counter]
+                        self.segment_frame_start_number = split_meta.segment_frame_start_number[counter]
+                        self.segment_int_start_number = split_meta.segment_int_start_number[counter]
+                        self.part_int_start_number = split_meta.part_int_start_number[counter]
+                        self.part_frame_start_number = split_meta.part_frame_start_number[counter]
+                        counter += 1
+
+                        # Save the seed image segment to a file
+
+                        print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
+                        self.saveSeedImage(seed_img=seed, seed_seg=segmap)
+                        j += 1
+
+                    i += 1
+
+                """
+                ################################################
+                # Original code (which works)
+
+                i = 1
+                previous_segment = 0
                 self.segment_part_number = 0
                 self.segment_ints = 0
                 self.segment_frames = 0
@@ -473,16 +569,6 @@ class Catalog_seed():
                         total_frames = (frame_end - frame_start) * total_ints
                         if total_ints > 1:
                             total_frames += total_ints - 1
-
-
-                        #print('$$$$$')
-                        #print(frame_splits)
-                        #print(int_start, self.frames_per_integration, initial_frame)
-                        #print(total_frames, frame_end, frame_start)
-
-
-                        #print('Int/frame information:')
-                        #print(i, j, int_start, int_end, frame_start, frame_end, time_start, time_end, total_frames, total_ints)
 
                         print('xxxxxxxxxxxxxxxxxxxxxxxxx')
                         print('TSO SEEDS')
@@ -520,73 +606,28 @@ class Catalog_seed():
                         for iii in range(seed.shape[0]):
                             print(seed[iii, :, 1021, 1026])
 
-
-
-
-
-
-
-
-
-                        '''    int-splits only below here
-
-                        This works in the case of splitting between integrations only
-
-                        frame_start = int_start * (self.frames_per_integration + 1)
-                        time_start = frame_start * self.frametime
-                        frame_end = int_end * (self.frames_per_integration + 1) - 2
-                        time_end = frame_end * self.frametime
-                        total_frames = frame_end - frame_start + 1
-                        total_ints = int_end - int_start
-
-
-
-                        print('Int information:')
-                        print(i, int_start, int_end, frame_start, frame_end, time_start, time_end, total_frames, total_ints)
-
-
-                        seed, segmap = tso.add_tso_sources(self.seedimage, self.seed_segmap,
-                                                                           tso_seeds, tso_segs,
-                                                                           tso_lightcurves, self.frametime,
-                                                                           total_frames, self.total_frames,
-                                                                           self.frames_per_integration,
-                                                                           total_ints,
-                                                                           self.params['Readout']['resets_bet_ints'],
-                                                                           starting_time=time_start,
-                                                                           starting_frame=frame_start,
-                                                                           samples_per_frametime=5)
-
-                        '''
-
-
-
-                        # For seed images to be dispersed in WFSS mode,
-                        # embed the seed image in a full frame array. The disperser
-                        # tool does not work on subarrays
-                        # THIS SHOULD NOT BE NEEDED HERE SINCE THIS SECTION ONLY
-                        # WORKS ON TSO IMAGING
-                        #aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-                        #if aperture_suffix not in ['FULL', 'CEN']:
-                        #    seed, segmap = self.pad_wfss_subarray(seed, segmap)
-
-                        #[0, 3, 6, 9, 12, 15, ...]
-                        #int_start, int_end
-
-                        #[0, 7, 14, 21, 28, 30]
-                        #self.file_segment_indexes
-
-                        #print('\n')
-                        #print("Integration splits: ", integration_splits)
-                        #print("Integration start and end: ", int_start, int_end)
-                        #print("segment dividers:", self.file_segment_indexes)
-
-
                         self.segment_number = np.where(int_end <= self.file_segment_indexes)[0][0]
+                        self.segment_ints = self.file_segment_indexes[self.segment_number] - self.file_segment_indexes[self.segment_number - 1]
+                        self.segment_frames = (self.group_segment_indexes_g[1] - self.group_segment_indexes_g[0]) * \
+                                              (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
+
+
+
+                        print('\n\n\nAAAAAAAHHHHHH!!!!!')
+                        print(int_end)
+                        print(self.file_segment_indexes)
+                        print(self.segment_number)
+                        print(self.segment_ints)
+                        print('\n\n')
+
+
+
+
                         if self.segment_number == previous_segment:
                             #self.segment_part_number = copy.deepcopy(previous_part_number) + 1
                             self.segment_part_number += 1
-                            self.segment_ints += seed.shape[0]
-                            self.segment_frames += seed.shape[1]
+                            #self.segment_ints += seed.shape[0]
+                            #self.segment_frames += seed.shape[1]
                             #self.segment_frame_start_number =  # should not need to be changed
                             #self.segment_int_start_number =   # should not need to be changed
                             self.part_int_start_number = int_start - segment_starting_int_number
@@ -598,8 +639,8 @@ class Catalog_seed():
                             print("New Segment!")
                             self.segment_part_number = 1
                             previous_segment = copy.deepcopy(self.segment_number)
-                            self.segment_ints = copy.deepcopy(seed.shape[0])
-                            self.segment_frames = copy.deepcopy(seed.shape[1])
+                            #self.segment_ints = copy.deepcopy(seed.shape[0])
+                            #self.segment_frames = copy.deepcopy(seed.shape[1])
                             self.segment_frame_start_number = initial_frame
                             self.segment_int_start_number = int_start
                             self.part_int_start_number = 0
@@ -637,6 +678,12 @@ class Catalog_seed():
                         segmap *= self.maskimage
 
                         # Save the seed image segment to a file
+
+                        print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
+
+
+
+
                         self.saveSeedImage(seed_img=seed, seed_seg=segmap)
                         j += 1
 
@@ -648,7 +695,8 @@ class Catalog_seed():
                     #hlist.writeto(seed_segment_file, overwrite=True)
 
                     i += 1
-
+                    # end original code
+                """
             print("Set these as the outputs of the call to add_tso_sources once testing is complete")
             self.seedimage = seed
             self.seed_segmap = segmap
@@ -895,7 +943,7 @@ class Catalog_seed():
         else:
             usefilt = 'filter'
 
-        if self.total_seed_segments == 1:
+        if self.total_seed_segments_and_parts == 1:
             self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][usefilt] +
                                           '_seed_image.fits')
         else:
@@ -947,9 +995,9 @@ class Catalog_seed():
         # Observations with high data volumes (e.g. moving targets, TSO)
         # can be split into multiple "segments" in order to cap the
         # maximum file size
-        kw['EXSEGTOT'] = self.total_seed_segments
-        kw['EXSEGNUM'] = self.segment_number
-        kw['PART_NUM'] = self.segment_part_number
+        kw['EXSEGTOT'] = self.total_seed_segments  # Total number of segments in exp
+        kw['EXSEGNUM'] = self.segment_number       # Segment number of this file
+        kw['PART_NUM'] = self.segment_part_number  # Segment part number of this file
 
         # Total number of integrations and groups in the current segment
         # (combining all parts of the segment)
@@ -961,10 +1009,13 @@ class Catalog_seed():
         kw['EXPGRP'] = self.params['Readout']['ngroup']
 
         # Indexes of the ints and groups where the data in this file go
+        # Frame and integration indexes of the segment within the exposure
         kw['SEGFRMST'] = self.segment_frame_start_number
         kw['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         kw['SEGINTST'] = self.segment_int_start_number
         kw['SEGINTED'] = self.segment_int_start_number + integ - 1
+
+        # Frame and integration indexes of the part within the segment
         kw['PTINTSRT'] = self.part_int_start_number
         kw['PTFRMSRT'] = self.part_frame_start_number
 
@@ -977,6 +1028,15 @@ class Catalog_seed():
             kw['NOMXEND'] = kw['NOMXSTRT'] + self.ffsize - 1
             kw['NOMYSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
             kw['NOMYEND'] = kw['NOMYSTRT'] + self.ffsize - 1
+
+        # TSO-specific header keywords
+        if self.params['Inst']['mode'] in ['ts_imaging', 'ts_grism']:
+            kw['TSOVISIT'] = True
+        else:
+            kw['TSOVISIT'] = False
+
+        kw['XREF_SCI'] = self.siaf.XSciRef
+        kw['YREF_SCI'] = self.siaf.YSciRef
 
         kw['GRISMPAD'] = self.grism_direct_factor
         self.seedinfo = kw

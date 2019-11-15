@@ -211,6 +211,12 @@ class DarkPrep():
         yd = modshape[-2]
         xd = modshape[-1]
 
+
+        print('\nDARK mod.shape: ', modshape)
+        print(model.sbAndRefpix.shape)
+        print(self.subarray_bounds)
+        print('')
+
         if ((self.subarray_bounds[0] != 0) or (self.subarray_bounds[2] != (xd - 1))
            or (self.subarray_bounds[1] != 0) or (self.subarray_bounds[3] != (yd - 1))):
 
@@ -722,6 +728,17 @@ class DarkPrep():
         print(split_seed)
         print(group_segment_indexes)
         print(integration_segment_indexes)
+        # In order to avoid the case of having a single integration
+        # in the final file, which leads to rate rather than rateints
+        # files in the pipeline, check to be sure that the integration
+        # splitting indexes indicate the last split isn't a single
+        # integration
+        if len(integration_segment_indexes) > 2:
+            delta_int = integration_segment_indexes[1:] - integration_segment_indexes[0: -1]
+            if delta_int[-1] == 1 and delta_int[0] != 1:
+                integration_segment_indexes[-2] -= 1
+                print('Adjusted to avoid single integration: ', integration_segment_indexes)
+
 
 
         #if 1>0:
@@ -916,7 +933,7 @@ class DarkPrep():
                     final_zero_sbandrefpix = np.zeros((number_of_ints, ydim, xdim))
 
                 if not use_all_files:
-                    print('Setting integration {} to use file {}'.format(file_index, os.path.split(filename)[1]))
+                    print('Setting integration {} to use file {}\n'.format(file_index, os.path.split(filename)[1]))
                     final_dark[file_index, :, :, :] = self.linDark.data
                     final_sbandrefpix[file_index, :, :, :] = self.linDark.sbAndRefpix
                     final_zerodata[file_index, :, :] = self.zeroModel.data
@@ -1104,10 +1121,12 @@ class DarkPrep():
         dark_nskip = self.readpatterns['nskip'].data[mtch][0]
 
         nint, ngroup, yd, xd = dark.data.shape
-        outdark = np.zeros((self.params['Readout']['nint'], self.params['Readout']['ngroup'], yd, xd))
+        #outdark = np.zeros((self.params['Readout']['nint'], self.params['Readout']['ngroup'], yd, xd))
+        outdark = np.zeros((1, self.params['Readout']['ngroup'], yd, xd))
 
         if dark.sbAndRefpix is not None:
-            outsb = np.zeros((self.params['Readout']['nint'], self.params['Readout']['ngroup'], yd, xd))
+            #outsb = np.zeros((self.params['Readout']['nint'], self.params['Readout']['ngroup'], yd, xd))
+            outsb = np.zeros((1, self.params['Readout']['ngroup'], yd, xd))
 
         # We can only keep a zero frame around if the input dark
         # is RAPID, NISRAPID, or FGSRAPID. Otherwise that information is lost.
@@ -1117,12 +1136,34 @@ class DarkPrep():
         if ((darkpatt in rapids) & (dark.zeroframe is None)):
             dark.zeroframe = dark.data[:, 0, :, :]
             print("Saving 0th frame from data to the zeroframe extension")
+
+
+
+            print("RAPID dark.")
+            print(dark.data.shape)
+            print(dark.zeroframe.shape)
+            print(dark.sbAndRefpix.shape)
+
+
+
+
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
         elif ((darkpatt not in rapids) & (dark.zeroframe is None)):
             print("Unable to save the zeroth frame because the input dark current ramp is not RAPID.")
             sbzero = None
         elif ((darkpatt in rapids) & (dark.zeroframe is not None)):
+
+
+
+            print("RAPID dark. Zeroframe already exists.")
+            print(dark.data.shape)
+            print(dark.zeroframe.shape)
+            print(dark.sbAndRefpix.shape)
+
+
+
+
             # In this case we already have the zeroframe
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
@@ -1145,8 +1186,8 @@ class DarkPrep():
                 zeroaccumimage = np.zeros_like(outdark[0, 0, :, :], dtype=np.float)
 
             # Loop over integrations
-            for integ in range(self.params['Readout']['nint']):
-            #for integ in range(dark.data.shape[0]):
+            #for integ in range(self.params['Readout']['nint']):
+            for integ in range(dark.data.shape[0]):
                 frames = np.arange(0, self.params['Readout']['nframe'])
 
                 # Loop over groups
@@ -1202,6 +1243,10 @@ class DarkPrep():
         dark.header['NSKIP'] = self.params['Readout']['nskip']
         dark.header['NGROUPS'] = self.params['Readout']['ngroup']
         dark.header['NINTS'] = self.params['Readout']['nint']
+
+
+        print('\n\n\nMMMMMMMMMMMMMMMMM\noutdark shape: {}\n\n\n'.format(outdark.shape))
+
 
         return dark, sbzero
 
