@@ -397,14 +397,9 @@ class AptInput:
 
                 # Determine module and subarray of the observation
                 sub = input_dictionary['Subarray'][index]
-                module = input_dictionary['Module'][index]
 
-                # Check to see if the subarray is one where not all detectors
-                # are used
-                special_case = any([True if s in sub else False for s in LIMITED_DETECTOR_APERTURES])
-
-                #if 'DHSPIL' not in sub and 'FP1' not in sub:
-                if not special_case:
+                if 'DHSPIL' not in sub and 'FP1' not in sub:
+                    module = input_dictionary['Module'][index]
                     if module == 'ALL':
                         detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
                     elif module == 'A':
@@ -416,9 +411,7 @@ class AptInput:
                 else:
                     # Wait to handle cases where there are subarrays, and so things should not be
                     # expanded for all detectors.
-                    #detectors = ['placeholder']
-                    possible_detectors = LIMITED_DETECTOR_APERTURES[sub]
-                    detectors = [det for det in possible_detectors if module in det]
+                    detectors = ['placeholder']
 
             elif instrument == 'niriss':
                 detectors = ['NIS']
@@ -438,7 +431,6 @@ class AptInput:
                 observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
             observation_dictionary['detector'].extend(detectors)
 
-        """
         # Correct NIRCam aperture names for commissioning subarrays
         for index, instrument in enumerate(observation_dictionary['Instrument']):
             instrument = instrument.lower()
@@ -462,7 +454,6 @@ class AptInput:
 
                 observation_dictionary['aperture'][index] = aperture_name
                 observation_dictionary['detector'][index] = detector
-        """
 
         return observation_dictionary
 
