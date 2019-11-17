@@ -43,6 +43,7 @@ import copy
 import os
 import re
 import argparse
+import pkg_resources
 
 from astropy.table import Table, vstack
 from astropy.io import ascii
@@ -51,7 +52,7 @@ from pysiaf import rotations
 import yaml
 
 from . import read_apt_xml
-from ..utils import siaf_interface, constants
+from ..utils import siaf_interface, constants, utils
 
 
 class AptInput:
@@ -73,6 +74,10 @@ class AptInput:
         self.output_dir = output_dir
         self.output_csv = output_csv
         self.observation_list_file = observation_list_file
+
+        # Locate the module files, so that we know where to look
+        # for config subdirectory
+        self.config_path = os.path.join(pkg_resources.resource_filename('mirage', ''), 'config')
 
     def add_epochs(self, intab):
         """NOT CURRENTLY USED"""
@@ -389,6 +394,10 @@ class AptInput:
             observation_dictionary[key] = []
         observation_dictionary['detector'] = []
 
+        # Read in tables of aperture information
+        nircam_subarray_file = os.path.join(self.config_path, 'NIRCam_subarray_definitions.list')
+        nircam_apertures = utils.read_subarray_definition_file(nircam_subarray_file)
+
         for index, instrument in enumerate(input_dictionary['Instrument']):
             instrument = instrument.lower()
             if instrument == 'nircam':
@@ -397,39 +406,135 @@ class AptInput:
 
                 # Determine module and subarray of the observation
                 sub = input_dictionary['Subarray'][index]
-                if 'DHSPIL' not in sub and 'FP1' not in sub:
-                    module = input_dictionary['Module'][index]
-                    if module == 'ALL':
-                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-                    elif module == 'A':
-                        detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
-                    elif module == 'B':
-                        detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
-                    else:
-                        raise ValueError('Unknown module {}'.format(module))
+                module = input_dictionary['Module'][index]
+                if module == 'ALL':
+                    module = ['A', 'B']
                 else:
-                    # Wait to handle cases where there are subarrays, and so things should not be
-                    # expanded for all detectors.
-                    detectors = ['placeholder']
+                    module = list(module)
 
-            elif instrument == 'niriss':
-                detectors = ['NIS']
+                # Match up `sub` with aperture names in the aperture table
+                # FULL matches up with the standard full frame imaging
+                # apertures as well as full frame Grism apertures
+                matches = np.where(nircam_apertures['Name'] == sub)[0]
 
-            elif instrument == 'nirspec':
-                detectors = ['NRS']
+                if len(matches) == 0:
+                    raise ValueError("ERROR: aperture {} in not present in the subarray definition file {}"
+                                     .format(sub, nircam_subarray_file))
 
-            elif instrument == 'fgs':
-                guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
-                detectors = ['G{}'.format(guider_number)]
+                # Keep only apertures in the correct module
+                matched_allmod_apertures = nircam_apertures['AperName'][matches].data
+                matched_apertures = []
+                for mod in module:
+                    good = [ap for ap in matched_apertures if 'NRC{}'.format(mod) in ap]
+                    matched_apertures.extend(good)
 
-            elif instrument == 'miri':
-                detectors = ['MIR']
+                if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
+                    print('FULL')
+                    mode = input_dictionary['Mode'][index]
+                    if ((sub == 'FULL') and (mode in ['wfss', 'ts_grism'])):
+                        print('GRISM MODE')
+                        matched_apertures = np.array([ap for ap in matched_apertures if 'GRISM' in ap])
+                        long_filter = input_dictionary['LongFilter'][index]
+                        filter_dependent_apertures = [ap for ap in matched_apertures if len(ap.split('_')) == 3]
+                        filtered_aperture = self.extract_grism_aperture(filter_dependent_apertures, long_filter)
 
-            n_detectors = len(detectors)
-            for key in input_dictionary:
-                observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
-            observation_dictionary['detector'].extend(detectors)
+                        filtered_splits = filtered_aperture[0].split('_')
+                        filtered_ap_no_det = '{}_{}'.format(filtered_splits[1], filtered_splits[2])
+                        detectors = [filtered_splits[0][3:5]]
 
+                        # SW apertures
+                        apertures_to_add = []
+                        for ap in matched_apertures:
+                            splits = ap.split('_')
+                            if '5' not in splits[0]:
+                                apertures_to_add.append(splits[1])
+                                detectors.append(splits[0][3:5])
+
+                        matched_apertures = [filtered_ap_no_det].extend(apertures_to_add)
+
+                    else:
+                        print('IMAGING MODE')
+                        matched_apertures = [ap for ap in matched_apertures if sub in ap]
+                        detectors = [ap.split('_')[0][3:5] for ap in matched_apertures]
+                        matched_apertures = [sub] * len(detectors)
+                elif 'SUBGRISM' in sub:
+                    print('SUBGRISM')
+                    long_filter = input_dictionary['LongFilter'][index]
+                    filter_dependent_apertures = [ap for ap in matched_apertures if len(ap.split('_')) == 3]
+                    filtered_aperture = self.extract_grism_aperture(filter_dependent_apertures, long_filter)
+
+                    filtered_splits = filtered_aperture[0].split('_')
+                    filtered_ap_no_det = '{}_{}'.format(filtered_splits[1], filtered_splits[2])
+                    detectors = [filtered_splits[0][3:5]]
+
+                    # SW apertures
+                    apertures_to_add = []
+                    for ap in matched_apertures:
+                        splits = ap.split('_')
+                        if '5' not in splits[0]:
+                            apertures_to_add.append(splits[1])
+                            detectors.append(splits[0][3:5])
+
+                    matched_apertures = [filtered_ap_no_det].extend(apertures_to_add)
+
+                # Add entries to observation dictionary
+                num_entries = len(detectors)
+                observation_dictionary['Subarray'].extend(matched_apertures) extend? or replace?
+                for key in input_dictionary:
+                    if key not in ['Subarray']:
+                        observation_dictionary[key].extend(([input_dictionary[key][index]] * num_entries))
+                observation_dictionary['detector'].extend(detectors)
+
+                #possible_detectors = [ap.split('_')[0][3:5] for ap in matched_apertures]
+                #detectors = []
+                #for mod in module:
+                #    detectors.extend([det for det in possible_detectors if mod in det])
+
+                print('XXXXXXXXXXXXXXXXX')
+                print(sub, module, matched_apertures, detectors)
+                print('XXXXXXXXXXXXXXXXX')
+
+
+                # Check to see if the subarray is one where not all detectors
+                # are used
+                #special_case = any([True if s in sub else False for s in LIMITED_DETECTOR_APERTURES])
+
+                #if 'DHSPIL' not in sub and 'FP1' not in sub:
+                #if not special_case:
+                #    if module == 'ALL':
+                #        detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+                #    elif module == 'A':
+                #        detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
+                #    elif module == 'B':
+                #        detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
+                #    else:
+                #        raise ValueError('Unknown module {}'.format(module))
+                #else:
+                #    # Wait to handle cases where there are subarrays, and so things should not be
+                #    # expanded for all detectors.
+                #    #detectors = ['placeholder']
+                #    possible_detectors = LIMITED_DETECTOR_APERTURES[sub]
+                #    detectors = [det for det in possible_detectors if module in det]
+            else:
+                if instrument == 'niriss':
+                    detectors = ['NIS']
+
+                elif instrument == 'nirspec':
+                    detectors = ['NRS']
+
+                elif instrument == 'fgs':
+                    guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                    detectors = ['G{}'.format(guider_number)]
+
+                elif instrument == 'miri':
+                    detectors = ['MIR']
+
+                n_detectors = len(detectors)
+                for key in input_dictionary:
+                    observation_dictionary[key].extend(([input_dictionary[key][index]] * n_detectors))
+                observation_dictionary['detector'].extend(detectors)
+
+        """
         # Correct NIRCam aperture names for commissioning subarrays
         for index, instrument in enumerate(observation_dictionary['Instrument']):
             instrument = instrument.lower()
@@ -453,8 +558,40 @@ class AptInput:
 
                 observation_dictionary['aperture'][index] = aperture_name
                 observation_dictionary['detector'][index] = detector
+        """
 
         return observation_dictionary
+
+    def extract_grism_aperture(self, apertures, filter_name):
+        """In the case of a Grism observation (WFSS or GRISM TSO), where a
+        given crossing filter is used, find the appropriate aperture to
+        use.
+
+        Paramters
+        ---------
+        apertures : list
+            List of possible grism apertures
+
+        filter_name : str
+            Name of crossing filter
+
+        Returns
+        -------
+        apertures : list
+            Modified list containig the correct aperture
+        """
+        filter_match = [True if filter_name in mtch else False for mtch in apertures]
+        if any(filter_match):
+            print('EXACT FILTER MATCH')
+            apertures = list(apertures[filter_match])
+        else:
+            print('NO EXACT FILTER MATCH')
+            filter_int = int(filter_name[1:4])
+            aperture_int = np.array([int(ap.split('_')[-1][1:4]) for ap in apertures])
+            wave_diffs = np.abs(aperture_int - filter_int)
+            min_diff_index = np.where(wave_diffs == np.min(wave_diffs))[0]
+            apertures = list(apertures[min_diff_index])
+        return apertures
 
     def extract_value(self, line):
         """Extract text from xml line
