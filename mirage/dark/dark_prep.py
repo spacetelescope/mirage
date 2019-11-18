@@ -719,8 +719,8 @@ class DarkPrep():
         #if memory > self.params['Output']['max_memory'] * 2048 * 2048:
 
         #split_seed, integration_segment_indexes = self.file_splits()
-        xdim = self.subarray_bounds[2] - self.subarray_bounds[0]
-        ydim = self.subarray_bounds[3] - self.subarray_bounds[1]
+        xdim = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
+        ydim = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
         split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
                                                                                           self.params['Readout']['ngroup'],
                                                                                           self.params['Readout']['nint'])

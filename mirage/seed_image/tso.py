@@ -149,16 +149,15 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
             print(frame_number, frame_index, min_index, indexes)
             print(relative_signal)
             tmpy, tmpx = psf.shape
-            print(psf[tmpy // 2 - 5, tmpx // 2])
-            print(ft_psf[tmpy // 2 - 5, tmpx // 2])
-            print(frame_psf[tmpy // 2 - 5, tmpx // 2])
-            print(frame_seed[frame_index, tmpy // 2 - 5, tmpx // 2])
+            print(psf[tmpy // 2, tmpx // 2], np.max(psf), psf.shape, tmpy // 2, tmpx // 2)
+            print(ft_psf[tmpy // 2, tmpx // 2], np.max(ft_psf))
+            print(frame_psf[tmpy // 2, tmpx // 2], np.max(frame_psf))
+            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed))
 
             frame_seed[frame_index, :, :] += frame_psf
 
 
-            print(frame_seed[frame_index, tmpy // 2 - 5, tmpx // 2])
-
+            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed))
 
 
         # Add the TSO target to the segmentation map
@@ -186,12 +185,12 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         #print('frame, rel_frame, and int_number:', frame, rel_frame, int_number)
 
         if frame in integration_starts:
-            print('first frame in integration, frame_seed and seed_image:', frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
+            #print('first frame in integration, frame_seed and seed_image:', frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
             final_seed[int_number, 0, :, :] = copy.deepcopy(frame_seed[frame-starting_frame, :, :]) + seed_image_per_frame
             #print('final_seed[{}, 0, :, :] = frame_seed[{}, :, :]'.format(int_number, frame-starting_frame))
         elif frame not in reset_frames:
             #print('int: {}, rel_frame {}, frame-starting frame {}'.format(int_number, rel_frame, frame-starting_frame))
-            print('intermediate frame in integration, frame_seed and seed_image:', final_seed[int_number, rel_frame-1, 1021, 1026], frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
+            #print('intermediate frame in integration, frame_seed and seed_image:', final_seed[int_number, rel_frame-1, 1021, 1026], frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
             final_seed[int_number, rel_frame, :, :] = final_seed[int_number, rel_frame-1, :, :] + \
                 frame_seed[frame-starting_frame, :, :] + seed_image_per_frame
 
