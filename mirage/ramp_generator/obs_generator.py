@@ -870,7 +870,7 @@ class Observation():
                 f_match = self.params['Readout']['filter'] == fw_positions['Name']
                 p_match = self.params['Readout']['pupil'] == fw_positions['Name']
             elif self.instrument.upper() == 'NIRCAM':
-                if self.detector[-1] == '5':
+                if '5' in self.detector or 'LONG' in self.detector:
                     channel = 'LW'
                 else:
                     channel = 'SW'
