@@ -152,7 +152,7 @@ class Catalog_seed():
         # calculate the exposure time of a single frame, based on the size of the subarray
         self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'],
                                                self.params['Readout']['array_name'],
-                                               self.nominal_dims[0], self.nominal_dims[1],
+                                               self.nominal_dims[1], self.nominal_dims[0],
                                                self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
 
