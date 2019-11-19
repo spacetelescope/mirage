@@ -141,19 +141,23 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     elif instrument == 'fgs':
         xs = ydim
         ys = xdim
-        colpad = 6
-        if 'acq1' in aperture.lower():
-            colpad = 12
-        rowpad = 1
-        if amps == 4:
+        colpad = 12
+
+        if namps == 4:
+            rowpad = 1
             fullpad = 1
         else:
+            rowpad = 2
             fullpad = 0
+
+        if ((xdim <= 32) & (ydim <= 32)):
+            colpad = 6
+            rowpad = 1
 
     return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter(oldfilter,oldpupil):
+def check_niriss_filter(oldfilter, oldpupil):
     """
     This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
     that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
@@ -204,6 +208,7 @@ def check_niriss_filter(oldfilter,oldpupil):
         newfilter = oldfilter
         newpupil = oldpupil
     return newfilter, newpupil
+
 
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
