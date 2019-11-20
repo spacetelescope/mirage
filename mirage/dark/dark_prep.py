@@ -1006,7 +1006,7 @@ class DarkPrep():
         self.prepDark = read_fits.Read_fits()
         self.prepDark.data = final_dark
         self.prepDark.zeroframe = final_zerodata
-        self.prepDark.sbAndRefpix = final_zero_sbandrefpix
+        self.prepDark.sbAndRefpix = final_sbandrefpix
         self.prepDark.zero_sbAndRefpix = final_zero_sbandrefpix
         self.prepDark.header = self.linDark.header
 
