@@ -21,16 +21,16 @@ def test_fgs_cal_frametime():
     TRK, and FG are not yet supported
     """
     fgs_full = calc_frame_time('fgs', 'FGS_', 2048, 2048, 4)
-    assert np.isclose(fgs_full, 10.61382, rtol=0., atol=1e-5)
+    assert np.isclose(fgs_full, 10.73676, rtol=0., atol=1e-5), print(fgs_full)
 
     fgs_128 = calc_frame_time('fgs', 'FGS_', 128, 128, 1)
-    assert np.isclose(fgs_128, 0.1806, rtol=0., atol=1e-5)
+    assert np.isclose(fgs_128, 0.1806, rtol=0., atol=1e-5), print(fgs_128)
 
     fgs_32 = calc_frame_time('fgs', 'FGS_', 32, 32, 1)
-    assert np.isclose(fgs_32, 0.01254, rtol=0., atol=1e-5)
+    assert np.isclose(fgs_32, 0.01254, rtol=0., atol=1e-5), print(fgs_32)
 
     fgs_8 = calc_frame_time('fgs', 'FGS_', 8, 8, 1)
-    assert np.isclose(fgs_8, 0.00126, rtol=0., atol=1e-5)
+    assert np.isclose(fgs_8, 0.00126, rtol=0., atol=1e-5), print(fgs_8)
 
 
 def test_nircam_frametime():
@@ -87,3 +87,15 @@ def test_niriss_frametime():
 
     nis_64 = calc_frame_time('niriss', 'NIS_SUBTAAMI', 64, 64, 1)
     assert np.isclose(nis_64, 0.05016, rtol=0., atol=1e-5)
+
+    nis_wfss64r = calc_frame_time('niriss', 'NIS_WFSS64R', 64, 2048, 4)
+    assert np.isclose(nis_wfss64r, 0.34061, rtol=0., atol=1e-5)
+
+    nis_wfss64c = calc_frame_time('niriss', 'NIS_WFSS64C', 2048, 64, 1)
+    assert np.isclose(nis_wfss64c, 1.55800, rtol=0., atol=1e-5)
+
+    nis_wfss128r = calc_frame_time('niriss', 'NIS_WFSS128R', 128, 2048, 4)
+    assert np.isclose(nis_wfss128r, 0.67597, rtol=0., atol=1e-5)
+
+    nis_wfss128c = calc_frame_time('niriss', 'NIS_WFSS128C', 2048, 128, 1)
+    assert np.isclose(nis_wfss128c, 2.87000, rtol=0., atol=1e-5)

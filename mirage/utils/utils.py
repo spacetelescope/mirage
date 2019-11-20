@@ -125,6 +125,12 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
                 rowpad = 3
 
     elif instrument == "niriss":
+        # Reverse x and y since NIRISS's fast readout direction is
+        # opposite of NIRCam's
+        tmpx = copy.deepcopy(xdim)
+        xdim = copy.deepcopy(ydim)
+        ydim = tmpx
+
         colpad = 12
 
         # Fullframe
@@ -136,13 +142,15 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             fullpad = 0
 
     elif instrument == 'fgs':
+        # Reverse x and y since FGS's fast readout direction is
+        # opposite of NIRCam's
+        tmpx = copy.deepcopy(xdim)
+        xdim = copy.deepcopy(ydim)
+        ydim = tmpx
+
         rowpad = 1
         fullpad = 0
-
-        if ((xdim == 2048) & (ydim == 2048)):
-            colpad = 6
-        else:
-            colpad = 12
+        colpad = 12
 
         if ((xdim <= 32) & (ydim <= 32)):
             colpad = 6
