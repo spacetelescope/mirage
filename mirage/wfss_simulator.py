@@ -151,11 +151,14 @@ class WFSSSim():
 
         # Create hdf5 file with spectra of all sources if requested.
         if self.create_continuum_seds:
+            det_name = cat.params['Readout']['array_name'].split('_')[0]
             self.SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files, input_spectra=self.SED_dict,
                                                                   input_spectra_file=self.SED_file,
                                                                   extrapolate_SED=self.extrapolate_SED,
                                                                   output_filename=self.final_SED_file,
-                                                                  normalizing_mag_column=self.SED_normalizing_catalog_column)
+                                                                  normalizing_mag_column=self.SED_normalizing_catalog_column,
+                                                                  instrument=self.instrument, filter_name=self.crossing_filter,
+                                                                  module=self.module, detector=det_name)
 
         # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,

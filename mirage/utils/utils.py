@@ -21,6 +21,7 @@ Dependencies
 import copy
 import json
 import os
+import pkg_resources
 import re
 
 from astropy.io import ascii as asc
@@ -422,6 +423,49 @@ def get_aperture_definition(aperture_name, instrument):
     aperture_definition = [aperture_name, detector, filt, xstart, ystart, xend,
                            yend, refpix_x, refpix_y, refpix_v2, refpix_v3]
     return aperture_definition
+
+
+def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_detector=None):
+    """Locate the filter throughput file in the config directory that
+    corresponds to the given instrument/module/filter
+
+    Parameters
+    ----------
+    instrument : str
+        Name of JWST instrument.
+
+    filter_name : str
+        Name of the filter. Ignored in the case of FGS.
+
+    nircam_module : str
+        Name of module. Ignored except in the case of NIRCam
+
+    fgs_detector : str
+        Name of FGS detector (e.g. 'GUIDER1'). Ignored in the case of other
+        instruments
+
+    Returns
+    -------
+    throughput_file : str
+        Name of ascii file containing the filter throughput curve
+    """
+    modpath = pkg_resources.resource_filename('mirage', '')
+    config_path = os.path.join(modpath, 'config')
+
+    instrument = instrument.lower()
+    if instrument == 'nircam':
+        tp_file = '{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
+                                                                          nircam_module.lower())
+    elif instrument == 'niriss':
+        tp_file = '{}_niriss_throughput1.txt'.format(filter_name.lower())
+    elif instrument == 'fgs':
+        det_number = fgs_detector[-1]
+        tp_file = 'guider{}_throughput_py.txt'.format(det_number)
+    else:
+        raise ValueError('ERROR: invalid instrument: {}'.format(instrument))
+
+    throughput_file = os.path.join(config_path, tp_file)
+    return throughput_file
 
 
 def get_subarray_info(params, subarray_table):

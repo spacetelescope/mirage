@@ -30,10 +30,13 @@ from astropy.io import ascii
 import astropy.units as u
 import numpy as np
 from scipy.interpolate import interp1d
+from synphot import Observation, SourceSpectrum, units
+from synphot.spectrum import SpectralElement
+from synphot.models import Empirical1D
 
 from . import hdf5_catalog
 from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS
-from mirage.utils.utils import magnitude_to_countrate
+from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file
 
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
 CONFIG_PATH = os.path.join(MODULE_PATH, 'config')
@@ -307,7 +310,8 @@ def get_filter_info(column_names, magsys):
 
 
 def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
-                     extrapolate_SED=True, output_filename=None, normalizing_mag_column=None):
+                     extrapolate_SED=True, output_filename=None, normalizing_mag_column=None,
+                     instrument=None, filter_name=None, module=None, detector=None):
     """Overall wrapper function
 
     Parameters
@@ -325,7 +329,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         attached. If no units are supplied, Mirage assumes wavelengths
         in microns and flux densities in Flambda units.
 
-    input_specctra_file : str
+    input_spectra_file : str
         Name of an hdf5 file containing spectra for some/all targets
 
     extrapolate_SED : bool
@@ -338,9 +342,21 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
 
     normalizing_mag_column : str
         If some/all of the input spectra (from input_spectra or
-        input_spectra_file) are normalized (to a median of 1.0), they will
+        input_spectra_file) are to be renormalized, they will
         be scaled based on the magnitude values given in this specified
         column from the input catalog_file.
+
+    instrument : str
+        Name of instrument (e.g. 'nircam')
+
+    filter_name : str
+        Name of filter (e.g. 'F200W')
+
+    module : str
+        Name of module (e.g. 'A')
+
+    detector : str
+        Name of detector (e.g. 'NRCA1', 'GUIDER1')
 
     Returns
     -------
@@ -389,8 +405,13 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
             rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
             rescaling_parameters = filter_info[normalizing_mag_column]
+
+            # Note that nircam_module is ignored for non-NIRCam requests.
+            # fgs_detector is ignored for non-FGS requests
+            filter_thru_file = get_filter_throughput_file(instrument=instrument, filter_name=filter_name,
+                                                          nircam_module=module, fgs_detector=detector)
             all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
-                                                           rescaling_parameters, mag_sys)
+                                                           rescaling_parameters, mag_sys, filter_thru_file)
 
         # For sources in catalog_file but not in all_input_spectra, use the
         # magnitudes in the catalog_file, interpolate/extrapolate as necessary
@@ -453,7 +474,7 @@ def read_catalog(filename):
     return catalog, mag_sys
 
 
-def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_system):
+def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_system, bandpass_file):
     """Rescale any input spectra that are normalized
 
     Parameters
@@ -480,6 +501,10 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
     magnitude_system : str
         Magnitude system corresponding to the input magnitudes (e.g. 'abmag')
 
+    bandpass_file : str
+        Name of ascii file containing filter throughput curve. (Generally
+        retrieved from config directory)
+
     Returns
     -------
     spec : OrderedDict
@@ -500,8 +525,44 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
             if not any(match):
                 raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
                                   'number {}. Unable to rescale.').format(dataset))
-            magnitude = catalog_info[mag_colname][match]
-            mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
-            flux *= mag_in_flam
-            spec[dataset]['fluxes'] = flux * FLAMBDA_CGS_UNITS
+            magnitude = catalog_info[mag_colname].data[match][0]
+
+            # Create a synphot source spectrum
+            fake_flux_units = units.FLAM
+            source_spectrum = SourceSpectrum(Empirical1D, points=waves, lookup_table=flux.value * fake_flux_units, keep_neg=True)
+
+            # Create a synphot SpectralElement containing the filter bandpass
+            filter_tp = ascii.read(bandpass_file)
+            bp_waves = filter_tp['Wavelength_microns'].data * u.micron
+            bp_waves = bp_waves.to(u.Angstrom)
+            thru = filter_tp['Throughput'].data
+
+            bandpass = SpectralElement(Empirical1D, points=bp_waves.value, lookup_table=thru, keep_neg=True)
+
+            # Renormalize
+            magnitude_system = magnitude_system.lower()
+            if magnitude_system == 'vegamag':
+                magunits = units.VEGAMAG
+                vega_spec = SourceSpectrum.from_vega()
+            elif magnitude_system == 'abmag':
+                magunits = u.ABmag
+                vega_spec = None
+            elif magnitude_system == 'stmag':
+                magunits = u.STmag
+                vega_spec = None
+            elif magnitude_system == 'counts':
+                raise ValueError('ERROR: normalization to a given countrate not yet supported.')
+            renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
+
+            spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
+
+            # old code
+
+            #mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
+            #flux *= mag_in_flam
+            #spec[dataset]['fluxes'] = flux * FLAMBDA_CGS_UNITS
     return spec
+
+
+
+
