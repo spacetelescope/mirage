@@ -148,12 +148,18 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
         xdim = copy.deepcopy(ydim)
         ydim = tmpx
 
-        rowpad = 1
-        fullpad = 0
         colpad = 12
+        fullpad = 0
+
+        if ((xdim == 2048) & (ydim == 2048)):
+            rowpad = 1
+            fullpad = 1
+        else:
+            rowpad = 2
 
         if ((xdim <= 32) & (ydim <= 32)):
             colpad = 6
+            rowpad = 1
 
     return ((1.0 * xdim / amps + colpad) * (ydim + rowpad) + fullpad) * 1.e-5
 

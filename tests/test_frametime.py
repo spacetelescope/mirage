@@ -21,16 +21,16 @@ def test_fgs_cal_frametime():
     TRK, and FG are not yet supported
     """
     fgs_full = calc_frame_time('fgs', 'FGS_', 2048, 2048, 4)
-    assert np.isclose(fgs_full, 10.73676, rtol=0., atol=1e-5), print(fgs_full)
+    assert np.isclose(fgs_full, 10.73677, rtol=0., atol=1e-5)
 
     fgs_128 = calc_frame_time('fgs', 'FGS_', 128, 128, 1)
-    assert np.isclose(fgs_128, 0.1806, rtol=0., atol=1e-5), print(fgs_128)
+    assert np.isclose(fgs_128, 0.1820, rtol=0., atol=1e-5)
 
     fgs_32 = calc_frame_time('fgs', 'FGS_', 32, 32, 1)
-    assert np.isclose(fgs_32, 0.01254, rtol=0., atol=1e-5), print(fgs_32)
+    assert np.isclose(fgs_32, 0.01254, rtol=0., atol=1e-5)
 
     fgs_8 = calc_frame_time('fgs', 'FGS_', 8, 8, 1)
-    assert np.isclose(fgs_8, 0.00126, rtol=0., atol=1e-5), print(fgs_8)
+    assert np.isclose(fgs_8, 0.00126, rtol=0., atol=1e-5)
 
 
 def test_nircam_frametime():
