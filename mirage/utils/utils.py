@@ -109,8 +109,6 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     """
     instrument = instrument.lower()
     if instrument == "nircam":
-        xs = xdim
-        ys = ydim
         colpad = 12
 
         # Fullframe
@@ -121,13 +119,12 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             # All subarrays
             rowpad = 2
             fullpad = 0
+
             if ((xdim <= 8) & (ydim <= 8)):
                 # The smallest subarray
                 rowpad = 3
 
     elif instrument == "niriss":
-        xs = ydim
-        ys = xdim
         colpad = 12
 
         # Fullframe
@@ -139,22 +136,18 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             fullpad = 0
 
     elif instrument == 'fgs':
-        xs = ydim
-        ys = xdim
-        colpad = 12
+        rowpad = 1
+        fullpad = 0
 
-        if namps == 4:
-            rowpad = 1
-            fullpad = 1
+        if ((xdim == 2048) & (ydim == 2048)):
+            colpad = 6
         else:
-            rowpad = 2
-            fullpad = 0
+            colpad = 12
 
         if ((xdim <= 32) & (ydim <= 32)):
             colpad = 6
-            rowpad = 1
 
-    return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
+    return ((1.0 * xdim / amps + colpad) * (ydim + rowpad) + fullpad) * 1.e-5
 
 
 def check_niriss_filter(oldfilter, oldpupil):
