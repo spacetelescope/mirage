@@ -276,24 +276,14 @@ def niriss_background_scaling(param_dict, detector, module):
     low, medium, high = find_low_med_high(bkgd_at_pivot)
 
     # Find the value based on the level in the yaml file
-    if isinstance(param_dict['simSignals']['bkgdrate'], str):
-        background_level = param_dict['simSignals']['bkgdrate'].lower()
-        if background_level == "low":
-            level_value = low
-        elif background_level == "medium":
-            level_value = medium
-        elif background_level == "high":
-            level_value = high
-        else:
-            raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
-                              .format(params_dict['simSignals']['bkgdrate'])))
-    elif isinstance(param_dict['simSignals']['bkgdrate'], float) or isinstance(param_dict['simSignals']['bkgdrate'], int):
-        level_value = param_dict['simSignals']['bkgdrate']
+    background_level = param_dict['simSignals']['bkgdrate'].lower()
+    if background_level == "low":
+        level_value = low
+    elif background_level == "medium":
+        level_value = medium
+    elif background_level == "high":
+        level_value = high
     else:
-        raise ValueError("ERROR: Unrecognized background value type: {}".format(param_dict['simSignals']['bkgdrate']))
-
-    # The pre-computed background images for NIRISS were created using the
-    # "medium" setting. So the scaling factor is the ratio of the requested
-    # level to medium
-    ratio = level_value / medium
-    return ratio
+        raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, medium, or high"
+                          .format(params_dict['simSignals']['bkgdrate'])))
+    return level_value

@@ -45,6 +45,7 @@ import yaml
 import numpy as np
 from astropy.io import fits
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+from scipy.stats import sigmaclip
 
 from .catalogs import spectra_from_catalog
 from .seed_image import catalog_seed_image
@@ -191,8 +192,13 @@ class WFSSSim():
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
                                                                     dmode.lower())
 
-            # The niriss_background_scaling function can handle a bkgdrate of low/medium/high or a number
-            scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+            if isinstance(self.params['simSignals']['bkgdrate'], str):
+                if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
+                    scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+                else:
+                    raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
+            elif isinstance(self.params['simSignals']['bkgdrate'], float) or isinstance(self.params['simSignals']['bkgdrate'], int):
+                scaling_factor = self.params['simSignals']['bkgdrate']
 
         # Default to extracting all orders
         orders = None
@@ -223,7 +229,17 @@ class WFSSSim():
                         # value in the image to "low" or "high", rather than the median
                         full_background_file = os.path.join(loc, background_file)
                         background_image = fits.getdata(full_background_file)
-                        background_image *= scaling_factor
+
+                        # Before scaling the background image by the scaling_factor
+                        # we need to normalize by the sigma-clipped mean value. This is
+                        # because the background files were produced and scaled to the
+                        # ETC "medium" level at some arbirtrary pointing, but the
+                        # "medium" level is pointing-dependent. Current background files
+                        # are scaled such that the "medium" value from the ETC is the
+                        # sigma-clipped mean value.
+                        clip, lo, hi = sigmaclip(background_image, low=3, high=3)
+                        background_mean = np.mean(clip)
+                        background_image = background_image / background_mean * scaling_factor
                         dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
 
                     background_done = True
