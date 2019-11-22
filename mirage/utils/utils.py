@@ -109,8 +109,6 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     """
     instrument = instrument.lower()
     if instrument == "nircam":
-        xs = xdim
-        ys = ydim
         colpad = 12
 
         # Fullframe
@@ -121,13 +119,18 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             # All subarrays
             rowpad = 2
             fullpad = 0
+
             if ((xdim <= 8) & (ydim <= 8)):
                 # The smallest subarray
                 rowpad = 3
 
     elif instrument == "niriss":
-        xs = ydim
-        ys = xdim
+        # Reverse x and y since NIRISS's fast readout direction is
+        # opposite of NIRCam's
+        tmpx = copy.deepcopy(xdim)
+        xdim = copy.deepcopy(ydim)
+        ydim = tmpx
+
         colpad = 12
 
         # Fullframe
@@ -139,21 +142,29 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             fullpad = 0
 
     elif instrument == 'fgs':
-        xs = ydim
-        ys = xdim
-        colpad = 6
-        if 'acq1' in aperture.lower():
-            colpad = 12
-        rowpad = 1
-        if amps == 4:
+        # Reverse x and y since FGS's fast readout direction is
+        # opposite of NIRCam's
+        tmpx = copy.deepcopy(xdim)
+        xdim = copy.deepcopy(ydim)
+        ydim = tmpx
+
+        colpad = 12
+        fullpad = 0
+
+        if ((xdim == 2048) & (ydim == 2048)):
+            rowpad = 1
             fullpad = 1
         else:
-            fullpad = 0
+            rowpad = 2
 
-    return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
+        if ((xdim <= 32) & (ydim <= 32)):
+            colpad = 6
+            rowpad = 1
+
+    return ((1.0 * xdim / amps + colpad) * (ydim + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter(oldfilter,oldpupil):
+def check_niriss_filter(oldfilter, oldpupil):
     """
     This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
     that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
@@ -204,6 +215,7 @@ def check_niriss_filter(oldfilter,oldpupil):
         newfilter = oldfilter
         newpupil = oldpupil
     return newfilter, newpupil
+
 
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
