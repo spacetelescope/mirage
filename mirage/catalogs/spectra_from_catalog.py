@@ -35,7 +35,7 @@ from synphot.spectrum import SpectralElement
 from synphot.models import Empirical1D
 
 from . import hdf5_catalog
-from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES
 from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file
 
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
@@ -311,7 +311,8 @@ def get_filter_info(column_names, magsys):
 
 def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                      extrapolate_SED=True, output_filename=None, normalizing_mag_column=None,
-                     instrument=None, filter_name=None, module=None, detector=None):
+                     instrument=None, filter_name=None, module=None, detector=None,
+                     gain_file=None):
     """Overall wrapper function
 
     Parameters
@@ -358,6 +359,9 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     detector : str
         Name of detector (e.g. 'NRCA1', 'GUIDER1')
 
+    gain_file : str
+        Name of fits file containing the gain map for the detector
+
     Returns
     -------
     output_filename : str
@@ -367,7 +371,34 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     if output_filename is None:
         output_filename = create_output_sed_filename(catalog_files[0], input_spectra_file)
 
+    # Read in the gain file and calculate the sigma-clipped mean value
+    #with fits.open(gain_file) as hdulist:
+    #    gain_array = hdulist[1].data
+    #gain = utils.sigma_clipped_mean_value_of_image(gain_array, 3)
+    if instrument == 'nircam':
+        filter_val = int(filter_name[1:4])
+        if filter_val > 230.:
+            channel = 'lw'
+        else:
+            channel = 'sw'
+        selector = '{}{}'.format(channel, module.lower())
+        gain = MEAN_GAIN_VALUES['nircam'][selector]
+    elif instrument == 'niriss':
+        gain = MEAN_GAIN_VALUES['niriss']
+    elif instrument == 'fgs':
+        gain = MEAN_GAIN_VALUES['fgs'][detector.lower()]
+
+
+
+
+
+
+
+
+
+    # Dictionary to contain all input spectra
     all_input_spectra = {}
+
     # Read in input spectra from file, add to all_input_spectra dictionary
     if input_spectra_file is not None:
         spectra_from_file = hdf5_catalog.open(input_spectra_file)
@@ -411,7 +442,8 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
             filter_thru_file = get_filter_throughput_file(instrument=instrument, filter_name=filter_name,
                                                           nircam_module=module, fgs_detector=detector)
             all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
-                                                           rescaling_parameters, mag_sys, filter_thru_file)
+                                                           rescaling_parameters, mag_sys, filter_thru_file,
+                                                           gain)
 
         # For sources in catalog_file but not in all_input_spectra, use the
         # magnitudes in the catalog_file, interpolate/extrapolate as necessary
@@ -474,7 +506,8 @@ def read_catalog(filename):
     return catalog, mag_sys
 
 
-def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_system, bandpass_file):
+def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_file,
+                               gain_value):
     """Rescale any input spectra that are normalized
 
     Parameters
@@ -505,15 +538,22 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
         Name of ascii file containing filter throughput curve. (Generally
         retrieved from config directory)
 
+    gain_value : float
+        Gain value (e-/ADU) to use to adjust any rescaled spectra to produce
+        given countrates in ADU/sec rather than e-/sec. This is needed
+        because the flux calibration info (e.g. photflam, photfnu) were
+        created such that they translate from magnitudes to ADU/sec rather
+        than to e-/sec
+
     Returns
     -------
     spec : OrderedDict
-        Input dictionary, with flux values rescaled for sources that are
-        normalized
+        Input dictionary, with flux values rescaled (in FLAM units) to the
+        requested magnitude, only for spectra where the flux units are
+        astropy.units.pct
     """
-    photflam, photfnu, zp, pivot = filter_parameters
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
-    print('Normalizing magnitude column name is {}'.format(mag_colname))
+    instrument = mag_colname.split('_')[0]
 
     for dataset in spec:
         waves = spec[dataset]['wavelengths']
@@ -522,6 +562,7 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
         if (flux_units == u.pct):
             # print('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
+
             if not any(match):
                 raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
                                   'number {}. Unable to rescale.').format(dataset))
@@ -554,7 +595,7 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
                 raise ValueError('ERROR: normalization to a given countrate not yet supported.')
             renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
 
-            spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
+            spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam') / gain_value
 
             # old code
 

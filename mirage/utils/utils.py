@@ -25,6 +25,8 @@ import pkg_resources
 import re
 
 from astropy.io import ascii as asc
+import numpy as np
+from scipy.stats import sigmaclip
 
 from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS
 
@@ -572,6 +574,29 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
         except:
             raise ValueError(("ST mag to countrate conversion failed."
                               "magnitude = {}, photflam = {}".format(mag, photflam)))
+
+
+def sigma_clipped_mean_value_of_image(array, sigma_value):
+    """Return the sigma-clipped mean value of a 2D array
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        array of values
+
+    sigma_value : int
+        Number of sigma to use as clipping threshold. Clipping will be
+        symmetric above and below the mean
+
+    Returns
+    -------
+    meanval : float
+        3-sigma iteratively sigma-clipped mean value of ``array``
+    """
+    good = np.isfinite(array)
+    clipped, lo, hi = sigmaclip(array[good], low=sigma_value, high=sigma_value)
+    meanval = clipped.mean()
+    return meanval
 
 
 def parse_RA_Dec(ra_string, dec_string):

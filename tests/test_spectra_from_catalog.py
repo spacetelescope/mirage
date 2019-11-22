@@ -13,11 +13,18 @@ Use
 import os
 import numpy as np
 
+from astropy.io import ascii
+from astropy.table import Table
 import astropy.units as u
+from synphot import SourceSpectrum, Observation, units
+from synphot.spectrum import SpectralElement
+from synphot.models import Empirical1D
+from synphot.models import BlackBodyNorm1D
 
 from mirage.catalogs import spectra_from_catalog as spec
 from mirage.catalogs import hdf5_catalog as hdf5
-from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES
+from mirage.utils.utils import get_filter_throughput_file, magnitude_to_countrate
 
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/hdf5_catalogs')
@@ -195,3 +202,93 @@ def test_multiple_ascii_catalogs():
         flambda_output_catalog = os.path.join(TEST_DATA_DIR, outbase)
         os.remove(flambda_output_catalog)
     os.remove(sed_catalog)
+
+
+def test_spectra_rescaling():
+    """Test the functionality for rescaling input spectra to a given
+    magnitude in a given filter
+    """
+    # JWST primary mirror area in cm^2. Needed for countrate check
+    # at the end
+    primary_area = 25.326 * 10000.
+
+    # Create spectrum: one source to be normalized
+    # and the other should not be
+    waves = np.arange(0.4, 5.6, 0.01)
+    flux = np.repeat(1e-16, len(waves))
+    flux2 = np.repeat(2.905820300378683e-19, len(waves))
+    spectra = {1: {"wavelengths": waves * u.micron,
+                   "fluxes": flux * u.pct},
+               2: {"wavelengths": waves * u.micron,
+                   "fluxes": flux2 * units.FLAM}}
+
+    # Create source catalog containing scaling info
+    catalog = Table()
+    catalog['index'] = [1, 2]
+    catalog['nircam_f322w2_magnitude'] = [18., 18.]
+    catalog['niriss_f444w_magnitude'] = [18., 18.]
+
+    # Instrument info
+    instrument = ['nircam', 'niriss', 'fgs']
+    filter_name = ['F322W2', 'F444W', None]
+    module = ['B', 'N', 'F']
+    detector = ['NRCA1', 'NIS', 'GUIDER1']
+
+    # Magnitude systems of renormalization magnitudes
+    mag_sys = ['vegamag', 'abmag', 'stmag']
+
+    # Loop over options and test each
+    for inst, filt, mod, det in zip(instrument, filter_name, module, detector):
+        # Filter throughput files
+        filter_thru_file = get_filter_throughput_file(instrument=inst, filter_name=filt,
+                                                      nircam_module=mod, fgs_detector=det)
+
+        # Create filter bandpass object, to be used in the final
+        # comparison
+        filter_tp = ascii.read(filter_thru_file)
+        bp_waves = filter_tp['Wavelength_microns'].data * u.micron
+        bp_waves = bp_waves.to(u.Angstrom)
+        thru = filter_tp['Throughput'].data
+        bandpass = SpectralElement(Empirical1D, points=bp_waves.value, lookup_table=thru, keep_neg=True)
+
+        # Retrieve the correct gain value that goes with the fluxcal info
+        if inst == 'nircam':
+            gain = MEAN_GAIN_VALUES['nircam']['lwb']
+        elif inst == 'niriss':
+            gain = MEAN_GAIN_VALUES['niriss']
+        elif inst == 'fgs':
+            gain = MEAN_GAIN_VALUES['fgs'][det]
+
+        # Check the renormalization in all photometric systems
+        for magsys in mag_sys:
+            rescaled_spectra = spec.rescale_normalized_spectra(spectra, catalog, magsys, filter_thru_file, gain)
+
+            # Calculate the countrate associated with the renormalized
+            # spectrum through the requested filter
+            for dataset in rescaled_spectra:
+                rescaled_spectrum = SourceSpectrum(Empirical1D, points=rescaled_spectra[dataset]['wavelengths'],
+                                                   lookup_table=rescaled_spectra[dataset]['fluxes'], keep_neg=True)
+                obs = Observation(rescaled_spectrum, bandpass)
+                renorm_counts = obs.countrate(area=primary_area)
+
+                # Calculate the countrate associated with an object of
+                # matching magnitude
+                mag_col = '{}_{}_magnitude'.format(inst.lower(), filt.lower())
+                filt_info = spec.get_filter_info([mag_col], magsys)
+                magnitude = catalog[mag_col][dataset - 1]
+                photflam, photfnu, zeropoint, pivot = filt_info[mag_col]
+                check_counts = magnitude_to_countrate('imaging', magsys, magnitude, photfnu=photfnu,
+                                                      photflam=photflam, vegamag_zeropoint=zeropoint)
+
+                # Check that the countrates agree
+                print('Working on: ', inst, filt, mod, det, magsys, dataset, magnitude)
+                print(filter_thru_file)
+                print('dataset and rescaled flux value')
+                print(dataset, rescaled_spectra[dataset]['fluxes'][0])
+                print('Fluxcal info', magsys, magnitude, photfnu, photflam, zeropoint)
+                print('Counts from renormalized spectrum: ', renorm_counts)
+                print('Counts from magnitude_to_countrate: ', check_counts)
+                print('Ratio: {}\n'.format(renorm_counts.value / check_counts))
+                #comparison = np.isclose(renorm_counts.value, check_counts, atol=0., rtol=0.01)
+                #assert comparison, print("FAILED TEST FOR: {}, {}, {}, {}, {}".format(inst, filt, mod,
+                #                                                                      det, magsys))
