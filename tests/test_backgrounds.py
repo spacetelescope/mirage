@@ -108,9 +108,12 @@ def test_niriss_background_scaling():
               'Inst': {'instrument': 'NIRISS'},
               'Reffiles': {'flux_cal': os.path.join(CONFIG_DIR, 'niriss_zeropoints.list')}
               }
-    value = backgrounds.niriss_background_scaling(params, detector, module)
-    assert np.isclose(value, 1.0, atol=0., rtol=0.001)
 
+    # Ratio of requested medium value to the medium-scaled background image should be 1.0
+    medium_ratio = backgrounds.niriss_background_scaling(params, detector, module)
+    assert np.isclose(medium_ratio, 1.0, atol=0., rtol=0.001)
+
+    # Ratio of requested low value to the medium-scaled background image should be < 1.0
     params['simSignals']['bkgdrate'] = 'low'
-    value = backgrounds.niriss_background_scaling(params, detector, module)
-    assert value < 1.0
+    low_ratio = backgrounds.niriss_background_scaling(params, detector, module)
+    assert low_ratio < 1.0

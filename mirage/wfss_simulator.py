@@ -175,18 +175,24 @@ class WFSSSim():
                                                                                   self.params['Telescope']['dec'],
                                                                                   self.params['Output']['date_obs'])
             else:
-                print("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
-                back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
-                                                                                   self.module)
-            print('back wave: ', back_wave)
-            print('back_sig: ', back_sig)
+                if isinstance(self.params['simSignals']['bkgdrate'], str):
+                    if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
+                        print("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
+                        back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
+                                                                                           self.module)
+                    else:
+                        raise ValueError("ERROR: Unrecognized background rate. Must be one of 'low', 'medium', 'high'")
+                else:
+                    raise ValueError(("ERROR: WFSS background rates must be one of 'low', 'medium', 'high', "
+                                      "or use_dateobs_for_background must be True "))
 
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
             background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
                                                                     dmode.lower())
+
+            # The niriss_background_scaling function can handle a bkgdrate of low/medium/high or a number
             scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
-            print('scaling_factor:', scaling_factor)
 
         # Default to extracting all orders
         orders = None
