@@ -197,7 +197,7 @@ class WFSSSim():
                     scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
                 else:
                     raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
-            elif isinstance(self.params['simSignals']['bkgdrate'], float) or isinstance(self.params['simSignals']['bkgdrate'], int):
+            elif np.isreal(self.params['simSignals']['bkgdrate']):
                 scaling_factor = self.params['simSignals']['bkgdrate']
 
         # Default to extracting all orders

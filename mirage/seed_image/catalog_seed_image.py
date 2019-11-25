@@ -3783,14 +3783,6 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-        """
-        # In the future we expect zeropoints to be detector dependent, as they
-        # currently are for FGS. So if we are working with NIRCAM or NIRISS,
-        # manually add a Detector key to the dictionary as a placeholder.
-        if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
-            self.zps = self.add_detector_to_zeropoints(detector)
-        """
-
         if self.params['Inst']['instrument'].lower() == 'niriss':
             newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
             self.params['Readout']['filter'] = newfilter
@@ -3813,22 +3805,6 @@ class Catalog_seed():
         # Get basic flux calibration information
         self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
             fluxcal_info(self.params, self.usefilt, detector, module)
-
-        """
-        if self.params['Readout'][self.usefilt] not in self.zps['Filter']:
-            raise ValueError(("WARNING: requested filter {} is not in the list of "
-                              "possible filters.".format(self.params['Readout'][self.usefilt])))
-
-        # Get the photflambda and photfnu values that go with
-        # the filter
-        mtch = ((self.zps['Detector'] == detector) &
-                (self.zps['Filter'] == self.params['Readout'][self.usefilt]) &
-                (self.zps['Module'] == module))
-        self.vegazeropoint = self.zps['VEGAMAG'][mtch][0]
-        self.photflam = self.zps['PHOTFLAM'][mtch][0]
-        self.photfnu = self.zps['PHOTFNU'][mtch][0]
-        self.pivot = self.zps['Pivot_wave'][mtch][0]
-        """
 
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings
