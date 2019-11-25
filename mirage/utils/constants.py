@@ -44,6 +44,7 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
 
 MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192},
                     'niriss': 1.624192,
+                    #'niriss': 1.655228,
                     'fgs': {'guider1': 1.0, 'guider2': 1.0}
                     }
 

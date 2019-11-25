@@ -12,6 +12,7 @@ Use
 """
 import os
 import numpy as np
+import copy
 
 from astropy.io import ascii
 from astropy.table import Table
@@ -210,23 +211,49 @@ def test_spectra_rescaling():
     """
     # JWST primary mirror area in cm^2. Needed for countrate check
     # at the end
-    primary_area = 25.326 * 10000.
+    primary_area = 25.326 * (u.m * u.m)
 
     # Create spectrum: one source to be normalized
     # and the other should not be
     waves = np.arange(0.4, 5.6, 0.01)
     flux = np.repeat(1e-16, len(waves))
-    flux2 = np.repeat(2.905820300378683e-19, len(waves))
+    flux2 = np.repeat(4.24242424242e-18, len(waves))  # arbitrary value
     spectra = {1: {"wavelengths": waves * u.micron,
                    "fluxes": flux * u.pct},
                2: {"wavelengths": waves * u.micron,
                    "fluxes": flux2 * units.FLAM}}
 
+    '''WORKING FOR NIRCAM! NOT for NIRISS, because the gain value isn't right.
+    Curiously, it looks like the necessary gain value varies from photometric system
+    to photometric system, which makes no sense. You can calculate the gain value
+    from the ratio of the countrates and multiplying that value with the gain value
+    in constants.py
+    '''
+
+    '''
+    The non-rescaled spectra are probably overkill here, since the
+    values I'm putting in for them are coming from previous runs of
+    the renormalizer. If it's wrong there and I am inputting the wrrong
+    value, it does not matter since it will just renormalize incorrectly
+    again during the test. so the comparison is not helping anything.
+    Maybe just keep one non-rescaled spectrum around to prove that the
+    Mirage rescaling function does not modify it at all. Also keep in
+    mind that mirage ignores the catalog magnitude value in cases where
+    the spectrum is not renormalized, so you cannot run magnitude_to_countrate
+    as a comparison case there.
+    '''
+
+    print('Before looping:')
+    print('')
+    print(1, spectra[1]['fluxes'][10])
+    print(2, spectra[2]['fluxes'][10])
+    print('')
+
     # Create source catalog containing scaling info
     catalog = Table()
     catalog['index'] = [1, 2]
-    catalog['nircam_f322w2_magnitude'] = [18., 18.]
-    catalog['niriss_f444w_magnitude'] = [18., 18.]
+    catalog['nircam_f322w2_magnitude'] = [18.] * 2
+    catalog['niriss_f444w_magnitude'] = [18.] * 2
 
     # Instrument info
     instrument = ['nircam', 'niriss', 'fgs']
@@ -243,21 +270,20 @@ def test_spectra_rescaling():
         filter_thru_file = get_filter_throughput_file(instrument=inst, filter_name=filt,
                                                       nircam_module=mod, fgs_detector=det)
 
-        # Create filter bandpass object, to be used in the final
-        # comparison
-        filter_tp = ascii.read(filter_thru_file)
-        bp_waves = filter_tp['Wavelength_microns'].data * u.micron
-        bp_waves = bp_waves.to(u.Angstrom)
-        thru = filter_tp['Throughput'].data
-        bandpass = SpectralElement(Empirical1D, points=bp_waves.value, lookup_table=thru, keep_neg=True)
-
         # Retrieve the correct gain value that goes with the fluxcal info
         if inst == 'nircam':
             gain = MEAN_GAIN_VALUES['nircam']['lwb']
         elif inst == 'niriss':
             gain = MEAN_GAIN_VALUES['niriss']
         elif inst == 'fgs':
-            gain = MEAN_GAIN_VALUES['fgs'][det]
+            gain = MEAN_GAIN_VALUES['fgs'][det.lower()]
+
+        # Create filter bandpass object, to be used in the final
+        # comparison
+        filter_tp = ascii.read(filter_thru_file)
+        bp_waves = filter_tp['Wavelength_microns'].data * u.micron
+        thru = filter_tp['Throughput'].data
+        bandpass = SpectralElement(Empirical1D, points=bp_waves, lookup_table=thru) / gain
 
         # Check the renormalization in all photometric systems
         for magsys in mag_sys:
@@ -267,18 +293,27 @@ def test_spectra_rescaling():
             # spectrum through the requested filter
             for dataset in rescaled_spectra:
                 rescaled_spectrum = SourceSpectrum(Empirical1D, points=rescaled_spectra[dataset]['wavelengths'],
-                                                   lookup_table=rescaled_spectra[dataset]['fluxes'], keep_neg=True)
-                obs = Observation(rescaled_spectrum, bandpass)
+                                                   lookup_table=rescaled_spectra[dataset]['fluxes'])
+
+                print('')
+                print(dataset, type(dataset), spectra[dataset]['fluxes'][10])
+                print(dataset, type(dataset), rescaled_spectra[dataset]['fluxes'][10])
+                print('')
+
+                obs = Observation(rescaled_spectrum, bandpass, binset=bandpass.waveset)
                 renorm_counts = obs.countrate(area=primary_area)
 
                 # Calculate the countrate associated with an object of
                 # matching magnitude
-                mag_col = '{}_{}_magnitude'.format(inst.lower(), filt.lower())
+                if inst != 'fgs':
+                    mag_col = '{}_{}_magnitude'.format(inst.lower(), filt.lower())
+                else:
+                    mag_col = 'guider1_magnitude'
                 filt_info = spec.get_filter_info([mag_col], magsys)
                 magnitude = catalog[mag_col][dataset - 1]
                 photflam, photfnu, zeropoint, pivot = filt_info[mag_col]
-                check_counts = magnitude_to_countrate('imaging', magsys, magnitude, photfnu=photfnu,
-                                                      photflam=photflam, vegamag_zeropoint=zeropoint)
+                check_counts = magnitude_to_countrate('imaging', magsys, magnitude, photfnu=photfnu.value,
+                                                      photflam=photflam.value, vegamag_zeropoint=zeropoint)
 
                 # Check that the countrates agree
                 print('Working on: ', inst, filt, mod, det, magsys, dataset, magnitude)
@@ -289,6 +324,17 @@ def test_spectra_rescaling():
                 print('Counts from renormalized spectrum: ', renorm_counts)
                 print('Counts from magnitude_to_countrate: ', check_counts)
                 print('Ratio: {}\n'.format(renorm_counts.value / check_counts))
-                #comparison = np.isclose(renorm_counts.value, check_counts, atol=0., rtol=0.01)
-                #assert comparison, print("FAILED TEST FOR: {}, {}, {}, {}, {}".format(inst, filt, mod,
-                #                                                                      det, magsys))
+
+                if dataset == 1:
+                    # This dataset has been rescaled, so check that the
+                    # countrate from the rescaled spectrum matches that from
+                    # the magnitude it was rescaled to
+                    assert np.isclose(renorm_counts.value, check_counts, atol=0, rtol=0.001)
+                elif dataset == 2:
+                    # Not rescaled. In this case Mirage ignores the magnitude
+                    # value in the catalog, so we can't check against check_counts.
+                    # Just make sure that the rescaling function did not
+                    # change the spectrum at all
+                    assert np.all(spectra[dataset]['fluxes'] == rescaled_spectra[dataset]['fluxes'])
+
+

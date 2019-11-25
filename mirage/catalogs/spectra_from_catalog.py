@@ -442,8 +442,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
             filter_thru_file = get_filter_throughput_file(instrument=instrument, filter_name=filter_name,
                                                           nircam_module=module, fgs_detector=detector)
             all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
-                                                           rescaling_parameters, mag_sys, filter_thru_file,
-                                                           gain)
+                                                           rescaling_parameters, mag_sys, filter_thru_file)
 
         # For sources in catalog_file but not in all_input_spectra, use the
         # magnitudes in the catalog_file, interpolate/extrapolate as necessary
@@ -506,13 +505,12 @@ def read_catalog(filename):
     return catalog, mag_sys
 
 
-def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_file,
-                               gain_value):
+def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass_file, gain_value):
     """Rescale any input spectra that are normalized
 
     Parameters
     ----------
-    spec : OrderedDict
+    spectra : OrderedDict
         Dictionary containing spectra for some/all targets. Dictionary
         keys are the object indexes (such as from the index column in
         the catalog_file. Entries must be e.g.
@@ -521,7 +519,6 @@ def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_fi
         Wavelengths and fluxes can be lists, or lists with astropy units
         attached. If no units are supplied, Mirage assumes wavelengths
         in microns and flux densities in Flambda units.
-
 
     catalog_info : astropy.table.Table
         Index column and magnitude column to use for rescaling. Extracted
@@ -555,12 +552,16 @@ def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_fi
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
     instrument = mag_colname.split('_')[0]
 
+    # Make a copy so we aren't modifying spec in place, which seems to be passed
+    # by reference back to the calling function
+    spec = copy.deepcopy(spectra)
+
     for dataset in spec:
         waves = spec[dataset]['wavelengths']
         flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
-            # print('SED for source {} is normalized. Rescaling.'.format(dataset))
+            print('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
 
             if not any(match):
@@ -570,7 +571,7 @@ def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_fi
 
             # Create a synphot source spectrum
             fake_flux_units = units.FLAM
-            source_spectrum = SourceSpectrum(Empirical1D, points=waves, lookup_table=flux.value * fake_flux_units, keep_neg=True)
+            source_spectrum = SourceSpectrum(Empirical1D, points=waves, lookup_table=flux.value * fake_flux_units)
 
             # Create a synphot SpectralElement containing the filter bandpass
             filter_tp = ascii.read(bandpass_file)
@@ -578,7 +579,7 @@ def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_fi
             bp_waves = bp_waves.to(u.Angstrom)
             thru = filter_tp['Throughput'].data
 
-            bandpass = SpectralElement(Empirical1D, points=bp_waves.value, lookup_table=thru, keep_neg=True)
+            bandpass = SpectralElement(Empirical1D, points=bp_waves.value, lookup_table=thru) / gain_value
 
             # Renormalize
             magnitude_system = magnitude_system.lower()
@@ -595,7 +596,9 @@ def rescale_normalized_spectra(spec, catalog_info, magnitude_system, bandpass_fi
                 raise ValueError('ERROR: normalization to a given countrate not yet supported.')
             renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
 
-            spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam') / gain_value
+            spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
+        else:
+            print('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
 
             # old code
 
