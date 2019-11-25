@@ -97,7 +97,6 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
 
 
 
-
     yd, xd = seed_image.shape
     total_exposure_time = exposure_total_frames * frametime
 
