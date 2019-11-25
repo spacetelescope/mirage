@@ -53,7 +53,7 @@ def test_hdf5_file_input():
     sed_file = os.path.join(TEST_DATA_DIR, 'sed_file_with_normalized_dataset.hdf5')
     sed_catalog = spec.make_all_spectra(catfile, input_spectra_file=sed_file,
                                         normalizing_mag_column='nircam_f444w_magnitude',
-                                        output_filename=output_hdf5)
+                                        output_filename=output_hdf5, module='A')
 
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_hdf5_input_including_normalized.hdf5'))
     constructed = hdf5.open(sed_catalog)
@@ -80,7 +80,7 @@ def test_manual_inputs():
     sed_dict = hdf5.open(hdf5file)
     sed_catalog = spec.make_all_spectra(catfile, input_spectra=sed_dict,
                                         normalizing_mag_column='nircam_f444w_magnitude',
-                                        output_filename=output_hdf5)
+                                        output_filename=output_hdf5, module='A')
     constructed = hdf5.open(sed_catalog)
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_manual_input.hdf5'))
     for key in comparison:
@@ -107,7 +107,7 @@ def test_manual_plus_file_inputs():
                      "fluxes": [1e-17, 1.1e-17, 1.5e-17, 1.4e-17, 1.1e-17] * FLAMBDA_CGS_UNITS}
     sed_catalog = spec.make_all_spectra(catfile, input_spectra=manual_sed, input_spectra_file=sed_file,
                                         normalizing_mag_column='nircam_f444w_magnitude',
-                                        output_filename=output_hdf5)
+                                        output_filename=output_hdf5, module='A')
     comparison = hdf5.open(os.path.join(TEST_DATA_DIR, 'output_spec_from_file_plus_manual_input.hdf5'))
     constructed = hdf5.open(output_hdf5)
     for key in comparison:
@@ -223,32 +223,6 @@ def test_spectra_rescaling():
                2: {"wavelengths": waves * u.micron,
                    "fluxes": flux2 * units.FLAM}}
 
-    '''WORKING FOR NIRCAM! NOT for NIRISS, because the gain value isn't right.
-    Curiously, it looks like the necessary gain value varies from photometric system
-    to photometric system, which makes no sense. You can calculate the gain value
-    from the ratio of the countrates and multiplying that value with the gain value
-    in constants.py
-    '''
-
-    '''
-    The non-rescaled spectra are probably overkill here, since the
-    values I'm putting in for them are coming from previous runs of
-    the renormalizer. If it's wrong there and I am inputting the wrrong
-    value, it does not matter since it will just renormalize incorrectly
-    again during the test. so the comparison is not helping anything.
-    Maybe just keep one non-rescaled spectrum around to prove that the
-    Mirage rescaling function does not modify it at all. Also keep in
-    mind that mirage ignores the catalog magnitude value in cases where
-    the spectrum is not renormalized, so you cannot run magnitude_to_countrate
-    as a comparison case there.
-    '''
-
-    print('Before looping:')
-    print('')
-    print(1, spectra[1]['fluxes'][10])
-    print(2, spectra[2]['fluxes'][10])
-    print('')
-
     # Create source catalog containing scaling info
     catalog = Table()
     catalog['index'] = [1, 2]
@@ -257,10 +231,10 @@ def test_spectra_rescaling():
     catalog['fgs_magnitude'] = [18.] * 2
 
     # Instrument info
-    instrument = ['nircam', 'niriss', 'fgs']
-    filter_name = ['F322W2', 'F444W', None]
-    module = ['B', 'N', 'F']
-    detector = ['NRCA1', 'NIS', 'GUIDER1']
+    instrument = ['nircam', 'niriss']
+    filter_name = ['F322W2', 'F444W']
+    module = ['B', 'N']
+    detector = ['NRCA1', 'NIS']
 
     # Magnitude systems of renormalization magnitudes
     mag_sys = ['vegamag', 'abmag', 'stmag']
@@ -298,11 +272,6 @@ def test_spectra_rescaling():
                     rescaled_spectrum = SourceSpectrum(Empirical1D, points=rescaled_spectra[dataset]['wavelengths'],
                                                        lookup_table=rescaled_spectra[dataset]['fluxes'])
 
-                    print('')
-                    print(dataset, type(dataset), spectra[dataset]['fluxes'][10])
-                    print(dataset, type(dataset), rescaled_spectra[dataset]['fluxes'][10])
-                    print('')
-
                     obs = Observation(rescaled_spectrum, bandpass, binset=bandpass.waveset)
                     renorm_counts = obs.countrate(area=primary_area)
 
@@ -319,19 +288,36 @@ def test_spectra_rescaling():
                                                           photflam=photflam.value, vegamag_zeropoint=zeropoint)
 
                     # Check that the countrates agree
-                    print('Working on: ', inst, filt, mod, det, magsys, dataset, magnitude)
-                    print(filter_thru_file)
-                    print('dataset and rescaled flux value')
-                    print(dataset, rescaled_spectra[dataset]['fluxes'][0])
-                    print('Fluxcal info', magsys, magnitude, photfnu, photflam, zeropoint)
-                    print('Counts from renormalized spectrum: ', renorm_counts)
-                    print('Counts from magnitude_to_countrate: ', check_counts)
-                    print('Ratio: {}\n'.format(renorm_counts.value / check_counts))
+                    #print('Working on: ', inst, filt, mod, det, magsys, dataset, magnitude)
+                    #print(filter_thru_file)
+                    #print('dataset and rescaled flux value')
+                    #print(dataset, rescaled_spectra[dataset]['fluxes'][0])
+                    #print('Fluxcal info', magsys, magnitude, photfnu, photflam, zeropoint)
+                    #print('Counts from renormalized spectrum: ', renorm_counts)
+                    #print('Counts from magnitude_to_countrate: ', check_counts)
+                    #print('Ratio: {}\n'.format(renorm_counts.value / check_counts))
+
+                    if magsys != 'vegamag':
+                        # As long as the correct gain is used, AB mag and ST mag
+                        # count rates agree very well
+                        tolerance = 0.0005
+                    else:
+                        # Vegamag count rates for NIRISS have a larger disagreement
+                        # because the photom ref file was made under the assumption
+                        # that Vega = +0.02 magnitudes in all filters, but synphot
+                        # assumes 0.0.
+                        tolerance = 0.03
 
                     # This dataset has been rescaled, so check that the
                     # countrate from the rescaled spectrum matches that from
                     # the magnitude it was rescaled to
-                    assert np.isclose(renorm_counts.value, check_counts, atol=0, rtol=0.005)
+                    if isinstance(check_counts, u.quantity.Quantity):
+                        check_counts = check_counts.value
+                    if isinstance(renorm_counts, u.quantity.Quantity):
+                        renorm_counts = renorm_counts.value
+                    assert np.isclose(renorm_counts, check_counts, atol=0, rtol=tolerance), \
+                        print('Failed assertion: ', inst, filt, magsys, renorm_counts, check_counts,
+                              renorm_counts / check_counts)
                 elif dataset == 2:
                     # Not rescaled. In this case Mirage ignores the magnitude
                     # value in the catalog, so we can't check against check_counts.

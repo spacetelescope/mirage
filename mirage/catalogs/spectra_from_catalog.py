@@ -361,8 +361,7 @@ def get_filter_info(column_names, magsys):
 
 def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                      extrapolate_SED=True, output_filename=None, normalizing_mag_column=None,
-                     instrument=None, filter_name=None, module=None, detector=None,
-                     gain_file=None):
+                     module=None, detector=None):
     """Overall wrapper function
 
     Parameters
@@ -397,20 +396,13 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         be scaled based on the magnitude values given in this specified
         column from the input catalog_file.
 
-    instrument : str
-        Name of instrument (e.g. 'nircam')
-
-    filter_name : str
-        Name of filter (e.g. 'F200W')
-
     module : str
-        Name of module (e.g. 'A')
+        Name of module (e.g. 'A'). Only used when ``normalizing_mag_column``
+        is a NIRCam filter
 
     detector : str
-        Name of detector (e.g. 'NRCA1', 'GUIDER1')
-
-    gain_file : str
-        Name of fits file containing the gain map for the detector
+        Name of detector (e.g. 'GUIDER1'). Only used when ``normalizing_mag_column``
+        is for FGS
 
     Returns
     -------
@@ -421,30 +413,26 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     if output_filename is None:
         output_filename = create_output_sed_filename(catalog_files[0], input_spectra_file)
 
-    # Read in the gain file and calculate the sigma-clipped mean value
-    #with fits.open(gain_file) as hdulist:
-    #    gain_array = hdulist[1].data
-    #gain = utils.sigma_clipped_mean_value_of_image(gain_array, 3)
-    if instrument == 'nircam':
-        filter_val = int(filter_name[1:4])
-        if filter_val > 230.:
-            channel = 'lw'
-        else:
-            channel = 'sw'
-        selector = '{}{}'.format(channel, module.lower())
-        gain = MEAN_GAIN_VALUES['nircam'][selector]
-    elif instrument == 'niriss':
-        gain = MEAN_GAIN_VALUES['niriss']
-    elif instrument == 'fgs':
-        gain = MEAN_GAIN_VALUES['fgs'][detector.lower()]
+    # If normalizing_mag_column is not None, get instrument info in order
+    # to find the correct gain value
+    if normalizing_mag_column is not None:
+        instrument = normalizing_mag_column.split('_')[0].lower()
+        filter_name = 'none'
+        if instrument != 'fgs':
+            filter_name = normalizing_mag_column.split('_')[1]
 
-
-
-
-
-
-
-
+        if instrument == 'nircam':
+            filter_val = int(filter_name[1:4])
+            if filter_val > 230.:
+                channel = 'lw'
+            else:
+                channel = 'sw'
+            selector = '{}{}'.format(channel, module.lower())
+            gain = MEAN_GAIN_VALUES['nircam'][selector]
+        elif instrument == 'niriss':
+            gain = MEAN_GAIN_VALUES['niriss']
+        elif instrument == 'fgs':
+            gain = MEAN_GAIN_VALUES['fgs'][detector.lower()]
 
     # Dictionary to contain all input spectra
     all_input_spectra = {}
@@ -482,17 +470,16 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         catalog.write(flambda_output_catalog, format='ascii', overwrite=True)
         print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
 
-        # Remormalize here so you have access to filter_info
+        # Remormalize
         if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
             rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
-            rescaling_parameters = filter_info[normalizing_mag_column]
 
             # Note that nircam_module is ignored for non-NIRCam requests.
             # fgs_detector is ignored for non-FGS requests
             filter_thru_file = get_filter_throughput_file(instrument=instrument, filter_name=filter_name,
                                                           nircam_module=module, fgs_detector=detector)
             all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
-                                                           rescaling_parameters, mag_sys, filter_thru_file)
+                                                           mag_sys, filter_thru_file, gain)
 
         # For sources in catalog_file but not in all_input_spectra, use the
         # magnitudes in the catalog_file, interpolate/extrapolate as necessary
@@ -573,10 +560,6 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
     catalog_info : astropy.table.Table
         Index column and magnitude column to use for rescaling. Extracted
         from the original input catalog.
-
-    filter_parameters : tup
-        Photflam, photfnu, zeropoint, pivot wavelength for filter to use
-        for rescaling
 
     magnitude_system : str
         Magnitude system corresponding to the input magnitudes (e.g. 'abmag')

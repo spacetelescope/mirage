@@ -162,8 +162,7 @@ class WFSSSim():
                                                                   extrapolate_SED=self.extrapolate_SED,
                                                                   output_filename=self.final_SED_file,
                                                                   normalizing_mag_column=self.SED_normalizing_catalog_column,
-                                                                  instrument=self.instrument, filter_name=self.crossing_filter,
-                                                                  module=self.module, detector=det_name, gain_file=)
+                                                                  module=self.module, detector=det_name)
 
         # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
