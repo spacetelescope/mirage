@@ -2057,9 +2057,6 @@ class Observation():
         Nothing
         """
         pth = self.params[p[0]][p[1]]
-
-        print(pth)
-
         c1 = os.path.exists(pth)
         if not c1:
             raise NotADirectoryError(("WARNING: Unable to find the requested path "

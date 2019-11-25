@@ -30,14 +30,14 @@ before_install:
 
 install:
     # Remove WebbPSF conda install
-    - sed '/webbpsf/d' environment.yml
+    # - sed '/webbpsf/d' environment.yml
     # Install MIRaGe dependencies
     - conda env update -f=environment.yml
     # Install development versions of webbpsf and poppy
-    - git clone git://github.com/spacetelescope/poppy.git
-    - git clone git://github.com/spacetelescope/webbpsf.git
-    - pip install -e poppy/
-    - pip install -e webbpsf/
+    # - git clone git://github.com/spacetelescope/poppy.git
+    # - git clone git://github.com/spacetelescope/webbpsf.git
+    # - pip install -e poppy/
+    # - pip install -e webbpsf/
     # Install MIRaGe package
     - pip install -e .
 
