@@ -331,7 +331,7 @@ def test_spectra_rescaling():
                     # This dataset has been rescaled, so check that the
                     # countrate from the rescaled spectrum matches that from
                     # the magnitude it was rescaled to
-                    #assert np.isclose(renorm_counts.value, check_counts, atol=0, rtol=0.001)
+                    assert np.isclose(renorm_counts.value, check_counts, atol=0, rtol=0.005)
                 elif dataset == 2:
                     # Not rescaled. In this case Mirage ignores the magnitude
                     # value in the catalog, so we can't check against check_counts.
