@@ -45,12 +45,14 @@ import yaml
 import numpy as np
 from astropy.io import fits
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+from scipy.stats import sigmaclip
 
 from .catalogs import spectra_from_catalog
 from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .ramp_generator import obs_generator
-from .utils import read_fits
+from .utils import backgrounds, read_fits
+from .utils.flux_cal import fluxcal_info
 from .utils.constants import CATALOG_YAML_ENTRIES
 from .utils.utils import expand_environment_variable
 from .yaml import yaml_update
@@ -144,8 +146,11 @@ class WFSSSim():
             ptsrc_seeds.append(cat.ptsrc_seed_filename)
             galaxy_seeds.append(cat.galaxy_seed_filename)
             extended_seeds.append(cat.extended_seed_filename)
+
             # If Mirage is going to produce an hdf5 file of spectra,
-            # then we only need a single direct seed image.
+            # then we only need a single direct seed image. Note that
+            # find_param_info() has reordered the list such that the
+            # wfss mode yaml file will be examined first.
             if self.create_continuum_seds:
                 break
 
@@ -168,12 +173,35 @@ class WFSSSim():
         # orders to disperse.
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
-            background_file = ("{}_{}_back.fits"
-                               .format(self.crossing_filter, dmode))
+            if self.params['simSignals']['use_dateobs_for_background']:
+                print("Generating background spectrum for observation date: {}".format(self.params['Output']['date_obs']))
+                back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
+                                                                                  self.params['Telescope']['dec'],
+                                                                                  self.params['Output']['date_obs'])
+            else:
+                if isinstance(self.params['simSignals']['bkgdrate'], str):
+                    if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
+                        print("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
+                        back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
+                                                                                           self.module)
+                    else:
+                        raise ValueError("ERROR: Unrecognized background rate. Must be one of 'low', 'medium', 'high'")
+                else:
+                    raise ValueError(("ERROR: WFSS background rates must be one of 'low', 'medium', 'high', "
+                                      "or use_dateobs_for_background must be True "))
+
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
-            background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
-            print('Background file is {}'.format(background_file))
+            background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
+                                                                    dmode.lower())
+
+            if isinstance(self.params['simSignals']['bkgdrate'], str):
+                if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
+                    scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+                else:
+                    raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
+            elif np.isreal(self.params['simSignals']['bkgdrate']):
+                scaling_factor = self.params['simSignals']['bkgdrate']
 
         # Default to extracting all orders
         orders = None
@@ -192,7 +220,31 @@ class WFSSSim():
                 dispersed_objtype_seed.disperse(orders=orders)
                 # Only include the background in one of the object type seed images
                 if not background_done:
-                    dispersed_objtype_seed.finalize(Back=background_file)
+                    if self.instrument == 'nircam':
+                        background_image = dispersed_objtype_seed.disperse_background_1D([back_wave, back_sig])
+                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
+                    else:
+                        # BackLevel is used as such: background / max(background) * BackLevel
+                        # So we need to either set BackLevel equal to the requested level
+                        # NOT THE RATIO OF THAT TO MEDIUM, or we need to open the background
+                        # file and multiply it by the ratio of the requested level to medium.
+                        # The former isn't quite correct because it'll be scaling the maximum
+                        # value in the image to "low" or "high", rather than the median
+                        full_background_file = os.path.join(loc, background_file)
+                        background_image = fits.getdata(full_background_file)
+
+                        # Before scaling the background image by the scaling_factor
+                        # we need to normalize by the sigma-clipped mean value. This is
+                        # because the background files were produced and scaled to the
+                        # ETC "medium" level at some arbirtrary pointing, but the
+                        # "medium" level is pointing-dependent. Current background files
+                        # are scaled such that the "medium" value from the ETC is the
+                        # sigma-clipped mean value.
+                        clip, lo, hi = sigmaclip(background_image, low=3, high=3)
+                        background_mean = np.mean(clip)
+                        background_image = background_image / background_mean * scaling_factor
+                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
+
                     background_done = True
                 else:
                     dispersed_objtype_seed.finalize()
@@ -348,12 +400,15 @@ class WFSSSim():
             if i == 0:
                 self.instrument = params['Inst']['instrument'].lower()
                 if self.instrument == 'niriss':
-                    self.module = None
+                    self.module = 'N'
+                    self.detector = 'NIS'
                 elif self.instrument == 'nircam':
                     self.module = params['Readout']['array_name'][3]
+                    self.detector = params['Readout']['array_name'][0:5]
 
             if params['Inst']['mode'].lower() == 'wfss':
                 self.wfss_yaml = copy.deepcopy(pfile)
+                self.params = params
 
                 # Only 1 input yaml file should be for wfss mode
                 wfss_files_found += 1
@@ -375,13 +430,14 @@ class WFSSSim():
                 elif self.instrument == 'nircam':
                     self.crossing_filter = filter_name.upper()
                     self.dispersion_direction = pupil_name[-1].upper()
-                yamls_to_disperse.append(pfile)
+                # Prepend the wfss yaml file to the list, so that it is first
+                yamls_to_disperse.insert(0, pfile)
 
             elif params['Inst']['mode'].lower() in ['imaging', 'pom']:
                 # If the other yaml files are for imaging mode, we need to update them to
                 # be wfss mode so that the resulting seed images have the correct dimensions.
                 # Save these modified yaml files to new files.
-                params['Inst']['mode'] = 'imaging'
+                params['Inst']['mode'] = 'wfss'
                 params['Output']['grism_source_image'] = True
                 outdir, basename = os.path.split(pfile)
                 modified_file = os.path.join(outdir, 'tmp_update_to_wfss_mode_{}'.format(basename))
@@ -393,6 +449,64 @@ class WFSSSim():
             raise ValueError(("WARNING: No WFSS mode parameter files found. One of the parameter "
                               "files must be wfss mode in order to define grism and crossing filter."))
         return yamls_to_disperse
+
+    """
+    def generate_background_spectrum(self, ra, dec, day_of_year=None):
+        Call jwst_backgrounds in order to produce an estimate of background
+        versus wavelength for a particular pointing
+
+        background = jbt.background(ra, dec, 4.)
+        # If the user wants a background signal from a particular day,
+        # then extract that array here
+        if self.params['simSignals']['use_dateobs_for_background']:
+            obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
+            obs_dayofyear = obsdate.timetuple().tm_yday
+            if obs_dayofyear not in background.bkg_data['calendar']:
+                raise ValueError(("ERROR: The requested RA, Dec is not observable on {}. Either "
+                                  "specify a different day, or set simSignals:use_dateobs_for_background "
+                                  "to False.".format(self.params['Output']['date_obs'])))
+            #match = obs_dayofyear == background.bkg_data['calendar']
+            #back_wave = background.bkg_data['wave_array']
+            #back_sig = background.bkg_data['total_bg'][match, :]
+            background_file = 'background.txt'
+            background = jbt.get_background(ra, dec, 4., plot_background=False, plot_bathtub=False,
+                                            thisday=day_of_year, write_background=True, write_bathtub=False,
+                                            background_file=background_file)
+        else:
+            # If the user wants a background chosen from the three general
+            # levels (low, medium, of high) then we need to examine the
+            # returned background spectra for all days, determine from the
+            # histogram (of background values at the pivot wavelength) what
+            # "low", "medium", and "high" correspond to, and then pick out
+            # the spectrum from a day that is close to the requested level
+            vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params, usefilt, detector, module)
+            wave_diff = np.abs(background.bkg_data['wave_array'] - pivot_wavelength)
+            bkgd_wave = np.where(wave_diff == np.min(wave_diff))[0][0]
+            bkgd_at_pivot = background.bkg_data['total_bg'][:, bkgd_wave]
+
+            # Now sort and determine the low/medium/high levels
+            low, medium, high = find_low_med_high(bkgd_at_pivot)
+
+            # Find the value based on the level in the yaml file
+            background_level = self.params['simSignals']['bkgdrate'].lower()
+            if background_level == "low":
+                level_value = low
+            elif background_level == "medium":
+                level_value = medium
+            elif background_level == "high":
+                level_value = high
+            else:
+                raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
+                                  .format(self.params['simSignals']['bkgdrate'])))
+
+            # Find the day with the background at the pivot wavelength that
+            # is closest to the value associated with the requested level
+            diff = np.abs(bkgd_at_pivot - level_value)
+            mindiff = np.where(diff == np.min(diff))[0][0]
+            background_spec = background.bkg_data['total_bg'][mindiff, :]
+
+        return background_file
+    """
 
     def read_param_file(self, file):
         """
