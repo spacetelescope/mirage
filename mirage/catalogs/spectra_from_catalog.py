@@ -287,6 +287,10 @@ def get_filter_info(column_names, magsys):
                 match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
             elif instrument == 'niriss':
                 match = zp_table['Filter'] == filter_name
+
+            if not np.any(match):
+                raise ValueError("ERROR: no filter matching {} in {}.".format(filter_name, zp_file))
+
             zp = zp_table[magsys].data[match][0]
             photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
             photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS
@@ -302,6 +306,52 @@ def get_filter_info(column_names, magsys):
         photfnu = line['PHOTFNU'] * FNU_CGS_UNITS
         pivot = line['Pivot_wave'] * u.micron
         info[column_names[0]] = (photflam, photfnu, zp, pivot)
+
+    """
+    This code block works for columns that contain a mix of instruments
+    magsys = magsys.upper()
+    info = {}
+
+    # Get the list of instruments in the column names
+    instrument_names = [col.split('_')[0].lower() for col in column_names]
+
+    # Identify the list of unique files so we only need to open each once
+    unique_insts = list(set(instrument_names))
+
+    # Create a dcitionary of zeropoint tables for each instrument
+    zp_tables = {}
+    for inst in unique_insts:
+        zpfile = ZEROPOINT_FILES[inst]
+        tab = ascii.read(zpfile)
+        zp_tables[inst] = tab
+
+    # For each magnitude column, look up the info from the appropriate
+    # dictionary
+    for inst in instrument_names:
+        zp_table = zp_tables[inst]
+        if instrument in ['nircam', 'niriss']:
+            for entry in column_names:
+                filter_name = entry.split('_')[1].upper()
+                if instrument == 'nircam':
+                    match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
+                elif instrument == 'niriss':
+                    match = zp_table['Filter'] == filter_name
+                zp = zp_table[magsys].data[match][0]
+                photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
+                photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS
+                pivot = zp_table['Pivot_wave'].data[match][0] * u.micron
+                info[entry] = (photflam, photfnu, zp, pivot)
+
+        # For FGS, just use the values for GUIDER1 detector.
+        elif instrument == 'fgs':
+            line = zp_table[0]
+            # detector = line['Detector']
+            zp = line[magsys]
+            photflam = line['PHOTFLAM'] * FLAMBDA_CGS_UNITS
+            photfnu = line['PHOTFNU'] * FNU_CGS_UNITS
+            pivot = line['Pivot_wave'] * u.micron
+            info[column_names[0]] = (photflam, photfnu, zp, pivot)
+    """
 
     return info
 

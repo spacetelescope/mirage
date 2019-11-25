@@ -120,7 +120,7 @@ setup(
         'matplotlib>=1.4.3',
         'numpy',
         'photutils>=0.4.0',
-        'pysiaf>=0.1.11'
+        'pysiaf>=0.6.1'
         'scipy>=0.17',
     ],
     include_package_data=True,
