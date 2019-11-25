@@ -600,13 +600,4 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         else:
             print('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
 
-            # old code
-
-            #mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
-            #flux *= mag_in_flam
-            #spec[dataset]['fluxes'] = flux * FLAMBDA_CGS_UNITS
     return spec
-
-
-
-
