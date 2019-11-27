@@ -31,6 +31,7 @@ import astropy.units as u
 import numpy as np
 from scipy.interpolate import interp1d
 from synphot import Observation, SourceSpectrum, units
+from synphot.config import conf as syn_conf
 from synphot.spectrum import SpectralElement
 from synphot.models import Empirical1D
 
@@ -582,6 +583,11 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         requested magnitude, only for spectra where the flux units are
         astropy.units.pct
     """
+    # Get the Vega spectrum from synphot. Use the version that was used
+    # to create the photom reference files and filter zeropoints
+    with syn_conf.set_temp('vega_file', 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_008.fits'):
+        vegaspec = SourceSpectrum.from_vega()
+
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
     instrument = mag_colname.split('_')[0].lower()
 
@@ -619,7 +625,7 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
 
             if magnitude_system == 'vegamag':
                 magunits = units.VEGAMAG
-                vega_spec = SourceSpectrum.from_vega()
+                vega_spec = vegaspec
             elif magnitude_system == 'abmag':
                 magunits = u.ABmag
                 vega_spec = None
