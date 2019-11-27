@@ -583,7 +583,7 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         astropy.units.pct
     """
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
-    instrument = mag_colname.split('_')[0]
+    instrument = mag_colname.split('_')[0].lower()
 
     # Make a copy so we aren't modifying spec in place, which seems to be passed
     # by reference back to the calling function
@@ -616,6 +616,7 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
 
             # Renormalize
             magnitude_system = magnitude_system.lower()
+
             if magnitude_system == 'vegamag':
                 magunits = units.VEGAMAG
                 vega_spec = SourceSpectrum.from_vega()
@@ -627,7 +628,22 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
                 vega_spec = None
             elif magnitude_system == 'counts':
                 raise ValueError('ERROR: normalization to a given countrate not yet supported.')
-            renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
+            if magnitude_system != 'vegamag':
+                renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
+            else:
+                if instrument == 'nircam':
+                    # NIRCam vegamag zeropoints are based on synphot's Vega spectrum
+                    renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
+                elif instrument == 'niriss':
+                    # NIRISS vegamag zeropoints are based on Vega having a
+                    # magnitude of 0.02 in all filters
+                    renorm = source_spectrum.normalize((magnitude - 0.02) * units.VEGAMAG, bandpass, vegaspec=vega_spec)
+                elif instrument == 'fgs':
+                    # FGS vegamag zeropoints are based on a Sirius spectrum
+                    # rather than Vega
+                    raise NotImplementedError("Source spectrum rescaling for FGS not yet supported")
+                    sirius_spectrum = make_a_SourceSpectrum_object_of_Sirius()
+                    renorm = source_spectrum.normalize(magnitude * units.VEGAMAG, bandpass, vegaspec=sirius_spectrum)
 
             spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
         else:

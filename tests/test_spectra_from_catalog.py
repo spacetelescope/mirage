@@ -227,12 +227,12 @@ def test_spectra_rescaling():
     catalog = Table()
     catalog['index'] = [1, 2]
     catalog['nircam_f322w2_magnitude'] = [18.] * 2
-    catalog['niriss_f444w_magnitude'] = [18.] * 2
+    catalog['niriss_f090w_magnitude'] = [18.] * 2
     catalog['fgs_magnitude'] = [18.] * 2
 
     # Instrument info
     instrument = ['nircam', 'niriss']
-    filter_name = ['F322W2', 'F444W']
+    filter_name = ['F322W2', 'F090W']
     module = ['B', 'N']
     detector = ['NRCA1', 'NIS']
 
@@ -241,6 +241,11 @@ def test_spectra_rescaling():
 
     # Loop over options and test each
     for inst, filt, mod, det in zip(instrument, filter_name, module, detector):
+
+        # Extract the appropriate column from the catalog information
+        magcol = [col for col in catalog.colnames if inst in col]
+        sub_catalog = catalog['index', magcol[0]]
+
         # Filter throughput files
         filter_thru_file = get_filter_throughput_file(instrument=inst, filter_name=filt,
                                                       nircam_module=mod, fgs_detector=det)
@@ -262,7 +267,7 @@ def test_spectra_rescaling():
 
         # Check the renormalization in all photometric systems
         for magsys in mag_sys:
-            rescaled_spectra = spec.rescale_normalized_spectra(spectra, catalog, magsys, filter_thru_file, gain)
+            rescaled_spectra = spec.rescale_normalized_spectra(spectra, sub_catalog, magsys, filter_thru_file, gain)
 
             # Calculate the countrate associated with the renormalized
             # spectrum through the requested filter
@@ -287,26 +292,16 @@ def test_spectra_rescaling():
                     check_counts = magnitude_to_countrate('imaging', magsys, magnitude, photfnu=photfnu.value,
                                                           photflam=photflam.value, vegamag_zeropoint=zeropoint)
 
-                    # Check that the countrates agree
-                    #print('Working on: ', inst, filt, mod, det, magsys, dataset, magnitude)
-                    #print(filter_thru_file)
-                    #print('dataset and rescaled flux value')
-                    #print(dataset, rescaled_spectra[dataset]['fluxes'][0])
-                    #print('Fluxcal info', magsys, magnitude, photfnu, photflam, zeropoint)
-                    #print('Counts from renormalized spectrum: ', renorm_counts)
-                    #print('Counts from magnitude_to_countrate: ', check_counts)
-                    #print('Ratio: {}\n'.format(renorm_counts.value / check_counts))
-
                     if magsys != 'vegamag':
                         # As long as the correct gain is used, AB mag and ST mag
                         # count rates agree very well
                         tolerance = 0.0005
                     else:
-                        # Vegamag count rates for NIRISS have a larger disagreement
-                        # because the photom ref file was made under the assumption
-                        # that Vega = +0.02 magnitudes in all filters, but synphot
-                        # assumes 0.0.
-                        tolerance = 0.03
+                        # Vegamag count rates for NIRISS have a sligtly larger
+                        # disagreement. Zeropoints were derived assuming Vega = 0.02
+                        # magnitudes. This offset has been added to the rescaling
+                        # function, but may not be exact.
+                        tolerance = 0.0015
 
                     # This dataset has been rescaled, so check that the
                     # countrate from the rescaled spectrum matches that from
@@ -315,6 +310,8 @@ def test_spectra_rescaling():
                         check_counts = check_counts.value
                     if isinstance(renorm_counts, u.quantity.Quantity):
                         renorm_counts = renorm_counts.value
+
+                    print(inst, filt, magsys, renorm_counts, check_counts, renorm_counts / check_counts)
                     assert np.isclose(renorm_counts, check_counts, atol=0, rtol=tolerance), \
                         print('Failed assertion: ', inst, filt, magsys, renorm_counts, check_counts,
                               renorm_counts / check_counts)
