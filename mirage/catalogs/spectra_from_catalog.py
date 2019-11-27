@@ -587,6 +587,7 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
     # to create the photom reference files and filter zeropoints
     with syn_conf.set_temp('vega_file', 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_008.fits'):
         vegaspec = SourceSpectrum.from_vega()
+    print(vegaspec.meta)
 
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
     instrument = mag_colname.split('_')[0].lower()
