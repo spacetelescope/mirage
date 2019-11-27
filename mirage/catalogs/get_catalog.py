@@ -134,7 +134,7 @@ def get_sw_catalog(target_coords, search_radius=15 * u.arcmin):
         # Save shortwave catalog and header comments to file
         comments = [
             '',
-            'abmag',
+            'vegamag',
             'Catalog for ramp_simulator.py. created from 2MASS catalog',
             'Matching NIRCam SW F212N filter',
             'Magnitudes are Kmag (2-3 microns).'
