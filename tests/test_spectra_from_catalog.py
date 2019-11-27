@@ -228,13 +228,13 @@ def test_spectra_rescaling():
     catalog['index'] = [1, 2]
     catalog['nircam_f322w2_magnitude'] = [18.] * 2
     catalog['niriss_f090w_magnitude'] = [18.] * 2
-    catalog['fgs_magnitude'] = [18.] * 2
+    #catalog['fgs_magnitude'] = [18.] * 2
 
     # Instrument info
-    instrument = ['nircam', 'niriss']
-    filter_name = ['F322W2', 'F090W']
-    module = ['B', 'N']
-    detector = ['NRCA1', 'NIS']
+    instrument = ['nircam', 'niriss']  # , 'fgs']
+    filter_name = ['F322W2', 'F090W']  # , 'N/A']
+    module = ['B', 'N']  # , 'F']
+    detector = ['NRCA1', 'NIS']  # , 'GUIDER1']
 
     # Magnitude systems of renormalization magnitudes
     mag_sys = ['vegamag', 'abmag', 'stmag']

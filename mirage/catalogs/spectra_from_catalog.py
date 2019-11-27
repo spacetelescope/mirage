@@ -642,7 +642,12 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
                     # FGS vegamag zeropoints are based on a Sirius spectrum
                     # rather than Vega
                     raise NotImplementedError("Source spectrum rescaling for FGS not yet supported")
-                    sirius_spectrum = make_a_SourceSpectrum_object_of_Sirius()
+                    sirius_file = 'sirius_mod_003.txt'
+                    sirius_tab = ascii.read(sirius_file)
+                    sirius_waves = sirius_tab['Wavelength'] * u.Angstrom
+                    sirius_flux = sirius_tab['Flux'] * units.FLAM
+                    sirius_spectrum = SourceSpectrum(Empirical1D, points=sirius_waves, lookup_table=sirius_flux)
+                    #sirius_spec_norm = sirius_spectrum.normalize(0. * units.VEGAMAG, bandpass, vegaspec=sirius_spectrum)
                     renorm = source_spectrum.normalize(magnitude * units.VEGAMAG, bandpass, vegaspec=sirius_spectrum)
 
             spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
