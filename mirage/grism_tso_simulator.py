@@ -67,7 +67,7 @@ from mirage.ramp_generator import obs_generator
 from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
-from mirage.utils import utils, file_io
+from mirage.utils import utils, file_io, backgrounds
 from mirage.yaml import yaml_update
 
 
@@ -209,17 +209,67 @@ class GrismTSO():
         # source from the other sources
         self.split_param_file(orig_parameters)
 
+        print('Splitting background and TSO source into multiple yaml files')
+        print('Running background sources through catalog_seed_image')
+        print('background param file is:', self.background_paramfile)
+
         # Run the catalog_seed_generator on the non-TSO (background) sources
         background_direct = catalog_seed_image.Catalog_seed()
         background_direct.paramfile = self.background_paramfile
         background_direct.make_seed()
         background_segmentation_map = background_direct.seed_segmap
 
-        # Run the disperser on the background sources
+
+
+
+
+
+        # Stellar spectrum hdf5 file will be required, so no need to create one here.
+        # Create hdf5 file with spectra of all sources if requested
+        self.final_SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
+                                                                    input_spectra_file=self.SED_file,
+                                                                    extrapolate_SED=self.extrapolate_SED,
+                                                                    output_filename=self.final_SED_file,
+                                                                    normalizing_mag_column=self.SED_normalizing_catalog_column)
+
+        bkgd_waves, bkgd_fluxes = backgrounds.nircam_background_spectrum(orig_parameters,
+                                                                         self.detector, self.module)
+
+        # Run the disperser on the background sources. Add the background
+        # signal here as well
         print('\n\nDispersing background sources\n\n')
-        background_dispersed = self.run_disperser(background_direct.seed_file, orders=self.orders,
-                                                  create_continuum_seds=True, add_background=True)
-        print('Max signal in dispersed background img: {}'.format(np.max(background_dispersed.final)))
+
+        background_done = False
+        background_seed_files = [background_direct.ptsrc_seed_filename,
+                                 background_direct.galaxy_seed_filename,
+                                 background_direct.extended_seed_filename]
+        for seed_file in background_seed_files:
+            if seed_file is not None:
+                print("Dispersing seed image:", seed_file)
+                print('add_background is: ', not background_done)
+                disp = self.run_disperser(seed_file, orders=self.orders,
+                                          add_background=not background_done,
+                                          background_waves=bkgd_waves,
+                                          background_fluxes=bkgd_fluxes)
+                if not background_done:
+                    # Background is added at the first opportunity. At this
+                    # point, create an array to hold the final combined
+                    # dispersed background
+                    background_done = True
+                    background_dispersed = copy.deepcopy(disp.final)
+                background_dispersed += disp.final
+
+
+
+
+
+
+
+
+
+
+
+        print('Max signal in dispersed background img: {}'.format(np.max(background_dispersed)))
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -260,12 +310,12 @@ class GrismTSO():
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
         print('\n\nDispersing TSO source\n\n')
         grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders,
-                                               create_continuum_seds=False, add_background=False)
+                                               add_background=False, cache=True)
         print('Max signal in dispersed img: {}'.format(np.max(grism_seed_object.final)))
 
         # Save the dispersed seed images if requested
         if self.save_dispersed_seed:
-            h_back = fits.PrimaryHDU(background_dispersed.final)
+            h_back = fits.PrimaryHDU(background_dispersed)
             h_back.header['EXTNAME'] = 'BACKGROUND_SOURCES'
             h_tso = fits.ImageHDU(grism_seed_object.final)
             h_tso.header['EXTNAME'] = 'TSO_SOURCE'
@@ -278,7 +328,7 @@ class GrismTSO():
         # Crop dispersed seed images to correct final subarray size
         #no_transit_signal = grism_seed_object.final
         no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
-        background_dispersed.final = utils.crop_to_subarray(background_dispersed.final, tso_direct.subarray_bounds)
+        background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
         # Calculate file splitting info
         self.file_splitting()
@@ -387,9 +437,9 @@ class GrismTSO():
                         # comes from no_transit_signal
                         if total_frame_counter in unaltered_frames:
                             #print("{} is unaltered.".format(total_frame_counter))
-                            frame_only_signal = (background_dispersed.final + no_transit_signal) * self.frametime
+                            frame_only_signal = (background_dispersed + no_transit_signal) * self.frametime
                             print('Max signal in frame_only_signal: {}'.format(np.max(frame_only_signal)))
-                            print('input to this, max in background disp and tso disp images: {}, {}'.format(np.max(background_dispersed.final), np.max(no_transit_signal)))
+                            print('input to this, max in background disp and tso disp images: {}, {}'.format(np.max(background_dispersed), np.max(no_transit_signal)))
                         # If the frame is from a part of the lightcurve
                         # where the transit is happening, then call the
                         # cached disperser with the appropriate lightcurve
@@ -401,7 +451,7 @@ class GrismTSO():
                                 grism_seed_object.this_one[order].disperse_all_from_cache(trans_interp)
                             cropped_grism_seed_object = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
                             #frame_only_signal = (background_dispersed.final + grism_seed_object.final) * self.frametime
-                            frame_only_signal = (background_dispersed.final + cropped_grism_seed_object) * self.frametime
+                            frame_only_signal = (background_dispersed + cropped_grism_seed_object) * self.frametime
 
                         # Now add the signal from this frame to that in the
                         # previous frame in order to arrive at the total
@@ -651,8 +701,10 @@ class GrismTSO():
             pass
         if self.instrument == 'niriss':
             self.module = None
+            self.detetor = 'NIS'
         elif self.instrument == 'nircam':
             self.module = parameters['Readout']['array_name'][3]
+            self.detector = parameters['Readout']['array_name'][0:5]
         else:
             raise ValueError("ERROR: Grism TSO mode not supported for {}".format(self.instrument))
 
@@ -741,17 +793,19 @@ class GrismTSO():
             raise ValueError(("ERROR: Orders to be dispersed must be either None or some combination "
                               "of '+1', '+2'"))
 
-    def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False, add_background=True):  # , finalize=False):
+    def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False,
+                      add_background=True, background_waves=None, background_fluxes=None,
+                      cache=False):
         """
         """
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
-        if create_continuum_seds:
-            self.final_SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
-                                                                        input_spectra_file=self.SED_file,
-                                                                        extrapolate_SED=self.extrapolate_SED,
-                                                                        output_filename=self.final_SED_file,
-                                                                        normalizing_mag_column=self.SED_normalizing_catalog_column)
+        #if create_continuum_seds:
+        #    self.final_SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
+        #                                                                input_spectra_file=self.SED_file,
+        #                                                                extrapolate_SED=self.extrapolate_SED,
+        #                                                                output_filename=self.final_SED_file,
+        #                                                                normalizing_mag_column=self.SED_normalizing_catalog_column)
 
         # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
@@ -759,14 +813,14 @@ class GrismTSO():
 
         # Determine the name of the background file to use, as well as the
         # orders to disperse.
-        if self.instrument == 'nircam':
-            dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
-            background_file = ("{}_{}_back.fits"
-                               .format(self.crossing_filter, dmode))
-        elif self.instrument == 'niriss':
-            dmode = 'GR150{}'.format(self.dispersion_direction)
-            background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
-            print('Background file is {}'.format(background_file))
+        #if self.instrument == 'nircam':
+        dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
+        #    background_file = ("{}_{}_back.fits"
+        #                       .format(self.crossing_filter, dmode))
+        #elif self.instrument == 'niriss':
+        #    dmode = 'GR150{}'.format(self.dispersion_direction)
+        #    background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(), dmode.lower())
+        #    print('Background file is {}'.format(background_file))
         orders = self.orders
 
         # Create dispersed seed image from the direct images
@@ -774,21 +828,25 @@ class GrismTSO():
                                dmode, config_path=loc, instrument=self.instrument.upper(),
                                extrapolate_SED=self.extrapolate_SED, SED_file=self.final_SED_file,
                                SBE_save=self.source_stamps_file)
-        disp_seed.observation()
-        for order in orders:
-            disp_seed.this_one[order].disperse_all(cache=True)
+        disp_seed.observation(orders=orders)
 
-        print('DISPERSED SIZE: ', disp_seed.this_one[order].simulated_image.shape)
+        # Cache the dispersion if requested. This will allow you to
+        #disperse the same object again later with a different lightcurve
+        if cache:
+            for order in orders:
+                disp_seed.this_one[order].disperse_all(cache=True)
+        else:
+            disp_seed.disperse(orders=orders)
 
-
-        #if finalize:
         if add_background:
             #print('FINALIZING')
             #print(background_file)
             #with fits.open(os.path.join('/ifs/jwst/wit/mirage_data/nircam/GRISM_NIRCAM', background_file)) as h:
             #    delme = h[0].data
             #print('background file size: ', delme.shape)
-            disp_seed.finalize(Back=background_file)
+            #disp_seed.finalize(Back=background_file)
+            background_image = disp_seed.disperse_background_1D([background_waves, background_fluxes])
+            disp_seed.finalize(Back=background_image, BackLevel=None)
         else:
             disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
@@ -1000,9 +1058,6 @@ class GrismTSO():
         all but the TSO source, while the other will contain only the TSO
         source.
         """
-        # Read in the initial parameter file
-        #params = read_yaml(self.paramfile)
-
         file_dir, filename = os.path.split(self.paramfile)
         suffix = filename.split('.')[-1]
 
@@ -1020,22 +1075,23 @@ class GrismTSO():
 
         # Copy #2 - contaings only the TSO grism source catalog,
         # is set to wfss mode, and has no background
-        params['Inst']['mode'] = 'wfss'
-        params['Output']['grism_source_image'] = True
-        params['simSignals']['bkgdrate'] = 0.
-        params['simSignals']['zodiacal'] = 'None'
-        params['simSignals']['scattered'] = 'None'
+        tso_params = copy.deepcopy(params)
+        tso_params['Inst']['mode'] = 'wfss'
+        tso_params['Output']['grism_source_image'] = True
+        tso_params['simSignals']['bkgdrate'] = 0.
+        tso_params['simSignals']['zodiacal'] = 'None'
+        tso_params['simSignals']['scattered'] = 'None'
         other_catalogs = ['pointsource', 'galaxyListFile', 'extended', 'tso_imaging_catalog',
                           'movingTargetList', 'movingTargetSersic', 'movingTargetExtended',
                           'movingTargetToTrack']
         for catalog in other_catalogs:
-            params['simSignals'][catalog] = 'None'
-        params['simSignals']['pointsource'] = params['simSignals']['tso_grism_catalog']
-        params['Output']['file'] = params['Output']['file'].replace('.fits', '_tso_grism_sources.fits')
+            tso_params['simSignals'][catalog] = 'None'
+        tso_params['simSignals']['pointsource'] = tso_params['simSignals']['tso_grism_catalog']
+        tso_params['Output']['file'] = tso_params['Output']['file'].replace('.fits', '_tso_grism_sources.fits')
 
         self.tso_paramfile = self.paramfile.replace('.{}'.format(suffix),
                                                     '_tso_grism_sources.{}'.format(suffix))
-        utils.write_yaml(params, self.tso_paramfile)
+        utils.write_yaml(tso_params, self.tso_paramfile)
 
     @staticmethod
     def tso_catalog_check(catalog, exp_time):

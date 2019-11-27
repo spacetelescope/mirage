@@ -320,6 +320,23 @@ class Catalog_seed():
                        .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
                 self.psf_wing_sizes['number_of_pixels'][too_large] = max_wing_size
 
+        # Prepare for saving seed images. Set default values for the
+        # keywords that must appear in the headers of any seed image
+        # file
+
+        # Attributes related to file splitting, which is done in cases
+        # where the data volume is too large. Currently this is only
+        # implemented for imaging TSO. The only other mode where it
+        # will need to be implemented is moving tagets
+        self.segment_number = 1
+        self.segment_part_number = 1
+        self.segment_frames = self.frames_per_integration  # self.seedimage.shape[1]
+        self.segment_ints = self.params['Readout']['nint']  # self.seedimage.shape[0]
+        self.segment_frame_start_number = 0
+        self.segment_int_start_number = 0
+        self.part_int_start_number = 0
+        self.part_frame_start_number = 0
+
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             print('Creating signal rate image of synthetic inputs.')
@@ -373,6 +390,7 @@ class Catalog_seed():
             self.create_tso_seed(split_seed=split_seed, integration_splits=integration_segment_indexes,
                                  frame_splits=group_segment_indexes)
         else:
+
             # For seed images to be dispersed in WFSS mode,
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
@@ -381,18 +399,19 @@ class Catalog_seed():
                (aperture_suffix not in ['FULL', 'CEN'])):
                 self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
 
+            # THIS HAS BEEN MOVED ABOVE, PRIOR TO CREATE_SIDEREAL_IMAGE
             # Attributes related to file splitting, which is done in cases
             # where the data volume is too large. Currently this is only
             # implemented for imaging TSO. The only other mode where it
             # will need to be implemented is moving tagets
-            self.segment_number = 1
-            self.segment_part_number = 1
-            self.segment_frames = self.seedimage.shape[1]
-            self.segment_ints = self.seedimage.shape[0]
-            self.segment_frame_start_number = 0
-            self.segment_int_start_number = 0
-            self.part_int_start_number = 0
-            self.part_frame_start_number = 0
+            #self.segment_number = 1
+            #self.segment_part_number = 1
+            #self.segment_frames = self.seedimage.shape[1]
+            #self.segment_ints = self.seedimage.shape[0]
+            #self.segment_frame_start_number = 0
+            #self.segment_int_start_number = 0
+            #self.part_int_start_number = 0
+            #self.part_frame_start_number = 0
 
             # For NIRISS POM data, extract the central 2048x2048
             if self.params['Inst']['mode'] in ["pom"]:
@@ -407,14 +426,14 @@ class Catalog_seed():
                 self.seed_segmap *= self.maskimage
 
             # Save the combined static + moving targets ramp
-            self.saveSeedImage()
- 
+            self.seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
+            self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_filename)
+
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
 
-
     def create_tso_seed(self, split_seed=False, integration_splits=-1, frame_splits=-1):
-        """Create a seed image for time series or grism time series
+        """Create a seed image for time series
         sources. Just like for moving targets, the seed image will
         be 4D
 
@@ -482,7 +501,30 @@ class Catalog_seed():
                 segmap *= self.maskimage
 
                 # Save the seed image segment to a file
-                self.saveSeedImage(seed_img=seed, seed_seg=segmap)
+
+
+
+                if self.total_seed_segments_and_parts == 1:
+                    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
+                                                  '_seed_image.fits')
+                else:
+                    print('XXXXXXX SHOULD NOT BE HERE XXXXXXXXXXXXXX')
+                    stop
+
+                    seg_string = str(self.segment_number).zfill(3)
+                    part_string = str(self.segment_part_number).zfill(3)
+                    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
+                                                  '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+
+                self.seed_files.append(self.seed_file)
+
+
+
+
+
+
+
+                self.saveSeedImage(seed, segmap, self.seed_file)
                 print('XXXXXXX Calling saveSeedImage   XXXXXXXX')
             else:
 
@@ -490,8 +532,8 @@ class Catalog_seed():
                 ###############################################
                 # Try using frame splitting metadata class
                 split_meta = SplitFileMetaData(integration_splits, frame_splits,
-                                              self.file_segment_indexes, self.group_segment_indexes_g,
-                                              self.frames_per_integration, self.frames_per_group, self.frametime)
+                                               self.file_segment_indexes, self.group_segment_indexes_g,
+                                               self.frames_per_integration, self.frames_per_group, self.frametime)
 
                 counter = 0
                 i = 1
@@ -536,7 +578,16 @@ class Catalog_seed():
                         # Save the seed image segment to a file
 
                         print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
-                        self.saveSeedImage(seed_img=seed, seed_seg=segmap)
+
+
+                        seg_string = str(self.segment_number).zfill(3)
+                        part_string = str(self.segment_part_number).zfill(3)
+                        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
+                                                      '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+
+
+                        self.saveSeedImage(seed, segmap, self.seed_file)
+                        self.seed_files.append(self.seed_file)
                         j += 1
 
                     i += 1
@@ -703,9 +754,7 @@ class Catalog_seed():
             self.seedimage = seed
             self.seed_segmap = segmap
         else:
-            print('Grism TSO not yet supported!')
-            # Catalog will be different format here
-            # Different lightcurves for different filters/wavelengths?
+            print('Grism TSO should be done with grism_tso_simulator.py!')
 
     def get_frame_count_info(self):
         """Calculate information on the number of frames per group and
@@ -948,16 +997,16 @@ class Catalog_seed():
         kw['UNITS'] = units
         kw['TGROUP'] = tgroup
 
-        if self.total_seed_segments_and_parts == 1:
-            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                          '_seed_image.fits')
-        else:
-            seg_string = str(self.segment_number).zfill(3)
-            part_string = str(self.segment_part_number).zfill(3)
-            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                          '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
-
-        self.seed_files.append(self.seed_file)
+        #if self.total_seed_segments_and_parts == 1:
+        #    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
+        #                                  '_seed_image.fits')
+        #else:
+        #    seg_string = str(self.segment_number).zfill(3)
+        #    part_string = str(self.segment_part_number).zfill(3)
+        #    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
+        #                                  '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+        #
+        #self.seed_files.append(self.seed_file)
 
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
@@ -2030,7 +2079,7 @@ class Catalog_seed():
         else:
             self.point_source_seed = None
             self.point_source_seg_map = None
-            self.point_seed_filename = None
+            self.ptsrc_seed_filename = None
 
         # Simulated galaxies
         # Read in the list of galaxy positions/magnitudes to simulate
