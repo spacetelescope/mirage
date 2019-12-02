@@ -601,12 +601,20 @@ class AptInput:
                         # while observations have a value of 1
                         # (that I've seen so far)
 
+                        # The exception to this rule is TA images.
+                        # These have Exp values of 0. Sigh.
+
+
                         if ((np.int(elements[1]) > 0) & ('NRC' in elements[4]
                                                          or 'NIS' in elements[4]
                                                          or 'FGS' in elements[4]
                                                          or 'NRS' in elements[4]
                                                          or 'MIR' in elements[4])
-                            ):
+                            ) or (('TA' in elements[4]) & ('NRC' in elements[4]
+                                                         or 'NIS' in elements[4]
+                                                         or 'FGS' in elements[4]
+                                                         or 'NRS' in elements[4]
+                                                         or 'MIR' in elements[4])):
                             if (elements[18] == 'PARALLEL') and ('MIRI' in elements[4]):
                                 skip = True
 

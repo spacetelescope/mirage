@@ -1264,11 +1264,12 @@ class ReadAPTXML():
         exposures_dictionary['LongFilter'] = [acq_filter, long_filter]
         exposures_dictionary['LongPupil'] = ['CLEAR', long_pupil]
         exposures_dictionary['FiducialPointOverride'] = [str(False)] * 2
+        exposures_dictionary['ParallelInstrument'] = [False] * 2
 
         # Populate other keywords with None
         for key in self.APTObservationParams_keys:
             value = 'reset_value'
-            if key in proposal_parameter_dictionary.keys():
+            if key in proposal_parameter_dictionary.keys() and key != 'TargetID':
                 value = [proposal_parameter_dictionary[key]] * 2
             elif exposures_dictionary[key] == []:
                 value = [str(None)] * 2
