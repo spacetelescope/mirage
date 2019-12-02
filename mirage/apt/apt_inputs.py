@@ -423,20 +423,37 @@ class AptInput:
 
                 # Keep only apertures in the correct module
                 matched_allmod_apertures = nircam_apertures['AperName'][matches].data
+
+                print('matched_allmod_apertures', matched_allmod_apertures)
+                print('module:', module)
+
+
                 matched_apertures = []
                 for mod in module:
-                    good = [ap for ap in matched_apertures if 'NRC{}'.format(mod) in ap]
+                    good = [ap for ap in matched_allmod_apertures if 'NRC{}'.format(mod) in ap]
                     matched_apertures.extend(good)
+                    print('good:', good)
+                    print('filter out by module:', matched_apertures)
 
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
                     print('FULL')
                     mode = input_dictionary['Mode'][index]
-                    if ((sub == 'FULL') and (mode in ['wfss', 'ts_grism'])):
-                        print('GRISM MODE')
-                        matched_apertures = np.array([ap for ap in matched_apertures if 'GRISM' in ap])
+                    if (sub == 'FULL'):
+                        if mode == 'wfss':
+
+                            print('FULL GRISM MODE')
+                            matched_apertures = np.array([ap for ap in matched_apertures if 'GRISM' in ap and 'GRISMTS' not in ap])
+                            print(matched_apertures)
+
+                        elif mode == 'ts_grism':
+                            print('FULL GRISMTS MODE')
+                            matched_apertures = np.array([ap for ap in matched_apertures if 'GRISM' in ap])
+                            this_needs_to_be_fixed()
+
                         long_filter = input_dictionary['LongFilter'][index]
-                        filter_dependent_apertures = [ap for ap in matched_apertures if len(ap.split('_')) == 3]
+                        filter_dependent_apertures = np.array([ap for ap in matched_apertures if len(ap.split('_')) == 3])
                         filtered_aperture = self.extract_grism_aperture(filter_dependent_apertures, long_filter)
+                        print('FILTERED_APERTURE:', filtered_aperture)
 
                         filtered_splits = filtered_aperture[0].split('_')
                         filtered_ap_no_det = '{}_{}'.format(filtered_splits[1], filtered_splits[2])
@@ -452,11 +469,23 @@ class AptInput:
 
                         matched_apertures = [filtered_ap_no_det].extend(apertures_to_add)
 
+
+                        print(detectors)
+                        print(matched_apertures)
+
+
                     else:
                         print('IMAGING MODE')
+                        print(sub)
+                        print(matched_apertures)
                         matched_apertures = [ap for ap in matched_apertures if sub in ap]
+                        print(matched_apertures)
                         detectors = [ap.split('_')[0][3:5] for ap in matched_apertures]
                         matched_apertures = [sub] * len(detectors)
+
+                        print(detectors)
+                        print(matched_apertures)
+
                 elif 'SUBGRISM' in sub:
                     print('SUBGRISM')
                     long_filter = input_dictionary['LongFilter'][index]
@@ -477,9 +506,13 @@ class AptInput:
 
                     matched_apertures = [filtered_ap_no_det].extend(apertures_to_add)
 
+                    print(detectors)
+                    print(matched_apertures)
+
                 # Add entries to observation dictionary
                 num_entries = len(detectors)
-                observation_dictionary['Subarray'].extend(matched_apertures) extend? or replace?
+                print('need to replace entries, not extend, right?')
+                #observation_dictionary['Subarray'].extend(matched_apertures) extend? or replace?
                 for key in input_dictionary:
                     if key not in ['Subarray']:
                         observation_dictionary[key].extend(([input_dictionary[key][index]] * num_entries))
@@ -583,7 +616,8 @@ class AptInput:
         filter_match = [True if filter_name in mtch else False for mtch in apertures]
         if any(filter_match):
             print('EXACT FILTER MATCH')
-            apertures = list(apertures[filter_match])
+            print(filter_match)
+            apertures = list(np.array(apertures)[filter_match])
         else:
             print('NO EXACT FILTER MATCH')
             filter_int = int(filter_name[1:4])
@@ -591,6 +625,9 @@ class AptInput:
             wave_diffs = np.abs(aperture_int - filter_int)
             min_diff_index = np.where(wave_diffs == np.min(wave_diffs))[0]
             apertures = list(apertures[min_diff_index])
+
+            print(filter_int, aperture_int, min_diff_index, apertures)
+
         return apertures
 
     def extract_value(self, line):
