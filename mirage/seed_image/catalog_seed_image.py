@@ -426,8 +426,14 @@ class Catalog_seed():
                 self.seed_segmap *= self.maskimage
 
             # Save the combined static + moving targets ramp
-            self.seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
+            if self.params['Inst']['instrument'].lower() != 'fgs':
+                self.seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
+            else:
+                self.seed_file = '{}_final_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_filename)
+            print("Final seed image and segmentation map saved as {}".format(self.seed_file))
+            print("Seed image, segmentation map, and metadata available as:")
+            print("self.seedimage, self.seed_segmap, self.seedinfo.")
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
@@ -1997,6 +2003,7 @@ class Catalog_seed():
             signalimage = np.zeros((yd, xd), dtype=np.float)
             segmentation_map = np.zeros((yd, xd))
 
+        instrument_name = self.params['Inst']['instrument'].lower()
         # yd, xd = signalimage.shape
         arrayshape = signalimage.shape
 
@@ -2072,7 +2079,10 @@ class Catalog_seed():
                                                                                            self.point_source_seg_map)
 
             # Save the point source seed image
-            self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+            if instrument_name != 'fgs':
+                self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+            else:
+                self.ptsrc_seed_filename = '{}_ptsrc_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.point_source_seed, self.point_source_seg_map, self.ptsrc_seed_filename)
             print("Point source image and segmap saved as {}".format(self.ptsrc_seed_filename))
 
@@ -2106,7 +2116,10 @@ class Catalog_seed():
                                                                                              self.galaxy_source_seg_map)
 
             # Save the galaxy source seed image
-            self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+            if instrument_name != 'fgs':
+                self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+            else:
+                self.galaxy_seed_filename = '{}_galaxy_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.galaxy_source_seed, self.galaxy_source_seg_map, self.galaxy_seed_filename)
             print("Simulated galaxy image and segmap saved as {}".format(self.galaxy_seed_filename))
 
@@ -2147,7 +2160,10 @@ class Catalog_seed():
                                                                                                  self.extended_source_seg_map)
 
             # Save the extended source seed image
-            self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+            if instrument_name != 'fgs':
+                self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+            else:
+                self.extended_seed_filename = '{}_extended_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.extended_source_seed, self.extended_source_seg_map, self.extended_seed_filename)
             print("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
 

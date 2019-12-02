@@ -59,6 +59,8 @@ def fluxcal_info(params, usefilt, detector, module):
     # manually add a Detector key to the dictionary as a placeholder.
     if params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
         zps = add_detector_to_zeropoints(detector, zpts)
+    else:
+        zps = copy.deepcopy(zpts)
 
     # Make sure the requested filter is allowed
     if params['Readout'][usefilt] not in zps['Filter']:
