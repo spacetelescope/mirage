@@ -740,11 +740,11 @@ class SimInput:
             elif parallel_instrument.upper() == 'NIRCAM':
                 module = self.info['Module'][obs_indexes[par_indexes[0]]]
                 detectors_used = np.array(self.info['detector'])[obs_indexes[par_indexes]]
-            n_det = len(set(detectors_used))
 
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
                 if module == 'ALL':
                     module = 'A and B'
+                n_det = len(set(detectors_used))
             else:
                 n_det = 1
 
@@ -2012,6 +2012,9 @@ class SimInput:
             # For now, skip populating the target RA and Dec in WFSC data.
             # The read_xxxxx funtions for these observation types will have
             # to be updated to make use of the proposal_parameter_dictionary
+            if np.isreal(input['TargetRA']):
+                input['TargetRA'] = str(input['TargetRA'])
+                input['TargetDec'] = str(input['TargetDec'])
             if input['TargetRA'] != '0':
                 ra_degrees, dec_degrees = utils.parse_RA_Dec(input['TargetRA'], input['TargetDec'])
             else:
