@@ -21,9 +21,12 @@ Dependencies
 import copy
 import json
 import os
+import pkg_resources
 import re
 
 from astropy.io import ascii as asc
+import numpy as np
+from scipy.stats import sigmaclip
 
 from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS
 
@@ -109,8 +112,6 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     """
     instrument = instrument.lower()
     if instrument == "nircam":
-        xs = xdim
-        ys = ydim
         colpad = 12
 
         # Fullframe
@@ -121,13 +122,18 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             # All subarrays
             rowpad = 2
             fullpad = 0
+
             if ((xdim <= 8) & (ydim <= 8)):
                 # The smallest subarray
                 rowpad = 3
 
     elif instrument == "niriss":
-        xs = ydim
-        ys = xdim
+        # Reverse x and y since NIRISS's fast readout direction is
+        # opposite of NIRCam's
+        tmpx = copy.deepcopy(xdim)
+        xdim = copy.deepcopy(ydim)
+        ydim = tmpx
+
         colpad = 12
 
         # Fullframe
@@ -139,21 +145,29 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
             fullpad = 0
 
     elif instrument == 'fgs':
-        xs = ydim
-        ys = xdim
-        colpad = 6
-        if 'acq1' in aperture.lower():
-            colpad = 12
-        rowpad = 1
-        if amps == 4:
+        # Reverse x and y since FGS's fast readout direction is
+        # opposite of NIRCam's
+        tmpx = copy.deepcopy(xdim)
+        xdim = copy.deepcopy(ydim)
+        ydim = tmpx
+
+        colpad = 12
+        fullpad = 0
+
+        if ((xdim == 2048) & (ydim == 2048)):
+            rowpad = 1
             fullpad = 1
         else:
-            fullpad = 0
+            rowpad = 2
 
-    return ((1.0 * xs / amps + colpad) * (ys + rowpad) + fullpad) * 1.e-5
+        if ((xdim <= 32) & (ydim <= 32)):
+            colpad = 6
+            rowpad = 1
+
+    return ((1.0 * xdim / amps + colpad) * (ydim + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter(oldfilter,oldpupil):
+def check_niriss_filter(oldfilter, oldpupil):
     """
     This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
     that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
@@ -204,6 +218,7 @@ def check_niriss_filter(oldfilter,oldpupil):
         newfilter = oldfilter
         newpupil = oldpupil
     return newfilter, newpupil
+
 
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
@@ -426,6 +441,49 @@ def get_aperture_definition(aperture_name, instrument):
     return aperture_definition
 
 
+def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_detector=None):
+    """Locate the filter throughput file in the config directory that
+    corresponds to the given instrument/module/filter
+
+    Parameters
+    ----------
+    instrument : str
+        Name of JWST instrument.
+
+    filter_name : str
+        Name of the filter. Ignored in the case of FGS.
+
+    nircam_module : str
+        Name of module. Ignored except in the case of NIRCam
+
+    fgs_detector : str
+        Name of FGS detector (e.g. 'GUIDER1'). Ignored in the case of other
+        instruments
+
+    Returns
+    -------
+    throughput_file : str
+        Name of ascii file containing the filter throughput curve
+    """
+    modpath = pkg_resources.resource_filename('mirage', '')
+    config_path = os.path.join(modpath, 'config')
+
+    instrument = instrument.lower()
+    if instrument == 'nircam':
+        tp_file = '{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
+                                                                          nircam_module.lower())
+    elif instrument == 'niriss':
+        tp_file = '{}_niriss_throughput1.txt'.format(filter_name.lower())
+    elif instrument == 'fgs':
+        det_number = fgs_detector[-1]
+        tp_file = 'guider{}_throughput_py.txt'.format(det_number)
+    else:
+        raise ValueError('ERROR: invalid instrument: {}'.format(instrument))
+
+    throughput_file = os.path.join(config_path, tp_file)
+    return throughput_file
+
+
 def get_subarray_info(params, subarray_table):
     """Find aperture-specific information from the subarray information config file
 
@@ -530,6 +588,29 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
         except:
             raise ValueError(("ST mag to countrate conversion failed."
                               "magnitude = {}, photflam = {}".format(mag, photflam)))
+
+
+def sigma_clipped_mean_value_of_image(array, sigma_value):
+    """Return the sigma-clipped mean value of a 2D array
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        array of values
+
+    sigma_value : int
+        Number of sigma to use as clipping threshold. Clipping will be
+        symmetric above and below the mean
+
+    Returns
+    -------
+    meanval : float
+        3-sigma iteratively sigma-clipped mean value of ``array``
+    """
+    good = np.isfinite(array)
+    clipped, lo, hi = sigmaclip(array[good], low=sigma_value, high=sigma_value)
+    meanval = clipped.mean()
+    return meanval
 
 
 def parse_RA_Dec(ra_string, dec_string):

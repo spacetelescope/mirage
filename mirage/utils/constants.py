@@ -49,25 +49,10 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'superbias': 'superbias',
                    'pixelflat': 'flat'}
 
-# Apertures that use fewer than all detectors in the module
-LIMITED_DETECTOR_APERTURES = {'SUBGRISM64': ['NRCA1', 'NRCA3', 'NRCA5', 'NRCB4', 'NRCB2', 'NRCB5'],
-                              'SUBGRISM128': ['NRCA1', 'NRCA3', 'NRCA5', 'NRCB4', 'NRCB2', 'NRCB5'],
-                              'SUBGRISM256': ['NRCA1', 'NRCA3', 'NRCA5', 'NRCB4', 'NRCB2', 'NRCB5'],
-                              'SUB32TATSGRISM': ['NRCA5', 'NRCB5'],
-                              'DHSPIL': ['NRCA3', 'NRCB4'],
-                              'DHSPIL_SUB96': ['NRCA3', 'NRCB4'],
-                              'DHSPIL_WEDGES': ['NRCA3', 'NRCB4'],
-                              'FP1': ['NRCA3', 'NRCB4'],
-                              'FP1_SUB8': ['NRCA3', 'NRCB4'],
-                              'FP1_SUB64': ['NRCA3', 'NRCB4'],
-                              'FP2MIMF': ['NRCA3', 'NRCB4'],
-                              'FP3MIMF': ['NRCA1', 'NRCB2'],
-                              'FP4MIMF': ['NRCA2', 'NRCB1'],
-                              'FP5MIMF': ['NRCA4', 'NRCB3'],
-                              'SUB64P': ['NRCA3', 'NRCA5', 'NRCB1', 'NRCB5'],
-                              'SUB160P': ['NRCA3', 'NRCA5', 'NRCB1', 'NRCB5'],
-                              'SUB400P': ['NRCA3', 'NRCA5', 'NRCB1', 'NRCB5'],
-                              }
+MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192},
+                    'niriss': 1.611902,
+                    'fgs': {'guider1': 1.9712874, 'guider2': 1.6897644}
+                    }
 
 
 def grism_factor(instrument_name):

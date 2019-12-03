@@ -36,10 +36,12 @@ import pysiaf
 from . import moving_targets
 from . import segmentation_map as segmap
 from ..reference_files import crds_tools
+from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface
 from ..utils.constants import CRDS_FILE_TYPES
+from ..utils.flux_cal import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
@@ -149,7 +151,7 @@ class Catalog_seed():
         # calculate the exposure time of a single frame, based on the size of the subarray
         self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'],
                                                self.params['Readout']['array_name'],
-                                               self.nominal_dims[0], self.nominal_dims[1],
+                                               self.nominal_dims[1], self.nominal_dims[0],
                                                self.params['Readout']['namp'])
         print("Frametime is {}".format(self.frametime))
 
@@ -284,7 +286,10 @@ class Catalog_seed():
             self.seed_segmap *= maskimage
 
         # Save the combined static + moving targets ramp
-        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_seed_image.fits')
+        if self.params['Inst']['instrument'].lower() != 'fgs':
+            self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_seed_image.fits')
+        else:
+            self.seed_file = '{}_seed_image.fits'.format(self.basename)
         self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_file)
         print("Final seed image and segmentation map saved as {}".format(self.seed_file))
         print("Seed image, segmentation map, and metadata available as:")
@@ -1462,6 +1467,7 @@ class Catalog_seed():
             signalimage = np.zeros((yd, xd), dtype=np.float)
             segmentation_map = np.zeros((yd, xd))
 
+        instrument_name = self.params['Inst']['instrument'].lower()
         # yd, xd = signalimage.shape
         arrayshape = signalimage.shape
 
@@ -1537,7 +1543,10 @@ class Catalog_seed():
                                                                                            self.point_source_seg_map)
 
             # Save the point source seed image
-            self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+            if instrument_name != 'fgs':
+                self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+            else:
+                self.ptsrc_seed_filename = '{}_ptsrc_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.point_source_seed, self.point_source_seg_map, self.ptsrc_seed_filename)
             print("Point source image and segmap saved as {}".format(self.ptsrc_seed_filename))
 
@@ -1571,7 +1580,10 @@ class Catalog_seed():
                                                                                              self.galaxy_source_seg_map)
 
             # Save the galaxy source seed image
-            self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+            if instrument_name != 'fgs':
+                self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+            else:
+                self.galaxy_seed_filename = '{}_galaxy_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.galaxy_source_seed, self.galaxy_source_seg_map, self.galaxy_seed_filename)
             print("Simulated galaxy image and segmap saved as {}".format(self.galaxy_seed_filename))
 
@@ -1612,7 +1624,10 @@ class Catalog_seed():
                                                                                                  self.extended_source_seg_map)
 
             # Save the extended source seed image
-            self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+            if instrument_name != 'fgs':
+                self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+            else:
+                self.extended_seed_filename = '{}_extended_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.extended_source_seed, self.extended_source_seg_map, self.extended_seed_filename)
             print("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
 
@@ -3755,8 +3770,12 @@ class Catalog_seed():
         if self.params['simSignals']['galaxyListFile'] == 'None':
             print('No galaxy catalog provided in yaml file.')
 
+
+
+        """
         # Read in list of zeropoints/photflam/photfnu
         self.zps = ascii.read(self.params['Reffiles']['flux_cal'])
+        """
 
         # Determine the instrument module and detector from the aperture name
         aper_name = self.params['Readout']['array_name']
@@ -3767,10 +3786,8 @@ class Catalog_seed():
             # module = detector[0]
             detector = aper_name.split('_')[0]
             self.detector = detector
-            shortdetector = detector
             if self.params["Inst"]["instrument"].lower() == 'nircam':
                 module = detector[3]
-                shortdetector = detector[3:]
             elif self.params["Inst"]["instrument"].lower() == 'niriss':
                 module = detector[0]
             elif self.params["Inst"]["instrument"].lower() == 'fgs':
@@ -3779,14 +3796,8 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-        # In the future we expect zeropoints to be detector dependent, as they
-        # currently are for FGS. So if we are working with NIRCAM or NIRISS,
-        # manually add a Detector key to the dictionary as a placeholder.
-        if self.params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
-            self.zps = self.add_detector_to_zeropoints(detector)
-
         if self.params['Inst']['instrument'].lower() == 'niriss':
-            newfilter,newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
+            newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
             self.params['Readout']['filter'] = newfilter
             self.params['Readout']['pupil'] = newpupil
 
@@ -3804,19 +3815,9 @@ class Catalog_seed():
             self.params['Readout']['filter'] = 'NA'
             self.params['Readout']['pupil'] = 'NA'
 
-        if self.params['Readout'][self.usefilt] not in self.zps['Filter']:
-            raise ValueError(("WARNING: requested filter {} is not in the list of "
-                              "possible filters.".format(self.params['Readout'][self.usefilt])))
-
-        # Get the photflambda and photfnu values that go with
-        # the filter
-        mtch = ((self.zps['Detector'] == detector) &
-                (self.zps['Filter'] == self.params['Readout'][self.usefilt]) &
-                (self.zps['Module'] == module))
-        self.vegazeropoint = self.zps['VEGAMAG'][mtch][0]
-        self.photflam = self.zps['PHOTFLAM'][mtch][0]
-        self.photfnu = self.zps['PHOTFNU'][mtch][0]
-        self.pivot = self.zps['Pivot_wave'][mtch][0]
+        # Get basic flux calibration information
+        self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
+            fluxcal_info(self.params, self.usefilt, detector, module)
 
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -3857,6 +3858,12 @@ class Catalog_seed():
         # are used
         bkgdrate_options = ['high', 'medium', 'low']
 
+        # For WFSS observations, we want the background in the direct
+        # seed image to be zero. The dispersed background will be created
+        # and added as part of the dispersion process
+        if self.params['Inst']['mode'].lower() == 'wfss':
+            self.params['simSignals']['bkgdrate'] = 0.
+
         if np.isreal(self.params['simSignals']['bkgdrate']):
             self.params['simSignals']['bkgdrate'] = float(self.params['simSignals']['bkgdrate'])
         else:
@@ -3885,9 +3892,21 @@ class Catalog_seed():
                 print(("Using {} filter throughput file for background calculation."
                        .format(filter_file)))
 
-                self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
-                                                                                  filter_file,
-                                                                                  level=self.params['simSignals']['bkgdrate'].lower())
+                if self.params['simSignals']['use_dateobs_for_background']:
+                    bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
+                                                                                       self.params['Telescope']['dec'],
+                                                                                       self.params['Output']['date_obs'])
+                    self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
+                                                                                      filter_file,
+                                                                                      back_wave=bkgd_wave,
+                                                                                      back_sig=bkgd_spec)
+                    print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
+                else:
+                    # Here the background level is based on high/medium/low rather than date
+                    self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
+                                                                                      filter_file,
+                                                                                      level=self.params['simSignals']['bkgdrate'].lower())
+                    print("Background rate determined using requested level: {}".format(self.params['simSignals']['bkgdrate']))
                 print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
             else:
                 raise ValueError(("WARNING: unrecognized background rate value. "
@@ -4087,7 +4106,7 @@ class Catalog_seed():
         #    coord_transform = self.simple_coord_transform()
         return coord_transform
 
-    def calculate_background(self, ra, dec, ffile, level='medium'):
+    def calculate_background(self, ra, dec, ffile, back_wave=None, back_sig=None, level='medium'):
         '''Use the JWST background calculator to come up with
         an appropriate background level for the observation.
         Options for level include low, medium, high'''
@@ -4098,19 +4117,28 @@ class Catalog_seed():
         # Read in filter throughput file
         filt_wav, filt_thru = self.read_filter_throughput(ffile)
 
-        # Get background information
-        # Any wavelength will return the 2D array that includes
-        # all wavelengths, so just use a dummy value of 2.5 microns
-        bg = jbt.background(ra, dec, 2.5)
+        # If the user wants a background signal from a particular day,
+        # then extract that array here
+        if self.params['simSignals']['use_dateobs_for_background']:
+            """
+            # Get background information
+            # Any wavelength will return the 2D array that includes
+            # all wavelengths, so just use a dummy value of 2.5 microns
+            bg = jbt.background(ra, dec, 2.5)
 
-        # Now we need to loop over each day (in the background)
-        # info, convolve the background curve with the filter
-        # throughput curve, and then integrate. THEN, we can
-        # calculate the low/medium/high values.
-        bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
-        for i in range(len(bg.bkg_data['total_bg'][:, 0])):
-            back_wave = bg.bkg_data['wave_array']
-            back_sig = bg.bkg_data['total_bg'][i, :]
+            # If the user wants a background signal from a particular day,
+            # then extract that array here
+            if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
+                obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
+                obs_dayofyear = obsdate.timetuple().tm_yday
+                if obs_dayofyear not in bg.bkg_data['calendar']:
+                    raise ValueError(("ERROR: The requested RA, Dec is not observable on {}. Either "
+                                      "specify a different day, or set simSignals:use_dateobs_for_background "
+                                      "to False.".format(self.params['Output']['date_obs'])))
+                match = obs_dayofyear == bg.bkg_data['calendar']
+                back_wave = bg.bkg_data['wave_array']
+                back_sig = bg.bkg_data['total_bg'][match, :]
+            """
 
             # Interpolate background to match filter wavelength grid
             bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
@@ -4119,23 +4147,54 @@ class Catalog_seed():
             filt_bkgd = bkgd_interp * filt_thru
 
             # Integrate
-            bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
+            bval = np.trapz(filt_bkgd, x=filt_wav) * u.MJy / u.steradian
 
-        # Now sort and determine the low/medium/high levels
-        x = np.sort(bsigs)
-        y = np.arange(1, len(x) + 1) / len(x)
-
-        if level.lower() == 'low':
-            perc = 0.1
-        elif level.lower() == 'medium':
-            perc = 0.5
-        elif level.lower() == 'high':
-            perc = 0.9
         else:
-            raise ValueError("Unrecognized background level string")
+            """
+            # If the user has requested background in terms of low/medium/high,
+            # then we need to examine all the background arrays.
+            # Loop over each day (in the background)
+            # info, convolve the background curve with the filter
+            # throughput curve, and then integrate. THEN, we can
+            # calculate the low/medium/high values.
+            bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
+            for i in range(len(bg.bkg_data['total_bg'][:, 0])):
+                back_wave = bg.bkg_data['wave_array']
+                back_sig = bg.bkg_data['total_bg'][i, :]
 
-        # Interpolate to the requested level
-        bval = np.interp(perc, y, x) * u.MJy / u.steradian
+                # Interpolate background to match filter wavelength grid
+                bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
+
+                # Combine
+                filt_bkgd = bkgd_interp * filt_thru
+
+                # Integrate
+                bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
+
+            # Now sort and determine the low/medium/high levels
+            low, medium, high = backgrounds.find_low_med_high(bsigs)
+
+            # Find the value based on the level in the yaml file
+            level = level.lower()
+            if level == "low":
+                bval = low
+            elif level == "medium":
+                bval = medium
+            elif level == "high":
+                bval = high
+            else:
+                raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
+                                  .format(level)))
+            """
+
+            # If the user has requested background in terms of low/medium/high,
+            # then we need to examine all the background arrays.
+            # Loop over each day (in the background)
+            # info, convolve the background curve with the filter
+            # throughput curve, and then integrate. THEN, we can
+            # calculate the low/medium/high values.
+            bval = backgrounds.low_medium_high_background_value(ra, dec, level, filt_wav, filt_thru)
+            bval = bval * u.MJy / u.steradian
 
         # Convert from MJy/str to ADU/sec
         # then divide by area of pixel

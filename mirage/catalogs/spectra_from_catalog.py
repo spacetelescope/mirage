@@ -30,10 +30,14 @@ from astropy.io import ascii
 import astropy.units as u
 import numpy as np
 from scipy.interpolate import interp1d
+from synphot import Observation, SourceSpectrum, units
+from synphot.config import conf as syn_conf
+from synphot.spectrum import SpectralElement
+from synphot.models import Empirical1D
 
 from . import hdf5_catalog
-from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS
-from mirage.utils.utils import magnitude_to_countrate
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES
+from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file
 
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
 CONFIG_PATH = os.path.join(MODULE_PATH, 'config')
@@ -287,6 +291,10 @@ def get_filter_info(column_names, magsys):
                 match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
             elif instrument == 'niriss':
                 match = zp_table['Filter'] == filter_name
+
+            if not np.any(match):
+                raise ValueError("ERROR: no filter matching {} in {}.".format(filter_name, zp_file))
+
             zp = zp_table[magsys].data[match][0]
             photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
             photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS
@@ -303,11 +311,58 @@ def get_filter_info(column_names, magsys):
         pivot = line['Pivot_wave'] * u.micron
         info[column_names[0]] = (photflam, photfnu, zp, pivot)
 
+    """
+    This code block works for columns that contain a mix of instruments
+    magsys = magsys.upper()
+    info = {}
+
+    # Get the list of instruments in the column names
+    instrument_names = [col.split('_')[0].lower() for col in column_names]
+
+    # Identify the list of unique files so we only need to open each once
+    unique_insts = list(set(instrument_names))
+
+    # Create a dcitionary of zeropoint tables for each instrument
+    zp_tables = {}
+    for inst in unique_insts:
+        zpfile = ZEROPOINT_FILES[inst]
+        tab = ascii.read(zpfile)
+        zp_tables[inst] = tab
+
+    # For each magnitude column, look up the info from the appropriate
+    # dictionary
+    for inst in instrument_names:
+        zp_table = zp_tables[inst]
+        if instrument in ['nircam', 'niriss']:
+            for entry in column_names:
+                filter_name = entry.split('_')[1].upper()
+                if instrument == 'nircam':
+                    match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
+                elif instrument == 'niriss':
+                    match = zp_table['Filter'] == filter_name
+                zp = zp_table[magsys].data[match][0]
+                photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
+                photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS
+                pivot = zp_table['Pivot_wave'].data[match][0] * u.micron
+                info[entry] = (photflam, photfnu, zp, pivot)
+
+        # For FGS, just use the values for GUIDER1 detector.
+        elif instrument == 'fgs':
+            line = zp_table[0]
+            # detector = line['Detector']
+            zp = line[magsys]
+            photflam = line['PHOTFLAM'] * FLAMBDA_CGS_UNITS
+            photfnu = line['PHOTFNU'] * FNU_CGS_UNITS
+            pivot = line['Pivot_wave'] * u.micron
+            info[column_names[0]] = (photflam, photfnu, zp, pivot)
+    """
+
     return info
 
 
 def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
-                     extrapolate_SED=True, output_filename=None, normalizing_mag_column=None):
+                     extrapolate_SED=True, output_filename=None, normalizing_mag_column=None,
+                     module=None, detector=None):
     """Overall wrapper function
 
     Parameters
@@ -325,7 +380,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         attached. If no units are supplied, Mirage assumes wavelengths
         in microns and flux densities in Flambda units.
 
-    input_specctra_file : str
+    input_spectra_file : str
         Name of an hdf5 file containing spectra for some/all targets
 
     extrapolate_SED : bool
@@ -338,9 +393,17 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
 
     normalizing_mag_column : str
         If some/all of the input spectra (from input_spectra or
-        input_spectra_file) are normalized (to a median of 1.0), they will
+        input_spectra_file) are to be renormalized, they will
         be scaled based on the magnitude values given in this specified
         column from the input catalog_file.
+
+    module : str
+        Name of module (e.g. 'A'). Only used when ``normalizing_mag_column``
+        is a NIRCam filter
+
+    detector : str
+        Name of detector (e.g. 'GUIDER1'). Only used when ``normalizing_mag_column``
+        is for FGS
 
     Returns
     -------
@@ -351,7 +414,30 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     if output_filename is None:
         output_filename = create_output_sed_filename(catalog_files[0], input_spectra_file)
 
+    # If normalizing_mag_column is not None, get instrument info in order
+    # to find the correct gain value
+    if normalizing_mag_column is not None:
+        instrument = normalizing_mag_column.split('_')[0].lower()
+        filter_name = 'none'
+        if instrument != 'fgs':
+            filter_name = normalizing_mag_column.split('_')[1]
+
+        if instrument == 'nircam':
+            filter_val = int(filter_name[1:4])
+            if filter_val > 230.:
+                channel = 'lw'
+            else:
+                channel = 'sw'
+            selector = '{}{}'.format(channel, module.lower())
+            gain = MEAN_GAIN_VALUES['nircam'][selector]
+        elif instrument == 'niriss':
+            gain = MEAN_GAIN_VALUES['niriss']
+        elif instrument == 'fgs':
+            gain = MEAN_GAIN_VALUES['fgs'][detector.lower()]
+
+    # Dictionary to contain all input spectra
     all_input_spectra = {}
+
     # Read in input spectra from file, add to all_input_spectra dictionary
     if input_spectra_file is not None:
         spectra_from_file = hdf5_catalog.open(input_spectra_file)
@@ -385,12 +471,16 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         catalog.write(flambda_output_catalog, format='ascii', overwrite=True)
         print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
 
-        # Remormalize here so you have access to filter_info
+        # Remormalize
         if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
             rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
-            rescaling_parameters = filter_info[normalizing_mag_column]
+
+            # Note that nircam_module is ignored for non-NIRCam requests.
+            # fgs_detector is ignored for non-FGS requests
+            filter_thru_file = get_filter_throughput_file(instrument=instrument, filter_name=filter_name,
+                                                          nircam_module=module, fgs_detector=detector)
             all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
-                                                           rescaling_parameters, mag_sys)
+                                                           mag_sys, filter_thru_file, gain)
 
         # For sources in catalog_file but not in all_input_spectra, use the
         # magnitudes in the catalog_file, interpolate/extrapolate as necessary
@@ -453,12 +543,12 @@ def read_catalog(filename):
     return catalog, mag_sys
 
 
-def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_system):
+def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass_file, gain_value):
     """Rescale any input spectra that are normalized
 
     Parameters
     ----------
-    spec : OrderedDict
+    spectra : OrderedDict
         Dictionary containing spectra for some/all targets. Dictionary
         keys are the object indexes (such as from the index column in
         the catalog_file. Entries must be e.g.
@@ -468,40 +558,106 @@ def rescale_normalized_spectra(spec, catalog_info, filter_parameters, magnitude_
         attached. If no units are supplied, Mirage assumes wavelengths
         in microns and flux densities in Flambda units.
 
-
     catalog_info : astropy.table.Table
         Index column and magnitude column to use for rescaling. Extracted
         from the original input catalog.
 
-    filter_parameters : tup
-        Photflam, photfnu, zeropoint, pivot wavelength for filter to use
-        for rescaling
-
     magnitude_system : str
         Magnitude system corresponding to the input magnitudes (e.g. 'abmag')
+
+    bandpass_file : str
+        Name of ascii file containing filter throughput curve. (Generally
+        retrieved from config directory)
+
+    gain_value : float
+        Gain value (e-/ADU) to use to adjust any rescaled spectra to produce
+        given countrates in ADU/sec rather than e-/sec. This is needed
+        because the flux calibration info (e.g. photflam, photfnu) were
+        created such that they translate from magnitudes to ADU/sec rather
+        than to e-/sec
 
     Returns
     -------
     spec : OrderedDict
-        Input dictionary, with flux values rescaled for sources that are
-        normalized
+        Input dictionary, with flux values rescaled (in FLAM units) to the
+        requested magnitude, only for spectra where the flux units are
+        astropy.units.pct
     """
-    photflam, photfnu, zp, pivot = filter_parameters
+    # Get the Vega spectrum from synphot. Use the version that was used
+    # to create the photom reference files and filter zeropoints
+    with syn_conf.set_temp('vega_file', 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_008.fits'):
+        vegaspec = SourceSpectrum.from_vega()
+
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
-    print('Normalizing magnitude column name is {}'.format(mag_colname))
+    instrument = mag_colname.split('_')[0].lower()
+
+    # Make a copy so we aren't modifying spec in place, which seems to be passed
+    # by reference back to the calling function
+    spec = copy.deepcopy(spectra)
 
     for dataset in spec:
         waves = spec[dataset]['wavelengths']
         flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
-            # print('SED for source {} is normalized. Rescaling.'.format(dataset))
+            print('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
+
             if not any(match):
                 raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
                                   'number {}. Unable to rescale.').format(dataset))
-            magnitude = catalog_info[mag_colname][match]
-            mag_in_flam = convert_to_flam(magnitude, filter_parameters, magnitude_system)
-            flux *= mag_in_flam
-            spec[dataset]['fluxes'] = flux * FLAMBDA_CGS_UNITS
+            magnitude = catalog_info[mag_colname].data[match][0]
+
+            # Create a synphot source spectrum
+            fake_flux_units = units.FLAM
+            source_spectrum = SourceSpectrum(Empirical1D, points=waves, lookup_table=flux.value * fake_flux_units)
+
+            # Create a synphot SpectralElement containing the filter bandpass
+            filter_tp = ascii.read(bandpass_file)
+            bp_waves = filter_tp['Wavelength_microns'].data * u.micron
+            bp_waves = bp_waves.to(u.Angstrom)
+            thru = filter_tp['Throughput'].data
+
+            bandpass = SpectralElement(Empirical1D, points=bp_waves.value, lookup_table=thru) / gain_value
+
+            # Renormalize
+            magnitude_system = magnitude_system.lower()
+
+            if magnitude_system == 'vegamag':
+                magunits = units.VEGAMAG
+                vega_spec = vegaspec
+            elif magnitude_system == 'abmag':
+                magunits = u.ABmag
+                vega_spec = None
+            elif magnitude_system == 'stmag':
+                magunits = u.STmag
+                vega_spec = None
+            elif magnitude_system == 'counts':
+                raise ValueError('ERROR: normalization to a given countrate not yet supported.')
+            if magnitude_system != 'vegamag':
+                renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
+            else:
+                if instrument == 'nircam':
+                    # NIRCam vegamag zeropoints are based on synphot's Vega spectrum
+                    renorm = source_spectrum.normalize(magnitude * magunits, bandpass, vegaspec=vega_spec)
+                elif instrument == 'niriss':
+                    # NIRISS vegamag zeropoints are based on Vega having a
+                    # magnitude of 0.02 in all filters
+                    renorm = source_spectrum.normalize((magnitude - 0.02) * units.VEGAMAG, bandpass, vegaspec=vega_spec)
+                elif instrument == 'fgs':
+                    # FGS vegamag zeropoints are based on a Sirius spectrum
+                    # rather than Vega
+                    raise NotImplementedError("Source spectrum rescaling for FGS not yet supported")
+                    sirius_file = 'sirius_mod_003.txt'
+                    sirius_tab = ascii.read(sirius_file)
+                    sirius_waves = sirius_tab['Wavelength'] * u.Angstrom
+                    sirius_flux = sirius_tab['Flux'] * units.FLAM
+                    sirius_spectrum = SourceSpectrum(Empirical1D, points=sirius_waves, lookup_table=sirius_flux)
+                    #sirius_spec_norm = sirius_spectrum.normalize(0. * units.VEGAMAG, bandpass, vegaspec=sirius_spectrum)
+                    renorm = source_spectrum.normalize(magnitude * units.VEGAMAG, bandpass, vegaspec=sirius_spectrum)
+
+            spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
+        else:
+            print('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
+
     return spec
