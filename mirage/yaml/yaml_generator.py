@@ -736,17 +736,16 @@ class SimInput:
 
             if prime_instrument.upper() == 'NIRCAM':
                 module = self.info['Module'][obs_indexes[pri_indexes[0]]]
+                detectors_used = np.array(self.info['detector'])[obs_indexes[pri_indexes]]
             elif parallel_instrument.upper() == 'NIRCAM':
                 module = self.info['Module'][obs_indexes[par_indexes[0]]]
+                detectors_used = np.array(self.info['detector'])[obs_indexes[par_indexes]]
+            n_det = len(set(detectors_used))
 
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
-                if module in ['A', 'B']:
-                    n_det = 5
                 if module == 'ALL':
-                    n_det = 10
                     module = 'A and B'
             else:
-                # number of detectors
                 n_det = 1
 
             if coord_par == 'true':
@@ -754,16 +753,16 @@ class SimInput:
             else:
                 instrument_string = '    Prime: {}'.format(prime_instrument)
 
-            print('Observation {}:'.format(obs))
+            print('\nObservation {}:'.format(obs))
             print(instrument_string)
             print('    {} visit(s)'.format(n_visits))
-            print('    {} activitiy(ies)'.format(n_activities))
-            print('    {} exposure(s)'.format(n_exposures))
+            print('    {} activity(ies)'.format(n_activities))
+            #print('    {} exposure(s)'.format(n_exposures))
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
                 print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
             print('    {} file(s)'.format(total_files))
 
-        print('\n{} exposures total.'.format(total_exposures))
+        # print('\n{} exposures total.'.format(total_exposures))
         print('{} output files written to: {}'.format(len(yamls), self.output_dir))
 
     def create_output_name(self, input_obj, index=0):
@@ -1232,10 +1231,6 @@ class SimInput:
                 # we need to build the aperture name from the combination of detector
                 # and subarray name.
                 aperture = self.info['aperture'][i]
-                if 'NRC' == aperture[0:3]:
-                    sub = self.info['Subarray'][i]
-                    det = 'NRC' + self.info['detector'][i]
-                    aperture = det + '_' + sub
 
                 # Get the number of amps from the subarray definition file
                 match = aperture == subarray_def['AperName']
@@ -1255,6 +1250,14 @@ class SimInput:
                     aperture = aperture[0]
 
                 amp = subarray_def['num_amps'][match][0]
+
+                # Default to amps=4 for subarrays that can have 1 or 4
+                # Not sure where to get this info from. Doesn't seem to
+                # be in the APT xml file
+                if amp == 0:
+                    amp = 4
+                    print(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
+                           'In the future this information should be made a user input.'.format(aperture)))
                 namp.append(amp)
 
                 # same activity ID

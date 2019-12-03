@@ -362,6 +362,7 @@ class AptInput:
                         guider_aperture = 'FGS{}_FULL'.format(guider_number)
                         fixed_apertures.append(guider_aperture)
                     else:
+                        print(instrument, aperture, inst_match_ap, aperture_key[instrument.lower()])
                         raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
                 else:
                     fixed_apertures.append(aperture)
@@ -423,131 +424,119 @@ class AptInput:
 
                 # Keep only apertures in the correct module
                 matched_allmod_apertures = nircam_apertures['AperName'][matches].data
-
-                print('matched_allmod_apertures', matched_allmod_apertures)
-                print('module:', module)
-
-
                 matched_apertures = []
                 for mod in module:
                     good = [ap for ap in matched_allmod_apertures if 'NRC{}'.format(mod) in ap]
                     matched_apertures.extend(good)
-                    print('good:', good)
-                    print('filter out by module:', matched_apertures)
 
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
-                    print('FULL')
                     mode = input_dictionary['Mode'][index]
                     if (sub == 'FULL'):
-                        if mode == 'wfss':
 
-                            print('FULL GRISM MODE')
-                            matched_apertures = np.array([ap for ap in matched_apertures if 'GRISM' in ap and 'GRISMTS' not in ap])
-                            print(matched_apertures)
+                        if mode in ['imaging', 'ts_imaging', 'wfss']:
+                            # This block should catch full-frame observations
+                            # in either imaging (including TS imaging) or
+                            # wfss mode
+                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
+                            matched_apertures = []
+                            detectors = []
+                            for ap in matched_aps:
+                                detectors.append(ap[3:5])
+                                split = ap.split('_')
+                                if len(split) == 3:
+                                    ap_string = '{}_{}'.format(split[1], split[2])
+                                elif len(split) == 2:
+                                    ap_string = split[1]
+                                matched_apertures.append(ap_string)
 
                         elif mode == 'ts_grism':
-                            print('FULL GRISMTS MODE')
+                            # This block should get Grism Time Series
+                            # observations that use the full frame
                             matched_apertures = np.array([ap for ap in matched_apertures if 'GRISM' in ap])
-                            this_needs_to_be_fixed()
+                            filtered_aperture = input_dictionary['aperture'][index]
+                            filtered_splits = filtered_aperture.split('_')
+                            filtered_ap_no_det = '{}_{}'.format(filtered_splits[1], filtered_splits[2])
+                            detectors = [filtered_splits[0][3:5]]
 
-                        long_filter = input_dictionary['LongFilter'][index]
-                        filter_dependent_apertures = np.array([ap for ap in matched_apertures if len(ap.split('_')) == 3])
-                        filtered_aperture = self.extract_grism_aperture(filter_dependent_apertures, long_filter)
-                        print('FILTERED_APERTURE:', filtered_aperture)
+                            # Get correct apertures
+                            apertures_to_add = []
 
-                        filtered_splits = filtered_aperture[0].split('_')
-                        filtered_ap_no_det = '{}_{}'.format(filtered_splits[1], filtered_splits[2])
-                        detectors = [filtered_splits[0][3:5]]
-
-                        # SW apertures
-                        apertures_to_add = []
-                        for ap in matched_apertures:
-                            splits = ap.split('_')
-                            if '5' not in splits[0]:
-                                apertures_to_add.append(splits[1])
-                                detectors.append(splits[0][3:5])
-
-                        matched_apertures = [filtered_ap_no_det].extend(apertures_to_add)
-
-
-                        print(detectors)
-                        print(matched_apertures)
-
+                            final_matched_apertures = []
+                            final_detectors = []
+                            filtered_ap_det = filtered_aperture[3:5]
+                            for ap in matched_apertures:
+                                det = ap[3:5]
+                                if ap == filtered_aperture or det != filtered_ap_det:
+                                    final_matched_apertures.append(ap)
+                                    final_detectors.append(det)
+                            matched_apertures = final_matched_apertures
+                            detectors = final_detectors
 
                     else:
-                        print('IMAGING MODE')
-                        print(sub)
-                        print(matched_apertures)
+                        # 'Standard' imaging subarrays: SUB320, SUB400P, etc
                         matched_apertures = [ap for ap in matched_apertures if sub in ap]
-                        print(matched_apertures)
                         detectors = [ap.split('_')[0][3:5] for ap in matched_apertures]
                         matched_apertures = [sub] * len(detectors)
 
-                        print(detectors)
-                        print(matched_apertures)
-
                 elif 'SUBGRISM' in sub:
-                    print('SUBGRISM')
+                    # This should catch only Grism Time Series observations
+                    # and engineering imaging observations, which are the
+                    # only 2 templates that can use SUBGRISM apertures
                     long_filter = input_dictionary['LongFilter'][index]
                     filter_dependent_apertures = [ap for ap in matched_apertures if len(ap.split('_')) == 3]
-                    filtered_aperture = self.extract_grism_aperture(filter_dependent_apertures, long_filter)
 
-                    filtered_splits = filtered_aperture[0].split('_')
+                    filtered_aperture = input_dictionary['aperture'][index]
+                    filtered_splits = filtered_aperture.split('_')
                     filtered_ap_no_det = '{}_{}'.format(filtered_splits[1], filtered_splits[2])
                     detectors = [filtered_splits[0][3:5]]
 
-                    # SW apertures
+                    # Get correct apertures
                     apertures_to_add = []
+
+                    final_matched_apertures = []
+                    final_detectors = []
+                    filtered_ap_det = filtered_aperture[3:5]
                     for ap in matched_apertures:
-                        splits = ap.split('_')
-                        if '5' not in splits[0]:
-                            apertures_to_add.append(splits[1])
-                            detectors.append(splits[0][3:5])
+                        det = ap[3:5]
+                        if ap == filtered_aperture or det != filtered_ap_det:
+                            final_matched_apertures.append(ap)
+                            final_detectors.append(det)
+                    matched_apertures = []
+                    for ap in final_matched_apertures:
+                        split = ap.split('_')
+                        if len(split) == 3:
+                            ap_string = '{}_{}'.format(split[1], split[2])
+                        elif len(split) == 2:
+                            ap_string = split[1]
+                        matched_apertures.append(ap_string)
+                    detectors = final_detectors
+                else:
+                    # TA, WFSC apertures
+                    stripped_apertures = []
+                    detectors = []
+                    for ap in matched_apertures:
+                        detectors.append(ap[3:5])
+                        split = ap.split('_')
+                        if len(split) == 3:
+                            ap_string = '{}_{}'.format(split[1], split[2])
+                        elif len(split) == 2:
+                            ap_string = split[1]
+                        stripped_apertures.append(ap_string)
+                    matched_apertures = stripped_apertures
 
-                    matched_apertures = [filtered_ap_no_det].extend(apertures_to_add)
-
-                    print(detectors)
-                    print(matched_apertures)
+                full_apertures = ['NRC{}_{}'.format(det, sub) for det, sub in zip(detectors, matched_apertures)]
 
                 # Add entries to observation dictionary
                 num_entries = len(detectors)
-                print('need to replace entries, not extend, right?')
                 #observation_dictionary['Subarray'].extend(matched_apertures) extend? or replace?
                 for key in input_dictionary:
-                    if key not in ['Subarray']:
+                    #if key not in ['Subarray']:
+                    if key not in ['aperture', 'detector', 'Subarray']:
                         observation_dictionary[key].extend(([input_dictionary[key][index]] * num_entries))
                 observation_dictionary['detector'].extend(detectors)
+                observation_dictionary['aperture'].extend(full_apertures)
+                observation_dictionary['Subarray'].extend(matched_apertures)
 
-                #possible_detectors = [ap.split('_')[0][3:5] for ap in matched_apertures]
-                #detectors = []
-                #for mod in module:
-                #    detectors.extend([det for det in possible_detectors if mod in det])
-
-                print('XXXXXXXXXXXXXXXXX')
-                print(sub, module, matched_apertures, detectors)
-                print('XXXXXXXXXXXXXXXXX')
-
-
-                # Check to see if the subarray is one where not all detectors
-                # are used
-                #special_case = any([True if s in sub else False for s in LIMITED_DETECTOR_APERTURES])
-
-                #if 'DHSPIL' not in sub and 'FP1' not in sub:
-                #if not special_case:
-                #    if module == 'ALL':
-                #        detectors = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
-                #    elif module == 'A':
-                #        detectors = ['A1', 'A2', 'A3', 'A4', 'A5']
-                #    elif module == 'B':
-                #        detectors = ['B1', 'B2', 'B3', 'B4', 'B5']
-                #    else:
-                #        raise ValueError('Unknown module {}'.format(module))
-                #else:
-                #    # Wait to handle cases where there are subarrays, and so things should not be
-                #    # expanded for all detectors.
-                #    #detectors = ['placeholder']
-                #    possible_detectors = LIMITED_DETECTOR_APERTURES[sub]
-                #    detectors = [det for det in possible_detectors if module in det]
             else:
                 if instrument == 'niriss':
                     detectors = ['NIS']
