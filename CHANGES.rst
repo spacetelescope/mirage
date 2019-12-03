@@ -1,3 +1,13 @@
+1.1.3
+=====
+
+Yaml Generator
+--------------
+
+- Update generator to produce yaml files only for the detectors used with a given aperture. e.g. SUB400P with the NIRCam B module only uses NIRCam B1 and B5 detectors. With this update,
+yaml files will only be produced for B1 and B5, whereas previously yaml files were generated for all 5 B module detectors. This change only affects NIRCam.
+
+
 1.1.2
 =====
 

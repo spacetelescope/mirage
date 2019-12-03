@@ -151,6 +151,8 @@ class ReadAPTXML():
             ra = '{}:{}:{}'.format(ra_hour, ra_min, ra_sec)
             dec = '{}:{}:{}'.format(dec_deg, dec_arcmin, dec_arcsec)
             self.target_info[t_name] = (ra, dec)
+        print('target_info:')
+        print(self.target_info)
 
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
@@ -226,6 +228,10 @@ class ReadAPTXML():
             except IndexError as e:
                 print("No target ID for observation: {}".format(obs))
                 targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
+
+            # For NIRSpec Internal Lamp
+            if targ_name == 'NONE':
+                self.target_info[targ_name] = ('0', '0')
 
             # extract visit numbers
             visit_numbers = [np.int(element.items()[0][1]) for element in obs if
