@@ -1,5 +1,10 @@
-Not Yet Tagged
-==============
+1.1.2
+=====
+
+WFSS
+----
+
+- Update functionality for rescaling input spectra to desired magnitude in given instrument/filter. Rescaling is now done via synphot's renormalize() function in the prpoper photon-weighted units. (#412)
 
 Catalogs
 --------

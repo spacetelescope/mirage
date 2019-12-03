@@ -42,6 +42,12 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'superbias': 'superbias',
                    'pixelflat': 'flat'}
 
+MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192},
+                    'niriss': 1.611902,
+                    'fgs': {'guider1': 1.9712874, 'guider2': 1.6897644}
+                    }
+
+
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when
     creating grism simulations compared to direct image simulations

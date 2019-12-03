@@ -20,6 +20,7 @@ dependencies:
 - python>=3.6,<3.7
 - scipy>=1.1.0
 - sphinx>=2.1
+- synphot>=0.2.0
 - webbpsf>=0.9.0
 - yaml==0.1.7
 - pip:
