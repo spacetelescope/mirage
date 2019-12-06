@@ -28,6 +28,7 @@ from astropy.io import ascii
 from astropy.table import Table, Column
 import numpy as np
 
+TSO_GRISM_INDEX = 99999
 
 class PointSourceCatalog():
     def __init__(self, ra=[], dec=[], x=[], y=[]):
@@ -537,7 +538,8 @@ class GrismTSOCatalog(PointSourceCatalog):
     def create_table(self):
         """Create an astropy table containing the catalog
         """
-        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units)
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units,
+                                 minimum_index=TSO_GRISM_INDEX)
 
         # Add the lightcurve filename column
         semimajor_col = Column(self._semimajor_axis, name='Semimajor_axis_in_stellar_radii')
@@ -791,14 +793,14 @@ def cat_from_file(filename, catalog_type='point_source'):
     return catalog_object
 
 
-def create_basic_table(ra_values, dec_values, magnitudes, location_units):
+def create_basic_table(ra_values, dec_values, magnitudes, location_units, minimum_index=1):
     """Create astropy table containing the basic catalog info
     NOTE THAT THIS IS OUTSIDE CLASSES
     """
     basic_table = Table()
 
     # Add index, filename, RA, Dec or x, y columns
-    index_col = Column(np.arange(1, len(ra_values)+1), name='index')
+    index_col = Column(np.arange(minimum_index, minimum_index + len(ra_values)), name='index')
     ra_col = Column(ra_values, name='x_or_RA')
     dec_col = Column(dec_values, name='y_or_Dec')
     basic_table.add_columns([index_col, ra_col, dec_col])

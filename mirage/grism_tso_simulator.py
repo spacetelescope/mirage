@@ -56,6 +56,7 @@ import astropy.units as u
 import batman
 import numpy as np
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+import pkg_resources
 import pysiaf
 from scipy.interpolate import interp1d
 
@@ -64,6 +65,7 @@ from mirage.catalogs import spectra_from_catalog
 from mirage.seed_image import catalog_seed_image
 from mirage.dark import dark_prep
 from mirage.ramp_generator import obs_generator
+from mirage.reference_files import crds_tools
 from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
@@ -133,6 +135,7 @@ class GrismTSO():
                               "input files needed for the simulation."
                               "These files must be downloaded separately"
                               "from the Mirage package.".format(env_var)))
+        self.modpath = pkg_resources.resource_filename('mirage', '')
 
         # Set the user-input parameters
         self.paramfile = parameter_file
@@ -250,7 +253,8 @@ class GrismTSO():
                 disp = self.run_disperser(seed_file, orders=self.orders,
                                           add_background=not background_done,
                                           background_waves=bkgd_waves,
-                                          background_fluxes=bkgd_fluxes)
+                                          background_fluxes=bkgd_fluxes,
+                                          finalize=True)
                 if not background_done:
                     # Background is added at the first opportunity. At this
                     # point, create an array to hold the final combined
@@ -306,11 +310,13 @@ class GrismTSO():
         # Determine which frames of the exposure will take place with the unaltered stellar
         # spectrum. This will be all frames where the associated lightcurve is 1.0 everywhere.
         transit_frames, unaltered_frames = self.find_transit_frames(lightcurves)
+        print('Transit Frames:', transit_frames)
+        print('Unaltered Frames:', unaltered_frames)
 
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
         print('\n\nDispersing TSO source\n\n')
         grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders,
-                                               add_background=False, cache=True)
+                                               add_background=False, cache=True, finalize=True)
         print('Max signal in dispersed img: {}'.format(np.max(grism_seed_object.final)))
 
         # Save the dispersed seed images if requested
@@ -430,8 +436,8 @@ class GrismTSO():
                     #previous_frame = np.zeros_like(background_dispersed.final)
                     #previous_frame = np.zeros_like(segment_seed[0, 0, :, :])
                     for frame in np.arange(grp_dim):
-                        #print('TOTAL FRAME COUNTER: ', total_frame_counter)
-                        #print('integ and frame: ', integ, frame)
+                        print('TOTAL FRAME COUNTER: ', total_frame_counter)
+                        print('integ and frame: ', integ, frame)
                         # If a frame is from the part of the lightcurve
                         # with no transit, then the signal in the frame
                         # comes from no_transit_signal
@@ -439,7 +445,7 @@ class GrismTSO():
                             #print("{} is unaltered.".format(total_frame_counter))
                             frame_only_signal = (background_dispersed + no_transit_signal) * self.frametime
                             print('Max signal in frame_only_signal: {}'.format(np.max(frame_only_signal)))
-                            print('input to this, max in background disp and tso disp images: {}, {}'.format(np.max(background_dispersed), np.max(no_transit_signal)))
+                            #print('input to this, max in background disp and tso disp images: {}, {}'.format(np.max(background_dispersed), np.max(no_transit_signal)))
                         # If the frame is from a part of the lightcurve
                         # where the transit is happening, then call the
                         # cached disperser with the appropriate lightcurve
@@ -447,9 +453,26 @@ class GrismTSO():
                             print("{} is during the transit".format(total_frame_counter))
                             frame_transmission = lightcurves[total_frame_counter, :]
                             trans_interp = interp1d(transmission_spectrum['Wavelength'], frame_transmission)
+                            #print('BEFORE APPLYING TRANSMISSION SPEC:',np.max(grism_seed_object.this_one['+1'].simulated_image))
+                            #print('Transmission: ', trans_interp(3.))
+                            #temp_before = copy.deepcopy(grism_seed_object.final)
                             for order in self.orders:
                                 grism_seed_object.this_one[order].disperse_all_from_cache(trans_interp)
+                            # Here is where we call finalize on the TSO object
+                            # This will update grism_seed_object.final to
+                            # contain the correct signal
+                            grism_seed_object.finalize(Back=None, BackLevel=None)
                             cropped_grism_seed_object = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
+                            #print('AFTER APPLYING TRANSMISSION SPEC:', np.max(grism_seed_object.this_one['+1'].simulated_image))
+                            #print(np.max(grism_seed_object.final))
+                            #print(np.max(cropped_grism_seed_object))
+                            #temp_after = copy.deepcopy(grism_seed_object.final)
+                            #temp_diff = temp_before - temp_after
+                            #print(np.min(temp_diff), np.max(temp_diff))
+                            #hh0 = fits.PrimaryHDU(temp_diff)
+                            #hhlist = fits.HDUList([hh0])
+                            #hhlist.writeto('temp.fits', overwrite=True)
+                            #stop
                             #frame_only_signal = (background_dispersed.final + grism_seed_object.final) * self.frametime
                             frame_only_signal = (background_dispersed + cropped_grism_seed_object) * self.frametime
 
@@ -680,6 +703,12 @@ class GrismTSO():
         self.catalog_files = []
         parameters = utils.read_yaml(self.paramfile)
 
+        # Create dictionary to use when looking in CRDS for reference files
+        crds_dict = crds_tools.dict_from_yaml(parameters)
+
+        # Expand reference file entries to be full path names
+        parameters = utils.full_paths(parameters, self.modpath, crds_dict)
+
         try:
             CATALOG_YAML_ENTRIES.remove('tso_grism_catalog')
         except ValueError:
@@ -729,8 +758,7 @@ class GrismTSO():
         return parameters
 
 
-    @staticmethod
-    def make_lightcurves(catalog, frame_time, transmission_spec):
+    def make_lightcurves(self, catalog, frame_time, transmission_spec):
         """Given a transmission spectrum, create a series of lightcurves
         using ``batman``.
 
@@ -774,7 +802,7 @@ class GrismTSO():
 
         # The time resolution must be one frametime since we will need one
         # lightcurve for each frame later
-        time = np.linspace(start_time, end_time, frame_time)  # times at which to calculate light curve
+        time = np.arange(start_time, end_time, frame_time)  # times at which to calculate light curve
         model = batman.TransitModel(params, time)
 
         # Step along the transmission spectrum in wavelength space and
@@ -784,6 +812,14 @@ class GrismTSO():
             params.rp = radius                          # updates planet radius
             new_flux = model.light_curve(params)        # recalculates light curve
             lightcurves[:, i] = new_flux
+
+        # Save the 2D transmission data
+        h0 = fits.PrimaryHDU(lightcurves)
+        hdulist = fits.HDUList([h0])
+        outfile = '{}{}'.format(self.basename, '_normalized_lightcurves_vs_time.fits')
+        hdulist.writeto(outfile, overwrite=True)
+        print('2D array of lightcurves vs time saved to: {}'.format(outfile))
+
         return lightcurves, time
 
     def param_checks(self):
@@ -795,7 +831,7 @@ class GrismTSO():
 
     def run_disperser(self, direct_file, orders=["+1", "+2"], create_continuum_seds=False,
                       add_background=True, background_waves=None, background_fluxes=None,
-                      cache=False):
+                      cache=False, finalize=False):
         """
         """
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
@@ -838,17 +874,19 @@ class GrismTSO():
         else:
             disp_seed.disperse(orders=orders)
 
-        if add_background:
-            #print('FINALIZING')
-            #print(background_file)
-            #with fits.open(os.path.join('/ifs/jwst/wit/mirage_data/nircam/GRISM_NIRCAM', background_file)) as h:
-            #    delme = h[0].data
-            #print('background file size: ', delme.shape)
-            #disp_seed.finalize(Back=background_file)
-            background_image = disp_seed.disperse_background_1D([background_waves, background_fluxes])
-            disp_seed.finalize(Back=background_image, BackLevel=None)
-        else:
-            disp_seed.finalize(Back=None, BackLevel=None)
+        # Only finalize and/or add the background if requested.
+        if finalize:
+            if add_background:
+                #print('FINALIZING')
+                #print(background_file)
+                #with fits.open(os.path.join('/ifs/jwst/wit/mirage_data/nircam/GRISM_NIRCAM', background_file)) as h:
+                #    delme = h[0].data
+                #print('background file size: ', delme.shape)
+                #disp_seed.finalize(Back=background_file)
+                background_image = disp_seed.disperse_background_1D([background_waves, background_fluxes])
+                disp_seed.finalize(Back=background_image, BackLevel=None)
+            else:
+                disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
 
     def save_seed(self, seed, segmentation_map, seed_header, params): #, segment_num, part_num):

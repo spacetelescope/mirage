@@ -135,6 +135,7 @@ class AptInput:
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
                                   'MovingTargetSersic MovingTargetExtended ' \
                                   'MovingTargetConvolveExtended MovingTargetToTrack ' \
+                                  'ImagingTSOCatalog GrismTSOCatalog ' \
                                   'BackgroundRate DitherIndex CosmicRayLibrary CosmicRayScale'.split()
 
         nircam_mapping = {'ptsrc': 'PointSourceCatalog',
@@ -147,6 +148,8 @@ class AptInput:
                           'movext': 'MovingTargetExtended',
                           'movconv': 'MovingTargetConvolveExtended',
                           'solarsys': 'MovingTargetToTrack',
+                          'img_tso': 'ImagingTSOCatalog',
+                          'grism_tso': 'GrismTSOCatalog',
                           'bkgd': 'BackgroundRate',
                           }
 
@@ -195,7 +198,8 @@ class AptInput:
                     catalog_names = 'PointSourceCatalog GalaxyCatalog ' \
                                     'ExtendedCatalog MovingTargetList ' \
                                     'MovingTargetSersic MovingTargetExtended ' \
-                                    'MovingTargetToTrack'.split()
+                                    'MovingTargetToTrack ImagingTSOCatalog ' \
+                                    'GrismTSOCatalog'.split()
                     if key in catalog_names:
                         value = self.full_path(value)
                     intab[key].append(value)

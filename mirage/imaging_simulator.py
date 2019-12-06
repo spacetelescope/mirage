@@ -77,6 +77,8 @@ class ImgSim():
             obs.seedheader = cat.seedinfo
         else:
             obs.seed = cat.seed_files
+            print('USING SEED_FILES')
+            print(cat.seed_files)
         obs.create()
 
         # Make useful information class attributes

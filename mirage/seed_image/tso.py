@@ -299,9 +299,6 @@ def read_lightcurve(filename, index_value):
     """
     file_contents = open_tso(filename)
 
-    print(index_value)
-    print(file_contents)
-
     try:
         dataset = file_contents[index_value]
     except KeyError as e:

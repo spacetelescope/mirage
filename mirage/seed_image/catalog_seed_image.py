@@ -54,7 +54,7 @@ MIRAGE_VERSION = version.__version__
 
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
-MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_wfss"],
+MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_grism"],
          'niriss': ["imaging", "ami", "pom", "wfss"],
          'fgs': ["imaging"]}
 TRACKING_LIST = ['sidereal', 'non-sidereal']
@@ -375,7 +375,7 @@ class Catalog_seed():
         # Initially this includes only the reference pixels
         # Keep the mask image equal to the true subarray size, since this
         # won't be used to make a requested grism source image
-        if self.params['Inst']['mode'] not in ['wfss', 'tsgrism']:
+        if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
             self.maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
             self.maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
 
@@ -395,7 +395,7 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
                (aperture_suffix not in ['FULL', 'CEN'])):
                 self.seedimage, self.seed_segmap = self.pad_wfss_subarray(self.seedimage, self.seed_segmap)
 
@@ -417,7 +417,7 @@ class Catalog_seed():
             if self.params['Inst']['mode'] in ["pom"]:
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] not in ['wfss', 'tsgrism']:
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
                 # Multiply the mask by the seed image and segmentation map in
                 # order to reflect the fact that reference pixels have no signal
                 # from external sources. Seed images to be dispersed do not have
@@ -427,10 +427,10 @@ class Catalog_seed():
 
             # Save the combined static + moving targets ramp
             if self.params['Inst']['instrument'].lower() != 'fgs':
-                self.seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
+                self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
             else:
                 self.seed_file = '{}_final_seed_image.fits'.format(self.basename)
-            self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_filename)
+            self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_file)
             print("Final seed image and segmentation map saved as {}".format(self.seed_file))
             print("Seed image, segmentation map, and metadata available as:")
             print("self.seedimage, self.seed_segmap, self.seedinfo.")
@@ -456,16 +456,17 @@ class Catalog_seed():
         if self.params['Inst']['mode'].lower() == 'ts_imaging':
             tso_cat = self.get_point_source_list(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
 
-
-            print('TSO CAT')
-            print(tso_cat)
-
             # Create lists of seed images and segmentation maps for all
             # TSO objects
             tso_seeds = []
             tso_segs = []
             tso_lightcurves = []
             for source in tso_cat:
+                # Let's set the TSO source to be a unique index number.
+                # Otherwise the index number will be modified to be one
+                # greater than the max value after working on the background
+                # sources
+                source['index'] = 99999
 
                 # Place row in an empty table
                 t = tso_cat[:0].copy()
@@ -476,7 +477,12 @@ class Catalog_seed():
                 tso_seeds.append(copy.deepcopy(ptsrc_seed))
                 tso_segs.append(copy.deepcopy(ptsrc_seg))
 
-                lightcurve = tso.read_lightcurve(source['lightcurve_file'], source['index'])
+                # Under the assumption that there will always be only one
+                # TSO source, let's assume that the dataset number in the
+                # lightcurve file is always 1. This seems easiest for the
+                # users when creating the file.
+                #lightcurve = tso.read_lightcurve(source['lightcurve_file'], source['index'])
+                lightcurve = tso.read_lightcurve(source['lightcurve_file'], 1)
                 tso_lightcurves.append(lightcurve)
 
 
@@ -507,15 +513,11 @@ class Catalog_seed():
                 segmap *= self.maskimage
 
                 # Save the seed image segment to a file
-
-
-
                 if self.total_seed_segments_and_parts == 1:
                     self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
                                                   '_seed_image.fits')
                 else:
-                    print('XXXXXXX SHOULD NOT BE HERE XXXXXXXXXXXXXX')
-                    stop
+                    raise ValueError("ERROR: TSO seed file should not be split at this point.")
 
                     seg_string = str(self.segment_number).zfill(3)
                     part_string = str(self.segment_part_number).zfill(3)
@@ -594,6 +596,7 @@ class Catalog_seed():
 
                         self.saveSeedImage(seed, segmap, self.seed_file)
                         self.seed_files.append(self.seed_file)
+                        print('\n\n\n\nADDING FILE TO SELF.SEED_FILES\n\n\n')
                         j += 1
 
                     i += 1
@@ -1081,7 +1084,7 @@ class Catalog_seed():
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
-        if self.params['Inst']['mode'] in ['wfss', 'ts_wfss']:
+        if self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
             kw['NOMXDIM'] = self.ffsize
             kw['NOMYDIM'] = self.ffsize
             kw['NOMXSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
@@ -1721,7 +1724,7 @@ class Catalog_seed():
                 mt_integration[integ, :, :, :] += mt_source
 
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
                     noiseval += self.grism_background
 
                 if input_type in ['pointSource', 'galaxies']:
@@ -2073,7 +2076,7 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
                  (aperture_suffix not in ['FULL', 'CEN'])):
                 self.point_source_seed, self.point_source_seg_map = self.pad_wfss_subarray(self.point_source_seed,
                                                                                            self.point_source_seg_map)
@@ -2110,7 +2113,7 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
                  (aperture_suffix not in ['FULL', 'CEN'])):
                 self.galaxy_source_seed, self.galaxy_source_seg_map = self.pad_wfss_subarray(self.galaxy_source_seed,
                                                                                              self.galaxy_source_seg_map)
@@ -2154,7 +2157,7 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            if ((self.params['Inst']['mode'] in ['wfss', 'ts_wfss']) & \
+            if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
                  (aperture_suffix not in ['FULL', 'CEN'])):
                 self.extended_source_seed, self.extended_source_seg_map = self.pad_wfss_subarray(self.extended_source_seed,
                                                                                                  self.extended_source_seg_map)
@@ -2704,7 +2707,7 @@ class Catalog_seed():
 
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
                     noiseval += self.grism_background
                 ptsrc_segmap.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
             except IndexError:
@@ -3807,7 +3810,7 @@ class Catalog_seed():
                     galimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
                     # Divide readnoise by 100 sec, which is a 10 group RAPID ramp
                     noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                    if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                    if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
                         noiseval += self.grism_background
                     segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
 
@@ -4140,7 +4143,7 @@ class Catalog_seed():
 
                 # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
                 noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_wfss']:
+                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
                     noiseval += self.grism_background
 
                 # Make segmentation map
@@ -4284,7 +4287,7 @@ class Catalog_seed():
 
         # Non-sidereal WFSS observations are not yet supported
         if self.params['Telescope']['tracking'] == 'non-sidereal' and \
-           self.params['Inst']['mode'] in ['wfss', 'ts_wfss']:
+           self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
             raise ValueError(("WARNING: wfss observations with non-sidereal "
                               "targets not yet supported."))
 

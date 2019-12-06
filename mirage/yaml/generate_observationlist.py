@@ -33,7 +33,9 @@ from ..apt import read_apt_xml
 CAT_TYPE_MAPPING = {'point_source': 'PointsourceCatalog', 'galaxy': 'GalaxyCatalog',
                     'extended': 'ExtendedCatalog', 'moving_pointsource': 'MovingTargetList',
                     'moving_sersic': 'MovingTargetSersic', 'moving_extended': 'MovingTargetExtended',
-                    'moving_target_to_track': 'MovingTargetToTrack'}
+                    'moving_target_to_track': 'MovingTargetToTrack',
+                    'tso_imaging_catalog': 'ImagingTSOCatalog',
+                    'tso_grism_catalog': 'GrismTSOCatalog'}
 
 POSSIBLE_CATS = list(CAT_TYPE_MAPPING.keys())
 
@@ -514,6 +516,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     default_values['MovingTargetExtended'] = 'None'
     default_values['MovingTargetConvolveExtended'] = 'True'
     default_values['MovingTargetToTrack'] = 'None'
+    default_values['ImagingTSOCatalog'] = 'None'
+    default_values['GrismTSOCatalog'] = 'None'
     default_values['BackgroundRate_sw'] = 'low'
     default_values['BackgroundRate_lw'] = 'low'
     default_values['BackgroundRate'] = 'low'
@@ -620,6 +624,10 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     default_values['MovingTargetExtended'] = catalogs[cat_key]
                 if cat_key == 'moving_target_to_track':
                     default_values['MovingTargetToTrack'] = catalogs[cat_key]
+                if cat_key == 'tso_imaging_catalog':
+                    default_values['ImagingTSOCatalog'] = catalogs[cat_key]
+                if cat_key == 'tso_grism_catalog':
+                    default_values['GrismTSOCatalog'] = catalogs[cat_key]
             # Now that we have modified the default values, set catalogs to
             # None so that it is not accessed later
             catalogs_per_observation = None
@@ -694,6 +702,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     mov_sersic_catalog_value = default_values['MovingTargetSersic']
                     mov_extended_catalog_value = default_values['MovingTargetExtended']
                     mov_tracked_catalog_value = default_values['MovingTargetToTrack']
+                    im_tso_catalog_value = default_values['ImagingTSOCatalog']
+                    gr_tso_catalog_value = default_values['GrismTSOCatalog']
                 else:
                     try:
                         catalogs_to_use = catalogs_per_observation[observation_number][instrument.lower()]
@@ -709,6 +719,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     mov_sersic_catalog_value = catalogs_to_use['MovingTargetSersic']
                     mov_extended_catalog_value = catalogs_to_use['MovingTargetExtended']
                     mov_tracked_catalog_value = catalogs_to_use['MovingTargetToTrack']
+                    im_tso_catalog_value = catalogs_to_use['ImagingTSOCatalog']
+                    gr_tso_catalog_value = catalogs_to_use['GrismTSOCatalog']
 
                 # Get the proper cosmic ray values
                 if cosmic_rays is None:
@@ -766,6 +778,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                         "        MovingTargetSersic: {}\n".format(mov_sersic_catalog_value),
                         "        MovingTargetExtended: {}\n".format(mov_extended_catalog_value),
                         "        MovingTargetToTrack: {}\n".format(mov_tracked_catalog_value),
+                        "        ImagingTSOCatalog: {}\n".format(im_tso_catalog_value),
+                        "        GrismTSOCatalog: {}\n".format(gr_tso_catalog_value),
                         "        BackgroundRate: {}\n".format(background_sw_value),
                         ]
 
@@ -782,6 +796,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                         "        MovingTargetSersic: {}\n".format(mov_sersic_catalog_value),
                         "        MovingTargetExtended: {}\n".format(mov_extended_catalog_value),
                         "        MovingTargetToTrack: {}\n".format(mov_tracked_catalog_value),
+                        "        ImagingTSOCatalog: {}\n".format(im_tso_catalog_value),
+                        "        GrismTSOCatalog: {}\n".format(gr_tso_catalog_value),
                         "        BackgroundRate: {}\n".format(background_lw_value),
                         ]
 
@@ -823,6 +839,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                         "    MovingTargetSersic: {}\n".format(mov_sersic_catalog_value),
                         "    MovingTargetExtended: {}\n".format(mov_extended_catalog_value),
                         "    MovingTargetToTrack: {}\n".format(mov_tracked_catalog_value),
+                        "    ImagingTSOCatalog: {}\n".format(im_tso_catalog_value),
+                        "    GrismTSOCatalog: {}\n".format(gr_tso_catalog_value),
                         "    BackgroundRate: {}\n".format(background_value),
                         ]
 
