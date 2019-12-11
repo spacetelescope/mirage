@@ -35,6 +35,7 @@ import pysiaf
 
 from . import moving_targets
 from . import segmentation_map as segmap
+from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
 from mirage.seed_image import tso
 from ..reference_files import crds_tools
 from ..utils import backgrounds
@@ -466,7 +467,7 @@ class Catalog_seed():
                 # Otherwise the index number will be modified to be one
                 # greater than the max value after working on the background
                 # sources
-                source['index'] = 99999
+                source['index'] = TSO_GRISM_INDEX
 
                 # Place row in an empty table
                 t = tso_cat[:0].copy()
@@ -1860,6 +1861,7 @@ class Catalog_seed():
             pixel_x = entry0
             pixel_y = entry1
             ra_number, dec_number, ra_string, dec_string = self.XYToRADec(pixel_x, pixel_y)
+
         return pixel_x, pixel_y, ra_number, dec_number, ra_string, dec_string
 
     def nonsidereal_CRImage(self, file):

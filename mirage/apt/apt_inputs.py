@@ -912,13 +912,27 @@ class AptInput:
 
             aperture = self.siaf[siaf_instrument][aperture_name]
 
-            local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
-                                                    pointing_ra, pointing_dec, telescope_roll,
-                                                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
 
-            # calculate RA, Dec of reference location for the detector
-            ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
+            basex = np.float(self.exposure_tab['basey'][i])
+            basey = np.float(self.exposure_tab['basex'][i])
+
+            if 'NRCA5_GRISM' in aperture_name and 'WFSS' not in aperture_name:
+                # This puts the source in row 29, but faster just to grab the ra, dec directly
+                #local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                #    siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
+                #                                        pointing_ra, pointing_dec, telescope_roll,
+                #                                        v2_arcsec=aperture.V2Ref, v3_arcsec=aperture.V3Ref)
+                ra = pointing_ra
+                dec = pointing_dec
+            else:
+                local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                    siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
+                                                        pointing_ra, pointing_dec, telescope_roll,
+                                                        v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+
+                # Calculate RA, Dec of reference location for the detector
+                # Add in any offsets from the pointing file in the BaseX, BaseY columns
+                ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
             aperture_ra.append(ra)
             aperture_dec.append(dec)
 

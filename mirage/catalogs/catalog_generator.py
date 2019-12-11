@@ -490,7 +490,8 @@ class ImagingTSOCatalog(PointSourceCatalog):
     def create_table(self):
         """Create an astropy table containing the catalog
         """
-        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units)
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units,
+                                 minimum_index=TSO_GRISM_INDEX)
 
         # Add the lightcurve filename column
         lc_col = Column(self._lightcurve_file, name='lightcurve_file')

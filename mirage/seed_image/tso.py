@@ -151,12 +151,12 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
             print(psf[tmpy // 2, tmpx // 2], np.max(psf), psf.shape, tmpy // 2, tmpx // 2)
             print(ft_psf[tmpy // 2, tmpx // 2], np.max(ft_psf))
             print(frame_psf[tmpy // 2, tmpx // 2], np.max(frame_psf))
-            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed))
+            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed[frame_index, :, :]))
 
             frame_seed[frame_index, :, :] += frame_psf
 
 
-            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed))
+            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed[frame_index, :, :]))
 
 
         # Add the TSO target to the segmentation map
@@ -190,8 +190,12 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         elif frame not in reset_frames:
             #print('int: {}, rel_frame {}, frame-starting frame {}'.format(int_number, rel_frame, frame-starting_frame))
             #print('intermediate frame in integration, frame_seed and seed_image:', final_seed[int_number, rel_frame-1, 1021, 1026], frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
+            #print('FRAME: ', frame)
+            #print('int_number and rel_frame: ', int_number, rel_frame)
+            #print(frame_seed[frame-starting_frame, 151, 1875], seed_image_per_frame[151, 1875])
             final_seed[int_number, rel_frame, :, :] = final_seed[int_number, rel_frame-1, :, :] + \
                 frame_seed[frame-starting_frame, :, :] + seed_image_per_frame
+            #print(final_seed[int_number, rel_frame, 151, 1875])
 
     return final_seed, seed_segmentation_map
 

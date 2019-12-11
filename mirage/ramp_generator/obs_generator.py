@@ -42,6 +42,7 @@ import numpy as np
 from astropy.io import fits, ascii
 from astropy.table import Table
 from astropy.time import Time, TimeDelta
+import astropy.units as u
 import pysiaf
 
 from mirage.ramp_generator import unlinearize
@@ -2268,7 +2269,7 @@ class Observation():
     def populate_group_table(self, starttime, grouptime, ramptime, numint, numgroup, ny, nx):
         """Create some reasonable values to fill the GROUP extension table.
         These will not be completely correct because access to other ssb
-        scripts and more importantly, databses, is necessary. But they should be
+        scripts and more importantly, databases, is necessary. But they should be
         close.
 
         Parameters
@@ -2280,7 +2281,7 @@ class Observation():
             Exposure time of a single group (seconds)
 
         ramptime : float
-            Exposure tiem of the entire exposure (seconds)
+            Exposure time of the entire exposure (seconds)
 
         numint : int
             Number of integrations in data
@@ -2622,6 +2623,60 @@ class Observation():
                                          "input file! Not present in {}"
                                          .format(rele[0], rele[1], rfile)))
 
+    def int_times_table(self, integration_time, date_obs, time_obs):
+        """Create and populate the INT_TIMES table, which is saved as a
+        separate extension in the output data file
+
+        Parameters
+        ----------
+
+        integration_time : float
+            Exposure time for a single integration, including the reset
+            frame, in seconds
+
+        date_obs :
+
+        time_obs :
+
+        Returns
+        -------
+        int_times_tab : astropy.table.Table
+            Table of starting, mid, and end times for each integration
+        """
+        integration_numbers = np.arange(self.params['Readout']['nint'])
+
+        start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
+        start_time = Time(start_time_string)
+
+        integ_time_delta = TimeDelta(integration_time * u.second)
+        start_times = start_time + (integ_time_delta * integration_numbers)
+
+        integration_time_exclude_reset = TimeDelta((integration_time - self.frametime) * u.second)
+        end_times = start_times + integration_time_exclude_reset
+
+        mid_times = start_times + integration_time_exclude_reset / 2.
+
+        # For now, let's keep the BJD (Barycentric?) times identical
+        # to the MJD times.
+        start_times_bjd = start_times
+        mid_times_bjd = mid_times
+        end_times_bjd = end_times
+
+        # Create table
+        nrows = len(integration_numbers)
+        data_list = [(integration_numbers[i] + 1, start_times.mjd[i], mid_times.mjd[i], end_times.mjd[i],
+                      start_times_bjd.mjd[i], mid_times_bjd.mjd[i], end_times_bjd.mjd[i]) for i in range(nrows)]
+
+        int_times_tab = np.array(data_list,
+                                 dtype=[('integration_number','<i2'),
+                                        ('int_start_MJD_UTC','<f8'),
+                                        ('int_mid_MJD_UTC', '<f8'),
+                                        ('int_end_MJD_UTC','<f8'),
+                                        ('int_start_BJD_TDB','<f8'),
+                                        ('int_mid_BJD_TDB','<f8'),
+                                        ('int_end_BJD_TDB','<f8')])
+        return int_times_tab
+
     def save_DMS(self, ramp, zeroframe, filename, mod='1b', err_ext=None,
                 group_dq=None, pixel_dq=None):
         """Save the new, simulated integration in DMS format (i.e. DMS orientation
@@ -2778,8 +2833,6 @@ class Observation():
         print('\n\nPopulating xref_sci in output file:')
         print(self.seedheader['XREF_SCI'])
 
-
-
         try:
             outModel.meta.wcsinfo.siaf_xref_sci = self.seedheader['XREF_SCI']
             outModel.meta.wcsinfo.siaf_yref_sci = self.seedheader['YREF_SCI']
@@ -2801,6 +2854,10 @@ class Observation():
 
         outModel.meta.observation.date = self.params['Output']['date_obs']
         outModel.meta.observation.time = self.params['Output']['time_obs']
+
+        # Create INT_TIMES table, to be saved in INT_TIMES extension
+        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+        outModel.int_times = int_times
 
         if self.runStep['fwpw']:
             fwpw = ascii.read(self.params['Reffiles']['filtpupilcombo'])
@@ -2877,6 +2934,8 @@ class Observation():
         outModel.meta.exposure.nframes = self.params['Readout']['nframe']
         outModel.meta.exposure.ngroups = self.params['Readout']['ngroup']
         outModel.meta.exposure.nints = self.params['Readout']['nint']
+        outModel.meta.exposure.integration_start = self.seedheader['SEGINTST'] + 1
+        outModel.meta.exposure.integration_end = self.seedheader['SEGINTED'] + 1
 
         outModel.meta.exposure.sample_time = 10
         outModel.meta.exposure.frame_time = self.frametime
@@ -3097,6 +3156,10 @@ class Observation():
         # these only go in the fake ramp, not in the signal images....
         outModel[0].header['DATE-OBS'] = self.params['Output']['date_obs']
         outModel[0].header['TIME-OBS'] = self.params['Output']['time_obs']
+
+        # Create INT_TIMES table, to be saved in INT_TIMES extension
+        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+        outModel['INT_TIMES'] = int_times
 
         if self.runStep['fwpw']:
             fwpw = ascii.read(self.params['Reffiles']['filtpupilcombo'])
