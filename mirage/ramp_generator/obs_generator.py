@@ -2623,7 +2623,7 @@ class Observation():
                                          "input file! Not present in {}"
                                          .format(rele[0], rele[1], rfile)))
 
-    def int_times_table(self, integration_time, date_obs, time_obs):
+    def int_times_table(self, integration_time, date_obs, time_obs, num_ints):
         """Create and populate the INT_TIMES table, which is saved as a
         separate extension in the output data file
 
@@ -2634,9 +2634,14 @@ class Observation():
             Exposure time for a single integration, including the reset
             frame, in seconds
 
-        date_obs :
+        date_obs : str
+            Date string of observation ('2020-02-28')
 
-        time_obs :
+        time_obs : str
+            Time string of observation ('12:24:56')
+
+        num_ints : int
+            Number of integrations to put in the table
 
         Returns
         -------
@@ -2645,7 +2650,7 @@ class Observation():
         """
         integration_numbers = np.arange(self.params['Readout']['nint'])
 
-        start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
+        start_time_string = date_obs + 'T' + time_obs
         start_time = Time(start_time_string)
 
         integ_time_delta = TimeDelta(integration_time * u.second)
@@ -2856,7 +2861,8 @@ class Observation():
         outModel.meta.observation.time = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
+                                         outModel.data.shape[0])
         outModel.int_times = int_times
 
         if self.runStep['fwpw']:
@@ -3158,7 +3164,8 @@ class Observation():
         outModel[0].header['TIME-OBS'] = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
+                                         outModel.data.shape[0])
         outModel['INT_TIMES'] = int_times
 
         if self.runStep['fwpw']:
