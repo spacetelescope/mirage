@@ -431,6 +431,11 @@ class Catalog_seed():
                 self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
             else:
                 self.seed_file = '{}_final_seed_image.fits'.format(self.basename)
+
+            # Define self.seed_files for non-TSO observations
+            if len(self.seed_files) == 0:
+                self.seed_files = [self.seed_file]
+
             self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_file)
             print("Final seed image and segmentation map saved as {}".format(self.seed_file))
             print("Seed image, segmentation map, and metadata available as:")

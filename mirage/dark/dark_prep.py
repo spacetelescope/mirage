@@ -988,7 +988,7 @@ class DarkPrep():
             hl.writeto(objname, overwrite=True)
             print(("Linearized dark frame plus superbias and reference"
                    "pixel signals, as well as zeroframe, saved to {}. "
-                   "This can be used as input to the observation"
+                   "This can be used as input to the observation "
                    "generator.".format(objname)))
             self.dark_files.append(objname)
 
