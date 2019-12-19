@@ -392,7 +392,7 @@ class WFSSSim():
             with open(pfile, 'r') as infile:
                 params = yaml.safe_load(infile)
 
-            cats = [params['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
+            cats = [params['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES if 'tso_' not in cattype]
             cats = [e for e in cats if e.lower() != 'none']
             self.catalog_files.extend(cats)
 
