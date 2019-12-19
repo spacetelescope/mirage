@@ -504,11 +504,6 @@ class ReadAPTXML():
                 value = field.text
                 observation_dict[key] = value
 
-
-            print('\n\nObservation_dict:')
-            print(observation_dict)
-
-
             # Determine if there is an aperture override
             override = obs.find('.//' + self.apt + 'FiducialPointOverride')
             FiducialPointOverride = True if override is not None else False
