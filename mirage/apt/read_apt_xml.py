@@ -562,6 +562,14 @@ class ReadAPTXML():
                 # in the table are ignored.
                 if prime_instrument == 'NIRISS' and prime_template_name == 'NirissWfss':
                     observation_dict['PrimaryDithers'] = prime_template.find(prime_ns + dither_key_name).text
+
+                    # In the case where PrimaryDithers is e.g. 2-POINT-WITH-NIRCam,
+                    # extract the '2' and place it in the PrimaryDithers field
+                    try:
+                        int_dithers = np.int(observation_dict['PrimaryDithers'])
+                    except ValueError:
+                        observation_dict['PrimaryDitherType'] = copy.deepcopy(observation_dict['PrimaryDithers'])
+                        observation_dict['PrimaryDithers'] = observation_dict['PrimaryDithers'][0]
                     observation_dict['DitherSize'] = prime_template.find(prime_ns + 'DitherSize').text
                     number_of_primary_dithers = np.int(observation_dict['PrimaryDithers'][0])
                     number_of_subpixel_dithers = 1
