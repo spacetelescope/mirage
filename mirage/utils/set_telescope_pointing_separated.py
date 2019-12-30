@@ -135,8 +135,10 @@ def add_wcs(filename, roll=0.):
     #try:
     #    q, j2fgs_matrix, fsmcorr, obstime = get_pointing(obsstart, obsend)
     #except ValueError as exception:
-    ra = pheader['TARG_RA']
-    dec = pheader['TARG_DEC']
+    #ra = pheader['TARG_RA']
+    #dec = pheader['TARG_DEC']
+    ra = fheader['CRVAL1']
+    dec = fheader['CRVAL2']
     #roll = 0
 
     #logger.warning(
@@ -173,11 +175,11 @@ def add_wcs(filename, roll=0.):
     #        '\n\tRA = {} DEC={} PA_V3={}'.format(crval1, crval2, v3_pa_deg)
     #    )
 
-    fheader['RA_V1'] = v1_ra_deg
-    fheader['DEC_V1'] = v1_dec_deg
-    fheader['PA_V3'] = v3_pa_deg
-    fheader['CRVAL1'] = crval1
-    fheader['CRVAL2'] = crval2
+    #fheader['RA_V1'] = v1_ra_deg
+    #fheader['DEC_V1'] = v1_dec_deg
+    #fheader['PA_V3'] = v3_pa_deg
+    #fheader['CRVAL1'] = crval1
+    #fheader['CRVAL2'] = crval2
     fheader['PC1_1'] = -np.cos(pa_aper_deg * D2R)
     fheader['PC1_2'] = np.sin(pa_aper_deg * D2R)
     fheader['PC2_1'] = np.sin(pa_aper_deg * D2R)
