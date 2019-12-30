@@ -1,3 +1,12 @@
+1.1.4
+=====
+
+WCS keywords
+------------
+
+- Correct the input RA and Dec used to calculate the values of the PC matrix. Remove the calculation of CRVAL1,2 from set_telescope_pointing.py since it is already done in observation_generator.py
+
+
 1.1.3
 =====
 
