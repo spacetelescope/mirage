@@ -23,6 +23,7 @@ EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
 
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
 NIRISS_PUPIL_WHEEL_FILTERS = ['F090W', 'F115W', 'F158M', 'F140M', 'F150W', 'F200W']
+NIRCAM_PUPIL_WHEEL_FILTERS = ['F162M', 'F164N', 'F323N', 'F405N', 'F466N', 'F470N']
 
 FLAMBDA_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.AA
 FLAMBDA_MKS_UNITS = u.watt / u.meter**2 / u.micron
