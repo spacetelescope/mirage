@@ -37,7 +37,7 @@ from astropy.io import fits
 import numpy as np
 from webbpsf.utils import to_griddedpsfmodel
 
-from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS
+from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS
 from mirage.utils.utils import expand_environment_variable
 
 
@@ -108,6 +108,35 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
             pupil = 'CLEAR'
         elif instrument.upper() == 'NIRISS':
             pupil = 'CLEARP'
+
+    # NIRISS has many filters in the pupil wheel. WebbPSF does
+    # not make a distinction, but Mirage does. Adjust the info
+    # to match Mirage's expectations
+    if inst.upper() == 'NIRISS' and filt in NIRISS_PUPIL_WHEEL_FILTERS:
+        save_filt = copy(filt)
+        if pupil == 'CLEARP':
+            filt = 'CLEAR'
+        else:
+            raise ValueError(('Pupil value is something other than '
+                              'CLEARP, but the filter being used is '
+                              'in the pupil wheel.'))
+        pupil = save_filt
+
+    # Same for NIRCam
+    if inst.upper() == 'NIRCAM' and filt in NIRCAM_PUPIL_WHEEL_FILTERS:
+        save_filt = copy(filt)
+        if pupil == 'CLEAR':
+            if save_filt[0:2] == 'F4':
+                filt = 'F444W'
+            elif save_filt[0:2] == 'F3':
+                filt = 'F322W2'
+            elif save_filt[0:2] == 'F1':
+               filt = 'F150W2'
+        else:
+            raise ValueError(('Pupil value is something other than '
+                              'CLEAR, but the filter being used is '
+                              'in the pupil wheel.'))
+        pupil = save_filt
 
     opd_file = header['OPD_FILE']
     if default_psf:
@@ -322,6 +351,22 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                 else:
                     raise ValueError(('Pupil value is something other than '
                                       'CLEARP, but the filter being used is '
+                                      'in the pupil wheel.'))
+                file_pupil = save_filt
+
+            # Same for NIRCam
+            if file_inst.upper() == 'NIRCAM' and file_filt in NIRCAM_PUPIL_WHEEL_FILTERS:
+                save_filt = copy(file_filt)
+                if file_pupil == 'CLEAR':
+                    if save_filt[0:2] == 'F4':
+                        file_filt = 'F444W'
+                    elif save_filt[0:2] == 'F3':
+                        file_filt = 'F322W2'
+                    elif save_filt[0:2] == 'F1':
+                        file_filt = 'F150W2'
+                else:
+                    raise ValueError(('Pupil value is something other than '
+                                      'CLEAR, but the filter being used is '
                                       'in the pupil wheel.'))
                 file_pupil = save_filt
 
