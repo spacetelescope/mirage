@@ -211,12 +211,6 @@ class DarkPrep():
         yd = modshape[-2]
         xd = modshape[-1]
 
-
-        print('\nDARK mod.shape: ', modshape)
-        print(model.sbAndRefpix.shape)
-        print(self.subarray_bounds)
-        print('')
-
         if ((self.subarray_bounds[0] != 0) or (self.subarray_bounds[2] != (xd - 1))
            or (self.subarray_bounds[1] != 0) or (self.subarray_bounds[3] != (yd - 1))):
 
@@ -770,7 +764,6 @@ class DarkPrep():
                 use_all_files = True
                 files_to_use = dark_list
 
-            print('Number_of_ints: ', number_of_ints)
             print('Dark files to use:')
             print(files_to_use)
 
@@ -891,7 +884,7 @@ class DarkPrep():
                                                "Cannot yet skip the pipeline and provide a raw dark."))
 
                 if file_index == 0:
-                    print('self.linDark shape is {}. Expecting it to be 4D'.format(self.linDark.data.shape))
+                    #print('self.linDark shape is {}. Expecting it to be 4D'.format(self.linDark.data.shape))
                     junk, num_grps, ydim, xdim = self.linDark.data.shape
                     final_dark = np.zeros((number_of_ints, num_grps, ydim, xdim))
                     final_sbandrefpix = np.zeros((number_of_ints, num_grps, ydim, xdim))

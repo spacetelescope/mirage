@@ -559,7 +559,7 @@ class Catalog_seed():
 
                         self.saveSeedImage(seed, segmap, self.seed_file)
                         self.seed_files.append(self.seed_file)
-                        print('ADDING FILE {} TO SELF.SEED_FILES\n'.format(self.seed_file))
+                        print('Adding file {} to self.seed_files\n'.format(self.seed_file))
                         j += 1
 
                     i += 1
@@ -2444,11 +2444,6 @@ class Catalog_seed():
         # Loop over the entries in the point source list
         for i, entry in enumerate(pointSources):
 
-
-            print('entry in ptsrc catalog:')
-            print(entry)
-
-
             # Find the PSF size to use based on the countrate
             psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
 
@@ -2485,8 +2480,6 @@ class Catalog_seed():
 
             # Get the coordinates that describe the overlap between the
             # PSF image and the output aperture
-            print('Last call to create_psf_stamp_coords:')
-            print(x_delta, y_delta)
             xap, yap, xpts, ypts, (i1, i2), (j1, j2), (k1, k2), \
                 (l1, l2) = self.create_psf_stamp_coords(entry['pixelx']+x_delta, entry['pixely']+y_delta,
                                                         updated_psf_dimensions,

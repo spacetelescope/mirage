@@ -280,7 +280,7 @@ class GrismTSO():
         # Determine which frames of the exposure will take place with the unaltered stellar
         # spectrum. This will be all frames where the associated lightcurve is 1.0 everywhere.
         transit_frames, unaltered_frames = self.find_transit_frames(lightcurves)
-        print('Frame numbers containing the transit: {} - {}', np.min(transit_frames), np.max(transit_frames))
+        print('Frame numbers containing the transit: {} - {}'.format(np.min(transit_frames), np.max(transit_frames)))
 
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
         print('\n\nDispersing TSO source\n\n')
@@ -296,7 +296,7 @@ class GrismTSO():
             hlist = fits.HDUList([h_back, h_tso])
             disp_filename = '{}_dispersed_seed_images.fits'.format(self.basename)
             hlist.writeto(disp_filename, overwrite=True)
-            print('Dispersed seed images (background sources and TSO source) saved to {}.'
+            print('\nDispersed seed images (background sources and TSO source) saved to {}.\n\n'
                   .format(disp_filename))
 
         # Crop dispersed seed images to correct final subarray size
@@ -351,7 +351,7 @@ class GrismTSO():
                 initial_frame = self.grp_segment_indexes[j]
                 # int_dim and grp_dim are the number of integrations and
                 # groups in the current segment PART
-                print("Current segment part contains: Integrations: {}, Groups: {}".format(int_dim, grp_dim))
+                print("\n\nCurrent segment part contains: {} integrations and {} groups.".format(int_dim, grp_dim))
                 print("Creating frame by frame dispersed signal")
                 segment_seed = np.zeros((int_dim, grp_dim, self.seed_dimensions[0], self.seed_dimensions[1]))
 
@@ -413,7 +413,7 @@ class GrismTSO():
                                                                             str(self.segment_part_number).zfill(3))
 
 
-                print('\n\nSegment int and frame start numbers: {} {}'.format(self.segment_int_start_number, self.segment_frame_start_number))
+                print('Segment int and frame start numbers: {} {}'.format(self.segment_int_start_number, self.segment_frame_start_number))
                 #print('Part int and frame start numbers (ints and frames within the segment): {} {}'.format(self.part_int_start_number, self.part_frame_start_number))
 
                 # Disperser output is always full frame. Crop to the
@@ -856,7 +856,7 @@ class GrismTSO():
 
         print("Seed image and segmentation map saved as {}".format(self.seed_file))
         print("Seed image, segmentation map, and metadata available as:")
-        print("self.seedimage, self.seed_segmap, self.seedinfo.")
+        print("self.seedimage, self.seed_segmap, self.seedinfo.\n\n")
 
     def split_param_file(self, params):
         """Create 2 copies of the input parameter file. One will contain

@@ -184,8 +184,7 @@ class Observation():
                 ramp, rampzero = self.frame_to_ramp(inseed)
             else:
                 ramp, rampzero = self.frame_to_ramp_no_cr(inseed)
-            print('frame_to_ramp output shape: ', ramp.shape)
-            print('sim_exposure shape: ', sim_exposure.shape)
+
             sim_exposure[integ, :, :, :] = ramp
             sim_zero[integ, :, :] = rampzero
         return sim_exposure, sim_zero
@@ -938,7 +937,7 @@ class Observation():
                 nints = header_data['SEGINT']
                 ngroups = header_data['SEGGROUP']
 
-                print('Final seed image shape: ', nints, ngroups, ydim, xdim)
+                print('Final seed image shape: ({}, {}, {}, {})'.format(nints, ngroups, ydim, xdim))
                 seed = np.zeros((nints, ngroups, ydim, xdim))
                 segmap = seg_data
 
@@ -1046,10 +1045,8 @@ class Observation():
 
         self.file_check()
 
-
-        print('self.linDark:', self.linDark)
-        print('self.seed:', self.seed)
-
+        #print('self.linDark:', self.linDark)
+        #print('self.seed:', self.seed)
 
         # Get the input dark if a filename is supplied
         if self.linDark is None:
@@ -1077,11 +1074,6 @@ class Observation():
             self.linear_dark = copy.deepcopy(self.linDark)
             self.linDark = ['none']
             seed_dict = {self.linDark[0]: self.seed}
-
-
-        print('self.linear_dark sbAndRefpix shape: ', self.linear_dark.sbAndRefpix.shape)
-
-
 
         # Finally, collect information about the detector,
         # which will be needed for astrometry later
@@ -1137,14 +1129,13 @@ class Observation():
         self.read_superbias_file()
 
         for i, linDark in enumerate(self.linDark):
-            print('Output name: ', self.params['Output']['file'])
             temp_outdir, basename = os.path.split(self.params['Output']['file'])
 
             # Get the segment number of the file if present
             seg_location = linDark.find('_seg')
             if seg_location != -1:
                 seg_str = linDark[seg_location+4:seg_location+7]
-                print('first segment string: ', seg_str)
+                #print('first segment string: ', seg_str)
             else:
                 try:
                     seg_location = seed_dict[linDark][0].find('_seg')
@@ -1154,7 +1145,7 @@ class Observation():
                     seg_str = seed_dict[linDark][0][seg_location+4:seg_location+7]
                 else:
                     seg_str = ''
-                print('second segment string: ', seg_str)
+                #print('second segment string: ', seg_str)
 
             if seg_str != '':
                 # Assume standard JWST filename format
@@ -1166,16 +1157,15 @@ class Observation():
                 except IndexError:
                     # Non-standard filename format
                     basename = basename.replace('.fits', '-seg{}.fits'.format(seg_str))
-            basename = os.path.join(temp_outdir, basename)
+            #basename = os.path.join(temp_outdir, basename)
 
             if i > 0:
                 self.linear_dark = self.read_dark_file(self.linDark[i])
 
-            print('sbandrefpix shape: ', self.linear_dark.sbAndRefpix.shape)
-
             seed_files = seed_dict[linDark]
-            print('\nSeed files:')
-            print(seed_files)
+            if isinstance(seed_files[0], str):
+                print('\nSeed files:')
+                print(seed_files)
             # Get the corresponding input seed image(s)
             if isinstance(seed_files, str):
                 # If a single filename is suppliedself.read_seed(seed_files)
@@ -1191,13 +1181,6 @@ class Observation():
                 # appropriate objects, since they are saved in
                 # the same file as the seed image
                 self.seed_image = copy.deepcopy(seed_files)
-                #seed_files = [None]
-
-            print('\n')
-            print(self.seedheader)
-            print(self.seedheader['UNITS'])
-            print('\n')
-
 
             # If seed image is in units of electrons/sec then divide
             # by the gain to put in ADU/sec
@@ -1211,15 +1194,10 @@ class Observation():
                                   "seed image. Unable to determine whether the "
                                   "seed image is in units of ADU or electrons."))
 
-
-
-
-
             # Translate to ramp if necessary,
             # Add poisson noise and cosmic rays
             # Rearrange into requested read pattern
             # All done in one function to save memory
-            print('seed_image shape is: ', self.seed_image.shape)
             simexp, simzero = self.add_crs_and_noise(self.seed_image)
 
             # Multiply flat fields
@@ -1237,10 +1215,6 @@ class Observation():
                 simzero = self.add_ipc(np.expand_dims(simzero, axis=1))[:, 0, :, :]
 
             # Add the simulated source ramp to the dark ramp
-
-            print('\nLinear dark zeroframe shape: ', self.linear_dark.zeroframe.shape)
-            print('\nSimulated zeroframe shape: ', simzero.shape)
-
             lin_outramp, lin_zeroframe, lin_sbAndRefpix = self.add_synthetic_to_dark(simexp,
                                                                                      self.linear_dark,
                                                                                      syn_zeroframe=simzero)
@@ -1250,7 +1224,6 @@ class Observation():
             lin_outramp = self.add_detector_effects(lin_outramp)
             lin_zeroframe = self.add_detector_effects(np.expand_dims(lin_zeroframe, axis=1))[:, 0, :, :]
 
-
             # We need to first subtract superbias and refpix signals from the
             # original saturation limits, and then linearize them
             # Refpix signals will vary from group to group, but only by a few
@@ -1259,7 +1232,6 @@ class Observation():
             # Create a linearized saturation map
             limits = np.zeros_like(self.satmap) + 1.e6
 
-            print('Unlinearizing saturation values')
             if self.linear_dark.sbAndRefpix is not None:
                 lin_satmap = unlinearize.nonLinFunc(self.satmap - self.linear_dark.sbAndRefpix[0, 0, :, :],
                                                     nonlincoeffs, limits)
@@ -1290,7 +1262,7 @@ class Observation():
                     linearrampfile = basename.replace('.fits', '_linear.fits')
 
                 # Full path of output file
-                linearrampfile = linearrampfile.split('/')[-1]
+                #linearrampfile = linearrampfile.split('/')[-1]
                 linearrampfile = os.path.join(self.params['Output']['directory'], linearrampfile)
 
                 # Saturation flagging - to create the pixeldq extension
@@ -1360,7 +1332,7 @@ class Observation():
                     else:
                         self.save_fits(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
                     stp.add_wcs(rawrampfile, roll=self.params['Telescope']['rotation'])
-                    print("Final raw exposure saved to")
+                    print("Final raw exposure saved to: ")
                     print("{}".format(rawrampfile))
                     self.raw_output = rawrampfile
                 else:

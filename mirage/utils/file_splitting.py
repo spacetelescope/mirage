@@ -75,9 +75,9 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
         group_list = np.arange(0, groups, delta_group).astype(np.int)
         group_list = np.append(group_list, groups)
         print('Splitting within each integration:')
-        print('group_list: ', group_list)
         integration_list = np.arange(integrations + 1).astype(np.int)
         print('integration_list: ', integration_list)
+        print('group_list: ', group_list)
     elif observation > pixel_limit:
         split = True
         print('Splitting by integration:')
@@ -85,8 +85,8 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
         delta_int = np.int(pixel_limit / pix_per_int)
         integration_list = np.arange(0, integrations, delta_int).astype(np.int)
         integration_list = np.append(integration_list, integrations)
-        print('group_list: ', group_list)
         print('integration_list: ', integration_list)
+        print('group_list: ', group_list)
 
     return split, group_list, integration_list
 
