@@ -168,8 +168,8 @@ class SplitFileMetaData:
                 if total_ints > 1:
                     total_frames += total_ints - 1
 
-                print('int_start, int_end, i:', int_start, int_end, i)
-                print('initial_frame, frame_start, frame_end, total_frames:', initial_frame, frame_start, frame_end, total_frames)
+                #print('int_start, int_end, i:', int_start, int_end, i)
+                #print('initial_frame, frame_start, frame_end, total_frames:', initial_frame, frame_start, frame_end, total_frames)
 
                 self.total_frames.append(total_frames)
                 self.total_ints.append(total_ints)
@@ -180,19 +180,11 @@ class SplitFileMetaData:
                 self.segment_ints.append(DMS_integration_splits[segment_number] - DMS_integration_splits[segment_number - 1])
                 self.segment_frames.append((DMS_group_splits[1] - DMS_group_splits[0]) * frames_per_group)
 
-                print('\n\n\nAAAAAAAHHHHHH!!!!!')
-                print(int_end)
-                print(DMS_integration_splits)
-                print(segment_number)
-                print(self.segment_ints)
-                print('\n\n')
-
                 if segment_number == previous_segment:
                     segment_part_number += 1
                     part_int_start_number = int_start - segment_starting_int_number
                     part_frame_start_number = initial_frame
                 else:
-                    print("New Segment!")
                     segment_part_number = 1
                     previous_segment = copy.deepcopy(segment_number)
                     segment_frame_start_number = initial_frame
@@ -208,14 +200,14 @@ class SplitFileMetaData:
                 self.part_frame_start_number.append(part_frame_start_number)
                 self.segment_number.append(segment_number)
 
-                print("\n\nSegment Numbers:")
-                print(int_start, initial_frame)
-                print(self.total_frames)
-                print(self.segment_number, self.segment_part_number)
-                print(self.segment_ints, self.segment_frames)
-                print(self.segment_int_start_number, self.segment_frame_start_number)
-                print(self.part_int_start_number, self.part_frame_start_number)
-                print('\n\n')
+                #print("\n\nSegment Numbers:")
+                #print(int_start, initial_frame)
+                #print(self.total_frames)
+                #print(self.segment_number, self.segment_part_number)
+                #print(self.segment_ints, self.segment_frames)
+                #print(self.segment_int_start_number, self.segment_frame_start_number)
+                #print(self.part_int_start_number, self.part_frame_start_number)
+                #print('\n\n')
 
                 j += 1
 

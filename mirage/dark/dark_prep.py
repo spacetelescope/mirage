@@ -715,19 +715,11 @@ class DarkPrep():
 
         # If there will be too many frames, then the file will need
         # to be split into pieces to save memory
-        #split_seed = False
-        #if memory > self.params['Output']['max_memory'] * 2048 * 2048:
-
-        #split_seed, integration_segment_indexes = self.file_splits()
         xdim = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
         ydim = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
         split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
                                                                                           self.params['Readout']['ngroup'],
                                                                                           self.params['Readout']['nint'])
-        print('Splits:')
-        print(split_seed)
-        print(group_segment_indexes)
-        print(integration_segment_indexes)
         # In order to avoid the case of having a single integration
         # in the final file, which leads to rate rather than rateints
         # files in the pipeline, check to be sure that the integration
@@ -738,18 +730,6 @@ class DarkPrep():
             if delta_int[-1] == 1 and delta_int[0] != 1:
                 integration_segment_indexes[-2] -= 1
                 print('Adjusted to avoid single integration: ', integration_segment_indexes)
-
-
-
-        #if 1>0:
-        #    split_seed = True
-        #    #integration_segment_indexes = self.calculate_frame_splits()
-        #    integration_segment_indexes = [0, 10, 20, 30]
-        #    #self.total_seed_segments = len(integration_segment_indexes) - 1
-        #    print('\n********************\nNeed integration split indexes from a new function\n****************\n')
-        #else:
-        #    split_seed = False
-        #    integration_segment_indexes = [0, self.numints]
 
         # This currently pays attention only to splitting the file on integrations, and not
         # within an integration. It seems like we can keep it this way as the dark data is
@@ -767,10 +747,8 @@ class DarkPrep():
             else:
                 number_of_ints = self.numints
 
-            print('segment number: ', seg_index)
-            print('number of integrations:', number_of_ints)
-            print('split seed? ', split_seed)
-
+            print('Segment number: ', seg_index)
+            print('Number of integrations:', number_of_ints)
 
             # Generate the list of dark current files to use
             if number_of_ints == 1:
@@ -792,9 +770,8 @@ class DarkPrep():
                 use_all_files = True
                 files_to_use = dark_list
 
-            print('number_of_ints: ', number_of_ints)
-            print('use_all_files: ', use_all_files)
-            print('dark files to use:')
+            print('Number_of_ints: ', number_of_ints)
+            print('Dark files to use:')
             print(files_to_use)
 
             # Create a list describing which dark current file goes with
@@ -803,12 +780,11 @@ class DarkPrep():
             # is defined.
             mapping = np.random.choice(len(files_to_use), size=number_of_ints)
             mapping[0] = 0
-            print('mapping:', mapping)
 
             # Loop over dark current files
             for file_index, filename in enumerate(files_to_use):
 
-                print('file number:', file_index)
+                print('Working on dark file: {}'.format(filename))
                 if not use_all_files:
                     frames = np.arange(len(files_to_use))
                 else:
@@ -817,7 +793,6 @@ class DarkPrep():
                     # is larger than the number of dark current files
                     frames = np.where(mapping == file_index)[0]
 
-                print('frames:', frames)
                 # If the random number picker didn't pick this file for
                 # any integrations, then skip reading it in.
                 if len(frames) == 0:
@@ -836,15 +811,6 @@ class DarkPrep():
                 # the proposed output integration
                 self.data_volume_check(self.dark)
 
-
-                print('After data volume check: ', self.dark.data.shape)
-
-                # Compare the requested number of integrations
-                # to the number of integrations in the input dark
-                #print("Dark shape as read in: {}".format(self.dark.data.shape))
-                #self.darkints()
-                #print("Dark shape after copying integrations to match request: {}".format(self.dark.data.shape))
-
                 # Put the input dark (or linearized dark) into the
                 # requested readout pattern
                 self.dark, sbzeroframe = self.reorder_dark(self.dark)
@@ -857,7 +823,7 @@ class DarkPrep():
                 # pixels can be used in the processing.
                 if ((self.params['Inst']['use_JWST_pipeline']) & (self.runStep['linearized_darkfile'] is False)):
 
-                    # Linear ize the dark ramp via the SSB pipeline.
+                    # Linearize the dark ramp via the SSB pipeline.
                     # Also save a diff image of the original dark minus
                     # the superbias and refpix subtracted dark, to use later.
 
@@ -959,7 +925,6 @@ class DarkPrep():
             h0 = fits.PrimaryHDU()
             h1 = fits.ImageHDU(final_dark, name='SCI')
             h2 = fits.ImageHDU(final_sbandrefpix, name='SBANDREFPIX')
-            print('final size check: ', final_sbandrefpix.shape)
             h3 = fits.ImageHDU(final_zerodata, name='ZEROFRAME')
             h4 = fits.ImageHDU(final_zero_sbandrefpix, name='ZEROSBANDREFPIX')
 
@@ -1136,34 +1101,12 @@ class DarkPrep():
         if ((darkpatt in rapids) & (dark.zeroframe is None)):
             dark.zeroframe = dark.data[:, 0, :, :]
             print("Saving 0th frame from data to the zeroframe extension")
-
-
-
-            print("RAPID dark.")
-            print(dark.data.shape)
-            print(dark.zeroframe.shape)
-            print(dark.sbAndRefpix.shape)
-
-
-
-
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
         elif ((darkpatt not in rapids) & (dark.zeroframe is None)):
             print("Unable to save the zeroth frame because the input dark current ramp is not RAPID.")
             sbzero = None
         elif ((darkpatt in rapids) & (dark.zeroframe is not None)):
-
-
-
-            print("RAPID dark. Zeroframe already exists.")
-            print(dark.data.shape)
-            print(dark.zeroframe.shape)
-            print(dark.sbAndRefpix.shape)
-
-
-
-
             # In this case we already have the zeroframe
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
@@ -1243,11 +1186,6 @@ class DarkPrep():
         dark.header['NSKIP'] = self.params['Readout']['nskip']
         dark.header['NGROUPS'] = self.params['Readout']['ngroup']
         dark.header['NINTS'] = self.params['Readout']['nint']
-
-
-        print('\n\n\nMMMMMMMMMMMMMMMMM\noutdark shape: {}\n\n\n'.format(outdark.shape))
-
-
         return dark, sbzero
 
     def add_options(self, parser=None, usage=None):

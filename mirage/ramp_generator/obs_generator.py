@@ -925,12 +925,7 @@ class Observation():
 
         header : dict
         """
-        #int_counter = 0
-        #group_counter = 0
-
-        print("Reconstructing seed image")
-
-
+        print("Reconstructing seed image from multiple files")
         for i, filename in enumerate(filenames):
 
             print('File: ', filename)
@@ -938,8 +933,6 @@ class Observation():
             # Read in the data from one file
             seed_data, seg_data, header_data = self.read_seed(filename)
             ints, groups, ydim, xdim = seed_data.shape
-
-            print('data shape: ', seed_data.shape)
 
             if i == 0:
                 nints = header_data['SEGINT']
@@ -955,24 +948,10 @@ class Observation():
             grp_start = header_data['PTFRMSRT']
             seed[int_start: int_start+ints, grp_start: grp_start+groups, :, :] = seed_data
 
-
-
-            print('data placed into integration: ', int_start, int_start+ints)
-            print('                  groups: ', grp_start, grp_start+groups)
-            print(seed_data.shape)
-            print(seed.shape)
-
-            #seed[int_counter: int_counter+ints, group_counter: group_counter+groups, :, :] = seed_data
-            #group_counter += groups
-
-            # If the group counter reaches the number of groups expected
-            # in the seed image, then increment the integration counter
-            # and reset the group counter to zero so that the data from
-            # the next file will be placed at the beginning of the next
-            # integration
-            #if group_counter == ngroups:
-            #    int_counter += 1
-            #    group_counter = 0
+            #print('data placed into integration: ', int_start, int_start+ints)
+            #print('                  groups: ', grp_start, grp_start+groups)
+            #print(seed_data.shape)
+            #print(seed.shape)
 
         return seed, segmap, header_data
 

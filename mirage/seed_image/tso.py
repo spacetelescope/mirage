@@ -1,30 +1,8 @@
 #! /usr/bin/env python
 
 """
-This module contains code for adding a source with time-varying signal
-to a seed image
-
-
-Inputs:
-* seed image (counts/second)
-* PSF scaled to counts/second for given magnitude
-* coordinates within aperture to place the PSF, coordinates in the PSF that correspond to the area on the PSF to use
-* hdf5 file of the source
-
-method:
-* step along the light curve in time, at a cadence equal to the frame time.
-* for each step, integrate under the light curve to find out the relative brightness of the source
-* scale the input PSF based on integration results
-* scale the seed image to be in counts/frame
-* add PSF to the seed image
-* add seed image to the signal in the seed image corresponding to the previous frame
-* add Poisson noise/cosmic rays
-* move on to the next frame
-
-outputs:
-* 4d seed image with time varying source (similar to moving targets’ 4d seed image
-
-
+This module contains tools for adding a source with time-varying signal
+to a 4-dimensional seed image
 """
 import copy
 import numpy as np
@@ -90,13 +68,6 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
     seed_segmentation_map : numpy.ndarray
         2D array containing the segmentation map
     """
-    print('seed_segmentation_map type:')
-    print(type(seed_segmentation_map))
-
-
-
-
-
     yd, xd = seed_image.shape
     total_exposure_time = exposure_total_frames * frametime
 
@@ -133,6 +104,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         dx = frametime / (samples_per_frametime - 1)
 
         # Integrate the lightcurve for each frame
+        print('\nIntegrating lightcurve signal for each frame ')
         for frame_number in np.arange(total_frames) + starting_frame:
             frame_index = frame_number - starting_frame
             #print("Loop 1, frame number and index: ", frame_number, frame_index)
@@ -143,21 +115,8 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
             # is the integral of a flat line at 1.0 over one frametime
             relative_signal = romb(interp_lightcurve['fluxes'].value[indexes], dx) / frametime
             frame_psf = ft_psf * relative_signal
-
-            print('\nIntegrating lightcurve signal: ')
-            print(frame_number, frame_index, min_index, indexes)
-            print(relative_signal)
             tmpy, tmpx = psf.shape
-            print(psf[tmpy // 2, tmpx // 2], np.max(psf), psf.shape, tmpy // 2, tmpx // 2)
-            print(ft_psf[tmpy // 2, tmpx // 2], np.max(ft_psf))
-            print(frame_psf[tmpy // 2, tmpx // 2], np.max(frame_psf))
-            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed[frame_index, :, :]))
-
             frame_seed[frame_index, :, :] += frame_psf
-
-
-            print(frame_seed[frame_index, tmpy // 2, tmpx // 2], np.max(frame_seed[frame_index, :, :]))
-
 
         # Add the TSO target to the segmentation map
         seed_segmentation_map = update_segmentation_map(seed_segmentation_map, seg_map.segmap)
@@ -165,37 +124,25 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
     # Translate the frame-by-frame seed into the final, cumulative seed
     # image. Rearrange into integrations, resetting the signal for each
     # new integration.
-    #print(number_of_ints, frames_per_integration, resets_bet_ints, starting_frame)
+    print('Translate the frame-by-frame transit seed into the final, cumulative seed image.')
     integration_starts = np.arange(number_of_ints) * (frames_per_integration + resets_bet_ints) + starting_frame
     reset_frames = integration_starts[1:] - 1
-    #print('integration_starts:', integration_starts)
-    #print('reset frames:', reset_frames)
-    #final_seed = np.zeros((number_of_ints, frames_per_integration, yd, xd))
-    #print(number_of_ints, total_frames, len(reset_frames))
+
     if total_frames-len(reset_frames) > frames_per_integration:
         dimension = frames_per_integration
     else:
         dimension = total_frames-len(reset_frames)
     final_seed = np.zeros((number_of_ints, dimension, yd, xd))
-    #print('final_seed shape: ', final_seed.shape)
+
     for frame in np.arange(total_frames) + starting_frame:
         int_number = np.where(frame >= integration_starts)[0][-1]
-        rel_frame = frame - integration_starts[int_number]  # - starting_frame
-        #print('frame, rel_frame, and int_number:', frame, rel_frame, int_number)
+        rel_frame = frame - integration_starts[int_number]
 
         if frame in integration_starts:
-            #print('first frame in integration, frame_seed and seed_image:', frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
             final_seed[int_number, 0, :, :] = copy.deepcopy(frame_seed[frame-starting_frame, :, :]) + seed_image_per_frame
-            #print('final_seed[{}, 0, :, :] = frame_seed[{}, :, :]'.format(int_number, frame-starting_frame))
         elif frame not in reset_frames:
-            #print('int: {}, rel_frame {}, frame-starting frame {}'.format(int_number, rel_frame, frame-starting_frame))
-            #print('intermediate frame in integration, frame_seed and seed_image:', final_seed[int_number, rel_frame-1, 1021, 1026], frame_seed[frame-starting_frame, 1021, 1026], seed_image_per_frame[1021, 1026])
-            #print('FRAME: ', frame)
-            #print('int_number and rel_frame: ', int_number, rel_frame)
-            #print(frame_seed[frame-starting_frame, 151, 1875], seed_image_per_frame[151, 1875])
             final_seed[int_number, rel_frame, :, :] = final_seed[int_number, rel_frame-1, :, :] + \
                 frame_seed[frame-starting_frame, :, :] + seed_image_per_frame
-            #print(final_seed[int_number, rel_frame, 151, 1875])
 
     return final_seed, seed_segmentation_map
 
@@ -268,10 +215,26 @@ def check_lightcurve_time(light_curve, exposure_time, frame_time, divisions_per_
 
 def interpolate_lightcurve(light_curve, samples_per_frame_time, frame_time):
     """Given a lightcurve with arbitrary sampling times, interpolate
-    such that it has 3 (or 5?) samples per frametime. Start/mid/end, where
-    start is the same as end from the previous frametime, and end is
-    the same as start from the subsequent frametime. In order to use
-    Romberg, we need to integrate over 2^k + 1 samples each time.
+    such that it has ``samples_per_frame_time`` samples per frametime.
+    In order to use Romberg, we need to integrate over 2^k + 1 samples each time.
+
+    Parameters
+    ----------
+    light_curve : dict
+        Dictionary containing light curve. Times are in 'times' keyword,
+        and fluxes are in 'fluxes' keyword. Each should be an array with
+        associated unit.
+
+    samples_per_frame_time : int
+        Number of times to sample the lightcurve per frame exposure time
+
+    frame_time : float
+        Exposure time of one frame, in seconds.
+
+    Returns
+    -------
+    light_curve : dict
+        Modified dictionary containing the resampled lightcurve
     """
     time_units = light_curve['times'].unit
     flux_units = light_curve['fluxes'].unit
