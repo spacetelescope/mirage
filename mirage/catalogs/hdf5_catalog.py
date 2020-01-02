@@ -233,6 +233,16 @@ def save_tso(contents, filename, time_unit='', flux_unit=''):
 
     filename : str
         Name of hdf5 file to produce
+
+    time_unit : str
+        In the case where the ``times`` entry of ``contents`` is a numpy array
+        rather than an astropy Quantity, this unit will be used for the ``times``
+        entry. (e.g. 'second')
+
+    flux_unit : str
+        In the case where the ``fluxes`` entry of ``contents`` is a numpy array
+        rather than an astropy Quantity, this unit will be used for the ``fluxes``
+        entry. (e.g. 'flam_cgs')
     """
     with h5py.File(filename, "w") as file_obj:
         for key in contents.keys():

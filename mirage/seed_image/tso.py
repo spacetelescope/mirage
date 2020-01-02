@@ -44,6 +44,10 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         Total number of frames in the observation (this includes
         resets between integrations)
 
+    exposure_total_frames : int
+        Number of frames in the exposure (excluding resets between
+        integrations)
+
     frames_per_integration : int
         Number of frames per integration of the exposure
 
@@ -65,7 +69,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         4D array containing the 2D seed image for each frame of each
         integration in the exposure
 
-    seed_segmentation_map : numpy.ndarray
+    final_seed_segmentation_map : numpy.ndarray
         2D array containing the segmentation map
     """
     yd, xd = seed_image.shape
@@ -85,7 +89,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
     # rather than the cumulative signal since the beginning of the
     # integration
     frame_seed = np.zeros((total_frames, yd, xd))
-    seed_segmentation_map = np.zeros((yd, xd))
+    final_seed_segmentation_map = np.zeros((yd, xd))
     # Loop over TSO objects
     for source_number, (psf, seg_map, lightcurve) in enumerate(zip(psf_seeds, segmentation_maps, lightcurves)):
         # Check that the provided lightcurve is long enough to cover the
@@ -93,7 +97,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
         # with values of 1.0 until is is long enough. If the lightcurve
         # starts at some non-zero time, then extend the lightcurve with
         # 1.0's back to time=0.
-        lightcurve = check_lightcurve_time(lightcurve, total_exposure_time, frametime, samples_per_frametime)
+        lightcurve = check_lightcurve_time(lightcurve, total_exposure_time, frametime)
 
         # Scale the TSO source's seed image contribution to be for one
         # frametime rather than 1 second
@@ -119,7 +123,7 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
             frame_seed[frame_index, :, :] += frame_psf
 
         # Add the TSO target to the segmentation map
-        seed_segmentation_map = update_segmentation_map(seed_segmentation_map, seg_map.segmap)
+        final_seed_segmentation_map = update_segmentation_map(seed_segmentation_map, seg_map.segmap)
 
     # Translate the frame-by-frame seed into the final, cumulative seed
     # image. Rearrange into integrations, resetting the signal for each
@@ -144,10 +148,10 @@ def add_tso_sources(seed_image, seed_segmentation_map, psf_seeds, segmentation_m
             final_seed[int_number, rel_frame, :, :] = final_seed[int_number, rel_frame-1, :, :] + \
                 frame_seed[frame-starting_frame, :, :] + seed_image_per_frame
 
-    return final_seed, seed_segmentation_map
+    return final_seed, final_seed_segmentation_map
 
 
-def check_lightcurve_time(light_curve, exposure_time, frame_time, divisions_per_frametime):
+def check_lightcurve_time(light_curve, exposure_time, frame_time):
     """Check to be sure the provided lightcurve is long enough to cover
     the supplied total exposure time. If not, lengthen at the beginning
     or end such that it does. Times will only be added to the beginning
