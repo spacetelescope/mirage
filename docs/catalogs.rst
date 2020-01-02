@@ -12,6 +12,8 @@ Mirage accepts 7 different types of ascii source catalogs, all of which can be g
 5. :ref:`Moving point sources <moving_point_source>`
 6. :ref:`Moving Sersic sources <moving_sersic>`
 7. :ref:`Moving extended sources <moving_extended>`
+8. :ref:`Grism time series sources <grism_tso_cat>`
+9. :ref:`Imaging time series sources <imaging_tso_cat>`
 
 .. tip::
     For information on the optional hdf5 catalog that can be used when simulating WFSS data, see the :ref:`WFSS simulation page<wfss_data>`.
@@ -21,9 +23,9 @@ The type of source catalog(s) you need depends on the scene you are simulating. 
 +---------------------+------------------------+----------------------------------+
 | Type of observation | Static source catalogs | Trailed (moving) source catalogs |
 +=====================+========================+==================================+
-|      Sidereal       |    - Point source      |       - Moving point source      |
-|                     |    - Galaxies          |       - Moving Sersic sources    |
-|                     |    - Extended targets  |       - Moving extended sources  |
+|      Sidereal       |  - Point source        |       - Moving point source      |
+|                     |  - Galaxies            |       - Moving Sersic sources    |
+|                     |  - Extended targets    |       - Moving extended sources  |
 +---------------------+------------------------+----------------------------------+
 |    Non-sidereal     |  - Non-sidereal source |       - Point source             |
 |                     |                        |       - Galaxies                 |
@@ -31,6 +33,16 @@ The type of source catalog(s) you need depends on the scene you are simulating. 
 |                     |                        |       - Moving point source      |
 |                     |                        |       - Moving Sersic sources    |
 |                     |                        |       - Moving extended sources  |
++---------------------+------------------------+----------------------------------+
+|     Grism TSO       |  - Point source        |       - Not supported            |
+|                     |  - Galaxies            |                                  |
+|                     |  - Extended targets    |                                  |
+|                     |  - Grism Time Series   |                                  |
++---------------------+------------------------+----------------------------------+
+|    Imaging TSO      |  - Point source        |       - Not supported            |
+|                     |  - Galaxies            |                                  |
+|                     |  - Extended targets    |                                  |
+|                     |  - Imaging Time Series |                                  |
 +---------------------+------------------------+----------------------------------+
 
 
@@ -238,3 +250,47 @@ Similar to the catalog of static extended targets, this catalog contains a fits 
 	# constant.
 	filename            x_or_RA    y_or_Dec   nircam_f200w_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity
 	ring_nebula.fits    0.007       0.003             12.0               0.0             -0.5               -0.02
+
+
+.. _grism_tso_cat:
+
+Grism Time Series Sources
+-------------------------
+
+When creating Grism TSO data, this catalog should contain the information on the TSO source parent body only. Other (background) sources should be placed in a catalog appropriate to their source type (point source, galaxy, extended). The index number for the TSO source should be set to 99999, to help ensure it will take presidence over the background sources when constructing the segmentation map. See the `TSO example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRCam_TSO_examples.ipynb>`_ for an example of how to use Mirage's catalog generation functionality to create a Grism TSO source catalog. As with the other catalog types, the source location can be given in RA, Dec or pixel x, y.
+
+Most of the other columns in the catalog are specific to the `Batman <https://www.cfa.harvard.edu/~lkreidberg/batman/>`_ package, which Mirage uses when creating TSO data. See the Batman documentation for lists of the possible limb darkening models and associated coefficients. **Make sure that all time related entries use the same units.** Start_time and End_time are for the lightcurve relative to the start time of the exposure. Code development was done using a Start_time of 0.0 (i.e. the beginning of the exposure) and an End_time set to the maximum time the user wishes to simulate. If the End_time of the lightcurve comes before the end of the exposure, Mirage will automatically extend the lightcurve to fully encompass the exposure.
+
+The Transmission_spectrum column should hold the name of an ascii file containing the transmission curve of the source. This is the Wavelength-dependent effective radius of the planet, in units of the stellar radius. Again, see the `TSO example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRCam_TSO_examples.ipynb>`_ for an example of this file.
+
+Finally, this catalog contains magnitude columns similar to those in other catalog types. Note that along with this catalog, Grism TSO simulations require a file containing the SED of the star. If the SED in that file is given in flux density units, then the magnitudes in this catalog will be ignored. If the SED is normalized or scaled in some way, then the SED will be renormalized to the magnitude in this catalog corresponding to the filter of the TSO observation.
+
+::
+
+    # position_RA_Dec
+    # vegamag
+    #
+    #
+    index   x_or_RA     y_or_Dec   Semimajor_axis_in_stellar_radii  Orbital_inclination_deg  Eccentricity  Longitude_of_periastron  Limb_darkening_model  Limb_darkening_coeffs  Time_units  Start_time  End_time  Time_of_inferior_conjunction  Orbital_period      Transmission_spectrum      nircam_f444w_magnitude  nircam_f322w2_magnitude
+    99999 66.37090333 -30.60044722             9.37                        83.3                   0.0               90.0                 nonlinear        "0.5, 0.1, 0.1, -0.1"     second       0.0       580.0             280.0                   3162.24     ./transmission_spectrum.txt             9.0                     9.05
+
+
+.. _imaging_tso_cat:
+
+Imaging Time Series Sources
+---------------------------
+
+When creating Imaging TSO data, this catalog should contain the information on the TSO source parent body only. Other (background) sources should be placed in a catalog appropriate to their source type (point source, galaxy, extended). The index number for the TSO source should be set to 99999, to help ensure it will take presidence over the background sources when constructing the segmentation map. See the `TSO example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRCam_TSO_examples.ipynb>`_ for an example of how to use Mirage's catalog generation functionality to create an Imaging TSO source catalog. As with the other catalog types, the source location can be given in RA, Dec or pixel x, y.
+
+The lightcurve_file column should contain the name of an hdf5 file that contains a dataset with wavelength and flux arrays that describe the transit lightcurve at the wavelength range corresponding to the filter used in the observation. Again, see the `TSO example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRCam_TSO_examples.ipynb>`_ for an example of how to create this file.
+
+Finally, this catalog contains magnitude columns similar to those in other catalog types.
+
+::
+
+    # position_RA_Dec
+    # vegamag
+    #
+    #
+    index    x_or_RA     y_or_Dec         lightcurve_file       nircam_f182m_magnitude  nircam_f210m_magnitude   nircam_f470n_magnitude
+    99999  66.37090333 -30.60044722 ./example_lightcurve.hdf5          10.0                       9.5                    9.0

@@ -19,6 +19,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    example_yaml.rst
    imaging_simulations.rst
    wfss_simulations.rst
+   tso_simulations.rst
    three_steps.rst
    seed_images.rst
    dark_preparation.rst
