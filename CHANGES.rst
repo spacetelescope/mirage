@@ -1,3 +1,12 @@
+1.2
+===
+
+TSO Modes
+---------
+
+- Add the ability to simulate both grism and imaging time series observations for NIRCam. Example notebook included.
+
+
 1.1.5
 =====
 

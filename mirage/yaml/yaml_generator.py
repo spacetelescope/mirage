@@ -676,15 +676,24 @@ class SimInput:
         grism_source_image = ['False'] * len(self.info['Mode'])
         grism_input_only = ['False'] * len(self.info['Mode'])
         for i in range(len(self.info['Mode'])):
-            if self.info['Mode'][i].lower() == 'wfss':
+            if self.info['Mode'][i].lower() in ['wfss', 'ts_grism']:
                 if self.info['detector'][i] == 'NIS' or self.info['detector'][i][-1] == '5':
                     grism_source_image[i] = 'True'
                     grism_input_only[i] = 'True'
                 # SW detectors shouldn't be wfss
                 if self.info['Instrument'][i] == 'NIRCAM' and self.info['detector'][i][-1] != '5':
-                    self.info['Mode'][i] = 'imaging'
+                    if self.info['Mode'][i] == 'wfss':
+                        self.info['Mode'][i] = 'imaging'
+                    elif self.info['Mode'][i] == 'ts_grism':
+                        self.info['Mode'][i] = 'ts_imaging'
         self.info['grism_source_image'] = grism_source_image
         self.info['grism_input_only'] = grism_input_only
+
+        # Grism TSO adjustments. SW detectors should be flagged ts_imaging mode.
+        for i in range(len(self.info['Mode'])):
+            if self.info['Mode'][i].lower() == 'ts_grism':
+                if self.info['detector'][i][-1] != '5':
+                    self.info['Mode'][i] = 'ts_imaging'
 
         # level-3 associated keywords that are not present in APT file.
         # not quite sure how to populate these
@@ -1300,11 +1309,17 @@ class SimInput:
                     # We don't want aperture as a list
                     aperture = aperture[0]
 
-                amp = subarray_def['num_amps'][match][0]
+                # For grism tso observations, get the number of
+                # amplifiers to use from the APT file.
+                # For other modes, check the subarray def table.
+                try:
+                    amp = int(self.info['NumOutputs'][i])
+                except ValueError:
+                    amp = subarray_def['num_amps'][match][0]
 
                 # Default to amps=4 for subarrays that can have 1 or 4
-                # Not sure where to get this info from. Doesn't seem to
-                # be in the APT xml file
+                # if the number of amps is not defined. Hopefully we
+                # should never enter this code block given the lines above.
                 if amp == 0:
                     amp = 4
                     print(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
@@ -1870,6 +1885,7 @@ class SimInput:
             f.write('  readpatt: {}        # Readout pattern (RAPID, BRIGHT2, etc) overrides nframe, nskip unless it is not recognized\n'.format(input['ReadoutPattern']))
             f.write('  ngroup: {}              # Number of groups in integration\n'.format(input['Groups']))
             f.write('  nint: {}          # Number of integrations per exposure\n'.format(input['Integrations']))
+            f.write('  namp: {}          # Number of amplifiers used to read out detector\n'.format(input['namp']))
             f.write('  resets_bet_ints: {} #Number of detector resets between integrations\n'.format(self.resets_bet_ints))
 
             if instrument.lower() == 'nircam':
@@ -1970,6 +1986,8 @@ class SimInput:
                 MovingTargetExtended = input['{}_movext'.format(catkey)]
                 MovingTargetConvolveExtended = input['{}_movconv'.format(catkey)]
                 MovingTargetToTrack = input['{}_solarsys'.format(catkey)]
+                ImagingTSOCatalog = input['{}_img_tso'.format(catkey)]
+                GrismTSOCatalog = input['{}_grism_tso'.format(catkey)]
                 BackgroundRate = input['{}_bkgd'.format(catkey)]
             elif instrument.lower() in ['niriss', 'fgs']:
                 PointSourceCatalog = input['PointSourceCatalog']
@@ -1982,6 +2000,8 @@ class SimInput:
                 MovingTargetExtended = input['MovingTargetExtended']
                 MovingTargetConvolveExtended = input['MovingTargetConvolveExtended']
                 MovingTargetToTrack = input['MovingTargetToTrack']
+                ImagingTSOCatalog = input['ImagingTSOCatalog']
+                GrismTSOCatalog = input['GrismTSOCatalog']
                 BackgroundRate = input['BackgroundRate']
 
             f.write(('  pointsource: {}   #File containing a list of point sources to add (x, y locations and magnitudes)\n'
@@ -2011,6 +2031,8 @@ class SimInput:
             f.write(('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during '
                      'observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to '
                      '"moving_target" \n'.format(MovingTargetToTrack)))
+            f.write(('  tso_imaging_catalog: {} #Catalog of (generally one) source for Imaging Time Series observation\n'.format(ImagingTSOCatalog)))
+            f.write(('  tso_grism_catalog: {} #Catalog of (generally one) source for Grism Time Series observation\n'.format(GrismTSOCatalog)))
             f.write('  zodiacal:  None                          #Zodiacal light count rate image file \n')
             f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
             f.write('  scattered:  None                          #Scattered light count rate image file\n')

@@ -230,6 +230,52 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
     return value
 
 
+def nircam_background_spectrum(parameters, detector, module):
+    """Generate a background spectrum by calling jwst_backgrounds and
+    returning wavelengths and flux density values based on observation
+    date or low/medium/high
+
+    Parameters
+    ----------
+    parameters : dict
+        Nested dictionary containing parameters pertaining to background
+        generation. Designed around dictionary from reading in a Mirage
+        input yaml file
+
+    detector : str
+        Detector name (e.g. 'NRCA1')
+
+    module : str
+        Module name (e.g. 'A')
+
+    Returns
+    -------
+    waves : numpy.ndarray
+        1D array of wavelength values (in microns)
+
+    fluxes : numpy.ndarray
+        1D array of flux density values
+    """
+    if parameters['simSignals']['use_dateobs_for_background']:
+        print("Generating background spectrum for observation date: {}"
+              .format(parameters['Output']['date_obs']))
+        waves, fluxes = day_of_year_background_spectrum(parameters['Telescope']['ra'],
+                                                        parameters['Telescope']['dec'],
+                                                        parameters['Output']['date_obs'])
+    else:
+        if isinstance(parameters['simSignals']['bkgdrate'], str):
+            if parameters['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
+                print("Generating background spectrum based on requested level of: {}"
+                      .format(parameters['simSignals']['bkgdrate']))
+                waves, fluxes = low_med_high_background_spectrum(parameters, detector, module)
+            else:
+                raise ValueError("ERROR: Unrecognized background rate. Must be one of 'low', 'medium', 'high'")
+        else:
+            raise ValueError(("ERROR: WFSS background rates must be one of 'low', 'medium', 'high', "
+                              "or use_dateobs_for_background must be True "))
+    return waves, fluxes
+
+
 def niriss_background_scaling(param_dict, detector, module):
     """Determine the scaling factor needed to translate the pre-existing
     NIRISS WFSS background image to the requested signal level, which is

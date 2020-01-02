@@ -1,0 +1,29 @@
+# APT Output Product
+# 
+# APT Version: Version 27.3  JWST PRD: PRDOPSSOC-M-025 
+# Date: Mon Dec 30 20:13:59 GMT 2019
+
+JWST Pointing Report for JWST Submitted Proposal 88888 (wasp-79_example_TSO.aptx)
+
+========================================
+* GrismTSO-F444W (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  0    0   0    0 NRCA5_TAGRISMTS32         1 WASP-79   +66.37090  -30.60045   +0.000   +0.000   +0.000   +0.000  +73.262 -551.572   +0.000   +0.000 TARGET     T_ACQ          0      0  0.000 (base)
+  1    1   1    1 NRCA5_GRISM256_F444W      1 WASP-79   +66.37090  -30.60045   +0.000   +1.444   +0.000   +0.000  +94.949 -554.811   +0.000   +1.444 TARGET     SCIENCE        0      0 21.927          
+
+========================================
+* GrismTSO-F322W2 (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  0    0   0    0 NRCA5_TAGRISMTS32         1 WASP-79   +66.37090  -30.60045   +0.000   +0.000   +0.000   +0.000  +73.262 -551.572   +0.000   +0.000 TARGET     T_ACQ          0      0  0.000 (base)
+  1    1   1    1 NRCA5_GRISM256_F322W2     1 WASP-79   +66.37090  -30.60045   +0.000   +1.449   +0.000   +0.000  +50.773 -555.028   +0.000   +1.449 TARGET     SCIENCE        0      0 22.752          
+
+========================================
+* ImagingTSO (Obs 3)
+** Visit 3:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  0    0   0    0 NRCB5_TAPSIMG32           1 WASP-79   +66.37090  -30.60045   +0.000   +0.000   +0.000   +0.000 -152.003 -440.340   +0.000   +0.000 TARGET     T_ACQ          0      0  0.000 (base)
+  1    1   1    1 NRCB1_SUB400P             1 WASP-79   +66.37090  -30.60045   +0.000   +0.000   +0.000   +0.000 -146.051 -432.206   +0.000   +0.000 TARGET     SCIENCE        0      0 10.079          
+
+

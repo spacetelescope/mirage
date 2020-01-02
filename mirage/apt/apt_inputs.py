@@ -135,6 +135,7 @@ class AptInput:
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
                                   'MovingTargetSersic MovingTargetExtended ' \
                                   'MovingTargetConvolveExtended MovingTargetToTrack ' \
+                                  'ImagingTSOCatalog GrismTSOCatalog ' \
                                   'BackgroundRate DitherIndex CosmicRayLibrary CosmicRayScale'.split()
 
         nircam_mapping = {'ptsrc': 'PointSourceCatalog',
@@ -147,6 +148,8 @@ class AptInput:
                           'movext': 'MovingTargetExtended',
                           'movconv': 'MovingTargetConvolveExtended',
                           'solarsys': 'MovingTargetToTrack',
+                          'img_tso': 'ImagingTSOCatalog',
+                          'grism_tso': 'GrismTSOCatalog',
                           'bkgd': 'BackgroundRate',
                           }
 
@@ -195,7 +198,8 @@ class AptInput:
                     catalog_names = 'PointSourceCatalog GalaxyCatalog ' \
                                     'ExtendedCatalog MovingTargetList ' \
                                     'MovingTargetSersic MovingTargetExtended ' \
-                                    'MovingTargetToTrack'.split()
+                                    'MovingTargetToTrack ImagingTSOCatalog ' \
+                                    'GrismTSOCatalog'.split()
                     if key in catalog_names:
                         value = self.full_path(value)
                     intab[key].append(value)
@@ -471,7 +475,6 @@ class AptInput:
                                     final_detectors.append(det)
                             matched_apertures = final_matched_apertures
                             detectors = final_detectors
-
                     else:
                         # 'Standard' imaging subarrays: SUB320, SUB400P, etc
                         matched_apertures = [ap for ap in matched_apertures if sub in ap]
@@ -763,12 +766,20 @@ class AptInput:
                         # while observations have a value of 1
                         # (that I've seen so far)
 
+                        # The exception to this rule is TA images.
+                        # These have Exp values of 0. Sigh.
+
+
                         if ((np.int(elements[1]) > 0) & ('NRC' in elements[4]
                                                          or 'NIS' in elements[4]
                                                          or 'FGS' in elements[4]
                                                          or 'NRS' in elements[4]
                                                          or 'MIR' in elements[4])
-                            ):
+                            ) or (('TA' in elements[4]) & ('NRC' in elements[4]
+                                                         or 'NIS' in elements[4]
+                                                         or 'FGS' in elements[4]
+                                                         or 'NRS' in elements[4]
+                                                         or 'MIR' in elements[4])):
                             if (elements[18] == 'PARALLEL') and ('MIRI' in elements[4]):
                                 skip = True
 
@@ -881,9 +892,18 @@ class AptInput:
         """Given the V2, V3 values for the reference pixels associated
         with detector apertures, calculate corresponding RA, Dec.
         """
+        sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64',
+                                'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64']
+
+        lw_grismts_apertures = ['NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2',
+                                'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W']
+
+        intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
+
         aperture_ra = []
         aperture_dec = []
 
+        lw_grismts_aperture = None
         for i in range(len(self.exposure_tab['Module'])):
             siaf_instrument = self.exposure_tab["Instrument"][i]
             aperture_name = self.exposure_tab['aperture'][i]
@@ -891,6 +911,15 @@ class AptInput:
             pointing_dec = np.float(self.exposure_tab['dec'][i])
             pointing_v2 = np.float(self.exposure_tab['v2'][i])
             pointing_v3 = np.float(self.exposure_tab['v3'][i])
+
+            # When we run across a LW grism TS aperture, save
+            # the aperture name, because we'll need it when looking
+            # at the accompanying SW apertuers to follow. THIS
+            # RELIES ON THE LW ENTRY COMING BEFORE THE SW ENTRIES.
+            if aperture_name in lw_grismts_apertures:
+                lw_grismts_aperture = copy.deepcopy(aperture_name)
+                lw_filter = lw_grismts_aperture.split('_')[2]
+                lw_intermediate_aperture = [ap for ap in intermediate_lw_grismts_apertures if lw_filter in ap][0]
 
             if 'pav3' in self.exposure_tab.keys():
                 pav3 = np.float(self.exposure_tab['pav3'][i])
@@ -901,13 +930,38 @@ class AptInput:
 
             aperture = self.siaf[siaf_instrument][aperture_name]
 
-            local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
-                                                    pointing_ra, pointing_dec, telescope_roll,
-                                                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+            if 'NRCA5_GRISM' in aperture_name and 'WFSS' not in aperture_name:
+                # This puts the source in row 29, but faster just to grab the ra, dec directly
+                #local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                #    siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
+                #                                        pointing_ra, pointing_dec, telescope_roll,
+                #                                        v2_arcsec=aperture.V2Ref, v3_arcsec=aperture.V3Ref)
+                ra = pointing_ra
+                dec = pointing_dec
+            else:
+                if aperture_name in sw_grismts_apertures:
+                    # Special case. When looking at grism time series observation
+                    # we force the pointing to be at the reference location of the
+                    # LW *intermediate* aperture, rather than paying attention to
+                    # the V2, V3 in the pointing file. V2, V3 from the intermediate
+                    # aperture is where the source would land on the detector if
+                    # the grism were not in the beam. This is exactly what we want
+                    # for the SW detectors, where this is no grism.
 
-            # calculate RA, Dec of reference location for the detector
-            ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
+                    # Generate an attitude matrix from this and
+                    # use to get the RA, Dec in the SW apertures
+                    lw_gts = self.siaf[siaf_instrument][lw_intermediate_aperture]
+                    pointing_v2 = lw_gts.V2Ref
+                    pointing_v3 = lw_gts.V3Ref
+
+                local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                    siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
+                                                        pointing_ra, pointing_dec, telescope_roll,
+                                                        v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+
+                # Calculate RA, Dec of reference location for the detector
+                # Add in any offsets from the pointing file in the BaseX, BaseY columns
+                ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
             aperture_ra.append(ra)
             aperture_dec.append(dec)
 

@@ -23,6 +23,7 @@ import json
 import os
 import pkg_resources
 import re
+import yaml
 
 from astropy.io import ascii as asc
 import numpy as np
@@ -220,6 +221,50 @@ def check_niriss_filter(oldfilter, oldpupil):
     return newfilter, newpupil
 
 
+def crop_to_subarray(data, bounds):
+    """
+    Crop the given full frame array down to the appropriate
+    subarray size and location based on the requested subarray
+    name.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        Full frame image or ramp. (x,y) = (2048, 2048)
+        May be 2D, 3D, or 4D
+
+    bounds : list
+        4-element list containing the full frame indices that
+        define the position of the subarray.
+        [xstart, ystart, xend, yend]
+
+    Returns
+    -------
+    data : numpy.ndarray
+        Input array cropped in x and y dimensions
+    """
+    dimensions = len(data.shape)
+    yl, xl = data.shape[-2:]
+
+    valid = [False, False, False, False]
+    valid = [(b >= 0 and b < xl) for b in bounds[0:3:2]]
+    validy = [(b >= 0 and b < yl) for b in bounds[1:4:2]]
+    valid.extend(validy)
+
+    if all(valid):
+        if dimensions == 2:
+            return data[bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        elif dimensions == 3:
+            return data[:, bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        elif dimensions == 4:
+            return data[:, :, bounds[1]:bounds[3] + 1, bounds[0]:bounds[2] + 1]
+        else:
+            raise ValueError(("In crop_to_subarray, input array is not 2, 3, or 4D."))
+    else:
+            raise ValueError(("WARNING: subarray bounds are outside the "
+                              "dimensions of the input array."))
+
+ 
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
@@ -441,6 +486,44 @@ def get_aperture_definition(aperture_name, instrument):
     return aperture_definition
 
 
+def get_frame_count_info(numints, numgroups, numframes, numskips, numresets):
+    """Calculate information on the number of frames per group and
+    per integration
+
+    Parameters
+    ----------
+    numints : int
+        Number of integraitons in the exposure
+
+    numgroups : int
+        Number of groups per integration
+
+    numframes : int
+        Number of frames averaged together to create a group
+
+    numskips : int
+        Number of skipped frames per group
+
+    numresets : int
+        Number of detector resets between integrations
+
+    Returns
+    -------
+    frames_per_group
+    """
+    frames_per_group = numframes + numskips
+    frames_per_integration = numgroups * frames_per_group
+    total_frames = numgroups * frames_per_group
+
+    if numints > 1:
+        # Frames for all integrations
+        total_frames *= numints
+        # Add the resets for all but the first integration
+        total_frames += (numresets * (numints - 1))
+
+    return frames_per_group, frames_per_integration, total_frames
+
+
 def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_detector=None):
     """Locate the filter throughput file in the config directory that
     corresponds to the given instrument/module/filter
@@ -505,19 +588,25 @@ def get_subarray_info(params, subarray_table):
         mtch = params['Readout']['array_name'] == subarray_table['AperName']
         namps = subarray_table['num_amps'].data[mtch][0]
         if namps != 0:
-            params['Readout']['namp'] = namps
+            params['Readout']['namp'] = int(namps)
         else:
-            if ((params['Readout']['namp'] == 1) or
-               (params['Readout']['namp'] == 4)):
-                print(("CAUTION: Aperture {} can be used with either "
-                       "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
-                print("or a 4-amp readout. The difference is a factor of 4 in")
-                print(("readout time. You have requested {} amps."
-                       .format(params['Readout']['namp'])))
-            else:
-                raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
-                                  "'Readout':'namp' in the input yaml file to one of these values."
-                                  .format(params['Readout']['array_name'])))
+            try:
+                if ((params['Readout']['namp'] == 1) or
+                   (params['Readout']['namp'] == 4)):
+                    print(("CAUTION: Aperture {} can be used with either "
+                           "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
+                    print("or a 4-amp readout. The difference is a factor of 4 in")
+                    print(("readout time. You have requested {} amps."
+                           .format(params['Readout']['namp'])))
+                else:
+                    raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
+                                      "'Readout':'namp' in the input yaml file to one of these values."
+                                      .format(params['Readout']['array_name'])))
+            except KeyError:
+                raise KeyError(("WARNING: 'Readout':'namp' not present in input yaml file. "
+                                "{} aperture requires the number of amps to be 1 or 4. Please set "
+                                "'Readout':'namp' in the input yaml file to one of these values."
+                                .format(params['Readout']['array_name'])))
     else:
         raise ValueError(("WARNING: subarray name {} not found in the "
                           "subarray dictionary {}."
@@ -664,6 +753,42 @@ def parse_RA_Dec(ra_string, dec_string):
         raise ValueError("Error parsing RA, Dec strings: {} {}".format(ra_string, dec_string))
 
 
+def read_pattern_check(parameters):
+    # Check the readout pattern that's entered and set nframe and nskip
+    # accordingly
+    parameters['Readout']['readpatt'] = parameters['Readout']['readpatt'].upper()
+
+    # Read in readout pattern definition file
+    # and make sure the possible readout patterns are in upper case
+    readpatterns = asc.read(parameters['Reffiles']['readpattdefs'])
+    readpatterns['name'] = [s.upper() for s in readpatterns['name']]
+
+    # If the requested readout pattern is in the table of options,
+    # then adopt the appropriate nframe and nskip
+    if parameters['Readout']['readpatt'] in readpatterns['name']:
+        mtch = parameters['Readout']['readpatt'] == readpatterns['name']
+        parameters['Readout']['nframe'] = int(readpatterns['nframe'][mtch].data[0])
+        parameters['Readout']['nskip'] = int(readpatterns['nskip'][mtch].data[0])
+        print(('Requested readout pattern {} is valid. '
+               'Using the nframe = {} and nskip = {}'
+               .format(parameters['Readout']['readpatt'],
+                       parameters['Readout']['nframe'],
+                       parameters['Readout']['nskip'])))
+
+        print('in read_pattern_check, nframe and nskip are:')
+        print(parameters['Readout']['nframe'], parameters['Readout']['nskip'])
+        print(type(parameters['Readout']['nframe']), type(parameters['Readout']['nskip']))
+        print('maxiter', parameters['nonlin']['maxiter'], type(parameters['nonlin']['maxiter']))
+
+    else:
+        # If the read pattern is not present in the definition file
+        # then quit.
+        raise ValueError(("WARNING: the {} readout pattern is not defined in {}."
+                          .format(parameters['Readout']['readpatt'],
+                                  parameters['Reffiles']['readpattdefs'])))
+    return parameters
+
+
 def read_subarray_definition_file(filename):
     """Read in the file that contains a list of subarray names and related information
 
@@ -683,3 +808,39 @@ def read_subarray_definition_file(filename):
         raise RuntimeError(("Error: could not read in subarray definitions file: {}"
                             .format(filename)))
     return data
+
+
+def read_yaml(filename):
+    """Read the contents of a yaml file into a nested dictionary
+
+    Parameters
+    ----------
+    filename : str
+        Name of yaml file to be read in
+
+    Returns
+    -------
+    data : dict
+        Nested dictionary of file contents
+    """
+    try:
+        with open(filename, 'r') as f:
+            data = yaml.load(f, Loader=yaml.FullLoader)
+    except FileNotFoundError as e:
+            print(e)
+    return data
+
+
+def write_yaml(data, filename):
+    """Write a nested dictionary to a yaml file
+
+    Parameters
+    ----------
+    data : dict
+        Nested dictionary of paramters
+
+    filename : str
+        Output filename
+    """
+    with open(filename, 'w') as output:
+        yaml.dump(data, output, default_flow_style=False)
