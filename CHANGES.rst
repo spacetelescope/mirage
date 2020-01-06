@@ -1,3 +1,12 @@
+1.2.1
+=====
+
+TSO Modes
+---------
+
+- Updated documentation on readthedocs with information on TSO mode work
+
+
 1.2
 ===
 
