@@ -34,14 +34,11 @@ import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 
-
+import mirage
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils.file_splitting import find_file_splits
 from mirage.reference_files import crds_tools
 
-from mirage import version
-
-MIRAGE_VERSION = version.__version__
 
 # Allowed instruments
 INST_LIST = ['nircam', 'niriss', 'fgs']
@@ -934,7 +931,7 @@ class DarkPrep():
             h0.header['FASTAXIS'] = self.fastaxis
 
             # Add some basic Mirage-centric info
-            h0.header['MRGEVRSN'] = (MIRAGE_VERSION, 'Mirage version used')
+            h0.header['MRGEVRSN'] = (mirage.__version__, 'Mirage version used')
             h0.header['YAMLFILE'] = (self.paramfile, 'Mirage input yaml file')
 
             hl = fits.HDUList([h0, h1, h2, h3, h4])
