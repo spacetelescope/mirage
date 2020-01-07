@@ -8,7 +8,6 @@ import numpy as np
 
 import mirage
 
-MIRAGE_VERSION = mirage.__version__
 
 def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength,
          fullframe_size, nominal_dimensions, coord_adjust, grism_direct_factor,
@@ -86,7 +85,7 @@ def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength
     kw['POISSON'] = parameters['simSignals']['poissonseed']
     kw['PSFWFE'] = parameters['simSignals']['psfwfe']
     kw['PSFWFGRP'] = parameters['simSignals']['psfwfegroup']
-    kw['MRGEVRSN'] = MIRAGE_VERSION
+    kw['MRGEVRSN'] = mirage.__version__
 
     # Seed images provided to disperser are always embedded in an array
     # with dimensions equal to full frame * self.grism_direct_factor

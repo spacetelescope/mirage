@@ -51,7 +51,6 @@ from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
 
-MIRAGE_VERSION = mirage.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_grism"],
@@ -846,7 +845,7 @@ class Catalog_seed():
         kw['POISSON'] = self.params['simSignals']['poissonseed']
         kw['PSFWFE'] = self.params['simSignals']['psfwfe']
         kw['PSFWFGRP'] = self.params['simSignals']['psfwfegroup']
-        kw['MRGEVRSN'] = MIRAGE_VERSION
+        kw['MRGEVRSN'] = mirage.__version__
 
         # Observations with high data volumes (e.g. moving targets, TSO)
         # can be split into multiple "segments" in order to cap the

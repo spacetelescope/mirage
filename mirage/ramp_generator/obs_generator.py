@@ -52,7 +52,6 @@ from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES
 
-MIRAGE_VERSION = mirage.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_grism"],
@@ -391,7 +390,7 @@ class Observation():
             HDU List containing Mirage-related info in the primary header
         """
         hdulist = fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU()])
-        hdulist[0].header['MRGEVRSN'] = (MIRAGE_VERSION, 'Mirage version used')
+        hdulist[0].header['MRGEVRSN'] = (mirage.__version__, 'Mirage version used')
         hdulist[0].header['YAMLFILE'] = (self.paramfile, 'Mirage input yaml file')
         hdulist[0].header['GAINFILE'] = (self.params['Reffiles']['gain'], 'Gain file used by Mirage')
         hdulist[0].header['DISTORTN'] = (self.params['Reffiles']['astrometric'],
