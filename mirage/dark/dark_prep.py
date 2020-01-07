@@ -34,14 +34,12 @@ import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 
-
+import mirage
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils.file_splitting import find_file_splits
 from mirage.reference_files import crds_tools
 
-from mirage import version
-
-MIRAGE_VERSION = version.__version__
+MIRAGE_VERSION = mirage.__version__
 
 # Allowed instruments
 INST_LIST = ['nircam', 'niriss', 'fgs']

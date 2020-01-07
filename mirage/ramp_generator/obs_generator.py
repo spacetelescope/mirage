@@ -45,14 +45,14 @@ from astropy.time import Time, TimeDelta
 import astropy.units as u
 import pysiaf
 
+import mirage
 from mirage.ramp_generator import unlinearize
 from mirage.reference_files import crds_tools
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES
-from mirage import version
 
-MIRAGE_VERSION = version.__version__
+MIRAGE_VERSION = mirage.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_grism"],

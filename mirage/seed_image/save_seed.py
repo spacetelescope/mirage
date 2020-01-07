@@ -6,10 +6,9 @@ Utility for saving seed images
 from astropy.io import fits
 import numpy as np
 
-from mirage import version
+import mirage
 
-MIRAGE_VERSION = version.__version__
-
+MIRAGE_VERSION = mirage.__version__
 
 def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength,
          fullframe_size, nominal_dimensions, coord_adjust, grism_direct_factor,

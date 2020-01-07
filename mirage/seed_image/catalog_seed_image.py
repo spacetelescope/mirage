@@ -35,6 +35,7 @@ import pysiaf
 
 from . import moving_targets
 from . import segmentation_map as segmap
+import mirage
 from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
 from mirage.seed_image import tso
 from ..reference_files import crds_tools
@@ -49,10 +50,8 @@ from ..utils.constants import grism_factor, TSO_MODES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
-from mirage import version
 
-MIRAGE_VERSION = version.__version__
-
+MIRAGE_VERSION = mirage.__version__
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {'nircam': ["imaging", "ts_imaging", "wfss", "ts_grism"],
