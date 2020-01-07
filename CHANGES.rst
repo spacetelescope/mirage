@@ -1,3 +1,12 @@
+1.2.2
+=====
+
+Versioning
+----------
+
+Update package versioning to be done with setuptools-scm rather than relic.
+
+
 1.2.1
 =====
 
