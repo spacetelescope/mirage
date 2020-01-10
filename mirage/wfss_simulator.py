@@ -213,7 +213,7 @@ class WFSSSim():
                                                                       self.params['Telescope']['dec'],
                                                                       filter_file,
                                                                       self.params['simSignals']['use_dateobs_for_background'],
-                                                                      photflam, pivot_wavelength, siaf_instance,
+                                                                      MEAN_GAIN_VALUES['niriss'], siaf_instance,
                                                                       level=self.params['simSignals']['bkgdrate'])
 
                     # Having the grism in the beam reduces the throughput by 20%.

@@ -4239,6 +4239,19 @@ class Catalog_seed():
                 print(("Using {} filter throughput file for background calculation."
                        .format(filter_file)))
 
+                # To translate background signals from MJy/sr to e-/sec to
+                # ADU/sec, we need a mean gain value
+                if self.params['Inst']['instrument'].lower() == 'nircam':
+                    if '5' in detector:
+                        shorthand = 'lw{}'.format(module)
+                    else:
+                        shorthand = 'sw{}'.format(module)
+                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][shorthand]
+                elif self.params['Inst']['instrument'].lower() == 'niriss':
+                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
+                elifself.params['Inst']['instrument'].lower() == 'fgs':
+                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector]
+
                 if self.params['simSignals']['use_dateobs_for_background']:
                     bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
                                                                                        self.params['Telescope']['dec'],
@@ -4253,7 +4266,7 @@ class Catalog_seed():
                     # Here the background level is based on high/medium/low rather than date
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, False,
-                                                                                             self.photflam, self.pivot, self.siaf,
+                                                                                             gain_value, self.siaf,
                                                                                              level=self.params['simSignals']['bkgdrate'].lower())
                     print("Background rate determined using requested level: {}".format(self.params['simSignals']['bkgdrate']))
                 print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
@@ -4449,6 +4462,7 @@ class Catalog_seed():
         #    coord_transform = self.simple_coord_transform()
         return coord_transform
 
+    """
     def calculate_background(self, ra, dec, ffile, back_wave=None, back_sig=None, level='medium'):
         '''Use the JWST background calculator to come up with
         an appropriate background level for the observation.
@@ -4503,6 +4517,7 @@ class Catalog_seed():
         # to ADU/sec
         bval /= mjy_str
         return bval.value
+        """
 
     def saveSingleFits(self, image, name, key_dict=None, image2=None, image2type=None):
         # Save an array into the first extension of a fits file

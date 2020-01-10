@@ -10,12 +10,12 @@ Use
     parent directory of mirage/tests/:
     >>> pytest
 """
+import astropy.units as u
 import datetime
 from jwst_backgrounds import jbt
 import numpy as np
 import os
 import pkg_resources
-
 import pysiaf
 
 from mirage.utils import backgrounds, file_io
@@ -49,8 +49,10 @@ def test_day_of_year_background_spectrum():
 def test_specific_day_of_year_background_spectrum():
     """Test this function using specific inputs and compare to the ETC
     output values"""
-    lw_etc = 2.26 / MEAN_GAIN_VALUES['nircam']['lwa']  # 2.26 e/s/pix divided by gain 2.19 e/ADU, FOR LWA
-    sw_etc = 0.20  / MEAN_GAIN_VALUES['nircam']['swa']  # 0.20 e/s/pix divided by gain 2.44 e/ADU for SWA
+    sw_gain = MEAN_GAIN_VALUES['nircam']['swa']
+    lw_gain = MEAN_GAIN_VALUES['nircam']['lwa']
+    lw_etc = 2.26 / lw_gain  # 2.26 e/s/pix divided by gain 2.19 e/ADU, FOR LWA
+    sw_etc = 0.20  / sw_gain  # 0.20 e/s/pix divided by gain 2.44 e/ADU for SWA
 
     # Use the NIRISS Focus Field
     ra = 85.22458
@@ -58,25 +60,25 @@ def test_specific_day_of_year_background_spectrum():
     obs_date = '2021-10-04'
 
     lw_filter_file = os.path.join(CONFIG_DIR, 'F444W_nircam_plus_ote_throughput_moda_sorted.txt')
-    lw_photflam = 7.7190e-22  # FLAM in cgs
-    lw_pivot = 4.3849  # microns
+    #lw_photflam = 7.7190e-22  # FLAM in cgs
+    #lw_pivot = 4.3849  # microns
     lw_siaf = pysiaf.Siaf('nircam')['NRCA5_FULL']
     # Here: etc is 1.03, mirage is 0.84. This may be due to a bug in the ETC.
 
     sw_filter_file = os.path.join(CONFIG_DIR, 'F090W_nircam_plus_ote_throughput_moda_sorted.txt')
-    sw_photflam = 3.3895e-20  # FLAM in cgs
-    sw_pivot = 0.9034  # microns
+    #sw_photflam = 3.3895e-20  # FLAM in cgs
+    #sw_pivot = 0.9034  # microns
     sw_siaf = pysiaf.Siaf('nircam')['NRCA2_FULL']
 
     waves, signals = backgrounds.day_of_year_background_spectrum(ra, dec, obs_date)
 
-    sw_bkgd = backgrounds.calculate_background(ra, dec, sw_filter_file, True, sw_photflam, sw_pivot, sw_siaf,
+    sw_bkgd = backgrounds.calculate_background(ra, dec, sw_filter_file, True, sw_gain, sw_siaf,
                                                back_wave=waves, back_sig=signals)
-    lw_bkgd = backgrounds.calculate_background(ra, dec, lw_filter_file, True, lw_photflam, lw_pivot, lw_siaf,
+    lw_bkgd = backgrounds.calculate_background(ra, dec, lw_filter_file, True, lw_gain, lw_siaf,
                                                back_wave=waves, back_sig=signals)
 
-    assert np.isclose(sw_bkgd, sw_etc, atol=0, rtol=0.10)
-    # assert np.isclose(lw_bkgd, lw_etc, atol=0, rtol=0.10) -- may be affected by ETC bug
+    assert np.isclose(sw_bkgd, sw_etc, atol=0, rtol=0.15)
+    assert np.isclose(lw_bkgd, lw_etc, atol=0, rtol=0.25)
 
 def test_find_low_med_high():
     """Test function for finding pre-defined low, medium, and high
@@ -136,18 +138,20 @@ def test_low_medium_high_background_value():
 def test_specific_low_medium_high_background_value():
     """Test specific cases of this function and compare to ETC outputs
     """
-    etc = {'low': 0.24, 'medium': 0.26, 'high': 0.27}
+    # etc = {'low': 0.24, 'medium': 0.26, 'high': 0.27}  # MJy/sr from webform
+    etc = {'low': 1.246, 'medium': 1.352, 'high': 1.402}  # e-/sec/pixel measured from output image
 
     # Use the NIRISS Focus Field
     ra = 85.22458
     dec = -69.5225
 
+    siaf = pysiaf.Siaf('niriss')['NIS_CEN']
     filter_throughput_file = os.path.join(CONFIG_DIR, 'f150w_niriss_throughput1.txt')
     filter_waves, filter_thru = file_io.read_filter_throughput(filter_throughput_file)
 
-    bkgd_high = backgrounds.low_medium_high_background_value(ra, dec, "high", filter_waves, filter_thru)
-    bkgd_med = backgrounds.low_medium_high_background_value(ra, dec, "medium", filter_waves, filter_thru)
-    bkgd_low = backgrounds.low_medium_high_background_value(ra, dec, "low", filter_waves, filter_thru)
+    bkgd_high = backgrounds.low_medium_high_background_value(ra, dec, "high", filter_waves, filter_thru, siaf)
+    bkgd_med = backgrounds.low_medium_high_background_value(ra, dec, "medium", filter_waves, filter_thru, siaf)
+    bkgd_low = backgrounds.low_medium_high_background_value(ra, dec, "low", filter_waves, filter_thru, siaf)
 
     assert np.isclose(bkgd_high, etc['high'], atol=0., rtol=0.05)
     assert np.isclose(bkgd_med, etc['medium'], atol=0., rtol=0.05)

@@ -59,6 +59,10 @@ MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.19235
 # to when it is not in the beam
 NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 
+# For use in converting background MJy/sr to e-/sec
+PRIMARY_MIRROR_AREA = 25.326 * u.meter * u.meter
+PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
+
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when
