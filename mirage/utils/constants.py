@@ -55,6 +55,10 @@ MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.19235
                     'fgs': {'guider1': 1.9712874, 'guider2': 1.6897644}
                     }
 
+# Factor by which throughput is decreased when the Grism is used compared
+# to when it is not in the beam
+NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
+
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when

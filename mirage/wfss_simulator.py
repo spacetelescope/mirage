@@ -45,6 +45,7 @@ import yaml
 import numpy as np
 from astropy.io import fits
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+import pysiaf
 from scipy.stats import sigmaclip
 
 from .catalogs import spectra_from_catalog
@@ -53,8 +54,8 @@ from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import backgrounds, read_fits
 from .utils.flux_cal import fluxcal_info
-from .utils.constants import CATALOG_YAML_ENTRIES
-from .utils.utils import expand_environment_variable
+from .utils.constants import CATALOG_YAML_ENTRIES, NIRISS_GRISM_THROUGHPUT_FACTOR, MEAN_GAIN_VALUES
+from .utils.utils import expand_environment_variable, get_filter_throughput_file
 from .yaml import yaml_update
 
 NIRCAM_GRISM_CROSSING_FILTERS = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
@@ -196,11 +197,41 @@ class WFSSSim():
 
             if isinstance(self.params['simSignals']['bkgdrate'], str):
                 if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                    scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+                    #scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+
+                    usefilt = 'pupil'
+
+                    siaf_instance = pysiaf.Siaf('niriss')[self.params['Readout']['array_name']]
+                    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params, usefilt, self.detector, self.module)
+
+                    if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
+                        filter_file = get_filter_throughput_file(self.instrument, self.params['Readout'][usefilt])
+                    else:
+                        filter_file = self.params['Reffiles']['filter_throughput']
+
+                    scaling_factor = backgrounds.calculate_background(self.params['Telescope']['ra'],
+                                                                      self.params['Telescope']['dec'],
+                                                                      filter_file,
+                                                                      self.params['simSignals']['use_dateobs_for_background'],
+                                                                      photflam, pivot_wavelength, siaf_instance,
+                                                                      level=self.params['simSignals']['bkgdrate'])
+
+                    # Having the grism in the beam reduces the throughput by 20%.
+                    # Mulitply that into the scaling factor
+                    scaling_factor *= NIRISS_GRISM_THROUGHPUT_FACTOR
+
+                    # Translate from ADU/sec/pix to e-/sec/pix since that is
+                    # what the disperser works with
+                    scaling_factor *= MEAN_GAIN_VALUES['niriss']
+
                 else:
                     raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
             elif np.isreal(self.params['simSignals']['bkgdrate']):
-                scaling_factor = self.params['simSignals']['bkgdrate']
+                # The bkgdrate entry in the input yaml file is described as
+                # the desired signal in ADU/sec/pixel (when it is a number).
+                # Since we want e-/sec/pixel here for the disperser, multiply
+                # by the gain
+                scaling_factor = self.params['simSignals']['bkgdrate'] * MEAN_GAIN_VALUES['niriss']
 
         # Default to extracting all orders
         orders = None

@@ -42,7 +42,7 @@ from ..reference_files import crds_tools
 from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
-from ..utils import siaf_interface
+from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES
 from ..utils.flux_cal import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -4230,19 +4230,9 @@ class Catalog_seed():
 
                 # Find the appropriate filter throughput file
                 if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
-                    instrm = self.params['Inst']['instrument'].lower()
-                    if instrm == 'nircam':
-                        filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
-                                       .format(self.params['Readout'][self.usefilt].upper(), module.lower()))
-                    elif instrm == 'niriss':
-                        filter_file = ("{}_niriss_throughput1.txt"
-                                       .format(self.params['Readout'][self.usefilt].lower()))
-                    elif instrm == 'fgs':
-                        # det = self.params['Readout']['array_name'].split('_')[0]
-                        filter_file = "{}_throughput_py.txt".format(detector.lower())
-                    filt_dir = os.path.split(self.params['Reffiles']['filter_throughput'])[0]
-                    filter_file = os.path.join(filt_dir, filter_file)
-
+                    filter_file = utils.get_filter_throughput_file(self.params['Inst']['instrument'].lower(),
+                                                                   self.params['Readout'][self.usefilt],
+                                                                   fgs_detector=detector, nircam_module=module)
                 else:
                     filter_file = self.params['Reffiles']['filter_throughput']
 
@@ -4253,16 +4243,18 @@ class Catalog_seed():
                     bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
                                                                                        self.params['Telescope']['dec'],
                                                                                        self.params['Output']['date_obs'])
-                    self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
-                                                                                      filter_file,
-                                                                                      back_wave=bkgd_wave,
-                                                                                      back_sig=bkgd_spec)
+                    self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
+                                                                                             filter_file, True,
+                                                                                             self.photflam, self.pivot, self.siaf,
+                                                                                             back_wave=bkgd_wave,
+                                                                                             back_sig=bkgd_spec)
                     print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
                 else:
                     # Here the background level is based on high/medium/low rather than date
-                    self.params['simSignals']['bkgdrate'] = self.calculate_background(self.ra, self.dec,
-                                                                                      filter_file,
-                                                                                      level=self.params['simSignals']['bkgdrate'].lower())
+                    self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
+                                                                                             filter_file, False,
+                                                                                             self.photflam, self.pivot, self.siaf,
+                                                                                             level=self.params['simSignals']['bkgdrate'].lower())
                     print("Background rate determined using requested level: {}".format(self.params['simSignals']['bkgdrate']))
                 print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
             else:
@@ -4445,12 +4437,6 @@ class Catalog_seed():
                    "Setting to {}".format(value, typ, default)))
             return default
 
-    def read_filter_throughput(self, file):
-        '''Read in the ascii file containing the filter
-        throughput curve'''
-        tab = ascii.read(file)
-        return tab['Wavelength_microns'].data, tab['Throughput'].data
-
     def read_distortion_reffile(self):
         """Read in the CRDS-format distortion reference file and save
         the coordinate transformation model
@@ -4472,78 +4458,24 @@ class Catalog_seed():
         from astropy.units.equivalencies import si, cgs
 
         # Read in filter throughput file
-        filt_wav, filt_thru = self.read_filter_throughput(ffile)
+        filt_wav, filt_thru = file_io.read_filter_throughput(ffile)
 
         # If the user wants a background signal from a particular day,
         # then extract that array here
         if self.params['simSignals']['use_dateobs_for_background']:
-            """
-            # Get background information
-            # Any wavelength will return the 2D array that includes
-            # all wavelengths, so just use a dummy value of 2.5 microns
-            bg = jbt.background(ra, dec, 2.5)
-
-            # If the user wants a background signal from a particular day,
-            # then extract that array here
-            if self.params['simSignals']['use_dateobs_for_background'].lower() == 'true':
-                obsdate = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
-                obs_dayofyear = obsdate.timetuple().tm_yday
-                if obs_dayofyear not in bg.bkg_data['calendar']:
-                    raise ValueError(("ERROR: The requested RA, Dec is not observable on {}. Either "
-                                      "specify a different day, or set simSignals:use_dateobs_for_background "
-                                      "to False.".format(self.params['Output']['date_obs'])))
-                match = obs_dayofyear == bg.bkg_data['calendar']
-                back_wave = bg.bkg_data['wave_array']
-                back_sig = bg.bkg_data['total_bg'][match, :]
-            """
-
             # Interpolate background to match filter wavelength grid
             bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
 
             # Combine
             filt_bkgd = bkgd_interp * filt_thru
 
+            # Integrate over the filter bandpass
+            filt_integ = np.trapz(filt_thru, x=filt_wav)
+
             # Integrate
-            bval = np.trapz(filt_bkgd, x=filt_wav) * u.MJy / u.steradian
+            bval = np.trapz(filt_bkgd, x=filt_wav) / filt_integ * u.MJy / u.steradian
 
         else:
-            """
-            # If the user has requested background in terms of low/medium/high,
-            # then we need to examine all the background arrays.
-            # Loop over each day (in the background)
-            # info, convolve the background curve with the filter
-            # throughput curve, and then integrate. THEN, we can
-            # calculate the low/medium/high values.
-            bsigs = np.zeros(len(bg.bkg_data['total_bg'][:, 0]))
-            for i in range(len(bg.bkg_data['total_bg'][:, 0])):
-                back_wave = bg.bkg_data['wave_array']
-                back_sig = bg.bkg_data['total_bg'][i, :]
-
-                # Interpolate background to match filter wavelength grid
-                bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
-
-                # Combine
-                filt_bkgd = bkgd_interp * filt_thru
-
-                # Integrate
-                bsigs[i] = np.trapz(filt_bkgd, x=filt_wav)
-
-            # Now sort and determine the low/medium/high levels
-            low, medium, high = backgrounds.find_low_med_high(bsigs)
-
-            # Find the value based on the level in the yaml file
-            level = level.lower()
-            if level == "low":
-                bval = low
-            elif level == "medium":
-                bval = medium
-            elif level == "high":
-                bval = high
-            else:
-                raise ValueError(("ERROR: Unrecognized background value: {}. Must be low, mediumn, or high"
-                                  .format(level)))
-            """
-
             # If the user has requested background in terms of low/medium/high,
             # then we need to examine all the background arrays.
             # Loop over each day (in the background)

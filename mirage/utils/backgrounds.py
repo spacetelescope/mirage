@@ -7,6 +7,7 @@ import numpy as np
 
 from jwst_backgrounds import jbt
 
+from mirage.utils.file_io import read_filter_throughput
 from mirage.utils.flux_cal import fluxcal_info
 
 # Percentiles corresponding to "low", "medium", and "high" as used in
@@ -14,6 +15,100 @@ from mirage.utils.flux_cal import fluxcal_info
 LOW = 0.1
 MEDIUM = 0.5
 HIGH = 0.9
+
+
+def calculate_background(ra, dec, filter_file, use_dateobs, photflam, pivot,
+                         siaf_instance, back_wave=None, back_sig=None, level='medium'):
+    """Use the JWST background calculator to come up with an appropriate background
+    level for the observation.
+
+    Parameters
+    ----------
+    ra : float
+        RA in degrees
+
+    dec : float
+        Dec in degrees
+
+    filter_file : str
+        Name of ascii file containing filter throughput curve
+
+    use_dateobs : bool
+        Use the observation date to find the background value
+
+    photflam : float
+        Conversion factor from FLAM to ADU/sec
+
+    pivot : float
+        Pivot wavelength for the filter correspondig to ``filter_file``
+
+    siaf_instance : pysiaf.Siaf
+        Siaf instance for the instrument/aperture to be used
+
+    back_wave : numpy.ndarray
+        1D array of wavelength values for the background spectrum.
+        These are only used in the case where ``use_dateobs`` is True
+
+    back_sig : numpy.ndarray
+        1D array of signal values for the background spectrum.
+        These are only used in the case where ``use_dateobs`` is True
+
+    level : str
+        'low', 'medium', or 'high'
+
+    Returns
+    -------
+    bval.value : float
+        Background value in units of ADU/sec/pixel
+    """
+    from jwst_backgrounds import jbt
+    from astropy import units as u
+    from astropy.units.equivalencies import si, cgs
+
+    # Read in filter throughput file
+    filt_wav, filt_thru = read_filter_throughput(filter_file)
+
+    # If the user wants a background signal from a particular day,
+    # then extract that array here
+    if use_dateobs:
+        # Interpolate background to match filter wavelength grid
+        bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
+
+        # Combine
+        filt_bkgd = bkgd_interp * filt_thru
+
+        # Integrate over the filter bandpass
+        filt_integ = np.trapz(filt_thru, x=filt_wav)
+
+        # Integrate
+        bval = np.trapz(filt_bkgd, x=filt_wav) / filt_integ * u.MJy / u.steradian
+
+    else:
+        # If the user has requested background in terms of low/medium/high,
+        # then we need to examine all the background arrays.
+        # Loop over each day (in the background)
+        # info, convolve the background curve with the filter
+        # throughput curve, and then integrate. THEN, we can
+        # calculate the low/medium/high values.
+        bval = low_medium_high_background_value(ra, dec, level, filt_wav, filt_thru)
+        bval = bval * u.MJy / u.steradian
+
+    # Convert from MJy/str to ADU/sec
+    # then divide by area of pixel
+    flambda = cgs.erg / si.angstrom / si.cm ** 2 / si.s
+    photflam = photflam * flambda
+    pivot = pivot * u.micron
+    mjy = photflam.to(u.MJy, u.spectral_density(pivot))
+
+    # Divide by pixel area in steradians to get
+    # MJy/str per ADU/s
+    pixel_area = siaf_instance.XSciScale * u.arcsec * siaf_instance.YSciScale * u.arcsec
+    mjy_str = mjy / pixel_area.to(u.steradian)
+
+    # Convert the background signal from MJy/str
+    # to ADU/sec
+    bval /= mjy_str
+    return bval.value
 
 
 def day_of_year_background_spectrum(ra, dec, observation_date):
@@ -197,6 +292,9 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
         Background value corresponding to ``background_level``, integrated
         over the filter bandpass. Background units are MJy/str.
     """
+    # Integrate filter bandpass
+    filt_integ = np.trapz(filter_throughput, x=filter_waves)
+
     # Get background information
     bg = jbt.background(ra, dec, 4.)
     back_wave = bg.bkg_data['wave_array']
@@ -211,7 +309,23 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
         filt_bkgd = bkgd_interp * filter_throughput
 
         # Integrate
-        bsigs[i] = np.trapz(filt_bkgd, x=filter_waves)
+        bsigs[i] = np.trapz(filt_bkgd, x=filter_waves) / filt_integ
+
+        # Kevin's method where we convert to e/s first
+        # THIS METHOD IS TECHNICALLY MORE CORRECT THAN THAT USED ABOVE
+        # THE METHOD ABOVE BECOMES LESS ACCURATE FOR BACKGROUND SPECTRA
+        # THAT HAVE FEATURES. THE BACKGROUNDS FROM JWST_BACKGROUNDS ARE
+        # SMOOTH, SO THE METHOD ABOVE SHOULD BE FINE, BUT KEEP THIS OTHER
+        # METHOD DOCUMENTED HERE IN CASE WE NEED TO SWITCH TO IT LATER
+        #import astropy.units as u
+        #import pysiaf
+        #otearea = 25.326 * u.meter * u.meter
+        #h = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
+        #temp_siaf = pysiaf.Siaf('niriss')['NIS_CEN']
+        #pixelarea = temp_siaf.XSciScale * u.arcsec * temp_siaf.YSciScale * u.arcsec
+        #photon_total = otearea * (filt_bkgd * u.MJy / u.sr) * (1. / h) * 1.e-20 * pixelarea.to(u.sr) / (filter_waves * u.micron)
+        #integ_elec[i] = np.trapz(photon_total.value, x=filter_waves)
+    #low_e, medium_e, high_e = find_low_med_high(integ_elec)
 
     # Now sort and determine the low/medium/high levels
     low, medium, high = find_low_med_high(bsigs)

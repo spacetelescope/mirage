@@ -19,8 +19,44 @@ Use
         from mirage.utils import file_io
         gain, gain_head = file_io.read_gain_file(filename)
 """
-from astropy.io import fits
+import os
+
+from astropy.io import ascii, fits
 import numpy as np
+
+
+def find_filter_throughput_file(instrument, filter_name, detector=None, module=None):
+    """
+    """
+    # Find the appropriate filter throughput file
+    instrm = instrument.lower()
+    if instrm == 'nircam':
+        filter_file = ("{}_nircam_plus_ote_throughput_mod{}_sorted.txt"
+                       .format(filter_name.upper(), module.lower()))
+    elif instrm == 'niriss':
+        filter_file = ("{}_niriss_throughput1.txt"
+                       .format(filter_name.lower()))
+    elif instrm == 'fgs':
+        filter_file = "{}_throughput_py.txt".format(detector.lower())
+    return filter_file
+
+
+def read_filter_throughput(filename):
+    """Read in the ascii file containing a filter throughput curve
+
+    Parameters
+    ----------
+    filename : str
+        Name of ascii file containing throughput info
+
+    Returns
+    -------
+    (wavelengths, throughput) : tup
+        Tuple of 1D numpy arrays containing the wavelength and throughput
+        values from the file
+    """
+    tab = ascii.read(filename)
+    return tab['Wavelength_microns'].data, tab['Throughput'].data
 
 
 def read_gain_file(filename):
