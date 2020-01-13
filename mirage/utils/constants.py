@@ -50,7 +50,10 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'superbias': 'superbias',
                    'pixelflat': 'flat'}
 
-MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192},
+MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192,
+                               'nrca1': 2.4926066, 'nrca2': 2.5222762, 'nrca3': 2.4837794, 'nrca4': 2.2748423,
+                               'nrcb1': 2.5201690, 'nrcb2': 2.5557644, 'nrcb3': 2.5512073, 'nrcb4': 2.3360932,
+                               'nrca5': 2.1923525, 'nrcb5': 2.1811192},
                     'niriss': 1.611902,
                     'fgs': {'guider1': 1.9712874, 'guider2': 1.6897644}
                     }

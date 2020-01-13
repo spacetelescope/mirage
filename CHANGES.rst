@@ -1,3 +1,12 @@
+Master Branch
+=============
+
+Gain Values
+-----------
+
+Update observation_generator.py, wfss_simulator.py, grism_tso_simualtor.py to use the mean gain value stored in utils/constants.py rather than the values in the gain reference file when translating the dispersed seed image from units of e-/sec to ADU/sec.
+
+
 1.2.2
 =====
 

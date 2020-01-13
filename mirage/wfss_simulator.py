@@ -53,7 +53,7 @@ from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import backgrounds, read_fits
 from .utils.flux_cal import fluxcal_info
-from .utils.constants import CATALOG_YAML_ENTRIES
+from .utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES
 from .utils.utils import expand_environment_variable
 from .yaml import yaml_update
 
@@ -249,10 +249,6 @@ class WFSSSim():
                     dispersed_objtype_seed.finalize()
                 disp_seed += dispersed_objtype_seed.final
 
-        # Get gain map
-        gainfile = cat.params['Reffiles']['gain']
-        gain, gainheader = self.read_gain_file(gainfile)
-
         # Disperser output is always full frame. Remove the signal from
         # the refrence pixels now since we know exactly where they are
         disp_seed[0:4, :] = 0.
@@ -265,7 +261,6 @@ class WFSSSim():
             print("Subarray bounds: {}".format(cat.subarray_bounds))
             print("Dispersed seed image size: {}".format(disp_seed.shape))
             disp_seed = self.crop_to_subarray(disp_seed, cat.subarray_bounds)
-            gain = self.crop_to_subarray(gain, cat.subarray_bounds)
 
             # Segmentation map will be centered in a frame that is larger
             # than full frame by a factor of sqrt(2), so crop appropriately
@@ -287,6 +282,11 @@ class WFSSSim():
 
         # Convert seed image to ADU/sec to be consistent
         # with other simulator outputs
+        if self.instrument == 'niriss':
+            gain = MEAN_GAIN_VALUES['niriss']
+        elif self.instrument == 'nircam':
+            gain = MEAN_GAIN_VALUES['nircam']['lw{}'.format(self.module.lower())]
+
         disp_seed /= gain
 
         # Update seed image header to reflect the
@@ -613,6 +613,7 @@ class WFSSSim():
         image_hdu = fits.ImageHDU(seed_image)
         hdu_list = fits.HDUList([primary_hdu, image_hdu])
         hdu_list[0].header['units'] = 'e/sec'
+        hdu_list[1].header['units'] = 'e/sec'
         if self.disp_seed_filename is None:
             self.disp_seed_filename = self.default_dispersed_filename
         hdu_list.writeto(self.disp_seed_filename, overwrite=True)
