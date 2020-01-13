@@ -43,7 +43,7 @@ from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
-from ..utils.constants import CRDS_FILE_TYPES
+from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES
 from ..utils.flux_cal import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
@@ -113,6 +113,8 @@ class Catalog_seed():
 
     def make_seed(self):
         """MAIN FUNCTION"""
+        print('\n\nRunning catalog_seed_image..\n')
+
         # Read in input parameters and quality check
         self.seed_files = []
         self.readParameterFile()
@@ -4243,13 +4245,13 @@ class Catalog_seed():
                 # ADU/sec, we need a mean gain value
                 if self.params['Inst']['instrument'].lower() == 'nircam':
                     if '5' in detector:
-                        shorthand = 'lw{}'.format(module)
+                        shorthand = 'lw{}'.format(module.lower())
                     else:
-                        shorthand = 'sw{}'.format(module)
+                        shorthand = 'sw{}'.format(module.lower())
                     gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][shorthand]
                 elif self.params['Inst']['instrument'].lower() == 'niriss':
                     gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
-                elifself.params['Inst']['instrument'].lower() == 'fgs':
+                elif self.params['Inst']['instrument'].lower() == 'fgs':
                     gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector]
 
                 if self.params['simSignals']['use_dateobs_for_background']:
@@ -4258,18 +4260,18 @@ class Catalog_seed():
                                                                                        self.params['Output']['date_obs'])
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, True,
-                                                                                             self.photflam, self.pivot, self.siaf,
+                                                                                             gain_value, self.siaf,
                                                                                              back_wave=bkgd_wave,
                                                                                              back_sig=bkgd_spec)
                     print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
                 else:
                     # Here the background level is based on high/medium/low rather than date
+                    orig_level = copy.deepcopy(self.params['simSignals']['bkgdrate'])
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, False,
                                                                                              gain_value, self.siaf,
                                                                                              level=self.params['simSignals']['bkgdrate'].lower())
-                    print("Background rate determined using requested level: {}".format(self.params['simSignals']['bkgdrate']))
-                print('Background level set to: {}'.format(self.params['simSignals']['bkgdrate']))
+                    print("Background rate determined using {} level: {}".format(orig_level, self.params['simSignals']['bkgdrate']))
             else:
                 raise ValueError(("WARNING: unrecognized background rate value. "
                                   "Must be either a number or one of: {}"

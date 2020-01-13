@@ -127,9 +127,10 @@ def test_low_medium_high_background_value():
     filt_waves = np.array([1., 2., 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 4., 5.])
     filt_thru = np.array([0., 0., 0., 1., 1., 1., 1., 1., 0., 0., 0.])
 
-    bkgd_high = backgrounds.low_medium_high_background_value(ra, dec, "high", filt_waves, filt_thru)
-    bkgd_med = backgrounds.low_medium_high_background_value(ra, dec, "medium", filt_waves, filt_thru)
-    bkgd_low = backgrounds.low_medium_high_background_value(ra, dec, "low", filt_waves, filt_thru)
+    siaf = pysiaf.Siaf('nircam')['NRCA1_FULL']
+    bkgd_high = backgrounds.low_medium_high_background_value(ra, dec, "high", filt_waves, filt_thru, siaf)
+    bkgd_med = backgrounds.low_medium_high_background_value(ra, dec, "medium", filt_waves, filt_thru, siaf)
+    bkgd_low = backgrounds.low_medium_high_background_value(ra, dec, "low", filt_waves, filt_thru, siaf)
 
     assert bkgd_high > bkgd_med
     assert bkgd_med > bkgd_low

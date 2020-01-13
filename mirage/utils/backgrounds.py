@@ -82,6 +82,7 @@ def calculate_background(ra, dec, filter_file, use_dateobs, gain_value,
         pixelarea = siaf_instance.XSciScale * u.arcsec * siaf_instance.YSciScale * u.arcsec
         photon_total = PRIMARY_MIRROR_AREA * (filt_bkgd * u.MJy / u.sr) * (1. / PLANCK) * 1.e-20 * pixelarea.to(u.sr) / (filt_wav * u.micron)
         bval = np.trapz(photon_total, x=filt_wav)
+        bval = bval.value
 
     else:
         # If the user has requested background in terms of low/medium/high,
@@ -94,7 +95,7 @@ def calculate_background(ra, dec, filter_file, use_dateobs, gain_value,
 
     # Convert the background signal from e-/sec/pixel to ADU/sec/pixel
     bval /= gain_value
-    return bval.value
+    return bval
 
 
 def day_of_year_background_spectrum(ra, dec, observation_date):
