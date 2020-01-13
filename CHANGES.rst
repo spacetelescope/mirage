@@ -1,3 +1,20 @@
+Master Branch
+=============
+
+Backgrounds
+-----------
+
+Update the calculation of background signals to better match the values calcualted by the ETC. Values generally are within 10% of those from the ETC, although there are some filters/pointings/levels where the values differ by up to 20%.
+
+For the purposes of calculating the background signal in NIRISS WFSS simulations, the system throughput is simply set to 80% of the throughput in the imaging mode (with appropriate filter).
+
+Fixed bug in the Grism TSO simulator where the background signal was being added twice.
+
+Changed the code so that the Grism TSO simulator works in the case where no background source catalogs are provided. In this case, a dummy background point source catalog is generated, as the calculation and addition of background is done using the background sources.
+
+calculate_background function moved into backgrounds.py so that it can be more easily used by modules other than catalog_seed_image.
+
+
 1.2.2
 =====
 
