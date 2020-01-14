@@ -1,3 +1,12 @@
+Master Branch
+=============
+
+Non-sidereal
+------------
+
+Segmentation map addition bug corrected. Example notebook and input yaml file updated.
+
+
 1.2.2
 =====
 
