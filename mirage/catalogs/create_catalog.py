@@ -14,6 +14,7 @@ import os
 import pkg_resources
 
 from astropy.coordinates import SkyCoord, Galactic
+from astropy.io import ascii
 from astropy.table import Table, join
 import astropy.units as u
 from astroquery.gaia import Gaia
@@ -576,7 +577,7 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrum
     return source_list, filter_names
 
 
-def transform_besancon(besancon_cat, besancon_model, filter_names):
+def transform_johnson_to_jwst(johnson_cat, filter_names):
     """
     Given the output from a Besancon model, transform to JWST magnitudes by
     making a best match to the standard BOSZ model colours for the VJHKL
@@ -587,88 +588,114 @@ def transform_besancon(besancon_cat, besancon_model, filter_names):
 
     Parameters
     ----------
-    besancon_cat :  mirage.catalogs.create_catalog.PointSourceCatalog
-        This has the RA/Dec/VJHKL magnitude values for the sources
-
-    besancon_model : astropy.table.Table
-        This has the Besancon model results in a Table.  The ISM extinction
-        value is needed here.
+    johnson_cat : astropy.table.Table
+        Table containing sources with magnitudes in Johnson filters.
+        V, J, H, and K are required, along with Av (ISM extinction)
 
     filter_names : list
         The list of the requried output NIRCam/NIRISS/Guider filter names.
 
     Returns
     -------
-    out_magnitudes : numpy.ndarray
-        A two-dimensional float numpy array with the star number
-        in the first dimension and the estimated JWST magnitudes
-        in the second dimension.
-        A value of None is returned if the matching fails.  This
-        should not happen with the regular inputs.
+    johnson_cat : astropy.table.Table
+        Modified table with new columns for JWST filter-based magnitudes
     """
     standard_magnitudes, standard_values, standard_filters, standard_labels = read_standard_magnitudes()
-    nstars = len(besancon_cat.ra)
+    nstars = len(johnson_cat['V'].data)
     nfilters = len(filter_names)
+
+    # out_magnitudes is a two-dimensional float numpy array with the star
+    # number in the first dimension and the estimated JWST magnitudes
+    # in the second dimension. A value of None is returned if the matching
+    # fails.  This should not happen with the regular inputs.
     out_magnitudes = np.zeros((nstars, nfilters), dtype=np.float32)
     inds = crossmatch_filter_names(filter_names, standard_filters)
     in_magnitudes = np.zeros((4), dtype=np.float32)
-    vmags = besancon_model['V'].data
-    kmags = (besancon_model['V'] - besancon_model['V-K']).data
-    jmags = kmags + besancon_model['J-K'].data
-    hmags = jmags - besancon_model['J-H'].data
-    lmags = jmags - besancon_model['J-L'].data
+
     in_filters = ['Johnson V', 'Johnson J', 'Johnson H', 'Johnson K']
     for loop in range(nstars):
         # Exclude any bad values returned by the Besancon query
-        if vmags[loop] < 90:
-            in_magnitudes[0] = vmags[loop]
-            in_magnitudes[1] = jmags[loop]
-            in_magnitudes[2] = hmags[loop]
-            in_magnitudes[3] = kmags[loop]
+        if johnson_cat['V'].data[loop] < 90:
+            in_magnitudes[0] = johnson_cat['V'].data[loop]
+            in_magnitudes[1] = johnson_cat['J'].data[loop]
+            in_magnitudes[2] = johnson_cat['H'].data[loop]
+            in_magnitudes[3] = johnson_cat['K'].data[loop]
             newmags = match_model_magnitudes(in_magnitudes, in_filters, standard_magnitudes, standard_values,
                                              standard_filters, standard_labels)
             if newmags is None:
                 return None
-            newmags = besancon_model['Av'][loop]*standard_values[3, :] + newmags
+            newmags = johnson_cat['Av'].data[loop] * standard_values[3, :] + newmags
             out_magnitudes[loop, :] = newmags[inds]
         else:
             out_magnitudes[loop, :] = np.repeat(99., len(inds))
-    return out_magnitudes
+
+    # Create new columns for the JWST filter-based magnitudes
+    for magnitudes, filter_name in zip(out_magnitudes.transpose(), filter_names):
+        johnson_cat[filter_name] = magnitudes
+
+    return johnson_cat
 
 
-def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(13, 29), email='',
-                     seed=None, output_file=None):
+def catalog_colors_to_vjhk(color_catalog):
+    """Given a Table containing a catalog of sources with V magnitudes as
+    well as colors, generate J, H, and K magnitudes for all sources.
+
+    Parameters
+    ----------
+
+    color_catalog : astropy.table.Table
+        Table of sources. Should have columns named: 'K', 'V-K', 'J-H',
+        and 'J-K'
+
+    Returns
+    -------
+
+    color_catalog : astropy.table.Table
+        Modified Table with 'J', 'H', 'K' columns added
+    """
+    # Calculate magnitudes
+    kmags = color_catalog['K'].data
+    vmags = (color_catalog['K'] + color_catalog['V-K']).data
+    jmags = kmags + color_catalog['J-K'].data
+    hmags = jmags - color_catalog['J-H'].data
+
+    # Add to table
+    color_catalog['J'] = jmags
+    color_catalog['H'] = hmags
+    color_catalog['V'] = kmags
+    return color_catalog
+
+
+def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ2000', dec_column_name='DECJ2000',
+                                      magnitude_system='abmag', output_file=None):
     """Create a Mirage-formatted catalog containing sources from a query of the Besancon model
 
     Parameters
     ----------
-    ra : float
-        Right ascention (in decimal degrees) of the center of the catalog
-
-    dec : float
-        Declination (in decimal degrees) of the center of the catalog
-
-    box_width : float
-        Width (in arcseconds) of the box on the sky contained in the catalog
+    catalog_file : str
+        Name of ascii file containing the input catalog. The catalog must have
+        RA and Dec columns (whose names can be specified using ``ra_column_name``
+        and ``dec_column_name``), as well as a ``K`` column containing source
+        magnitudes in the K band, and an ``Av`` column containing ISM extinction.
+        It must also have either: 1) ``J``, ``H``,  and ``V`` columns with
+        appropriate magnitudes, or 2) ``V-K``, ``J-K``, and ``J-H`` columns.
 
     filters : dict
         Dictionary with keys equal to JWST instrument names, and values
         that are lists of filter names. Besancon sources will have magnitudes
         transformed into thiese filters
 
-    coords : str
-        Can be 'ra_dec' if ra and dec are Right Ascention and Declination,
-        or 'galactic' if coords are galactic longitude and latitude
+    ra_column_name : str
+        Name of the column in the input catalog that contains the Right Ascension
+        values for the sources
 
-    kmag_limits : tup
-        Minimum and maximum magnitude values to return in the catalog
+    dec_column_name : str
+        Name of the column in the input catalog that contains the Declination
+        values for the sources
 
-    email : str
-        Email address needed for the query to the Besancon model
-
-    seed : int
-        Seed for the random number generator used
-        to create RA and Dec values for model stars.
+    magnitude_system : str
+        Magnitude system of the values in the catalog. Options are 'abmag', 'stmag',
+        and 'vegamag'
 
     output_file : str
         If not None, save the catalog to a file with this name
@@ -679,9 +706,10 @@ def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(
         Catalog containing Besancon model stars with magnitudes in requested
         JWST filters
     """
-    # Query the Besancon model and create catalog
-    orig_cat, orig_query = besancon(ra, dec, box_width, coords=coords, kmag_limits=kmag_limits, email=email,
-                                    seed=seed)
+    # Check the input magnitude system
+    if magnitude_system not in ['abmag', 'stmag', 'vegamag']:
+        raise ValueError(("ERROR: magnitude_system for {} must be one of: 'abmag', 'stmag', 'vegamag'.")
+                         .format(catalog_file))
 
     # Create list of filter names from filters dictionary
     all_filters = []
@@ -689,23 +717,49 @@ def besancon_catalog(ra, dec, box_width, filters, coords='ra_dec', kmag_limits=(
         filt_list = make_filter_names(instrument.lower(), filters[instrument])
         all_filters.extend(filt_list)
 
-    # Transform Besancon source magnitudes to be in requested filters
-    newmags = transform_besancon(orig_cat, orig_query, all_filters)
+    # Read in the input catalog
+    catalog = ascii.read(catalog_file)
 
-    # Combine RA, Dec values in original catalog with updated magnitude lists
-    # into a new catalog
-    transformed_besancon_cat = PointSourceCatalog(ra=orig_cat.table['x_or_RA'].data,
-                                                  dec=orig_cat.table['y_or_Dec'].data)
+    # Quick check to be sure required columns are present
+    req_cols = ['K', 'Av', ra_column_name, dec_column_name]
+    for colname in req_cols:
+        if colname not in catalog.colnames:
+            raise ValueError(('ERROR: Required column {} is missing from {}.'.format(colname, catalog_file)))
 
-    for mags, filt in zip(newmags.transpose(), all_filters):
+    # Check which columns are present to see if colors need to be translated
+    # into magnitudes
+    if 'J' in catalog.colnames and 'H' in catalog.colnames and 'V' in catalog.colnames:
+        calculate_magnitudes_from_colors = False
+    else:
+        if 'V-K' in catalog.colnames and 'J-K' in catalog.colnames and 'J-H' in catalog.colnames:
+            calculate_magnitudes_from_colors = True
+        else:
+            raise ValueError(("ERROR: {} must contain either 'J', 'H', and 'K' columns, or 'V-K', 'J-K' and "
+                              "'J-H' columns").format(catalog_file))
+
+    # If the input catalog contains only V magnitudes and colors, calculate
+    # the magnitudes in the other Johnson filters
+    if calculate_magnitudes_from_colors:
+        catalog = catalog_colors_to_vjhk(catalog)
+
+    # Translate Johnson-based filter magnitudes into JWST filter-based
+    # magnitudes for the requested filters.
+    catalog = transform_johnson_to_jwst(catalog, all_filters)
+
+    # Extract the relevant columns and create a Mirage-formatted point
+    # source catalog
+    mirage_cat = PointSourceCatalog(ra=catalog[ra_column_name].data,
+                                    dec=catalog[dec_column_name].data)
+
+    for filt in all_filters:
         instrument, filter_name, _ = filt.split('_')
-        transformed_besancon_cat.add_magnitude_column(mags, instrument=instrument, filter_name=filter_name)
+        mirage_cat.add_magnitude_column(catalog[filt], instrument=instrument, filter_name=filter_name)
 
     # Save to output file if requested
     if output_file is not None:
-        transformed_besancon_cat.save(output_file)
+        mirage_cat.save(output_file)
 
-    return transformed_besancon_cat
+    return mirage_cat
 
 
 def crossmatch_filter_names(filter_names, standard_filters):
@@ -774,22 +828,17 @@ def match_model_magnitudes(in_magnitudes, in_filters, standard_magnitudes,
     if nmatch != len(in_filters):
         print('Error in matching the requested filters for model matching.')
         return None
+
     subset = np.copy(standard_magnitudes[:, inds])
-    dim1 = subset.shape
-    nmodels = dim1[0]
-    rmsmin = 1.e+20
-    nmin = 0
-    omin = 0.
-    for loop in range(nmodels):
-        del1 = subset[loop, :] - in_magnitudes
-        offset = np.mean(del1)
-        delm = (subset[loop, :] - offset - in_magnitudes)
-        rms = math.sqrt(np.sum(delm*delm)/nmatch)
-        if rms < rmsmin:
-            rmsmin = rms
-            nmin = loop
-            omin = offset
-    out_magnitudes = np.copy(standard_magnitudes[nmin, :]-omin)
+    del1 = subset - in_magnitudes
+    offset = np.mean(del1, axis=1)
+    offset_exp = np.expand_dims(offset, axis=1)
+    offset_stack = np.concatenate([offset_exp, offset_exp, offset_exp, offset_exp], axis=1)
+    delm = (subset - offset_stack - in_magnitudes)
+    rms = np.sqrt(np.sum(delm * delm, axis=1) / nmatch)
+    smallest = np.where(rms == np.min(rms))[0][0]
+    out_magnitudes = standard_magnitudes[smallest, :] - offset[smallest]
+
     return out_magnitudes
 
 
@@ -1770,7 +1819,7 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
 
 
-def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29), seed=None):
+def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
     """
     This routine calls a server to get a Besancon star count model over a given
     small sky area at a defined position.  For documentation of the Besancon
@@ -1814,10 +1863,6 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
             that for the JWST instruments the 2MASS sources will
             saturate in full frame imaging in many cases.
 
-        seed : int
-            Seed to use in the random number generator for the RA and Dec
-            values for the Besancon sources.
-
     Returns
     -------
         cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -1827,9 +1872,7 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
         model : astropy.table.Table
             The full Besancon model table for the query.
     """
-    from astroquery.besancon import Besancon
     from astropy import units as u
-    from astropy.coordinates import SkyCoord
 
     # Specified coordinates. Will need to convert to galactic long and lat
     # when calling model
@@ -1837,79 +1880,89 @@ def besancon(ra, dec, box_width, coords='ra_dec', email='', kmag_limits=(13, 29)
     dec = dec * u.deg
     box_width = box_width * u.arcsec
 
-    if coords == 'ra_dec':
-        location = SkyCoord(ra=ra, dec=dec, frame='icrs')
-        coord1 = location.galactic.l.value
-        coord2 = location.galactic.b.value
-    elif coords == 'galactic':
-        coord1 = ra.value
-        coord2 = dec.value
+    min_ra = ra - box_width / 2
+    max_ra = ra + box_width / 2
+    min_dec = dec - box_width / 2
+    max_dec = dec + box_width / 2
 
-    # Area of region to search (model expects area in square degrees)
-    area = box_width * box_width
-    area = area.to(u.deg * u.deg)
+    # Define the list of colors to return
+    colors = 'V-K,J-K,J-H,J-L'
+
+    # Band minimum and maximum values correspond to the 9 Johnson-Cousins
+    # filters used by the Besancon model: V, B, U, R, I, J, H, K, L
+    # in that order.
+    band_min = '{},-99.0,-99.0,-99.0,-99.0,-99.0,-99.0,-99.0,-99.0'.format(kmag_limits[0])
+    band_max = '{},99.0,99.0,99.0,99.0,99.0,99.0,99.0,99.0'.format(kmag_limits[1])
 
     # Query the model
-    try:
-        model = Besancon.query(coord1, coord2, smallfield=True, area=area.value,
-                               colors_limits={"J-H": (-99, 99), "J-K": (-99, 99),
-                                              "J-L": (-99, 99), "V-K": (-99, 99)},
-                               mag_limits={'U': (-99, 99), 'B': (-99, 99), 'V': (-99, 99),
-                                           'R': (-99, 99), 'I': (-99, 99), 'J': (-99, 99),
-                                           'H': (-99, 99), 'K': kmag_limits, 'L': (-99, 99)},
-                               retrieve_file=True, email=email)
-    except ValueError as e:
-        print(e)
-        print("WARNING: Besancon query failed. Returning background star table with placeholder entry.")
-        model = Table()
-        model['Dist'] = [99.]
-        model['Mv'] = [99.]
-        model['CL'] = [99.]
-        model['Typ'] = [99.]
-        model['LTef'] = [99.]
-        model['logg'] = [99.]
-        model['Age'] = [99.]
-        model['Mass'] = [999.]
-        model['J-H'] = [0.]
-        model['J-K'] = [0.]
-        model['J-L'] = [0.]
-        model['V-K'] = [0.]
-        model['V'] = [99.]
-        model['[Fe/H]'] = [99.]
-        model['l'] = [99.]
-        model['b'] = [99.]
-        model['Av'] = [99.]
-        model['Mbol'] = [99.]
+    command = (('python galmod_client.py --url "https://model.obs-besancon.fr/ws/" --user {} '
+               '--create -p KLEH 2 -p Coor1_min {} -p Coor2_min {} -p Coor1_max {} -p Coor2_max {} '
+               '-p ref_filter K -p acol {} -p band_min {} -p band_max {} --run')
+               .format(username, min_ra.value, min_dec.value, max_ra.value, max_dec.value, colors, band_min, band_max))
+    print('Running command: ', command)
+    os.system(command)
 
-    # Calculate magnitudes in given bands
-    v_mags = model['V'].data
-    k_mags = (model['V'] - model['V-K']).data
-    j_mags = k_mags + model['J-K'].data
-    h_mags = j_mags - model['J-H'].data
-    l_mags = j_mags - model['J-L'].data
 
-    # Since these are theoretical stars generated by a model, we need to provide RA and Dec values.
-    # The model is run in 'smallfield' mode, which assumes a constant density of stars across the given
-    # area. So let's just select RA and Dec values at random across the fov.
-    half_width = box_width * 0.5
-    min_ra = ra - half_width
-    max_ra = ra + half_width
-    min_dec = dec - half_width
-    max_dec = dec + half_width
-    ra_values, dec_values = generate_ra_dec(len(k_mags), min_ra, max_ra, min_dec, max_dec, seed=seed)
+def crop_besancon(ra, dec, box_width, catalog_file, ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+    """Given a file containing an ascii source catalog, this function
+    will crop the catalog such that it contains only sources within the
+    provided RA/Dec range.
 
-    # Create the catalog object
-    cat = PointSourceCatalog(ra=ra_values, dec=dec_values)
+    Parameters
+    ----------
+    ra : float
+        Right Ascension, in degrees, of the center of the area to keep
 
-    # Add the J, H, K and L magnitudes as they may be useful for magnitude conversions later
-    cat.add_magnitude_column(v_mags, instrument='Besancon', filter_name='v', magnitude_system='vegamag')
-    cat.add_magnitude_column(j_mags, instrument='Besancon', filter_name='j', magnitude_system='vegamag')
-    cat.add_magnitude_column(h_mags, instrument='Besancon', filter_name='h', magnitude_system='vegamag')
-    cat.add_magnitude_column(k_mags, instrument='Besancon', filter_name='k', magnitude_system='vegamag')
-    cat.add_magnitude_column(l_mags, instrument='Besancon', filter_name='l', magnitude_system='vegamag')
-    nstars = len(cat.ra)
-    print('The Besancon model contains %d stars.' % (nstars))
-    return cat, model
+    dec : float
+        Declination, in degerees, of the center of the area to keep
+
+    box_width : float
+        Full width, in arcseconds, of the area to be kept. We assume a
+        square box.
+
+    catalog_file : str
+        Name of ascii file containing catalog
+
+    ra_column_name : str
+        Name of the column in the catalog containing the RA values
+
+    dec_column_name : str
+        Name of the column in the catalog containing the Dec values
+
+    Returns
+    -------
+    cropped_catalog : astropy.table.Table
+        Table containing cropped catalog
+    """
+    # Define min and max RA, Dec values to be kept
+    ra = ra * u.deg
+    dec = dec * u.deg
+    box_width = box_width * u.arcsec
+
+    min_ra = ra - box_width / 2
+    max_ra = ra + box_width / 2
+    min_dec = dec - box_width / 2
+    max_dec = dec + box_width / 2
+
+    # Read in input catalog
+    catalog = ascii.read(catalog_file)
+
+    # Check for requested columns
+    if ra_column_name not in catalog.colnames:
+        raise ValueError(('ERROR: {} does not contain a {} column.').format(catalog_file, ra_column_name))
+
+    if dec_column_name not in catalog.colnames:
+        raise ValueError(('ERROR: {} does not contain a {} column.').format(catalog_file, dec_column_name))
+
+    # Keep only sources within the range of RA and Dec
+    good = np.where((catalog[ra_column_name].data >= min_ra) & (catalog[ra_column_name].data <= max_ra) &
+                    (catalog[dec_column_name].data >= min_dec) & (catalog[dec_column_name].data <= max_dec))[0]
+
+    cropped_catalog = Table()
+    for colname in catalog.colnames:
+        cropped_catalog[colname] = catalog[colname][good]
+
+    return cropped_catalog
 
 
 def galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
