@@ -62,8 +62,9 @@ def create_basic_exposure_list(xml_file, pointing_file):
 
 
 def for_proposal(xml_filename, pointing_filename, point_source=True, extragalactic=True,
-                 catalog_splitting_threshold=0.12, email='', out_dir=None, save_catalogs=True,
-                 besancon_seed=None, galaxy_seed=None):
+                 catalog_splitting_threshold=0.12, besancon_catalog_file=None,
+                 ra_column_name='RAJ2000', dec_column_name='DECJ2000', out_dir=None,
+                 save_catalogs=True, galaxy_seed=None):
     """
     Given a pointing dictionary from an APT file, generate source catalogs
     that cover all of the coordinates specifired.
@@ -87,9 +88,22 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         in a given catalog. Sources farther than this distance will be placed
         into a separate catalog.
 
-    email : str
-        A valid email address is a required input for a call to the Besancon
-        model query
+    besancon_catalog_file : str
+        Name of ascii catalog containing background stars. The code was
+        developed around this being a catalog output by the Besaoncon
+        model (via ``besancon()``), but it can be any ascii catalog
+        of sources as long as it contains the columns specified in
+        the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+        If None, the Besancon step will be skipped and a catalog will be
+        built using only GAIA/2MASS/WISE
+
+    ra_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        right ascension of the sources.
+
+    dec_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        declination of the sources
 
     out_dir : str
         Directory in which to save catalog files
@@ -97,10 +111,6 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     save_catalogs : bool
         If True, save the catalogs to ascii files, in addition to returning
         them. If False, the catalog objects are returned, but not saved.
-
-    besancon_seed : int
-        Seed to use in the random number generator when choosing RA and
-        Dec values for Besancon sources.
 
     galaxy_seed : int
         Seed to use in the random number generator used in galaxy_background
@@ -230,8 +240,9 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 print('\n--- Creating {} point source catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
+                                                        besancon_catalog_file=besancon_catalog_file,
                                                         instrument=instrument, filters=filter_list,
-                                                        email=email, besancon_seed=besancon_seed)
+                                                        ra_column_name=ra_column_name, dec_column_name=dec_column_name)
                 if i == 0:
                     ptsrc_cat = copy.deepcopy(tmp_cat)
                 else:
@@ -484,8 +495,8 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', 
     return two_mass
 
 
-def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrument='NIRISS', filters=[],
-                     besancon_seed=None):
+def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument='NIRISS', filters=[],
+                     ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
     """
     This is a driver function to query the GAIA/2MASS/WISE catalogues
     plus the Besancon model and combine these into a single JWST source list.
@@ -513,11 +524,14 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrum
         box_width : float
             Size of the (square) target field in arc-seconds
 
-        kmag_limits :  tuple
-            Optional limits on the K magnitudes for the Besancon model query
-
-        email : str
-            A valid email address is required for the Besancon model server
+        besancon_catalog_file : str
+            Name of ascii catalog containing background stars. The code was
+            developed around this being a catalog output by the Besaoncon
+            model (via ``besancon()``), but it can be any ascii catalog
+            of sources as long as it contains the columns specified in
+            the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+            If None, the Besancon step will be skipped and a catalog will be
+            built using only GAIA/2MASS/WISE
 
         instrument : str
             One of "all", "NIRISS", "NIRCam", or "Guider"
@@ -526,9 +540,13 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrum
             Either an empty list (which gives all filters) or a list
             of filter names (i.e. F090W) to be calculated.
 
-        besancon_seed : int
-            Seed to use in the random number generator when choosing RA and
-            Dec values for Besancon sources.
+        ra_column_name : str
+            Name of the column within ``besancon_catalog_file`` containing the
+            right ascension of the sources.
+
+        dec_column_name : str
+            Name of the column within ``besancon_catalog_file`` containing the
+            declination of the sources
 
     Returns
     -------
@@ -552,28 +570,22 @@ def get_all_catalogs(ra, dec, box_width, kmag_limits=(13, 29), email='', instrum
         gaia_wise_crossref = query_GAIA_ptsrc_catalog(outra, outdec, box_width)
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
     wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width)
-    besancon_cat, besancon_model = besancon(outra, outdec, box_width,
-                                            email=email, kmag_limits=kmag_limits, seed=besancon_seed)
-    besancon_jwst = transform_besancon(besancon_cat, besancon_model, filter_names)
-    if len(filter_names) != len(filters):
-        newfilters = []
-        for loop in range(len(filter_names)):
-            values = filter_names[loop].split('_')
-            newfilters.append(values[1])
-    else:
-        newfilters = filters
 
-    for loop in range(len(newfilters)):
-        jwst_mags = besancon_jwst[:, loop]
-        if len(jwst_mags) != 1:
-            jwst_mags = np.squeeze(jwst_mags)
-        besancon_cat.add_magnitude_column(jwst_mags, instrument=instrument,
-                                          filter_name=newfilters[loop], magnitude_system='vegamag')
+    if besancon_catalog_file is not None:
+        filter_dict = {instrument: filters}
+        besancon_jwst = johnson_catalog_to_mirage_catalog(besancon_catalog_file, filter_dict, ra_column_name=ra_column_name,
+                                                          dec_column_name=dec_column_name, magnitude_system='vegamag')
+
+    # Combine data from GAIA/2MASS/WISE to create single catalog with JWST filters
     observed_jwst = combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise,
                                             gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters)
-    print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_cat.ra),
-                                                                                  len(observed_jwst.ra)))
-    source_list = combine_catalogs(observed_jwst, besancon_cat)
+
+    if besancon_catalog_file is not None:
+        print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_jwst.ra),
+                                                                                      len(observed_jwst.ra)))
+        source_list = combine_catalogs(observed_jwst, besancon_jwst)
+    else:
+        source_list = observed_jwst
     return source_list, filter_names
 
 
@@ -833,7 +845,7 @@ def match_model_magnitudes(in_magnitudes, in_filters, standard_magnitudes,
     del1 = subset - in_magnitudes
     offset = np.mean(del1, axis=1)
     offset_exp = np.expand_dims(offset, axis=1)
-    offset_stack = np.concatenate([offset_exp, offset_exp, offset_exp, offset_exp], axis=1)
+    offset_stack = np.repeat(offset_exp, len(in_magnitudes), axis=1)
     delm = (subset - offset_stack - in_magnitudes)
     rms = np.sqrt(np.sum(delm * delm, axis=1) / nmatch)
     smallest = np.where(rms == np.min(rms))[0][0]
@@ -1862,15 +1874,6 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
             bright limit is taken as magnitude 14 by default.  Note
             that for the JWST instruments the 2MASS sources will
             saturate in full frame imaging in many cases.
-
-    Returns
-    -------
-        cat : mirage.catalogs.create_catalog.PointSourceCatalog
-            Catalog containing simulated (random) sky positions within the
-            field and the associated VJHKL magnitudes.
-
-        model : astropy.table.Table
-            The full Besancon model table for the query.
     """
     from astropy import units as u
 
@@ -1895,10 +1898,13 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
     band_max = '{},99.0,99.0,99.0,99.0,99.0,99.0,99.0,99.0'.format(kmag_limits[1])
 
     # Query the model
-    command = (('python galmod_client.py --url "https://model.obs-besancon.fr/ws/" --user {} '
+    path = os.path.dirname(__file__)
+    client = os.path.join(path, 'galmod_client.py')
+    command = (('python {} --url "https://model.obs-besancon.fr/ws/" --user {} '
                '--create -p KLEH 2 -p Coor1_min {} -p Coor2_min {} -p Coor1_max {} -p Coor2_max {} '
                '-p ref_filter K -p acol {} -p band_min {} -p band_max {} --run')
-               .format(username, min_ra.value, min_dec.value, max_ra.value, max_dec.value, colors, band_min, band_max))
+               .format(client, username, min_ra.value, min_dec.value, max_ra.value, max_dec.value,
+                       colors, band_min, band_max))
     print('Running command: ', command)
     os.system(command)
 
@@ -1965,7 +1971,8 @@ def crop_besancon(ra, dec, box_width, catalog_file, ra_column_name='RAJ2000', de
     return cropped_catalog
 
 
-def galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
+def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function.
 
@@ -1980,15 +1987,22 @@ def galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), ema
     filter_list : list
         List of filters to use to generate the catalog. (e.g ['F480M', 'F444W'])
 
-    kmag_limits : tup
-        Minimum and maximum magnitudes to use in the query to Besancon model
+    besancon_catalog_file : str
+        Name of ascii catalog containing background stars. The code was
+        developed around this being a catalog output by the Besaoncon
+        model (via ``besancon()``), but it can be any ascii catalog
+        of sources as long as it contains the columns specified in
+        the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+        If None, the Besancon step will be skipped and a catalog will be
+        built using only GAIA/2MASS/WISE
 
-    email : str
-        A valid email address is needed to query the Besancon model
+    ra_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        right ascension of the sources.
 
-    seed : int
-        Seed to use in the random number generator when choosing RA and
-        Dec values for Besancon sources.
+    dec_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        declination of the sources
 
     Returns
     -------
@@ -2000,13 +2014,14 @@ def galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), ema
     coord = SkyCoord(galactic_longitude, galactic_latitude, frame=Galactic)
 
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
-                                               kmag_limits=kmag_limits, email=email,
-                                               instrument=instrument, filters=filter_list,
-                                               besancon_seed=seed)
+                                               besancon_catalog_file=besancon_catalog_file, instrument=instrument,
+                                               filters=filter_list, ra_column_name=ra_column_name,
+                                               dec_column_name=dec_column_name)
     return cat
 
 
-def out_of_galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
+def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
+                          ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
     """Convenience function to create typical scene looking out of the plane of
     the Milky Way by querying the Besancon model
 
@@ -2021,15 +2036,22 @@ def out_of_galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 2
     filter_list : list
         List of filters to use to generate the catalog. (e.g ['F480M', 'F444W'])
 
-    kmag_limits : tup
-        Minimum and maximum magnitudes to use in the query to Besancon model
+    besancon_catalog_file : str
+        Name of ascii catalog containing background stars. The code was
+        developed around this being a catalog output by the Besaoncon
+        model (via ``besancon()``), but it can be any ascii catalog
+        of sources as long as it contains the columns specified in
+        the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+        If None, the Besancon step will be skipped and a catalog will be
+        built using only GAIA/2MASS/WISE
 
-    email : str
-        A valid email address is needed to query the Besancon model
+    ra_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        right ascension of the sources.
 
-    seed : int
-        Seed to use in the random number generator when choosing RA and
-        Dec values for Besancon sources.
+    dec_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        declination of the sources
 
     Returns
     -------
@@ -2041,13 +2063,14 @@ def out_of_galactic_plane(box_width, instrument, filter_list, kmag_limits=(13, 2
     coord = SkyCoord(galactic_longitude, galactic_latitude, frame=Galactic)
 
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
-                                               kmag_limits=kmag_limits, email=email,
-                                               instrument=instrument, filters=filter_list,
-                                               besancon_seed=seed)
+                                               besancon_catalog_file=besancon_catalog_file, instrument=instrument,
+                                               filters=filter_list, ra_column_name=ra_column_name,
+                                               dec_column_name=dec_column_name)
     return cat
 
 
-def galactic_bulge(box_width, instrument, filter_list, kmag_limits=(13, 29), email='', seed=None):
+def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
 
@@ -2062,15 +2085,22 @@ def galactic_bulge(box_width, instrument, filter_list, kmag_limits=(13, 29), ema
     filter_list : list
         List of filters to use to generate the catalog. (e.g ['F480M', 'F444W'])
 
-    kmag_limits : tup
-        Minimum and maximum magnitudes to use in the query to Besancon model
+    besancon_catalog_file : str
+        Name of ascii catalog containing background stars. The code was
+        developed around this being a catalog output by the Besaoncon
+        model (via ``besancon()``), but it can be any ascii catalog
+        of sources as long as it contains the columns specified in
+        the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+        If None, the Besancon step will be skipped and a catalog will be
+        built using only GAIA/2MASS/WISE
 
-    email : str
-        A valid email address is needed to query the Besancon model
+    ra_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        right ascension of the sources.
 
-    seed : int
-        Seed to use in the random number generator when choosing RA and
-        Dec values for Besancon sources.
+    dec_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        declination of the sources
 
     Returns
     -------
@@ -2082,9 +2112,9 @@ def galactic_bulge(box_width, instrument, filter_list, kmag_limits=(13, 29), ema
     coord = SkyCoord(galactic_longitude, galactic_latitude, frame=Galactic)
 
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
-                                               kmag_limits=kmag_limits, email=email,
-                                               instrument=instrument, filters=filter_list,
-                                               besancon_seed=seed)
+                                               besancon_catalog_file=besancon_catalog_file, instrument=instrument,
+                                               filters=filter_list, ra_column_name=ra_column_name,
+                                               dec_column_name=dec_column_name)
     return cat
 
 
