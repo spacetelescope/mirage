@@ -1,6 +1,11 @@
 Master Branch
 =============
 
+Besancon Model Query
+--------------------
+
+Code relating to the production of Besancon model source catalogs has been updated to reflect the new workflow for querying and retrieving data. This is now a 2-step process. Users must create an account on the Besancon model website. Queries can then be submitting using the `catalogs.create_catalog.besancon` function. The user must then wait for an email which contains a link to download the resulting catalog. Conversion of this catalog to Mirage-format can then proceed. See the `Catalog_Generation_Tools.ipynb` notebook for details.
+
 Non-sidereal
 ------------
 
