@@ -893,7 +893,7 @@ def read_standard_magnitudes():
     # of filters in the input file, where the names are a bit different.
     # Note that for the GAIA g filter the trailing space is needed to
     # allow the code to differentiate the G, BP, and RP filters.
-    standard_filters = ['Johnson V', 'Johnson H', 'Johnson H', 'Johnson K',
+    standard_filters = ['Johnson V', 'Johnson J', 'Johnson H', 'Johnson K',
                         '2MASS J', '2MASS H', '2MASS Ks', 'Johnson L',
                         'WISE W1', 'WISE W2', 'WISE W3', 'WISE W4', 'GAIA g ',
                         'GAIA gbp', 'GAIA grp',
