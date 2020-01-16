@@ -54,7 +54,7 @@ from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import backgrounds, read_fits
 from .utils.flux_cal import fluxcal_info
-from .utils.constants import CATALOG_YAML_ENTRIES, NIRISS_GRISM_THROUGHPUT_FACTOR, MEAN_GAIN_VALUES
+from .utils.constants import CATALOG_YAML_ENTRIES, NIRISS_GRISM_THROUGHPUT_FACTOR, MEAN_GAIN_VALUES, NIRISS_GRISM_THROUGHPUT_FACTOR
 from .utils.utils import expand_environment_variable, get_filter_throughput_file
 from .yaml import yaml_update
 
@@ -228,10 +228,10 @@ class WFSSSim():
                     raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
             elif np.isreal(self.params['simSignals']['bkgdrate']):
                 # The bkgdrate entry in the input yaml file is described as
-                # the desired signal in ADU/sec/pixel (when it is a number).
+                # the desired signal in ADU/sec/pixel IN A DIRECT IMAGE
                 # Since we want e-/sec/pixel here for the disperser, multiply
-                # by the gain
-                scaling_factor = self.params['simSignals']['bkgdrate'] * MEAN_GAIN_VALUES['niriss']
+                # by the gain as well as the throughput factor for the grism.
+                scaling_factor = self.params['simSignals']['bkgdrate'] * MEAN_GAIN_VALUES['niriss'] * NIRISS_GRISM_THROUGHPUT_FACTOR
 
         # Default to extracting all orders
         orders = None

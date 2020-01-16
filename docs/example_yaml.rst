@@ -90,7 +90,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  zodiscale_:  1.0                                #Zodi scaling factor
 	  scattered_:  None                               #Scattered light count rate image file
 	  scatteredscale_: 1.0                            #Scattered light scaling factor
-	  bkgdrate_: medium                               #Constant background count rate (electrons/sec/pixel)
+	  bkgdrate_: medium                               #Constant background count rate (ADU/sec/pixel in an undispersed image) or "high","medium","low" similar to what is used in the ETC
 	  poissonseed_: 2012872553                        #Random number generator seed for Poisson simulation)
 	  photonyield_: True                              #Apply photon yield in simulation
 	  pymethod_: True                                 #Use double Poisson simulation for photon yield
@@ -809,7 +809,7 @@ Scattered light count rate image file. This file is assumed to contain a 2-dimen
 Scattered light scaling factor
 ++++++++++++++++++++++++++++++
 
-*simSignals:scatteredscake*
+*simSignals:scatteredscale*
 
 Scaling factor to multiply the :ref:`scattered light count rate image <scattered>` by prior to adding to the seed image.
 
@@ -820,11 +820,29 @@ Background signal
 
 *simSignals:bkgdrate*
 
-There are two options when specifying the background rate with this keyword:
+This entry, in combination with the :ref:`use_dateobs_for_background <use_dateobs_for_background>` and :ref:`date_obs <date_obs>` parameters, controls the background signal that is added to simulations. The text below describes the way Mirage interprets the various input options:
 
-1. When a number is provided, a constant (across all pixels) background count rate is added to the output data. The value is assumed to have units of counts per pixel per second.
 
-2. Alternately, the value can be “high”, “medium”, or “low”. If one of these options is used, the simulator uses the `jwst_backgrounds <https://github.com/spacetelescope/jwst_backgrounds>`_ repository to calculate the background rate to apply to the simulated data. The package calculates the background signal at the requested pointing on the sky for each night over the course of a year and creates a histogram of these values. If the requested background is "low" then the returned background level is equal to that of the 10th percentile in the histogram. A "medium" background corresponds to the 50th percentile value, and "high" is the 90th percentile value. In this case, the returned background rate includes contributions from zodiacal light and telescope thermal emission.
+**Imaging Mode (both NIRCam and NIRISS)**
+
+- Number: The input value is assumed to be in units of ADU/pixel/second. This constant background value is placed in all pixels.
+- "low", “medium”, or “high”. If one of these options is used, the simulator uses the `jwst_backgrounds <https://github.com/spacetelescope/jwst_backgrounds>`_ repository to calculate the background rate to apply to the simulated data. The package calculates the background signal at the requested pointing on the sky for each night over the course of a year and creates a histogram of these values. If the requested background is "low" then the returned background level is equal to that of the 10th percentile in the histogram. A "medium" background corresponds to the 50th percentile value, and "high" is the 90th percentile value. In this case, the returned background rate includes contributions from zodiacal light and telescope thermal emission.
+- :ref:`use_dateobs_for_background <use_dateobs_for_background>` set to True: (NOTE: currently the bkgdrate value must be set to "low", "medium", or "high" when using this option. If it is set to a number, then that number will be used and use_dateobs_for_background will be ignored.) This is similar to the "low", “medium”, “high” case above, but instead of calculating the background based on a percetile of the distribution of background values, Mirage will select the background value associated with the date in the :ref:`date_obs <date_obs>` parameter.
+
+
+**WFSS Mode**
+
+NIRCam
+
+- Number: Not supported
+- "low", “medium”, or “high”. Similar to the imaging case above. In this case, the background spectrum matching the percentile value is kept. This is fed into the disperser software, which generates a 2D background image.
+- :ref:`use_dateobs_for_background <use_dateobs_for_background>` set to True. The background spectrum for the date in the :ref:`date_obs <date_obs>` parameter is fed into the disperser, which generates a 2D background image.
+
+NIRISS
+
+- Number: The input number is assumed to be the desired background value in ADU/pixels/second in the **undispersed view** of the scene. To get the background value in the dispersed image, this number is multiplied by the throughput of the NIRISS grism, which is about 80%. The dispersed background image, which is in the collection of Mirage reference files, is then scaled such that the mean value is equal to the calculated dispersed background value.
+- "low", “medium”, or “high”. Same as in the imaging case above. The calculated backrgound value will be multiplied by the throughput of the NIRISS grism, which is about 80%.
+- :ref:`use_dateobs_for_background <use_dateobs_for_background>`. Not supported
 
 Note that background rates associated with the "low", "medium", and "high" values are calculated in the same way as when they are used in the `JWST ETC <https://jwst.etc.stsci.edu/>`_.
 

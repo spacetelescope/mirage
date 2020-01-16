@@ -16,7 +16,7 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 import mirage
-from mirage import version
+from mirage import __version__
 import stsci_rtd_theme
 
 # -- Project information -----------------------------------------------------
@@ -26,11 +26,10 @@ copyright = '2018, STScI'
 author = 'STScI (Hilbert, Volk, Chambers, Sahlmann et al.)'
 
 # The short X.Y version
-full_version = version.__version__
-version_parts = full_version.split('.')
+version_parts = __version__.split('.')
 version = "{}.{}".format(version_parts[0], version_parts[1])
 # The full version, including alpha/beta/rc tags
-release = full_version
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
