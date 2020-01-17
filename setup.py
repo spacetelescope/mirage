@@ -117,9 +117,6 @@ setup(
         'webbpsf>=0.9.0',
         'pyyaml>=5.1.2'
     ],
-    #dependency_links = ['git+https://github.com/spacetelescope/jwst#0.13.8',
-    #                    'git+https://github.com/npirzkal/NIRCAM_Gsim',
-    #                    'git+https://github.com/npirzkal/GRISMCONF'],
     include_package_data=True,
     cmdclass={
         'build_sphinx': BuildSphinx
