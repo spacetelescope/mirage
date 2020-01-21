@@ -204,7 +204,7 @@ class WFSSSim():
                     siaf_instance = pysiaf.Siaf('niriss')[self.params['Readout']['array_name']]
                     vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params, usefilt, self.detector, self.module)
 
-                    if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
+                    if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt' or self.params['Reffiles']['filter_throughput'] == 'config':
                         filter_file = get_filter_throughput_file(self.instrument, self.params['Readout'][usefilt])
                     else:
                         filter_file = self.params['Reffiles']['filter_throughput']
