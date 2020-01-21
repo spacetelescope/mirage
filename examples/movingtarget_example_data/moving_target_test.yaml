@@ -1,7 +1,7 @@
 Inst:
   instrument: NIRCam          #Instrument name
   mode: imaging               #Observation mode (e.g. imaging, WFSS, moving_target)
-  use_JWST_pipeline: False   #Use pipeline in data transformations
+  use_JWST_pipeline: True   #Use pipeline in data transformations
 
 Readout:
   readpatt: RAPID        #Readout pattern (RAPID, BRIGHT2, etc)
@@ -32,6 +32,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
+  filter_wheel_positions: config  # File containing resolver wheel positions for each filter/pupil
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
 
@@ -59,7 +60,7 @@ simSignals:
   psfwfe: predicted                               #PSF WFE value (0,115,123,132,136,150,155)
   psfwfegroup: 0                             #WFE realization group (0 to 9)
   galaxyListFile: None
-  extended: None          #Extended emission count rate image file name
+  extended: None         #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
   PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output image (True or False)
@@ -105,6 +106,9 @@ Output:
   PI_Name: D. Adams  #Proposal PI Name
   Proposal_category: GO  #Proposal category
   Science_category: Cosmology  #Science category
+  target_name: 'My_Target'
+  target_ra: 53.101
+  target_dec: -27.801
   observation_number: '002'    #Observation Number
   observation_label: Obs1    #User-generated observation Label
   visit_number: '024'    #Visit Number

@@ -1,6 +1,7 @@
 Master Branch
 =============
 
+
 Backgrounds
 -----------
 
@@ -13,6 +14,16 @@ Fixed bug in the Grism TSO simulator where the background signal was being added
 Changed the code so that the Grism TSO simulator works in the case where no background source catalogs are provided. In this case, a dummy background point source catalog is generated, as the calculation and addition of background is done using the background sources.
 
 calculate_background function moved into backgrounds.py so that it can be more easily used by modules other than catalog_seed_image.
+
+Besancon Model Query
+--------------------
+
+Code relating to the production of Besancon model source catalogs has been updated to reflect the new workflow for querying and retrieving data. This is now a 2-step process. Users must create an account on the Besancon model website. Queries can then be submitting using the `catalogs.create_catalog.besancon` function. The user must then wait for an email which contains a link to download the resulting catalog. Conversion of this catalog to Mirage-format can then proceed. See the `Catalog_Generation_Tools.ipynb` notebook for details.
+
+Non-sidereal
+------------
+
+Segmentation map addition bug corrected. Example notebook and input yaml file updated.
 
 
 1.2.2
