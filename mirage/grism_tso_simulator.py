@@ -293,6 +293,10 @@ class GrismTSO():
         no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
         background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
+        # Mulitp[ly the dispersed seed images by the flat field
+        no_transit_signal *= tso_direct.flatfield
+        background_dispersed *= tso_direct.flatfield
+
         # Save the dispersed seed images if requested
         if self.save_dispersed_seed:
             h_back = fits.PrimaryHDU(background_dispersed)

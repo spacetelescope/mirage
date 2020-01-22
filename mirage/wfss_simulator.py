@@ -148,6 +148,11 @@ class WFSSSim():
             galaxy_seeds.append(cat.galaxy_seed_filename)
             extended_seeds.append(cat.extended_seed_filename)
 
+            # Save the flat field file associated with the wfss yaml so
+            # that we can apply it to the dispersed seed image if requested
+            if pfile == self.wfss_yaml:
+                self.flatfield = cat.flatfield
+
             # If Mirage is going to produce an hdf5 file of spectra,
             # then we only need a single direct seed image. Note that
             # find_param_info() has reordered the list such that the
@@ -308,6 +313,12 @@ class WFSSSim():
                          cat.subarray_bounds[2] + dx, cat.subarray_bounds[3] + dy]
             cat.seed_segmap = self.crop_to_subarray(cat.seed_segmap, segbounds)
 
+        # If it is a NIRCam observation, multiply the dispsersed seed
+        # image by the flat field. For NIRISS, the flat was multiplied
+        # in to the direct seed image, as they need to have their
+        # occulting spots in the direct seed image.
+        if self.instrument == 'nircam':
+            disp_seed *= self.flatfield
 
         # Save the dispersed seed image if requested
         # Save in units of e/s, under the idea that this should be a
