@@ -10,20 +10,24 @@ dependencies:
 - gwcs>=0.10a.dev21+g75e92da
 - healpy>=1.10
 - h5py>=2.8.0
+- ipython
+- jupyter
 - jwxml>=0.3.0
+- lxml>=3.6.4
 - matplotlib>=3.0.0
 - numpy>=1.16
 - photutils>=0.6
-- pip>=18.0
-- pysynphot>=0.9.12
+- poppy>=0.9.0
 - pytest>=3.8.1
 - python>=3.6,<3.7
 - scipy>=1.1.0
 - sphinx>=2.1
 - synphot>=0.2.0
 - webbpsf>=0.9.0
-- yaml==0.1.7
+- pyyaml>=5.1.2
 - pip:
     - jwst-backgrounds>=1.1.1
     - pysiaf>=0.6.1
-    - git+https://github.com/spacetelescope/jwst@0.13.8
+    - git+https://github.com/spacetelescope/jwst@0.14.2
+    - git+https://github.com/npirzkal/GRISMCONF
+    - git+https://github.com/npirzkal/NIRCAM_Gsim

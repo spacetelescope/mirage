@@ -45,21 +45,6 @@ except ImportError:
             print('!\n! Sphinx is not installed!\n!', file=sys.stderr)
             exit(1)
 
-
-# make sure jwst is available
-try:
-    import jwst
-except ImportError:
-    try:
-        subprocess.check_call(['git', 'clone',
-                               'https://github.com/spacetelescope/jwst.git'])
-        sys.path.insert(1, 'jwst')
-        # import jwst
-    except subprocess.CalledProcessError as e:
-        print(e)
-        exit(1)
-
-
 setup(
     name='mirage',
     description='Create simulated JWST data',
@@ -96,16 +81,15 @@ setup(
         'astropy>=3.2.1',
         'astroquery>=0.3.8',
         'crds>=7.4.1',
-        'GRISMCONF @ git+https://github.com/npirzkal/GRISMCONF',
         'gwcs>=0.10a.dev21+g75e92da',
         'healpy==1.12.5',
         'h5py>=2.8.0',
-        'jwst @ git+https://github.com/spacetelescope/jwst#0.13.8',
+        'ipython',
+        'jupyter',
         'jwst-backgrounds>=1.1.1',
         'jwxml>=0.3.0',
         'lxml>=3.6.4',
         'matplotlib>=3.0.0',
-        'NIRCAM_Gsim @ git+https://github.com/npirzkal/NIRCAM_Gsim',
         'numpy',
         'photutils>=0.7.2',
         'poppy>=0.9.0',
