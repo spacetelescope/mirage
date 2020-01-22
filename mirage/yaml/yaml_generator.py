@@ -2037,7 +2037,7 @@ class SimInput:
             f.write('  zodiscale:  1.0                            #Zodi scaling factor\n')
             f.write('  scattered:  None                          #Scattered light count rate image file\n')
             f.write('  scatteredscale: 1.0                        #Scattered light scaling factor\n')
-            f.write(('  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel) or '
+            f.write(('  bkgdrate: {}                         #Constant background count rate (ADU/sec/pixel in an undispersed image) or '
                      '"high","medium","low" similar to what is used in the ETC\n'.format(BackgroundRate)))
             f.write(('  poissonseed: {}                  #Random number generator seed for Poisson simulation)\n'
                      .format(np.random.randint(1, 2**32-2))))

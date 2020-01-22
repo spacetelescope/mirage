@@ -1,6 +1,25 @@
 Master Branch
 =============
 
+Flat Field
+----------
+
+Seed images are now multiplied by the flat field reference file rather than the pixel area map reference file in order to get the surface brightnesses correct. Or more simply, since one of the steps in the JWST calibration pipeline is to divide by the flat field, we must multiply by the flat field when creating the data. See #430. For imaging/time series modes, the flat field is multiplied into the seed image. For NIRCam WFSS mode, the flat field is multiplied in to the dispsersed seed image. For NIRISS WFSS, the flat field is multiplied in to the seed image prior to dispersing. This is because the flat field reference file contains both pixel-to-pixel differences in respsonse, as well as images of the occulting spots, which are in the optical train. Ideally the occulting spots would be multiplied into the seed image prior to dispersing, and then the pixel-to-pixel flat would be multiplied into the seed image after dispersing. Unfortunately these two effects are mixed in the flat field reference file and cannot be separated. This will have some implications for calibrated data products.
+
+
+Backgrounds
+-----------
+
+Update the calculation of background signals to better match the values calcualted by the ETC. Values generally are within 10% of those from the ETC, although there are some filters/pointings/levels where the values differ by up to 20%. #430
+
+For the purposes of calculating the background signal in NIRISS WFSS simulations, the system throughput is simply set to 80% of the throughput in the imaging mode (with appropriate filter).
+
+Fixed bug in the Grism TSO simulator where the background signal was being added twice.
+
+Changed the code so that the Grism TSO simulator works in the case where no background source catalogs are provided. In this case, a dummy background point source catalog is generated, as the calculation and addition of background is done using the background sources.
+
+calculate_background function moved into backgrounds.py so that it can be more easily used by modules other than catalog_seed_image.
+
 Besancon Model Query
 --------------------
 

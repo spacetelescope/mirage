@@ -471,7 +471,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         catalog.write(flambda_output_catalog, format='ascii', overwrite=True)
         print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
 
-        # Remormalize
+        # Renormalize
         if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
             rescaling_magnitudes = ascii_catalog['index', normalizing_mag_column]
 

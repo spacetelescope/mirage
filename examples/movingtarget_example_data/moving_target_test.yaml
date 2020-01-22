@@ -21,7 +21,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   linearity: crds    #linearity correction coefficients
   saturation: crds    #well depth reference files
   gain: crds  #Gain map
-  pixelflat: None
+  pixelflat: crds
   illumflat: None                               #Illumination flat field file
   astrometric: crds  #Astrometric distortion file (asdf)
   ipc: crds #File containing IPC kernel to apply
