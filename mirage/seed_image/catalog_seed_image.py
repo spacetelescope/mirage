@@ -1147,8 +1147,8 @@ class Catalog_seed():
                 non_sidereal_ramp += mtt_data_list[i]
                 # non_sidereal_zero += mtt_zero_list[i]
         if mtt_data_segmap is not None:
-            nonsidereal_segmap += mtt_data_segmap
-        return non_sidereal_ramp, nonsidereal_segmap
+            nonsidereal_segmap.segmap += mtt_data_segmap
+        return non_sidereal_ramp, nonsidereal_segmap.segmap
 
     def readMTFile(self, filename):
         """
@@ -1730,10 +1730,12 @@ class Catalog_seed():
 
             ptsrc = self.get_point_source_list(temp_ptsrc_filename)
             ptsrcCRImage, ptsrcCRSegmap = self.make_point_source_image(ptsrc)
+
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
                 ptsrcCRImage *= self.flatfield
+
             totalCRList.append(ptsrcCRImage)
             totalSegList.append(ptsrcCRSegmap)
 
@@ -1756,10 +1758,12 @@ class Catalog_seed():
             galaxies.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_sersic_sources.list'), format='ascii', overwrite=True)
 
             galaxyCRImage, galaxySegmap = self.make_galaxy_image('temp_non_sidereal_sersic_sources.list')
+
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
                 galaxyCRImage *= self.flatfield
+
             totalCRList.append(galaxyCRImage)
             totalSegList.append(galaxySegmap)
 
