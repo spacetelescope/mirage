@@ -717,7 +717,7 @@ class Catalog_seed():
         # If we are making a NIRISS grism direct image, we need to embed the true flat field
         # in an array of the appropriate dimension, where any pixels outside the
         # actual aperture are set to 1.0
-        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"]) and self.instrument == 'niriss':
+        if ((self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss"])) and self.instrument == 'niriss':
             mapshape = flat.shape
             # cannot use this: g, yd, xd = signalramp.shape
             # need to update dimensions: self.flat = np.ones((yd, xd))
