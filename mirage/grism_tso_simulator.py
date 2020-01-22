@@ -61,7 +61,7 @@ import pysiaf
 from scipy.interpolate import interp1d
 
 from mirage import wfss_simulator
-from mirage.catalogs import spectra_from_catalog
+from mirage.catalogs import catalog_generator, spectra_from_catalog
 from mirage.seed_image import catalog_seed_image
 from mirage.dark import dark_prep
 from mirage.ramp_generator import obs_generator
@@ -244,7 +244,8 @@ class GrismTSO():
                     # dispersed background
                     background_done = True
                     background_dispersed = copy.deepcopy(disp.final)
-                background_dispersed += disp.final
+                else:
+                    background_dispersed += disp.final
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -287,6 +288,15 @@ class GrismTSO():
         grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders,
                                                add_background=False, cache=True, finalize=True)
 
+        # Crop dispersed seed images to correct final subarray size
+        #no_transit_signal = grism_seed_object.final
+        no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
+        background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
+
+        # Mulitp[ly the dispersed seed images by the flat field
+        no_transit_signal *= tso_direct.flatfield
+        background_dispersed *= tso_direct.flatfield
+
         # Save the dispersed seed images if requested
         if self.save_dispersed_seed:
             h_back = fits.PrimaryHDU(background_dispersed)
@@ -298,11 +308,6 @@ class GrismTSO():
             hlist.writeto(disp_filename, overwrite=True)
             print('\nDispersed seed images (background sources and TSO source) saved to {}.\n\n'
                   .format(disp_filename))
-
-        # Crop dispersed seed images to correct final subarray size
-        #no_transit_signal = grism_seed_object.final
-        no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
-        background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
         # Calculate file splitting info
         self.file_splitting()
@@ -568,6 +573,20 @@ class GrismTSO():
         cats = [parameters['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
         cats = [e for e in cats if e.lower() != 'none']
         self.catalog_files.extend(cats)
+
+        if len(self.catalog_files) == 0:
+            # If no background source catalogs are given, create a dummy point
+            # source catalog and add it to the list. Without this, the
+            # creation of the final SED file would fail. Put the source
+            # down near the SEP and with a magnitude such that it won't
+            # disturb anything
+            filter_name = parameters['Readout']['filter'].lower()
+            dummy_ptsrc = catalog_generator.PointSourceCatalog(ra=[0.], dec=[-89.])
+            dummy_ptsrc.add_magnitude_column([40], instrument='nircam', filter_name=filter_name, magnitude_system='abmag')
+            dummy_cat = 'dummy_ptsrc.cat'
+            dummy_ptsrc.save(dummy_cat)
+            self.catalog_files.append(dummy_cat)
+            parameters['simSignals']['pointsource'] = dummy_cat
 
         self.instrument = parameters['Inst']['instrument'].lower()
         self.aperture = parameters['Readout']['array_name']

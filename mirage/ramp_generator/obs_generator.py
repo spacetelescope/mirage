@@ -3016,7 +3016,8 @@ class Observation():
             ex4 = fits.ImageHDU(err_ext.astype(np.float32), name='ERR')
             ex5 = fits.ImageHDU(zeroframe.astype(np.float32), name='ZEROFRAME')
             ex6 = fits.BinTableHDU(name='GROUP')
-            outModel = fits.HDUList([ex0, ex1, ex2, ex3, ex4, ex5, ex6])
+            ex7 = fits.BinTableHDU(name='INT_TIMES')
+            outModel = fits.HDUList([ex0, ex1, ex2, ex3, ex4, ex5, ex6, ex7])
             groupextnum = 6
 
         elif mod == '1b':
@@ -3024,7 +3025,8 @@ class Observation():
             ex1 = fits.ImageHDU(ramp.astype(np.uint16), name='SCI')
             ex2 = fits.ImageHDU(zeroframe.astype(np.uint16), name='ZEROFRAME')
             ex3 = fits.BinTableHDU(name='GROUP')
-            outModel = fits.HDUList([ex0, ex1, ex2, ex3])
+            ex4 = fits.BinTableHDU(name='INT_TIMES')
+            outModel = fits.HDUList([ex0, ex1, ex2, ex3, ex4])
             groupextnum = 3
 
         try:
@@ -3128,8 +3130,8 @@ class Observation():
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
         int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
-                                         outModel.data.shape[0])
-        outModel['INT_TIMES'] = int_times
+                                         outModel['SCI'].data.shape[0])
+        outModel['INT_TIMES'].data = int_times
 
         if self.runStep['fwpw']:
             fwpw = ascii.read(self.params['Reffiles']['filtpupilcombo'])

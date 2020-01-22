@@ -264,7 +264,7 @@ def crop_to_subarray(data, bounds):
             raise ValueError(("WARNING: subarray bounds are outside the "
                               "dimensions of the input array."))
 
- 
+
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
