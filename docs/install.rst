@@ -27,6 +27,9 @@ These are **jwst** which is the JWST calibration pipeline software, and two pack
     which works for MacOSX 10.13 (High Sierra). If this version of healpy does not work for your system, you may need to install a different version of healpy. If this
     is the case, replacing the third command above with `pip install mirage healpy==x.y.z`, where x.y.z is the version number you require, will install that version of healpy.
 
+.. tip::
+    This method installs `webbpsf <>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+
 
 Install the Development Version
 -------------------------------
@@ -52,13 +55,18 @@ Create and activate a new environment. In this example we call the environment "
     pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
     pip install git+https://github.com/spacetelescope/jwst@0.14.2
 
+.. tip::
+    This method installs `webbpsf <>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+
 Or, to install using the environment file, again creating an environment called "mirage"::
 
+    cd mirage
     conda env create -f environment.yml --name mirage python=3.6
     conda activate mirage
-    cd mirage
     pip install .
 
+.. tip::
+    For this latter case, packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary.
 
 .. _ref_file_collection:
 
