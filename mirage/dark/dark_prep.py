@@ -1132,8 +1132,6 @@ class DarkPrep():
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:
-                        print('integ: ', integ, 'frames: ', frames)
-                        print('dark.data.shape is: ', dark.data.shape)
                         accumimage = np.mean(dark.data[integ, frames, :, :], axis=0)
                         if dark.sbAndRefpix is not None:
                             zeroaccumimage = np.mean(dark.sbAndRefpix[integ, frames, :, :], axis=0)

@@ -45,6 +45,7 @@ import yaml
 import numpy as np
 from astropy.io import fits
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
+import pysiaf
 from scipy.stats import sigmaclip
 
 from .catalogs import spectra_from_catalog
@@ -53,8 +54,9 @@ from .dark import dark_prep
 from .ramp_generator import obs_generator
 from .utils import backgrounds, read_fits
 from .utils.flux_cal import fluxcal_info
-from .utils.constants import CATALOG_YAML_ENTRIES
-from .utils.utils import expand_environment_variable
+from .utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, NIRISS_GRISM_THROUGHPUT_FACTOR
+from .utils.utils import expand_environment_variable, get_filter_throughput_file
+
 from .yaml import yaml_update
 
 NIRCAM_GRISM_CROSSING_FILTERS = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', 'F300M',
@@ -147,6 +149,11 @@ class WFSSSim():
             galaxy_seeds.append(cat.galaxy_seed_filename)
             extended_seeds.append(cat.extended_seed_filename)
 
+            # Save the flat field file associated with the wfss yaml so
+            # that we can apply it to the dispersed seed image if requested
+            if pfile == self.wfss_yaml:
+                self.flatfield = cat.flatfield
+
             # If Mirage is going to produce an hdf5 file of spectra,
             # then we only need a single direct seed image. Note that
             # find_param_info() has reordered the list such that the
@@ -196,11 +203,41 @@ class WFSSSim():
 
             if isinstance(self.params['simSignals']['bkgdrate'], str):
                 if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                    scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+                    #scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
+
+                    usefilt = 'pupil'
+
+                    siaf_instance = pysiaf.Siaf('niriss')[self.params['Readout']['array_name']]
+                    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params, usefilt, self.detector, self.module)
+
+                    if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt' or self.params['Reffiles']['filter_throughput'] == 'config':
+                        filter_file = get_filter_throughput_file(self.instrument, self.params['Readout'][usefilt])
+                    else:
+                        filter_file = self.params['Reffiles']['filter_throughput']
+
+                    scaling_factor = backgrounds.calculate_background(self.params['Telescope']['ra'],
+                                                                      self.params['Telescope']['dec'],
+                                                                      filter_file,
+                                                                      self.params['simSignals']['use_dateobs_for_background'],
+                                                                      MEAN_GAIN_VALUES['niriss'], siaf_instance,
+                                                                      level=self.params['simSignals']['bkgdrate'])
+
+                    # Having the grism in the beam reduces the throughput by 20%.
+                    # Mulitply that into the scaling factor
+                    scaling_factor *= NIRISS_GRISM_THROUGHPUT_FACTOR
+
+                    # Translate from ADU/sec/pix to e-/sec/pix since that is
+                    # what the disperser works with
+                    scaling_factor *= MEAN_GAIN_VALUES['niriss']
+
                 else:
                     raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
             elif np.isreal(self.params['simSignals']['bkgdrate']):
-                scaling_factor = self.params['simSignals']['bkgdrate']
+                # The bkgdrate entry in the input yaml file is described as
+                # the desired signal in ADU/sec/pixel IN A DIRECT IMAGE
+                # Since we want e-/sec/pixel here for the disperser, multiply
+                # by the gain as well as the throughput factor for the grism.
+                scaling_factor = self.params['simSignals']['bkgdrate'] * MEAN_GAIN_VALUES['niriss'] * NIRISS_GRISM_THROUGHPUT_FACTOR
 
         # Default to extracting all orders
         orders = None
@@ -249,10 +286,6 @@ class WFSSSim():
                     dispersed_objtype_seed.finalize()
                 disp_seed += dispersed_objtype_seed.final
 
-        # Get gain map
-        gainfile = cat.params['Reffiles']['gain']
-        gain, gainheader = self.read_gain_file(gainfile)
-
         # Disperser output is always full frame. Remove the signal from
         # the refrence pixels now since we know exactly where they are
         disp_seed[0:4, :] = 0.
@@ -265,7 +298,6 @@ class WFSSSim():
             print("Subarray bounds: {}".format(cat.subarray_bounds))
             print("Dispersed seed image size: {}".format(disp_seed.shape))
             disp_seed = self.crop_to_subarray(disp_seed, cat.subarray_bounds)
-            gain = self.crop_to_subarray(gain, cat.subarray_bounds)
 
             # Segmentation map will be centered in a frame that is larger
             # than full frame by a factor of sqrt(2), so crop appropriately
@@ -277,6 +309,12 @@ class WFSSSim():
                          cat.subarray_bounds[2] + dx, cat.subarray_bounds[3] + dy]
             cat.seed_segmap = self.crop_to_subarray(cat.seed_segmap, segbounds)
 
+        # If it is a NIRCam observation, multiply the dispsersed seed
+        # image by the flat field. For NIRISS, the flat was multiplied
+        # in to the direct seed image, as they need to have their
+        # occulting spots in the direct seed image.
+        if self.instrument == 'nircam':
+            disp_seed *= self.flatfield
 
         # Save the dispersed seed image if requested
         # Save in units of e/s, under the idea that this should be a
@@ -287,6 +325,11 @@ class WFSSSim():
 
         # Convert seed image to ADU/sec to be consistent
         # with other simulator outputs
+        if self.instrument == 'niriss':
+            gain = MEAN_GAIN_VALUES['niriss']
+        elif self.instrument == 'nircam':
+            gain = MEAN_GAIN_VALUES['nircam']['lw{}'.format(self.module.lower())]
+
         disp_seed /= gain
 
         # Update seed image header to reflect the
@@ -613,6 +656,7 @@ class WFSSSim():
         image_hdu = fits.ImageHDU(seed_image)
         hdu_list = fits.HDUList([primary_hdu, image_hdu])
         hdu_list[0].header['units'] = 'e/sec'
+        hdu_list[1].header['units'] = 'e/sec'
         if self.disp_seed_filename is None:
             self.disp_seed_filename = self.default_dispersed_filename
         hdu_list.writeto(self.disp_seed_filename, overwrite=True)
