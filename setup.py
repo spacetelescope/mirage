@@ -45,20 +45,15 @@ except ImportError:
             print('!\n! Sphinx is not installed!\n!', file=sys.stderr)
             exit(1)
 
-
-# make sure jwst is available
-try:
-    import jwst
-except ImportError:
-    try:
-        subprocess.check_call(['git', 'clone',
-                               'https://github.com/spacetelescope/jwst.git'])
-        sys.path.insert(1, 'jwst')
-        # import jwst
-    except subprocess.CalledProcessError as e:
-        print(e)
-        exit(1)
-
+DOCS_REQUIRE = [
+    'sphinx',
+    'sphinx-automodapi',
+    'sphinx-rtd-theme',
+    'stsci-rtd-theme',
+]
+TESTS_REQUIRE = [
+    'pytest',
+]
 
 setup(
     name='mirage',
@@ -92,17 +87,31 @@ setup(
     use_scm_version=True,
     setup_requires=['setuptools_scm'],
     install_requires=[
-        'asdf>=1.2.0',
+        'asdf>=2.1.0',
         'astropy>=3.2.1',
+        'astroquery>=0.3.8',
+        'crds>=7.4.1',
+        'gwcs>=0.11',
+        'h5py>=2.8.0',
+        'ipython',
+        'jupyter',
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
-        'matplotlib>=1.4.3',
+        'matplotlib>=3.0.0',
         'numpy',
-        'photutils>=0.4.0',
-        'pysiaf>=0.6.1'
-        'scipy>=0.17',
+        'photutils>=0.7.2',
+        'pysiaf>=0.6.1',
+        'scipy>=1.1.0',
+        'synphot>=0.2.0',
+        'webbpsf>=0.9.0',
+        'pyyaml>=5.1.2'
     ],
     include_package_data=True,
+    extras_require={
+        'docs': DOCS_REQUIRE,
+        'test': TESTS_REQUIRE,
+    },
+    tests_require=TESTS_REQUIRE,
     cmdclass={
         'build_sphinx': BuildSphinx
     },)

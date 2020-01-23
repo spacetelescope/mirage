@@ -21,8 +21,7 @@ reads of the detector are present.
 ## Installation and Documentation
 
 The [main documentation for Mirage](https://mirage-data-simulator.readthedocs.io/en/latest/) is located on ReadTheDocs.
-
-Please find detailed installation instructions on our [ReadTheDocs](https://mirage-data-simulator.readthedocs.io/en/latest/install.html) page.
+[Detailed installation instructions](https://mirage-data-simulator.readthedocs.io/en/latest/install.html) can be found there.
 
 
 ## Examples
@@ -34,7 +33,7 @@ for imaging simulations, WFSS simulations, moving target
 
 ### Citation
 If you find this package useful, please consider citing the Zenodo record using the DOI badge above.
-Please find additional citation instructions in [CITATION](CITATION). 
+Please find additional citation instructions in [CITATION](CITATION).
 
 
 ## Contributing

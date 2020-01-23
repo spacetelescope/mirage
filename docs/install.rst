@@ -1,105 +1,77 @@
 Installing MIRAGE
 =================
+There are two aspects to Mirage installation. First, the software itself must be installed. Once this is complete, there is a set of reference files which
+must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`, as this is the latest stable version of the software.
 
-The easiest way to get a working installation of Mirage is to use the YAML file in the root directory, ``environment.yml``, to create a MIRaGe-specific conda environment.
 
-You can then use this environment whenever you need to use MIRaGe, or build upon it for any larger projects that require MIRaGe.
+.. _pypi:
 
-Set up a conda environment
---------------------------
-First, be sure that your conda installation is up to date. Exit any currently activated environment, if necessary.::
+Install from Pypi
+-----------------
 
-    conda deactivate
-    conda update conda
+Mirage is now hosted on `Pypi <https://pypi.org/project/mirage/>`_. To install the latest stable version of Mirage, use the commands below. In this example, we create
+a conda environment called "mirage" and then install the software into that environment. After installing Mirage, there are three packages which must be installed separately.
+These are: **jwst**, which is the JWST calibration pipeline software, and two packages that help to create dispersed data using the grisms.
 
-Get a copy of the MIRaGe repository::
+::
+
+    conda create -n mirage python=3.6 -y
+    conda activate mirage
+    pip install healpy==1.12.5
+    pip install mirage
+    pip install git+https://github.com/npirzkal/GRISMCONF#egg=grismconf
+    pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
+    pip install git+https://github.com/spacetelescope/jwst@0.14.2
+
+.. tip::
+    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
+    works for MacOSX 10.13 (High Sierra). If the version of healpy above does not work for your system, you may need to install a different version.
+
+.. tip::
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+
+
+Install the Development Version
+-------------------------------
+
+For those wishing to contribute to the code base, you can install Mirage by cloning and installing the repository. This is only
+recommended for those looking to help with development. In general, those wishing only to use Mirage should install the latest stable version from :ref:`Pypi <pypi>`.
+
+
+Clone the Mirage repository::
 
     git clone https://github.com/spacetelescope/mirage.git
 
-Move into the mirage directory and use the environment file to create a new environment. Give your environment a name you will recognize (here we choose ``mirage``)::
+Installation can then be done via pip, which uses setup.py, or using the conda environment file that is included in the package.
+
+To install using pip and setup.py:
+Create and activate a new environment. In this example we call the environment "mirage". Then move into the mirage directory, and install Mirage into the new environment::
+
+    conda create -n mirage python=3.6 -y
+    conda activate mirage
+    cd mirage
+    pip install healpy==1.12.5
+    pip install .
+    pip install git+https://github.com/npirzkal/GRISMCONF#egg=grismconf
+    pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
+    pip install git+https://github.com/spacetelescope/jwst@0.14.2
+
+.. tip::
+    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
+    works for MacOSX 10.13 (High Sierra). If the version of healpy above does not work for your system, you may need to install a different version.
+
+.. tip::
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+
+Or, to install using the environment file, again creating an environment called "mirage"::
 
     cd mirage
-    conda env create -f environment.yml -n mirage
-
-Once the environment is built, activate it.::
-
+    conda env create -f environment.yml --name mirage python=3.6
     conda activate mirage
+    pip install .
 
-Move out of the mirage directory before cloning and installing any of the depenencies.::
-
-    cd ../
-
-
-Install Development-Version Dependencies
-----------------------------------------
-
-Unfortunately, there are conflicts with some of MIRaGe's dependencies that have not been addressed in the latest pip and conda versions. So, in order for MIRaGe to work, we need to download and install the development versions of those packages. (This will no longer be necessary once both packages make new releases.)
-
-If you do not have a copy of the ``poppy`` or ``webbpsf`` git repositories, clone them::
-
-    git clone git://github.com/spacetelescope/poppy.git
-    git clone git://github.com/spacetelescope/webbpsf.git
-
-If you already have a local copy of these packages, first make sure you have the most up-to-date version. Here we assume that you have previously cloned
-the repository and that the ``origin`` remote points to the package. This is git's default behavior. If in doubt, simply delete the local copies and re-clone
-using the commands above.::
-
-    cd poppy
-    git fetch origin master
-    git pull origin master
-
-    cd ../webbpsf
-    git fetch origin master
-    git pull origin master
-    cd ../
-
-Then, install both ``poppy`` and ``webbpsf``::
-
-    pip install -e poppy
-    pip install -e webbpsf
-
-
-Install MIRaGe
---------------
-
-Next, install MIRaGe::
-
-    pip install -e mirage
-
-This ``pip`` command will also always install all required dependencies (though in this case, they were already installed when we built our conda environment). If you want to know what dependencies MIRaGe requires,, the list of packages can
-be viewed in the ``install_requires`` part of this repository's `setup.py file <../setup.py>`_.
-
-Install Supporting Packages
----------------------------
-
-If you plan to use MIRaGe to simulate **Wide Field Slitless (WFSS)** observations, you will also need to download two supporting packages:
-
-- `NIRCam_Gsim <https://github.com/npirzkal/NIRCAM_Gsim>`_
-- `GRISMCONF <https://github.com/npirzkal/GRISMCONF>`_
-
-For each of these packages, download the repository if you do not have a local copy::
-
-    git clone https://github.com/npirzkal/NIRCAM_Gsim.git
-    git clone https://github.com/npirzkal/GRISMCONF.git
-
-Or, if you already have a local copy, make sure you have the most recent version. Here we assume that you have previously cloned
-the repository and that the ``origin`` remote points to the package. This is git's default behavior. If in doubt, simply delete the local copies and re-clone
-using the commands above.::
-
-    cd ../NIRCAM_Gsim
-    git fetch upstream master
-    git pull upstream master
-    cd ../
-
-    cd ../GRISMCONF
-    git fetch upstream master
-    git pull upstream master
-    cd ../
-
-Then install::
-
-    pip install -e NIRCAM_Gsim
-    pip install -e GRISMCONF
+.. tip::
+    For this latter case, packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary.
 
 .. _ref_file_collection:
 

@@ -1,5 +1,11 @@
-Master Branch
-=============
+1.3
+===
+
+Installation
+------------
+
+setup.py has been modified to support installation via pip and Pypi. Installation documentation has been updated to describe the new process.
+
 
 Gain Values
 -----------
