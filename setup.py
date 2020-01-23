@@ -45,6 +45,16 @@ except ImportError:
             print('!\n! Sphinx is not installed!\n!', file=sys.stderr)
             exit(1)
 
+DOCS_REQUIRE = [
+    'sphinx',
+    'sphinx-automodapi',
+    'sphinx-rtd-theme',
+    'stsci-rtd-theme',
+]
+TESTS_REQUIRE = [
+    'pytest',
+]
+
 setup(
     name='mirage',
     description='Create simulated JWST data',
@@ -81,27 +91,27 @@ setup(
         'astropy>=3.2.1',
         'astroquery>=0.3.8',
         'crds>=7.4.1',
-        'gwcs>=0.10a.dev21+g75e92da',
-        'healpy==1.12.5',
+        'gwcs>=0.11',
         'h5py>=2.8.0',
         'ipython',
         'jupyter',
         'jwst-backgrounds>=1.1.1',
-        'jwxml>=0.3.0',
         'lxml>=3.6.4',
         'matplotlib>=3.0.0',
         'numpy',
         'photutils>=0.7.2',
-        'poppy>=0.9.0',
         'pysiaf>=0.6.1',
-        'pytest>=3.8.1',
         'scipy>=1.1.0',
-        'sphinx>=2.1',
         'synphot>=0.2.0',
         'webbpsf>=0.9.0',
         'pyyaml>=5.1.2'
     ],
     include_package_data=True,
+    extras_require={
+        'docs': DOCS_REQUIRE,
+        'test': TESTS_REQUIRE,
+    },
+    tests_require=TESTS_REQUIRE,
     cmdclass={
         'build_sphinx': BuildSphinx
     },)

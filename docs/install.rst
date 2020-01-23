@@ -17,15 +17,15 @@ These are: **jwst**, which is the JWST calibration pipeline software, and two pa
 
     conda create -n mirage python=3.6 -y
     conda activate mirage
+    pip install healpy==1.12.5
     pip install mirage
     pip install git+https://github.com/npirzkal/GRISMCONF#egg=grismconf
     pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
     pip install git+https://github.com/spacetelescope/jwst@0.14.2
 
 .. tip::
-    `Healpy <https://healpy.readthedocs.io/en/latest/>`_, upon which Mirage relies has released different wheels for different versions of Mac OSX. Mirage's setup file currently specifies healpy version 1.12.5,
-    which works for MacOSX 10.13 (High Sierra). If this version of healpy does not work for your system, you may need to install a different version of healpy. If this
-    is the case, replacing the third command above with `pip install mirage healpy==x.y.z`, where x.y.z is the version number you require, will install that version of healpy.
+    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
+    works for MacOSX 10.13 (High Sierra). If the version of healpy above does not work for your system, you may need to install a different version.
 
 .. tip::
     This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
@@ -50,10 +50,15 @@ Create and activate a new environment. In this example we call the environment "
     conda create -n mirage python=3.6 -y
     conda activate mirage
     cd mirage
+    pip install healpy==1.12.5
     pip install .
     pip install git+https://github.com/npirzkal/GRISMCONF#egg=grismconf
     pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
     pip install git+https://github.com/spacetelescope/jwst@0.14.2
+
+.. tip::
+    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
+    works for MacOSX 10.13 (High Sierra). If the version of healpy above does not work for your system, you may need to install a different version.
 
 .. tip::
     This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
