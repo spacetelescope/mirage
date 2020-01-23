@@ -50,7 +50,7 @@ from mirage.ramp_generator import unlinearize
 from mirage.reference_files import crds_tools
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
-from mirage.utils.constants import EXPTYPES
+from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES
 
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
@@ -392,7 +392,8 @@ class Observation():
         hdulist = fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU()])
         hdulist[0].header['MRGEVRSN'] = (mirage.__version__, 'Mirage version used')
         hdulist[0].header['YAMLFILE'] = (self.paramfile, 'Mirage input yaml file')
-        hdulist[0].header['GAINFILE'] = (self.params['Reffiles']['gain'], 'Gain file used by Mirage')
+        #hdulist[0].header['GAINFILE'] = (self.params['Reffiles']['gain'], 'Gain file used by Mirage')
+        hdulist[0].header['GAIN'] = (self.gain, 'Gain value used by Mirage')
         hdulist[0].header['DISTORTN'] = (self.params['Reffiles']['astrometric'],
                                          'Distortion reffile used by Mirage')
         hdulist[0].header['IPC'] = (self.params['Reffiles']['ipc'], 'IPC kernel used by Mirage')
@@ -1096,7 +1097,19 @@ class Observation():
 
         # Read in gain map to be used for adding Poisson noise
         # and to scale CRs to be in ADU
-        self.read_gain_map()
+        #self.read_gain_map()
+        # For the time being, use the mean gain value in constants.py in
+        # order to avoid discontinuities that can arise when gain reference
+        # files are made using binned areas of pixels, as they are now.
+        if self.instrument.lower() == 'niriss':
+            self.gain = MEAN_GAIN_VALUES['niriss']
+        elif self.instrument.lower() == 'nircam':
+            det = copy.deepcopy(self.detector.lower())
+            if 'long' in det:
+                det = det.replace('long', '5')
+            self.gain = MEAN_GAIN_VALUES['nircam'][det]
+        elif self.instrument.lower() == 'fgs':
+            self.gain = MEAN_GAIN_VALUES['fgs'][self.detector.lower()]
 
         # Calculate the exposure time of a single frame, based on
         # the size of the subarray
@@ -1187,7 +1200,7 @@ class Observation():
                 if self.seedheader['UNITS'] in ["e-/sec", "e-"]:
                     print(("Seed image is in units of {}. Dividing by gain."
                            .format(self.seedheader['units'])))
-                    self.seed_image /= self.gainim
+                    self.seed_image /= self.gain
             else:
                 raise ValueError(("'UNITS' keyword not present in header of "
                                   "seed image. Unable to determine whether the "
@@ -1613,7 +1626,7 @@ class Observation():
             l2 = 10+(j2-k)
 
             # Insert cosmic ray (divided by gain to put into ADU)
-            image[i1:i2, j1:j2] = image[i1:i2, j1:j2] + crimage[k1:k2, l1:l2] / self.gainim[k1:k2, l1:l2]
+            image[i1:i2, j1:j2] = image[i1:i2, j1:j2] + crimage[k1:k2, l1:l2] / self.gain  # self.gainim[k1:k2, l1:l2]
 
             self.cosmicraylist.write("{} {} {} {} {} {} {}\n".format((j2-j1)/2+j1, (i2-i1)/2+i1, ngroup,
                                      iframe, n, m, np.max(crimage[k1:k2, l1:l2])))
@@ -1658,7 +1671,7 @@ class Observation():
         # Can't add Poisson noise to pixels with negative values
         # Set those to zero when adding noise, then replace with
         # original value
-        signalgain = signalimage * self.gainim
+        signalgain = signalimage * self.gain
         highpix = np.where(signalgain == np.nanmax(signalgain))
         if np.nanmin(signalgain) < 0.:
             neg = signalgain < 0.
@@ -1672,7 +1685,7 @@ class Observation():
         if np.nanmin(signalgain) < 0.:
             newimage[neg] = negatives[neg]
 
-        newimage /= self.gainim
+        newimage /= self.gain
 
         # Quantum yield for NIRCam is always 1.0 (so psym1=0)
         # if self.params['simSignals']['photonyield'] and pym1 > 0.000001 and newimage[i, j] > 0:

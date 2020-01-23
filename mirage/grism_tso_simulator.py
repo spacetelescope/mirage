@@ -194,8 +194,8 @@ class GrismTSO():
                                                                                                    self.numresets)
 
         # Get gain map for later unit conversion
-        gainfile = orig_parameters['Reffiles']['gain']
-        gain, gainheader = file_io.read_gain_file(gainfile)
+        #gainfile = orig_parameters['Reffiles']['gain']
+        #gain, gainheader = file_io.read_gain_file(gainfile)
 
         # Make 2 copies of the input parameter file, separating the TSO
         # source from the other sources
@@ -426,7 +426,7 @@ class GrismTSO():
                 if orig_parameters['Readout']['array_name'] not in self.fullframe_apertures:
                     print("Dispersed seed image size: {}".format(segment_seed.shape))
                     segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
-                    gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
+                    #gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
 
                 # Segmentation map will be centered in a frame that is larger
                 # than full frame by a factor of sqrt(2), so crop appropriately
@@ -440,6 +440,7 @@ class GrismTSO():
 
                 # Convert seed image to ADU/sec to be consistent
                 # with other simulator outputs
+                gain = MEAN_GAIN_VALUES['nircam']['lw{}'.format(self.module.lower())]
                 segment_seed /= gain
 
                 # Update seed image header to reflect the
