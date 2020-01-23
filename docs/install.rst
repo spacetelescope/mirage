@@ -11,7 +11,7 @@ Install from Pypi
 
 Mirage is now hosted on `Pypi <https://pypi.org/project/mirage/>`_. To install the latest stable version of Mirage, use the commands below. In this example, we create
 a conda environment called "mirage" and then install the software into that environment. After installing Mirage, there are three packages which must be installed separately.
-These are **jwst** which is the JWST calibration pipeline software, and two packages that help to create dispersed data using the grisms.
+These are: **jwst**, which is the JWST calibration pipeline software, and two packages that help to create dispersed data using the grisms.
 
 ::
 
@@ -28,7 +28,7 @@ These are **jwst** which is the JWST calibration pipeline software, and two pack
     is the case, replacing the third command above with `pip install mirage healpy==x.y.z`, where x.y.z is the version number you require, will install that version of healpy.
 
 .. tip::
-    This method installs `webbpsf <>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
 
 
 Install the Development Version
@@ -56,7 +56,7 @@ Create and activate a new environment. In this example we call the environment "
     pip install git+https://github.com/spacetelescope/jwst@0.14.2
 
 .. tip::
-    This method installs `webbpsf <>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
 
 Or, to install using the environment file, again creating an environment called "mirage"::
 
