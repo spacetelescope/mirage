@@ -50,6 +50,7 @@ DOCS_REQUIRE = [
     'sphinx-automodapi',
     'sphinx-rtd-theme',
     'stsci-rtd-theme',
+    'extension-helpers',
 ]
 TESTS_REQUIRE = [
     'pytest',
@@ -90,6 +91,7 @@ setup(
         'asdf>=2.1.0',
         'astropy>=3.2.1',
         'astroquery>=0.3.8',
+        'batman-package',
         'crds>=7.4.1',
         'gwcs>=0.11',
         'h5py>=2.8.0',

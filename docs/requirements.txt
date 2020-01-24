@@ -7,3 +7,4 @@ setuptools==40.9.0
 sphinx>=2.0.1
 sphinx-automodapi==0.10
 stsci_rtd_theme==0.0.2
+extension-helpers
