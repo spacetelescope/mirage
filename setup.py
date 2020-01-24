@@ -46,6 +46,7 @@ except ImportError:
             exit(1)
 
 DOCS_REQUIRE = [
+    'nbsphinx',
     'sphinx',
     'sphinx-automodapi',
     'sphinx-rtd-theme',
