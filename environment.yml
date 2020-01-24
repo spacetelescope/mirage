@@ -25,6 +25,7 @@ dependencies:
 - webbpsf>=0.9.0
 - pyyaml>=5.1.2
 - pip:
+    - batman-package
     - jwst-backgrounds>=1.1.1
     - pysiaf>=0.6.1
     - git+https://github.com/spacetelescope/jwst@0.14.2
