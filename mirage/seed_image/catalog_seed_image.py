@@ -2002,7 +2002,7 @@ class Catalog_seed():
             print("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
 
             # Add galaxy segmentation map to the master copy
-            segmentation_map = add_segmentation_maps(segmentation_map, ext_segmap)
+            segmentation_map = self.add_segmentation_maps(segmentation_map, ext_segmap)
 
             # add the extended image to the synthetic signal rate image
             signalimage = signalimage + extimage
