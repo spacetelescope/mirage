@@ -67,7 +67,7 @@ from mirage.dark import dark_prep
 from mirage.ramp_generator import obs_generator
 from mirage.reference_files import crds_tools
 from mirage.utils import read_fits
-from mirage.utils.constants import CATALOG_YAML_ENTRIES
+from mirage.utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from mirage.utils import utils, file_io, backgrounds
 from mirage.yaml import yaml_update

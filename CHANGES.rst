@@ -1,3 +1,31 @@
+1.3.2
+=====
+
+Gain
+----
+
+Added a missing import statement for MEAN_GAIN_VALUES in the grism_tso_simulator
+
+Segmentation Map
+----------------
+
+Fixed a bug that was causing create_seed_image to crash when updating the segmentation map for extended sources
+
+Grism TSO plots
+---------------
+
+Removed call to an unused module in the TSO example notebook. This call was causing the notebook's plotting function to fail
+
+
+1.3.1
+=====
+
+Dependencies
+------------
+
+Added batman-package as a dependency. This is used when creating TSO data.
+
+
 1.3
 ===
 
