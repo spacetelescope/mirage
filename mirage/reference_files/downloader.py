@@ -314,7 +314,7 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
                     det_str.replace('LONG', '5')
                 darks_dir = os.path.join(directory, 'mirage_data', 'nircam', 'darks')
                 sub_directory = os.path.join(darks_dir, cal, det_str)
-            elif 'NIRISS' in filename.lower():
+            elif 'NIRISS' in filename:
                 darks_dir = os.path.join(directory, 'mirage_data', 'niriss', 'darks')
                 sub_directory = os.path.join(darks_dir, cal)
                 #sub_directory = os.path.join(directory, 'mirage_data', 'niriss', 'darks', cal)
