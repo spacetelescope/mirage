@@ -4,7 +4,7 @@ Unreleased
 Header Keywords
 ---------------
 
-Corrected schema to populate the XOFFSET and YOFFSET header keywords
+Corrected schema to populate the XOFFSET and YOFFSET header keywords (#454)
 
 
 Reference Files
