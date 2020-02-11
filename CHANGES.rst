@@ -1,3 +1,18 @@
+Unreleased
+==========
+
+Header Keywords
+---------------
+
+Corrected schema to populate the XOFFSET and YOFFSET header keywords
+
+
+Reference Files
+---------------
+
+Fix bug in downloader that was preventing NIRISS darks from being downloaded (#450)
+
+
 1.3.2
 =====
 
