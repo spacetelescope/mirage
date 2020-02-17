@@ -1,5 +1,5 @@
-Unreleased
-==========
+1.3.3
+=====
 
 Header Keywords
 ---------------
