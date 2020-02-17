@@ -775,11 +775,7 @@ class AptInput:
                                                          or 'FGS' in elements[4]
                                                          or 'NRS' in elements[4]
                                                          or 'MIR' in elements[4])
-                            ) or (('TA' in elements[4]) & ('NRC' in elements[4]
-                                                         or 'NIS' in elements[4]
-                                                         or 'FGS' in elements[4]
-                                                         or 'NRS' in elements[4]
-                                                         or 'MIR' in elements[4])):
+                            ) or (('TA' in elements[4]) & ('NRC' in elements[4])):
                             if (elements[18] == 'PARALLEL') and ('MIRI' in elements[4]):
                                 skip = True
 
