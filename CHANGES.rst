@@ -6,6 +6,16 @@ APT Pointing File
 
 Bug fix such that the only Target Acquisition observations that are read in are those for NIRCam TSO observations.
 
+Header Keywords
+---------------
+
+Corrected schema to populate the XOFFSET and YOFFSET header keywords (#454)
+
+Reference Files
+---------------
+
+Fix bug in downloader that was preventing NIRISS darks from being downloaded (#450)
+
 
 1.3.2
 =====
