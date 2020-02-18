@@ -2874,8 +2874,8 @@ class Observation():
         outModel.meta.dither.subpixel_type = self.params['Output']['subpix_dither_type']
         outModel.meta.dither.subpixel_number = self.params['Output']['subpix_dither_position']
         outModel.meta.dither.subpixel_total_points = self.params['Output']['total_subpix_dither_positions']
-        outModel.meta.dither.xoffset = self.params['Output']['xoffset']
-        outModel.meta.dither.yoffset = self.params['Output']['yoffset']
+        outModel.meta.dither.x_offset = self.params['Output']['xoffset']
+        outModel.meta.dither.y_offset = self.params['Output']['yoffset']
 
         # pixel coordinates in FITS header start from 1 not from 0
         xc = (self.subarray_bounds[2] + self.subarray_bounds[0])/2.+1.
