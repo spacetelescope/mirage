@@ -1,11 +1,15 @@
 1.3.3
 =====
 
+APT Pointing File
+-----------------
+
+Bug fix such that the only Target Acquisition observations that are read in are those for NIRCam TSO observations.
+
 Header Keywords
 ---------------
 
 Corrected schema to populate the XOFFSET and YOFFSET header keywords (#454)
-
 
 Reference Files
 ---------------
