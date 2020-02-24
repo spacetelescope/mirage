@@ -60,7 +60,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         Size of the PSF to generate, in pixels. Default is 1024.
 
     boresight: list, optional
-        Telescope boresight offset in V2/V3. This offset is added on top of the individual 
+        Telescope boresight offset in V2/V3 in arcminutes. This offset is added on top of the individual 
         segment tip/tilt values.
 
     overwrite : bool, optional
