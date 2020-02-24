@@ -33,7 +33,7 @@ from mirage.psf.psf_selection import get_library_file
 
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
-                          detectors='all', fov_pixels=1024, overwrite=False):
+                          detectors='all', fov_pixels=1024, boresight=None, overwrite=False):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -58,6 +58,10 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
 
     fov_pixels : int, optional
         Size of the PSF to generate, in pixels. Default is 1024.
+
+    boresight: list, optional
+        Telescope boresight offset in V2/V3. This offset is added on top of the individual 
+        segment tip/tilt values.
 
     overwrite : bool, optional
             True/False boolean to overwrite the output file if it already
@@ -129,6 +133,11 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
                 grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
 
+                if boresight is not None:
+                    grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
+                    grid.meta['BSOFF_V3'] = (boresight[1], 'Telescope boresight offset in V3 in arcminutes')
+
+                
                 # Write out file
                 filename = 'nircam_{}_{}_fovp{}_samp1_npsf1_seg{:02d}.fits'.format(det.lower(), filt.lower(),
                                                                                    fov_pixels, i_segment)
@@ -295,5 +304,11 @@ def get_segment_offset(segment_number, detector, library_list):
     x_arcsec = -2 * umrad_to_arcsec * tilt_onto_x 
     y_arcsec = -2 * umrad_to_arcsec * tilt_onto_y 
 
-
+    try:
+        x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
+        y_arcsec += header['BSOFF_V3']*60 # 
+        print("Added a telescope boresight offset based on header information")
+    except:
+        pass
+    
     return x_arcsec, y_arcsec
