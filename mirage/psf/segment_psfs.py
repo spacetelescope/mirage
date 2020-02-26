@@ -33,7 +33,7 @@ from mirage.psf.psf_selection import get_library_file
 
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
-                          detectors='all', fov_pixels=1024, overwrite=False):
+                          detectors='all', fov_pixels=1024, boresight=None, overwrite=False):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -58,6 +58,10 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
 
     fov_pixels : int, optional
         Size of the PSF to generate, in pixels. Default is 1024.
+
+    boresight: list, optional
+        Telescope boresight offset in V2/V3 in arcminutes. This offset is added on top of the individual 
+        segment tip/tilt values.
 
     overwrite : bool, optional
             True/False boolean to overwrite the output file if it already
@@ -126,9 +130,14 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 del grid.meta["oversampling"]
                 grid.meta['SEGID'] = (i_segment, 'ID of the mirror segment')
                 grid.meta['SEGNAME'] = (segname, 'Name of the mirror segment')
-                grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in microns')
-                grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in microns')
+                grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
+                grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
 
+                if boresight is not None:
+                    grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
+                    grid.meta['BSOFF_V3'] = (boresight[1], 'Telescope boresight offset in V3 in arcminutes')
+
+                
                 # Write out file
                 filename = 'nircam_{}_{}_fovp{}_samp1_npsf1_seg{:02d}.fits'.format(det.lower(), filt.lower(),
                                                                                    fov_pixels, i_segment)
@@ -259,27 +268,22 @@ def get_segment_offset(segment_number, detector, library_list):
 
     Returns
     -------
-    x_displacement
-        The shift of the segment PSF in NIRCam SW x pixels
+    x_arcsec
+        The x offset of the segment PSF in arcsec
     y_displacement
-        The shift of the segment PSF in NIRCam SW y pixels
+        The y offset of the segment PSF in arcsec
     """
 
     # Verify that the segment number in the header matches the index
     seg_index = int(segment_number) - 1
     header = fits.getheader(library_list[seg_index])
-
+    
     assert int(header['SEGID']) == int(segment_number), \
         "Uh-oh. The segment ID of the library does not match the requested " \
         "segment. The library_list was not assembled correctly."
     xtilt = header['XTILT']
     ytilt = header['YTILT']
     segment = header['SEGNAME'][:2]
-
-    # These conversion factors were empirically calculated by measuring the
-    # relation between tilt and the pixel displacement
-    tilt_to_pixel_slope = 13.4
-    tilt_to_pixel_intercept = 0
 
     control_xaxis_rotations = {
         'A1': 180, 'A2': 120, 'A3': 60, 'A4': 0, 'A5': -60,
@@ -296,18 +300,15 @@ def get_segment_offset(segment_number, detector, library_list):
     tilt_onto_y = (xtilt * np.cos(x_rot_rad)) - (ytilt * np.sin(x_rot_rad))
     tilt_onto_x = (xtilt * np.sin(x_rot_rad)) + (ytilt * np.cos(x_rot_rad))
 
-    # TODO: IS THE SLOPE DIFFERENT FOR LW DETECTORS????
-    x_displacement = -(tilt_onto_x * tilt_to_pixel_slope) + tilt_to_pixel_intercept  # pixels
-    y_displacement = -(tilt_onto_y * tilt_to_pixel_slope) + tilt_to_pixel_intercept  # pixels
+    umrad_to_arcsec = 1e-6 * (180./np.pi) * 3600
+    x_arcsec = -2 * umrad_to_arcsec * tilt_onto_x 
+    y_arcsec = -2 * umrad_to_arcsec * tilt_onto_y 
 
-    # Get the appropriate pixel scale from pysiaf
-    siaf = pysiaf.Siaf('nircam')
-    aperture = siaf['NRC{}_FULL'.format(detector[-2:].upper())]
-    nircam_x_pixel_scale = aperture.XSciScale  # arcsec/pixel
-    nircam_y_pixel_scale = aperture.YSciScale  # arcsec/pixel
-
-    # Convert the pixel displacement into angle
-    x_arcsec = x_displacement * nircam_x_pixel_scale  # arcsec
-    y_arcsec = y_displacement * nircam_y_pixel_scale  # arcsec
-
+    try:
+        x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
+        y_arcsec += header['BSOFF_V3']*60 # 
+        print("Added a telescope boresight offset based on header information")
+    except:
+        pass
+    
     return x_arcsec, y_arcsec
