@@ -60,7 +60,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         Size of the PSF to generate, in pixels. Default is 1024.
 
     boresight: list, optional
-        Telescope boresight offset in V2/V3 in arcminutes. This offset is added on top of the individual 
+        Telescope boresight offset in V2/V3 in arcminutes. This offset is added on top of the individual
         segment tip/tilt values.
 
     overwrite : bool, optional
@@ -132,12 +132,12 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 grid.meta['SEGNAME'] = (segname, 'Name of the mirror segment')
                 grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
                 grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
+                grid.meta['SMPISTON'] = (ote.segment_state[18][4], 'Secondary mirror piston (defocus) in microns')
 
                 if boresight is not None:
                     grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
                     grid.meta['BSOFF_V3'] = (boresight[1], 'Telescope boresight offset in V3 in arcminutes')
 
-                
                 # Write out file
                 filename = 'nircam_{}_{}_fovp{}_samp1_npsf1_seg{:02d}.fits'.format(det.lower(), filt.lower(),
                                                                                    fov_pixels, i_segment)
@@ -270,20 +270,33 @@ def get_segment_offset(segment_number, detector, library_list):
     -------
     x_arcsec
         The x offset of the segment PSF in arcsec
-    y_displacement
+    y_arcsec
         The y offset of the segment PSF in arcsec
     """
 
     # Verify that the segment number in the header matches the index
     seg_index = int(segment_number) - 1
     header = fits.getheader(library_list[seg_index])
-    
+
     assert int(header['SEGID']) == int(segment_number), \
         "Uh-oh. The segment ID of the library does not match the requested " \
         "segment. The library_list was not assembled correctly."
     xtilt = header['XTILT']
     ytilt = header['YTILT']
     segment = header['SEGNAME'][:2]
+    sm_piston = header.get('SMPISTON',0)
+
+    # SM piston has, as one of its effects, adding tilt onto each segment,
+    # along with higher order WFE such as defocus. We model here the effect
+    # of SM piston onto the x and y offsets.
+    # Coefficients determined based on WAS influence function matrix, as
+    # derived from segment control geometries.
+    if segment.startswith('A'):
+        xtilt += sm_piston * 0.010502
+    elif segment.startswith('B'):
+        xtilt += sm_piston * -0.020093
+    elif segment.startswith('C'):
+        ytilt += sm_piston * 0.017761
 
     control_xaxis_rotations = {
         'A1': 180, 'A2': 120, 'A3': 60, 'A4': 0, 'A5': -60,
@@ -301,14 +314,14 @@ def get_segment_offset(segment_number, detector, library_list):
     tilt_onto_x = (xtilt * np.sin(x_rot_rad)) + (ytilt * np.cos(x_rot_rad))
 
     umrad_to_arcsec = 1e-6 * (180./np.pi) * 3600
-    x_arcsec = -2 * umrad_to_arcsec * tilt_onto_x 
-    y_arcsec = -2 * umrad_to_arcsec * tilt_onto_y 
+    x_arcsec = -2 * umrad_to_arcsec * tilt_onto_x
+    y_arcsec = -2 * umrad_to_arcsec * tilt_onto_y
 
     try:
         x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
-        y_arcsec += header['BSOFF_V3']*60 # 
+        y_arcsec += header['BSOFF_V3']*60 #
         print("Added a telescope boresight offset based on header information")
     except:
         pass
-    
+
     return x_arcsec, y_arcsec
