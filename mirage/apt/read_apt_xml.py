@@ -239,7 +239,7 @@ class ReadAPTXML():
                              element.tag.split(self.apt)[1] == 'Visit']
 
             prop_params = [pi_name, prop_id, prop_title, prop_category,
-                           science_category, coordparallel, observation_number, obs_label]
+                           science_category, coordparallel, observation_number, obs_label, targ_name]
 
             proposal_parameter_dictionary = {'PI_Name': pi_name, 'ProposalID': prop_id,
                                              'Title': prop_title,
@@ -436,6 +436,7 @@ class ReadAPTXML():
         dictionary['APTTemplate'].append(tup[23])
         dictionary['Instrument'].append(tup[24])
         dictionary['ObservationName'].append(tup[25])
+        dictionary['TargetID'].append(tup[26])
         return dictionary
 
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary,
@@ -776,7 +777,7 @@ class ReadAPTXML():
 
     def read_commissioning_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label, target_name = prop_params
 
         # dictionary that holds the content of this observation only
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
@@ -789,6 +790,7 @@ class ReadAPTXML():
         typeflag = 'imaging'
         grismval = 'N/A'
         subarr = 'FULL'
+        amps = 4
         pdithtype = 'NONE'
         pdither = '1'
         sdithtype = 'STANDARD'
@@ -835,7 +837,8 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs , j + 1, template_name, 'NIRCAM', obs_label)
+                              i_obs , j + 1, template_name, 'NIRCAM', obs_label,
+                              target_name)
 
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -843,6 +846,9 @@ class ReadAPTXML():
             # Add the number of dithers
             number_of_dithers = int(pdither) * int(sdither)
             exposures_dictionary['number_of_dithers'] = [str(number_of_dithers)] * len(exposures_dictionary['Instrument'])
+
+            # Force 4 amp readout
+            exposures_dictionary['NumOutputs'] = [amps] * len(exposures_dictionary['Instrument'])
 
         # make sure all list items in the returned dictionary have the same length
         for key, item in exposures_dictionary.items():
@@ -855,7 +861,7 @@ class ReadAPTXML():
 
     def read_globalalignment_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label, target_name = prop_params
 
         # dictionary that holds the content of this observation only
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
@@ -929,7 +935,8 @@ class ReadAPTXML():
                           pdither, sdithtype, sdither, sfilt, lfilt,
                           rpatt, grps, ints, short_pupil,
                           long_pupil, grismval, coordparallel,
-                          i_obs, j + 1, template_name, 'NIRCAM', obs_label)
+                          i_obs, j + 1, template_name, 'NIRCAM', obs_label,
+                          target_name)
 
             exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -951,7 +958,7 @@ class ReadAPTXML():
 
     def read_coarsephasing_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label, target_name = prop_params
 
         # dictionary that holds the content of this observation only
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
@@ -1011,7 +1018,8 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs, j + 1, template_name, 'NIRCAM', obs_label)
+                              i_obs, j + 1, template_name, 'NIRCAM', obs_label,
+                              target_name)
 
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -1034,7 +1042,7 @@ class ReadAPTXML():
 
     def read_finephasing_template(self, template, template_name, obs, prop_params):
         # Get proposal parameters
-        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label = prop_params
+        pi_name, prop_id, prop_title, prop_category, science_category, coordparallel, i_obs, obs_label, target_name = prop_params
 
         # dictionary that holds the content of this observation only
         exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
@@ -1169,7 +1177,8 @@ class ReadAPTXML():
                               pdither, sdithtype, sdither, sfilt, lfilt,
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
-                              i_obs, 1, template_name, 'NIRCAM', obs_label)
+                              i_obs, 1, template_name, 'NIRCAM', obs_label,
+                              target_name)
 
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 exposures_dictionary['number_of_dithers'] += str(n_dith)

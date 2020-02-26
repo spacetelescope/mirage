@@ -383,6 +383,12 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                 segment_id = int(segment_id)
                 file_segment_id = int(header['SEGID'])
 
+            if segment_id is None and itm_sim:
+                # If we have an ITM library, then wfe is
+                # meaningless, so force it to match
+                file_wfe = 'predicted'
+                wfe = 'predicted'
+
             # allow check below to pass for FGS
             if instrument.lower() == 'fgs':
                 file_filt = 'N/A'
@@ -396,6 +402,9 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                      and file_filt == filt
                      and file_pupil == pupil
                      and file_wfe == wfe)
+
+            print('File info:', file_inst, file_det, file_filt, file_pupil, file_wfe, file_wfe_grp, wfe_group)
+            print(default_psf)
 
             if not wings and segment_id is None and not itm_sim and default_psf:
                 match = match and file_wfe_grp == wfe_group
