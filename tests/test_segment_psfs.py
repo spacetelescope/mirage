@@ -191,7 +191,7 @@ def test_get_segment_offset_remote(segment_number, correct_offset):
     """
     library_path = TEST_DATA_DIR
     library_list = get_segment_library_list(INSTRUMENT, DETECTOR, FILTER, library_path)
-
+    print('CPL:',segment_number, DETECTOR)
     x_arcsec, y_arcsec = get_segment_offset(segment_number, DETECTOR, library_list)
     assert (x_arcsec, y_arcsec) == correct_offset, 'Incorrect conversion of segment offsets'
 
@@ -223,6 +223,7 @@ def test_get_segment_offset_local_stored(test_library_file):
     """
     # Get test library file
     test_library_dir = os.path.dirname(test_library_file)
+
     seg_id = 12
     segment_file = get_library_file(
         INSTRUMENT, DETECTOR, FILTER, 'CLEAR', '', 0, test_library_dir,
@@ -240,7 +241,7 @@ def test_get_segment_offset_local_stored(test_library_file):
     library_list = [''] * 18
     library_list[11] = segment_file
     x_arcsec, y_arcsec = get_segment_offset(12, DETECTOR, library_list)
-    assert (x_arcsec, y_arcsec) == (7.532331578313969, 8.077137976712994), \
+    assert (x_arcsec, y_arcsec) == (7.412675266715986, 7.905276016530719), \
         'Incorrect conversion of segment offsets'
 
 
