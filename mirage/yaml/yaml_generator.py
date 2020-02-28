@@ -1629,9 +1629,9 @@ class SimInput:
             The list of paths to the PSF library(ies), with a length
             equal to the number of activities in the APT program.
         """
-        exp_ids = sorted(list(set(self.info['exposure'])))
+        exp_ids = sorted(list(set(self.info['entry_number'])))
         exp_id_indices = []
-        for exp_id in self.info['exposure']:
+        for exp_id in self.info['entry_number']:
             exp_id_indices.append(exp_ids.index(exp_id))
         n_activities = len(exp_ids)
 

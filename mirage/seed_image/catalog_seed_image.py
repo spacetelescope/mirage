@@ -2338,8 +2338,12 @@ class Catalog_seed():
 
             # Translate back to RA/Dec and save
             ra, dec = pysiaf.utils.rotations.pointing(attitude_ref, v2, v3)
-            # TODO: need to be smarter about which magnitude to use here
-            shifted_lines.add_row([ra, dec, line['magnitude']])
+
+            mag_cols = [col for col in line.colnames if 'magnitude' in col]
+            collist = [line['index']]
+            collist.extend([ra, dec])
+            collist.extend(line[mag_cols])
+            shifted_lines.add_row(collist)
 
         return shifted_lines
 
