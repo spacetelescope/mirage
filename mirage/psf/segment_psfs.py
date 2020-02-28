@@ -33,7 +33,8 @@ from mirage.psf.psf_selection import get_library_file
 
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
-                          detectors='all', fov_pixels=1024, boresight=None, overwrite=False):
+                          detectors='all', fov_pixels=1024, boresight=None, overwrite=False,
+                          segment=None):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -64,9 +65,11 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         segment tip/tilt values.
 
     overwrite : bool, optional
-            True/False boolean to overwrite the output file if it already
-            exists. Default is True.
+        True/False boolean to overwrite the output file if it already
+        exists. Default is True.
 
+    segment : int or list
+        The mirror segment number or list of numbers for which to generate PSF libraries
     """
     # Create webbpsf NIRCam instance
     nc = webbpsf.NIRCam()
@@ -89,9 +92,18 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     elif not isinstance(detectors, list):
         raise TypeError('Please define detectors as a string or list, not {}'.format(type(detectors)))
 
+    # Make sure segment is a list
+    nsegments = list(range(18))
+    if segment is not None:
+        if isinstance(segment, int):
+            nsegments = [segment]
+        elif isinstance(segment, list):
+            nsegments = segment
+        else:
+            raise ValueError("segment keyword must be either an integer or list of integers.")
 
-    # Create PSF grids for all segments, detectors, and filters
-    for i in range(18):
+    # Create PSF grids for all requested segments, detectors, and filters
+    for i in nsegments:
         start_time = time.time()
         i_segment = i + 1
         segname = webbpsf.webbpsf_core.segname(i_segment)
