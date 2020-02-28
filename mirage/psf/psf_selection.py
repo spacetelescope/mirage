@@ -245,8 +245,6 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
             print("OSError: Unable to open {}.".format(library_file))
     else:
         # Handle input ITM images
-        #itm_sim = fits.getval(library_file, 'ORIGIN')
-        #if itm_sim:
         library = _load_itm_library(library_file)
 
 
