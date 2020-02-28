@@ -1641,7 +1641,6 @@ class SimInput:
             paths_out = []
             for instrument in self.info['Instrument']:
                 default_path = self.global_psfpath[instrument.lower()]
-                # default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
                 paths_out.append(default_path)
             return paths_out
 
