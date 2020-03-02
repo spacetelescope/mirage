@@ -34,7 +34,7 @@ from mirage.psf.psf_selection import get_library_file
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
                           detectors='all', fov_pixels=1024, boresight=None, overwrite=False,
-                          segment=None):
+                          segment=None, jitter=None):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -70,6 +70,10 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
 
     segment : int or list
         The mirror segment number or list of numbers for which to generate PSF libraries
+
+    jitter : float
+        Jitter value to use in the call to webbpsf when generating PSF library. If None
+        (default) the nominal jitter (7mas radial) is used.
     """
     # Create webbpsf NIRCam instance
     nc = webbpsf.NIRCam()
@@ -101,6 +105,15 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
             nsegments = segment
         else:
             raise ValueError("segment keyword must be either an integer or list of integers.")
+
+    # Allow for non-nominal jitter values
+    if jitter is not None:
+        if isinstance(jitter, float):
+            nc.options['jitter'] = 'gaussian'
+            nc.options['jitter_sigma'] = jitter
+            print('Adding jitter', jitter)
+        else:
+            print("Wrong input to jitter, assuming defaults")
 
     # Create PSF grids for all requested segments, detectors, and filters
     for i in nsegments:
