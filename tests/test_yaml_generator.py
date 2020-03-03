@@ -308,6 +308,12 @@ def test_get_psf_path():
     yam.info['act_id'] = act_ids
     yam.info['Instrument'] = ['NIRCam'] * n_activities
 
+    # Put the entry_number entry of yam.apt_xml_dict into yam.info.
+    # Typically this is done when running create_inputs() in the
+    # yaml_generator. This step is skipped here to save time and
+    # avoid having to deal with lots of output files.
+    yam.info['entry_number'] = yam.apt_xml_dict['entry_number']
+
     # Test for a default path
     paths_out = yam.get_psf_path()
     assert len(paths_out) == n_activities,\
@@ -329,14 +335,15 @@ def test_get_psf_path():
         yam.get_psf_path()
         assert 'Please provide the psf_paths in the form of a list of strings ' \
                'with a length equal to the number of activities in the APT ' \
-               'program (101), not equal to 99.' in e, \
+               'program (103), not equal to 99.' in e, \
             'Failed to reject psf_path of incorrect length.'
 
     # Test for a list of paths of correct length
-    list_101_paths = [__location__] * 50 + [os.path.dirname(__location__)] * 51
-    yam.psf_paths = list_101_paths
+    list_paths = [__location__] * 9 + [os.path.dirname(__location__)] * 9
+    yam.psf_paths = list_paths
     paths_out = yam.get_psf_path()
-    assert paths_out == sorted(list_101_paths),\
+
+    assert paths_out == list_paths,\
         'List of PSF paths not properly assigned.'
 
     # Test for a completely invalid path

@@ -234,7 +234,7 @@ def get_catalog(target_coords, output_directory, search_radius=15 * u.arcmin):
 
 
 def get_all_catalogs(xml_file, out_dir='./'):
-    '''Query WISE and 2MASS catalogs and write out long- and shortwave
+    '''Query WISE and 2MASS catalogs and write out
     catalog files for each target in the provided APT proposal
 
     Parameters
