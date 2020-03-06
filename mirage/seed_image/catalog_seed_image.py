@@ -4251,7 +4251,7 @@ class Catalog_seed():
                 elif self.params['Inst']['instrument'].lower() == 'niriss':
                     gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
                 elif self.params['Inst']['instrument'].lower() == 'fgs':
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector]
+                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector.lower()]
 
                 if self.params['simSignals']['use_dateobs_for_background']:
                     bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
