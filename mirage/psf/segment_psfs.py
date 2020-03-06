@@ -339,8 +339,8 @@ def get_segment_offset(segment_number, detector, library_list):
     tilt_onto_x = (xtilt * np.sin(x_rot_rad)) + (ytilt * np.cos(x_rot_rad))
 
     umrad_to_arcsec = 1e-6 * (180./np.pi) * 3600
-    x_arcsec = -2 * umrad_to_arcsec * tilt_onto_x
-    y_arcsec = -2 * umrad_to_arcsec * tilt_onto_y
+    x_arcsec = 2 * umrad_to_arcsec * tilt_onto_x
+    y_arcsec = 2 * umrad_to_arcsec * tilt_onto_y
 
     try:
         x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
