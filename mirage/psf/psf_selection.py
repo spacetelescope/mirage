@@ -235,16 +235,19 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
 
     print("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
 
-    try:
-        library = to_griddedpsfmodel(library_file)
-    except KeyError:
-        # Handle input ITM images
-        itm_sim = fits.getval(library_file, 'ORIGIN')
-        if itm_sim:
-            library = _load_itm_library(library_file)
+    lib_head = fits.getheader(library_file)
+    itm_sim = lib_head.get('ORIGIN', '') == 'ITM'
 
-    except OSError:
-        print("OSError: Unable to open {}.".format(library_file))
+    if not itm_sim:
+        try:
+            library = to_griddedpsfmodel(library_file)
+        except OSError:
+            print("OSError: Unable to open {}.".format(library_file))
+    else:
+        # Handle input ITM images
+        library = _load_itm_library(library_file)
+
+
     return library
 
 
@@ -382,6 +385,12 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             if segment_id is not None:
                 segment_id = int(segment_id)
                 file_segment_id = int(header['SEGID'])
+
+            if segment_id is None and itm_sim:
+                # If we have an ITM library, then wfe is
+                # meaningless, so force it to match
+                file_wfe = 'predicted'
+                wfe = 'predicted'
 
             # allow check below to pass for FGS
             if instrument.lower() == 'fgs':
@@ -522,9 +531,8 @@ def _load_itm_library(library_file):
     data = fits.getdata(library_file)
     hdr = fits.getheader(library_file)
     if data.shape == (2048, 2048):
-        # TODO: Remove when Shannon adds her 3rd dimension check
-        # Add (empty) 3rd dimension to the data
-        data = np.array([data])
+        # Normalize the data
+        data /= np.sum(data)
 
         # Add PSF location and oversampling keywords
         hdr['DET_YX0'] = ('(1023, 1023)', "The #0 PSF's (y,x) detector pixel position")

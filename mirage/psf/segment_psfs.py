@@ -33,7 +33,8 @@ from mirage.psf.psf_selection import get_library_file
 
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
-                          detectors='all', fov_pixels=1024, boresight=None, overwrite=False):
+                          detectors='all', fov_pixels=1024, boresight=None, overwrite=False,
+                          segment=None, jitter=None):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -60,13 +61,19 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         Size of the PSF to generate, in pixels. Default is 1024.
 
     boresight: list, optional
-        Telescope boresight offset in V2/V3 in arcminutes. This offset is added on top of the individual 
+        Telescope boresight offset in V2/V3 in arcminutes. This offset is added on top of the individual
         segment tip/tilt values.
 
     overwrite : bool, optional
-            True/False boolean to overwrite the output file if it already
-            exists. Default is True.
+        True/False boolean to overwrite the output file if it already
+        exists. Default is True.
 
+    segment : int or list
+        The mirror segment number or list of numbers for which to generate PSF libraries
+
+    jitter : float
+        Jitter value to use in the call to webbpsf when generating PSF library. If None
+        (default) the nominal jitter (7mas radial) is used.
     """
     # Create webbpsf NIRCam instance
     nc = webbpsf.NIRCam()
@@ -89,9 +96,27 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     elif not isinstance(detectors, list):
         raise TypeError('Please define detectors as a string or list, not {}'.format(type(detectors)))
 
+    # Make sure segment is a list
+    nsegments = list(range(18))
+    if segment is not None:
+        if isinstance(segment, int):
+            nsegments = [segment]
+        elif isinstance(segment, list):
+            nsegments = segment
+        else:
+            raise ValueError("segment keyword must be either an integer or list of integers.")
 
-    # Create PSF grids for all segments, detectors, and filters
-    for i in range(18):
+    # Allow for non-nominal jitter values
+    if jitter is not None:
+        if isinstance(jitter, float):
+            nc.options['jitter'] = 'gaussian'
+            nc.options['jitter_sigma'] = jitter
+            print('Adding jitter', jitter)
+        else:
+            print("Wrong input to jitter, assuming defaults")
+
+    # Create PSF grids for all requested segments, detectors, and filters
+    for i in nsegments:
         start_time = time.time()
         i_segment = i + 1
         segname = webbpsf.webbpsf_core.segname(i_segment)
@@ -132,12 +157,12 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 grid.meta['SEGNAME'] = (segname, 'Name of the mirror segment')
                 grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
                 grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
+                grid.meta['SMPISTON'] = (ote.segment_state[18][4], 'Secondary mirror piston (defocus) in microns')
 
                 if boresight is not None:
                     grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
                     grid.meta['BSOFF_V3'] = (boresight[1], 'Telescope boresight offset in V3 in arcminutes')
 
-                
                 # Write out file
                 filename = 'nircam_{}_{}_fovp{}_samp1_npsf1_seg{:02d}.fits'.format(det.lower(), filt.lower(),
                                                                                    fov_pixels, i_segment)
@@ -270,20 +295,33 @@ def get_segment_offset(segment_number, detector, library_list):
     -------
     x_arcsec
         The x offset of the segment PSF in arcsec
-    y_displacement
+    y_arcsec
         The y offset of the segment PSF in arcsec
     """
 
     # Verify that the segment number in the header matches the index
     seg_index = int(segment_number) - 1
     header = fits.getheader(library_list[seg_index])
-    
+
     assert int(header['SEGID']) == int(segment_number), \
         "Uh-oh. The segment ID of the library does not match the requested " \
         "segment. The library_list was not assembled correctly."
     xtilt = header['XTILT']
     ytilt = header['YTILT']
     segment = header['SEGNAME'][:2]
+    sm_piston = header.get('SMPISTON',0)
+
+    # SM piston has, as one of its effects, adding tilt onto each segment,
+    # along with higher order WFE such as defocus. We model here the effect
+    # of SM piston onto the x and y offsets.
+    # Coefficients determined based on WAS influence function matrix, as
+    # derived from segment control geometries.
+    if segment.startswith('A'):
+        xtilt += sm_piston * 0.010502
+    elif segment.startswith('B'):
+        xtilt += sm_piston * -0.020093
+    elif segment.startswith('C'):
+        ytilt += sm_piston * 0.017761
 
     control_xaxis_rotations = {
         'A1': 180, 'A2': 120, 'A3': 60, 'A4': 0, 'A5': -60,
@@ -301,14 +339,14 @@ def get_segment_offset(segment_number, detector, library_list):
     tilt_onto_x = (xtilt * np.sin(x_rot_rad)) + (ytilt * np.cos(x_rot_rad))
 
     umrad_to_arcsec = 1e-6 * (180./np.pi) * 3600
-    x_arcsec = -2 * umrad_to_arcsec * tilt_onto_x 
-    y_arcsec = -2 * umrad_to_arcsec * tilt_onto_y 
+    x_arcsec = 2 * umrad_to_arcsec * tilt_onto_x
+    y_arcsec = 2 * umrad_to_arcsec * tilt_onto_y
 
     try:
         x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
-        y_arcsec += header['BSOFF_V3']*60 # 
+        y_arcsec += header['BSOFF_V3']*60 #
         print("Added a telescope boresight offset based on header information")
     except:
         pass
-    
+
     return x_arcsec, y_arcsec

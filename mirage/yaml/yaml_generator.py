@@ -1629,11 +1629,11 @@ class SimInput:
             The list of paths to the PSF library(ies), with a length
             equal to the number of activities in the APT program.
         """
-        act_ids = sorted(list(set(self.info['act_id'])))
-        act_id_indices = []
-        for act_id in self.info['act_id']:
-            act_id_indices.append(act_ids.index(act_id))
-        n_activities = len(act_ids)
+        exp_ids = sorted(list(set(self.info['entry_number'])))
+        exp_id_indices = []
+        for exp_id in self.info['entry_number']:
+            exp_id_indices.append(exp_ids.index(exp_id))
+        n_activities = len(exp_ids)
 
         # If no path explicitly provided, use the default path.
         if self.psf_paths is None:
@@ -1641,7 +1641,6 @@ class SimInput:
             paths_out = []
             for instrument in self.info['Instrument']:
                 default_path = self.global_psfpath[instrument.lower()]
-                # default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
                 paths_out.append(default_path)
             return paths_out
 
@@ -1659,7 +1658,7 @@ class SimInput:
 
         elif isinstance(self.psf_paths, list):
             print('Using provided PSF paths.')
-            paths_out = [sorted(self.psf_paths)[i] for i in act_id_indices]  # Why is this sorted..?? Seg number?
+            paths_out = [self.psf_paths[i] for i in exp_id_indices]
             return paths_out
 
         elif not isinstance(self.psf_paths, list) or not isinstance(self.psf_paths, str):
