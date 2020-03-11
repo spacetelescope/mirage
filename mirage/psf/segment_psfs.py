@@ -112,6 +112,13 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
             nc.options['jitter'] = 'gaussian'
             nc.options['jitter_sigma'] = jitter
             print('Adding jitter', jitter)
+        elif isinstance(jitter, str):
+            allowed_strings = ['PCS=Coarse_Like_ITM', 'PCS=Coarse']
+            if jitter in allowed_strings:
+                nc.options['jitter'] = jitter
+                print('Adding {} jitter'.format(jitter))
+            else:
+                print("Invalid jitter string. Must be one of: {}. Ignoring and using defaults.".format(allowed_strings))
         else:
             print("Wrong input to jitter, assuming defaults")
 

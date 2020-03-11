@@ -4,7 +4,14 @@ UNRELEASED:
 Commissioning
 -------------
 
-Lajoie implemented an optional telescope boresight offset and fixed the tilt scaling issue seen between SW and LW data when using segment_psfs.
+Allow use of strings for jitter input in the webbpsf call when generating PSF libraries for WFSC. A recent update (beyond 0.9.0) to webbpsf allows
+for this input. (#464)
+
+Updated the unstacked mirror and nonnominal PSF notebooks with bug fixes and improvements to support upcoming rehearsal. New notebook dealing with
+unstacked mirrors added to the repo. Updates made to get_catalog.py, psf_selection.py, yaml_generator.py and catalog_seed_image.py to support the
+unique PSF libraries used by WFSC simulations. (#463)
+
+Lajoie implemented an optional telescope boresight offset and fixed the tilt scaling issue seen between SW and LW data when using segment_psfs. (#462)
 
 
 1.3.3
