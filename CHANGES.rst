@@ -1,6 +1,12 @@
 UNRELEASED:
 ===========
 
+Metadata
+--------
+
+Populate APERNAME keyword in headers of output files. This keyword is not used by the jwst calibration pipeline later, but was requested by
+people working on WFSC simulations for their data analyses. (#467)
+
 Commissioning
 -------------
 
