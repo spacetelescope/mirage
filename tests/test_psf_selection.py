@@ -114,6 +114,7 @@ def test_get_segment_psf_library_file(test_segment_psf_library_file):
         assert "No PSF library file found matching requested parameters" in e
 
 
+@pytest.mark.skip(reason='Travis and Box not getting along')
 def test_load_itm_library(itm_file):
     """Test the loading of a GriddedPSFModel object from an ITM FITS file
 
