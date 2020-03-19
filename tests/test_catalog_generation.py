@@ -89,17 +89,6 @@ def test_2mass_catalog_generation():
 def test_catalog_combination():
     """Test the combination of two existing catalogs into one
     """
-    #two_mass, query_results = create_catalog.get_2MASS_ptsrc_catalog(80.4, -69.8, 120)
-    #fake_nrc_mags = np.zeros(len(two_mass.ra)) + 16.5
-    #two_mass.add_magnitude_column(fake_nrc_mags, instrument='nircam', filter_name='f480m',
-    #                              magnitude_system='vegamag')
-    #orig_two_mass = copy.deepcopy(two_mass)
-
-    #two_mass2, query_results2 = create_catalog.get_2MASS_ptsrc_catalog(70.4, -69.8, 120)
-    #fake_nrc_mags = np.zeros(len(two_mass2.ra)) + 12.12
-    #two_mass2.add_magnitude_column(fake_nrc_mags, instrument='niriss', filter_name='f200w',
-    #                               magnitude_system='vegamag')
-
     test_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/TwoMass_test.cat')
     input_cat = ascii.read(test_file)
 
@@ -119,26 +108,12 @@ def test_catalog_combination():
     test_cat_1.add_catalog(test_cat_2)
 
 
-    #two_mass.add_catalog(two_mass2)
-
-    #two_mass2_length = len(two_mass2.ra)
-    #orig_two_mass_length = len(orig_two_mass.ra)
-
     cat2_length = len(test_cat_2.ra)
 
     assert all(test_cat_1.ra[(0-cat2_length):] == test_cat_2.ra)
     assert all(test_cat_1.dec[(0-cat2_length):] == test_cat_2.dec)
     assert all(test_cat_1.ra[0: orig_length] == orig_cat_1.ra)
     assert all(test_cat_1.dec[0: orig_length] == orig_cat_1.dec)
-
-    #assert all(two_mass.ra[(0-two_mass2_length):] == two_mass2.ra)
-    #assert all(two_mass.dec[(0-two_mass2_length):] == two_mass2.dec)
-    #assert all(two_mass.ra[0: orig_two_mass_length] == orig_two_mass.ra)
-    #assert all(two_mass.dec[0: orig_two_mass_length] == orig_two_mass.dec)
-
-    #for key in two_mass.magnitudes.keys():
-    #    assert key in ['2mass_j_m_magnitude', '2mass_h_m_magnitude', '2mass_k_m_magnitude',
-    #                   'nircam_f480m_magnitude', 'niriss_f200w_magnitude']
 
 
 @pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
