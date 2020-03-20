@@ -2773,6 +2773,8 @@ class Observation():
         outModel.meta.program.science_category = self.params['Output']['Science_category']
         outModel.meta.program.continuation_id = 0
 
+        outModel.meta.aperture.name = self.params['Readout']['array_name']
+
         outModel.meta.target.catalog_name = 'UNKNOWN'
         outModel.meta.target.ra = self.params['Output']['target_ra']
         outModel.meta.target.dec = self.params['Output']['target_dec']
@@ -3086,6 +3088,8 @@ class Observation():
         outModel[0].header['SUBCAT'] = 'UNKNOWN'
         outModel[0].header['SCICAT'] = self.params['Output']['Science_category']
         outModel[0].header['CONT_ID'] = 0
+
+        outModel[0].header['APERNAME'] = self.params['Readout']['array_name']
 
         outModel[0].header['TARGNAME'] = 'UNKNOWN'
         outModel[0].header['TARGPROP'] = self.params['Output']['target_name']
