@@ -133,7 +133,7 @@ class DarkPrep():
         if (self.params['Readout']['ngroup'] > maxgroups):
             print(("WARNING: {} is limited to a maximum of {} groups. Proceeding with ngroup = {}."
                    .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
-            self.params['Readout']['readpatt'] = maxgroups
+            self.params['Readout']['ngroup'] = maxgroups
 
         # Check for entries in the parameter file that are None or blank,
         # indicating the step should be skipped. Create a dictionary of steps
@@ -851,7 +851,35 @@ class DarkPrep():
                         # to avoid confusion
                         self.linDark.zeroframe = np.zeros(self.linDark.zeroframe.shape)
                     else:
-                        self.zeroModel = None
+                        # In this case, the input dark has no zero frame data.
+                        # Let's add an (admittedly crude) approximation. Mirage
+                        # will use this to create the zeroframe in the simulated
+                        # data. The calibration pipeline does not currently do
+                        # anything with the zeroframe. In the future it will be
+                        # be used to determine signal rate for pixels that are
+                        # saturated in all groups. Our approximation here will be
+                        # the signal in the first group of the dark data normalized
+                        # to the exposure time of a single frame. This block of the
+                        # code should only be run if the input dark is a non-RAPID
+                        # dark from ground testing (i.e. a converted FITSWriter file)
+                        print(('Non-RAPID input dark with no zeroframe extension.'
+                               ' Creating an approximation.'))
+                        self.zeroModel = read_fits.Read_fits()
+                        nint, ng, ny, nx = self.dark.data.shape
+                        frametime = self.linDark.header['TFRAME']
+                        grouptime = self.linDark.header['TGROUP']
+                        zframe = self.linDark.data[0, 0, :, :] / grouptime * frametime
+
+                        # Make 3D, replicate the zeroframe to cover the needed number
+                        # of integrations
+                        self.zeroModel.data = np.expand_dims(zframe, axis=0)
+                        self.zeroModel.sbAndRefpix = np.expand_dims(self.linDark.sbAndRefpix[0, 0, :, :], axis=0)
+                        for i in range(2, nint+1):
+                            self.zeroModel.data = np.vstack((self.zeroModel.data, np.expand_dims(zframe, axis=0)))
+                            self.zeroModel.sbAndRefpix = np.vstack((self.zeroModel.sbAndRefpix, np.expand_dims(self.linDark.sbAndRefpix[0, 0, :, :], axis=0)))
+
+                        self.zeroModel.header = self.linDark.header
+                        self.zeroModel.header['NGROUPS'] = 1
 
                     # Now crop self.linDark, self.dark, and zeroModel
                     # to requested subarray
