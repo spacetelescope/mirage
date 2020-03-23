@@ -35,6 +35,8 @@ class Read_fits():
         self.translate['NFRAMES'] = 'exposure.nframes'
         self.translate['NSKIP'] = 'exposure.nskip'
         self.translate['GROUPGAP'] = 'exposure.groupgap'
+        self.translate['TFRAME'] = 'exposure.frame_time'
+        self.translate['TGROUP'] = 'exposure.group_time'
         self.translate['EXP_TYPE'] = 'exposure.type'
         self.translate['DETECTOR'] = 'instrument.detector'
         self.translate['INSTRUME'] = 'instrument.name'

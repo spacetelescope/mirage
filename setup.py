@@ -90,7 +90,7 @@ setup(
     setup_requires=['setuptools_scm'],
     install_requires=[
         'asdf>=2.1.0',
-        'astropy>=3.2.1',
+        'astropy>=4.0',
         'astroquery>=0.3.8',
         'batman-package',
         'crds>=7.4.1',
