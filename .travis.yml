@@ -8,9 +8,13 @@ compiler: gcc
 # Setting sudo to false opts in to Travis-CI container-based builds.
 sudo: false
 
+python:
+    - 3.5
+    - 3.6
+    - 3.7
+
 env:
     global:
-        - PYTHON_VERSION=3.6
         - EVENT_TYPE='push pull_request'
 
 matrix:

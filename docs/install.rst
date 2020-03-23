@@ -15,7 +15,7 @@ These are: **jwst**, which is the JWST calibration pipeline software, and two pa
 
 ::
 
-    conda create -n mirage python=3.6 -y
+    conda create -n mirage python=3.7 -y
     conda activate mirage
     pip install healpy==1.12.5
     pip install mirage
@@ -47,14 +47,14 @@ Installation can then be done via pip, which uses setup.py, or using the conda e
 To install using pip and setup.py:
 Create and activate a new environment. In this example we call the environment "mirage". Then move into the mirage directory, and install Mirage into the new environment::
 
-    conda create -n mirage python=3.6 -y
+    conda create -n mirage python=3.7 -y
     conda activate mirage
     cd mirage
     pip install healpy==1.12.5
     pip install .
     pip install git+https://github.com/npirzkal/GRISMCONF#egg=grismconf
     pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
-    pip install git+https://github.com/spacetelescope/jwst@0.14.2
+    pip install git+https://github.com/spacetelescope/jwst#0.15.1
 
 .. tip::
     Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
@@ -66,7 +66,7 @@ Create and activate a new environment. In this example we call the environment "
 Or, to install using the environment file, again creating an environment called "mirage"::
 
     cd mirage
-    conda env create -f environment.yml --name mirage python=3.6
+    conda env create -f environment.yml --name mirage python=3.7
     conda activate mirage
     pip install .
 
