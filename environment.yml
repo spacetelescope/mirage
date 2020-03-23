@@ -4,7 +4,7 @@ channels:
 - defaults
 dependencies:
 - asdf>=2.1.0
-- astropy==3.2.1
+- astropy>=4.0
 - astroquery>=0.3.8
 - crds>=7.4.1
 - gwcs>=0.11
