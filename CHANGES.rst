@@ -1,6 +1,11 @@
 UNRELEASED:
 ===========
 
+Python version
+--------------
+
+Update environment.yml file and installation documentation to show that Mirage works with python 3.7 (as well as 3.6 and 3.5) (#471)
+
 Dark Current
 ------------
 
