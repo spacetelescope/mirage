@@ -1,6 +1,13 @@
 UNRELEASED:
 ===========
 
+Dark Current
+------------
+
+Update dark_prep.py to allow the input of non-RAPID dark current exposures with no zeroframe extension. In this case, Mirage will construct
+an approximate zeroframe extension and add it in to the exposure. This situation should only occur in the case where older ground-testing
+darks that have been converted from FITS Writer format are used. (#470)
+
 Metadata
 --------
 
