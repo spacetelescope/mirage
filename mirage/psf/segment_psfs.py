@@ -29,12 +29,86 @@ import webbpsf
 from webbpsf.gridded_library import CreatePSFLibrary
 from webbpsf.utils import to_griddedpsfmodel
 
+import multiprocessing
+import functools
+
 from mirage.psf.psf_selection import get_library_file
+
+
+def _generate_psfs_for_one_segment(nrc_inst, ote, segment_tilts, out_dir, boresight, lib, detectors, filters, fov_pixels, nlambda, overwrite, i):
+    """
+    Helper function for parallelized segment PSF calculations
+
+	For use with multiprocessing.Pool, the iterable argument must be in the last position
+
+	See doc string of generate_segment_psfs for input parameter definitions.
+
+	"""
+    i_segment = i + 1
+
+    segname = webbpsf.webbpsf_core.segname(i_segment)
+    print('GENERATING SEGMENT {} DATA'.format(segname))
+
+    det_filt_match = False
+    for det in sorted(detectors):
+        for filt in list(filters):
+            # Make sure the detectors and filters match
+            if (det in lib.nrca_short_detectors and filt not in lib.nrca_short_filters) \
+                    or (det in lib.nrca_long_detectors and filt not in lib.nrca_long_filters):
+                continue
+
+            det_filt_match = True
+
+            # Define the filter and detector
+            nrc_inst.filter = filt
+            nrc_inst.detector = det
+
+            # Restrict the pupil to the current segment
+            pupil = webbpsf.webbpsf_core.one_segment_pupil(i_segment)
+            ote.amplitude = pupil[0].data
+            nrc_inst.pupil = ote
+
+            # Generate the PSF grid
+            # NOTE: we are choosing a polychromatic simulation here to better represent the
+            # complexity of simulating unstacked PSFs. See the WebbPSF website for more details.
+            grid = nrc_inst.psf_grid(num_psfs=1, save=False, all_detectors=False,
+                               use_detsampled_psf=True, fov_pixels=fov_pixels,
+                               oversample=1, overwrite=overwrite, add_distortion=False,
+                               nlambda=nlambda, verbose=False)
+
+            # Remove and add header keywords about segment
+            del grid.meta["grid_xypos"]
+            del grid.meta["oversampling"]
+            grid.meta['SEGID'] = (i_segment, 'ID of the mirror segment')
+            grid.meta['SEGNAME'] = (segname, 'Name of the mirror segment')
+            grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
+            grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
+            grid.meta['SMPISTON'] = (ote.segment_state[18][4], 'Secondary mirror piston (defocus) in microns')
+
+            if boresight is not None:
+                grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
+                grid.meta['BSOFF_V3'] = (boresight[1], 'Telescope boresight offset in V3 in arcminutes')
+
+            # Write out file
+            filename = 'nircam_{}_{}_fovp{}_samp1_npsf1_seg{:02d}.fits'.format(det.lower(), filt.lower(),
+                                                                               fov_pixels, i_segment)
+            filepath = os.path.join(out_dir, filename)
+            primaryhdu = fits.PrimaryHDU(grid.data)
+            tuples = [(a, b, c) for (a, (b, c)) in sorted(grid.meta.items())]
+            primaryhdu.header.extend(tuples)
+            hdu = fits.HDUList(primaryhdu)
+            hdu.writeto(filepath, overwrite=overwrite)
+            print('Saved gridded library file to {}'.format(filepath))
+
+    if det_filt_match == False:
+        raise ValueError('No matching filters and detectors given - all '
+                         'filters are longwave but detectors are shortwave, '
+                         'or vice versa.')
 
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
                           detectors='all', fov_pixels=1024, boresight=None, overwrite=False,
-                          segment=None, jitter=None):
+                          segment=None, jitter=None, nlambda=10):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -74,6 +148,9 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     jitter : float
         Jitter value to use in the call to webbpsf when generating PSF library. If None
         (default) the nominal jitter (7mas radial) is used.
+
+    nlambda : int
+        Number of wavelengths to use for polychromatic PSF calculations.
     """
     # Create webbpsf NIRCam instance
     nc = webbpsf.NIRCam()
@@ -97,12 +174,12 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         raise TypeError('Please define detectors as a string or list, not {}'.format(type(detectors)))
 
     # Make sure segment is a list
-    nsegments = list(range(18))
+    segments = list(range(18))
     if segment is not None:
         if isinstance(segment, int):
-            nsegments = [segment]
+            segments = [segment]
         elif isinstance(segment, list):
-            nsegments = segment
+            segments = segment
         else:
             raise ValueError("segment keyword must be either an integer or list of integers.")
 
@@ -122,71 +199,23 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         else:
             print("Wrong input to jitter, assuming defaults")
 
+	# Set up multiprocessing pool
+    nproc = min(multiprocessing.cpu_count() // 2,18)      # number of procs could be optimized further here. TBD.
+                                                  # some parts of PSF calc are themselves parallelized so using
+                                                  # fewer processes than number of cores is likely reasonable.
+    pool = multiprocessing.Pool(processes=nproc)
+    print(f"Will perform parallelized calculation using {nproc} processes")
+
+    # Set up a function instance with most arguments fixed
+    calc_psfs_for_one_segment = functools.partial(_generate_psfs_for_one_segment, nc, ote, segment_tilts, out_dir, boresight, lib, detectors,
+                                              filters, fov_pixels, nlambda, overwrite)
+
     # Create PSF grids for all requested segments, detectors, and filters
-    for i in nsegments:
-        start_time = time.time()
-        i_segment = i + 1
-        segname = webbpsf.webbpsf_core.segname(i_segment)
-        print('GENERATING SEGMENT {} DATA'.format(segname))
-        print('------------------------------')
-
-        det_filt_match = False
-        for det in sorted(detectors):
-            for filt in list(filters):
-                # Make sure the detectors and filters match
-                if (det in lib.nrca_short_detectors and filt not in lib.nrca_short_filters) \
-                        or (det in lib.nrca_long_detectors and filt not in lib.nrca_long_filters):
-                    continue
-
-                det_filt_match = True
-
-                # Define the filter and detector
-                nc.filter = filt
-                nc.detector = det
-
-                # Restrict the pupil to the current segment
-                pupil = webbpsf.webbpsf_core.one_segment_pupil(i_segment)
-                ote.amplitude = pupil[0].data
-                nc.pupil = ote
-
-                # Generate the PSF grid
-                # NOTE: we are choosing a polychromatic simulation here to better represent the
-                # complexity of simulating unstacked PSFs. See the WebbPSF website for more details.
-                grid = nc.psf_grid(num_psfs=1, save=False, all_detectors=False,
-                                   use_detsampled_psf=True, fov_pixels=fov_pixels,
-                                   oversample=1, overwrite=overwrite, add_distortion=False,
-                                   nlambda=10)
-
-                # Remove and add header keywords about segment
-                del grid.meta["grid_xypos"]
-                del grid.meta["oversampling"]
-                grid.meta['SEGID'] = (i_segment, 'ID of the mirror segment')
-                grid.meta['SEGNAME'] = (segname, 'Name of the mirror segment')
-                grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
-                grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
-                grid.meta['SMPISTON'] = (ote.segment_state[18][4], 'Secondary mirror piston (defocus) in microns')
-
-                if boresight is not None:
-                    grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
-                    grid.meta['BSOFF_V3'] = (boresight[1], 'Telescope boresight offset in V3 in arcminutes')
-
-                # Write out file
-                filename = 'nircam_{}_{}_fovp{}_samp1_npsf1_seg{:02d}.fits'.format(det.lower(), filt.lower(),
-                                                                                   fov_pixels, i_segment)
-                filepath = os.path.join(out_dir, filename)
-                primaryhdu = fits.PrimaryHDU(grid.data)
-                tuples = [(a, b, c) for (a, (b, c)) in sorted(grid.meta.items())]
-                primaryhdu.header.extend(tuples)
-                hdu = fits.HDUList(primaryhdu)
-                hdu.writeto(filepath, overwrite=overwrite)
-                print('Saved gridded library file to {}'.format(filepath))
-
-        if det_filt_match == False:
-            raise ValueError('No matching filters and detectors given - all '
-                             'filters are longwave but detectors are shortwave, '
-                             'or vice versa.')
-
-        print('\nElapsed time:', time.time() - start_time, '\n')
+    pool_start_time = time.time()
+    results = pool.map(calc_psfs_for_one_segment, segments)
+    pool_stop_time = time.time()
+    print('\n=========== Elapsed time (all segments):', pool_stop_time - pool_start_time, '============\n')
+    pool.close()
 
 
 def get_gridded_segment_psf_library_list(instrument, detector, filtername,
