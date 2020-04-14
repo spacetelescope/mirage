@@ -108,7 +108,7 @@ def _generate_psfs_for_one_segment(nrc_inst, ote, segment_tilts, out_dir, boresi
 
 def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'],
                           detectors='all', fov_pixels=1024, boresight=None, overwrite=False,
-                          segment=None, jitter=None, nlambda=10):
+                          segment=None, jitter=None, nlambda=10, nrc_options=None):
     """Generate NIRCam PSF libraries for all 18 mirror segments given a perturbed OTE
     mirror state. Saves each PSF library as a FITS file named in the following format:
         nircam_{filter}_fovp{fov size}_samp1_npsf1_seg{segment number}.fits
@@ -151,6 +151,10 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
 
     nlambda : int
         Number of wavelengths to use for polychromatic PSF calculations.
+
+    nrc_options : dict
+        Optional; additional options to set on the NIRCam class instance used in this function.
+        Any items in this dict will be added into the .options dict prior to the PSF calculations.
     """
     # Create webbpsf NIRCam instance
     nc = webbpsf.NIRCam()
@@ -198,6 +202,8 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                 print("Invalid jitter string. Must be one of: {}. Ignoring and using defaults.".format(allowed_strings))
         else:
             print("Wrong input to jitter, assuming defaults")
+    if nrc_options is not None:
+        nc.options.update(nrc_options)
 
 	# Set up multiprocessing pool
     nproc = min(multiprocessing.cpu_count() // 2,18)      # number of procs could be optimized further here. TBD.
