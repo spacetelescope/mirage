@@ -4,6 +4,15 @@ There are two aspects to Mirage installation. First, the software itself must be
 must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`, as this is the latest stable version of the software.
 
 
+.. attention::
+    **For those running Mac OSX 10.14:**
+
+    There are several extra steps that must be taken when installing Mirage on a machine running Mac OSX 10.14 (Mojave). These changes are relalted to the option of running calculations in the `Batman <https://github.com/lkreidberg/batman>`_ package in parallel. There are two options for this modified installation, which are described in this `Batman issue on github <https://github.com/lkreidberg/batman/issues/32https://github.com/lkreidberg/batman/issues/32>`_
+
+    1. (The less invasive method) If you do want to make use of parallel processing, you must install LLVM and OpenMP on your machine prior to installing Mirage as described below. See this `StackOverflow issue <https://stackoverflow.com/questions/43555410/enable-openmp-support-in-clang-in-mac-os-x-sierra-mojave>`_ for details.
+
+    2. If you do not wish to use parallel processing within Batman, then you must clone the `Batman <https://github.com/lkreidberg/batman>`_ package, open its *setup.py* file, and remove "-fopenmp". In this case, it is easiest to then :ref:`install Mirage via the environment file <env_file_install>`. Before creating the environment, remove Batman from the environment file. Then create the environment, and then pip install the local copy of Batman.
+
 .. _pypi:
 
 Install from Pypi
@@ -63,7 +72,9 @@ Create and activate a new environment. In this example we call the environment "
 .. tip::
     This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
 
-Or, to install using the environment file, again creating an environment called "mirage"::
+.. _env_file_install:
+
+**Or, to install using the environment file, again creating an environment called "mirage"**::
 
     cd mirage
     conda env create -f environment.yml --name mirage python=3.6
