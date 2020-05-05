@@ -657,7 +657,6 @@ class SimInput:
             darks.append(self.get_dark(instrument, det))
             lindarks.append(self.get_lindark(instrument, det))
 
-        self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
             self.info['dark'] = [None] * len(darks)
@@ -900,9 +899,11 @@ class SimInput:
         files = self.dark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
-        else:
+        elif len(files) > 1:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
+        else:
+            return None
 
     def get_lindark(self, instrument, detector):
         """
@@ -922,9 +923,11 @@ class SimInput:
         files = self.lindark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
-        else:
+        elif len(files) > 1:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
+        else:
+            return None
 
     def get_readpattern_defs(self, filename=None):
         """Read in the readpattern definition file and return table.
