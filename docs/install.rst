@@ -7,11 +7,8 @@ must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`,
 .. attention::
     **For those running Mac OSX 10.14:**
 
-    There are several extra steps that must be taken when installing Mirage on a machine running Mac OSX 10.14 (Mojave). These changes are relalted to the option of running calculations in the `Batman <https://github.com/lkreidberg/batman>`_ package in parallel. There are two options for this modified installation, which are described in this `Batman issue on github <https://github.com/lkreidberg/batman/issues/32https://github.com/lkreidberg/batman/issues/32>`_
+    Some users have reported errors when installing Mirage on their machines running Mac OSX 10.14. If you see installation failures for the synphot or batman packages, they are most likely related to the OpenMP library. See the section below on :ref:`Troubleshooting for Mac OSX 10.14 installtion <osx1014>`.
 
-    1. (The less invasive method) If you do want to make use of parallel processing, you must install LLVM and OpenMP on your machine prior to installing Mirage as described below. See this `StackOverflow issue <https://stackoverflow.com/questions/43555410/enable-openmp-support-in-clang-in-mac-os-x-sierra-mojave>`_ for details.
-
-    2. If you do not wish to use parallel processing within Batman, then you must clone the `Batman <https://github.com/lkreidberg/batman>`_ package, open its *setup.py* file, and remove "-fopenmp". In this case, it is easiest to then :ref:`install Mirage via the environment file <env_file_install>`. Before creating the environment, remove Batman from the environment file. Then create the environment, and then pip install the local copy of Batman.
 
 .. _pypi:
 
@@ -83,6 +80,45 @@ Create and activate a new environment. In this example we call the environment "
 
 .. tip::
     For this latter case, packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary.
+
+
+.. _osx1014:
+
+Troubleshooting for Mac OSX 10.14 installtion
+---------------------------------------------
+
+If you have installation errors on your machine running 10.14 (Mojave), try these solutions.
+
+Synphot
++++++++
+
+If the synphot package fails to build, try installing via conda using the conda-forge channel. Do this before installing Mirage, using the command:
+
+    - conda install synphot -c conda-forge
+
+Batman
+++++++
+
+If the `Batman <https://github.com/lkreidberg/batman>`_ package fails to build, the work-around is more complex. Mirage uses the Batman package when simulating imaging and grism Time Series Observations (TSO).
+
+The installation errors are related to supporting Batman's ability to run calculations in parallel. There are two options for modifying the installation, which are described in this `Batman issue on github <https://github.com/lkreidberg/batman/issues/32https://github.com/lkreidberg/batman/issues/32>`_
+
+    1. If you do want to make use of parallel processing (or simply want to try the less invasive installation fix), you must install LLVM and OpenMP on your machine prior to installing Mirage. See this `StackOverflow issue <https://stackoverflow.com/questions/43555410/enable-openmp-support-in-clang-in-mac-os-x-sierra-mojave>`_ for details. If you successfully install these, then you should be able to install Mirage following the instructions in the sections above.
+
+
+    2. If you do not wish to use parallel processing within Batman, or the option above fails, then you can modify Batman such that it does not use parallel processing. This involves modifying the Batman and Mirage *setup.py* files and install using those. Clone the `Batman <https://github.com/lkreidberg/batman>`_ package, open its *setup.py* file, and remove "-fopenmp". Then you must clone Mirage and remove Batman from Mirage's *environment.yml* and *setup.py* files. Then create the environment using *environment.yml*, pip install the local copy of Batman, and pip install the local copy of Mirage.
+
+    ::
+
+        cd mirage
+        conda env create -f environment.yml --name mirage python=3.6
+        conda activate mirage
+        pip install .
+        cd ../batman
+        pip install .
+
+    3. If you are having installtion problems and will not be creating TSO simulations, you could skip Batman installation altogether. In this case you will still need to clone Mirage and remove Batman from the *environment.yml* and *setup.py* files. Then :ref:`install Mirage via the environment file <env_file_install>`.
+
 
 .. _ref_file_collection:
 

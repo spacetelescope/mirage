@@ -54,6 +54,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  filtpupilcombo_:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
 	  filter_wheel_positions_: config  #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
 	  flux_cal_:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
+	  filter_throughput_: /Users/me/mirage/mirage/config/placeholder.txt #File containing filter throughput curve
 
 	nonlin_:
 	  limit_: 60000.0        #Upper singal limit to which nonlinearity is applied (ADU)
@@ -86,6 +87,8 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  movingTargetExtended_: None                     #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
 	  movingTargetConvolveExtended_: True             #convolve the extended moving targets with PSF before adding.
 	  movingTargetToTrack_: None                      #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+	  tso_imaging_catalog_: None                      #Catalog listing TSO source to be used for imaging TSO simulations
+	  tso_grism_catalog_: None                        #Catalog listing TSO source to be used for grism TSO observations
 	  zodiacal_:  None                                #Zodiacal light count rate image file
 	  zodiscale_:  1.0                                #Zodi scaling factor
 	  scattered_:  None                               #Scattered light count rate image file
@@ -512,6 +515,15 @@ Ascii file that lists flux conversion factors and the pivot wavelength associate
 .. hint::
 	To use the flux calibration files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
 
+.. _filter_throughput:
+
+Filter Throughput
++++++++++++++++++
+
+*Reffiels:filter_throughput*
+
+Ascii files that contains the system throughput when using a particular filter. By default, the yaml generator will set this parameter to have a value of "placeholder.txt" in the input yaml files. Mirage will then locate the appropriate throughput file at runtime.
+
 .. _nonlin:
 
 Nonlin section
@@ -767,6 +779,24 @@ Tracked non-sidereal target catalog file
 *simSignals:movingTargetToTrack*
 
 This ascii catalog file is used for what are traditionally (in HST jargon) called 'moving targets'.  Targets listed in this file are treated as non-sidereal targets that JWST will track during the simulated observation. In this case, the target listed in this file will appear static in the output data, but all other sources (e.g. those listed in :ref:`pointSource <pointsource>`, :ref:`galaxyListFile <galaxyListFile>`, and :ref:`extended <extended>`) will all appear trailed through the data. A description and example of the file are shown in the :ref:`Non-sidereal Source <nonsidereal>` section on the :ref:`Catalogs <catalogs>` page.
+
+.. _tso_imaging_catalog:
+
+TSO Imaging Catalog
++++++++++++++++++++
+
+*simSignals:tso_imaging_catalog*
+
+Ascii catalog file containing information on the source to be used when creating imaging TSO observations. The catalog format is detailed in the :ref:`Imaging TSO Catalog section <imaging_tso_cat>` section of the :ref:`Source Catalog Formats page <catalogs>`.
+
+.. _tso_grism_catalog:
+
+TSO Grism Catalog
++++++++++++++++++
+
+*simSignals:tso_grism_catalog*
+
+Ascii catalog file containing information on the source to be used when creating grism TSO observations. The catalog format is detailed in the :ref:`Grism TSO Catalog section <grism_tso_cat>` section of the :ref:`Source Catalog Formats page <catalogs>`.
 
 .. _zodiacal:
 
