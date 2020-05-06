@@ -661,9 +661,15 @@ class SimInput:
         if self.use_linearized_darks:
             self.info['dark'] = [None] * len(darks)
             self.info['lindark'] = lindarks
+            if set(lindarks) == set([None]):
+                raise RuntimeError(("ERROR: Linearized darks requested, but no linearized dark files "
+                                    "found. Check: {}").format(os.path.join(os.path.expandvars('$MIRAGE_DATA'), instrument)))
         else:
             self.info['dark'] = darks
             self.info['lindark'] = [None] * len(lindarks)
+            if set(darks) == set([None]):
+                raise RuntimeError(("ERROR: Raw darks requested, but no raw dark files found. "
+                                    "Check: {}").format(os.path.join(os.path.expandvars('$MIRAGE_DATA'), instrument)))
 
         # Add setting describing whether JWST pipeline will be used
         self.info['use_JWST_pipeline'] = [self.use_JWST_pipeline] * len(darks)
