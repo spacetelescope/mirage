@@ -657,14 +657,19 @@ class SimInput:
             darks.append(self.get_dark(instrument, det))
             lindarks.append(self.get_lindark(instrument, det))
 
-        self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
             self.info['dark'] = [None] * len(darks)
             self.info['lindark'] = lindarks
+            if set(lindarks) == set([None]):
+                raise RuntimeError(("ERROR: Linearized darks requested, but no linearized dark files "
+                                    "found. Check: {}").format(os.path.join(os.path.expandvars('$MIRAGE_DATA'), instrument)))
         else:
             self.info['dark'] = darks
             self.info['lindark'] = [None] * len(lindarks)
+            if set(darks) == set([None]):
+                raise RuntimeError(("ERROR: Raw darks requested, but no raw dark files found. "
+                                    "Check: {}").format(os.path.join(os.path.expandvars('$MIRAGE_DATA'), instrument)))
 
         # Add setting describing whether JWST pipeline will be used
         self.info['use_JWST_pipeline'] = [self.use_JWST_pipeline] * len(darks)
@@ -900,9 +905,11 @@ class SimInput:
         files = self.dark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
-        else:
+        elif len(files) > 1:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
+        else:
+            return None
 
     def get_lindark(self, instrument, detector):
         """
@@ -922,9 +929,11 @@ class SimInput:
         files = self.lindark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
-        else:
+        elif len(files) > 1:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
+        else:
+            return None
 
     def get_readpattern_defs(self, filename=None):
         """Read in the readpattern definition file and return table.
