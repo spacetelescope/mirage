@@ -1850,15 +1850,19 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
         ra : float
             Right ascension or galactic longitude for the sky
             position where the model is to be calculated, in degrees.
-            Which it is depends on the "coords" parameter.
 
         dec : float
             Declinatinon or galactic latitude for the sky
             position where the model is to be calculated, in degrees.
-            Which it is depends on the "coords" parameter.
 
         box_width : float
             Size of the (square) sky area to be simulated, in arc-seconds
+
+        username : str
+            Username associated with the Besanson model website (listed
+            in the docstring above) that will be used to submit the query.
+            The website will prompt for a password before creating the
+            query
 
         kmag_limits : tup
             The range of allowable K magnitudes for the model, given
