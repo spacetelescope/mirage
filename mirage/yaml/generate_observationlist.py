@@ -442,7 +442,7 @@ def expand_for_dithers(indict, verbose=True):
         print('Number of entries after expanding dithers:  {}'.format(len(expanded_table)))
 
     if verbose:
-        for obs_id in np.unique(expanded_table['ObservationID']):
+        for obs_id in list(dict.fromkeys(expanded_table['ObservationID'])):
             print('Expanded table for Observation {} has {} entries'.format(obs_id, len(np.where(expanded_table['ObservationID']==obs_id)[0])))
     return expanded
 
@@ -494,9 +494,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     return_dict = None
 
     # array of unique instrument names
-    used_instruments = np.unique(xml_dict['Instrument'])
     all_observation_ids = xml_dict['ObservationID']
-    unique_observation_ids = np.unique(all_observation_ids).tolist()
 
     # List of target names from the proposal
     all_targets = xml_dict['TargetID']
@@ -651,13 +649,13 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     entry_number = 0  # running number for every entry in the observation list
 
     # Create an instrument-specific counter to be used with input catalogs
-    all_instruments = np.unique(xml_dict['Instrument'])
     counter = {}
-    for inst in all_instruments:
+    for inst in np.unique(xml_dict['Instrument']):
         counter[inst] = 0
 
     entry_numbers = []
-    observation_numbers = np.unique(xml_dict['ObservationID'])
+    observation_numbers = list(dict.fromkeys(xml_dict['ObservationID']))
+
     for observation_index, observation_number in enumerate(observation_numbers):
         first_index = xml_dict['ObservationID'].index(observation_number)
         text += [
@@ -665,7 +663,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
             "  Name: '{}'\n".format(xml_dict['ObservationName'][first_index])
             ]
         observation_rows = np.where(np.array(xml_dict['ObservationID']) == observation_number)[0]
-        instruments_in_observation = np.unique(np.array(xml_dict['Instrument'])[observation_rows])
         for index in observation_rows:
             number_of_dithers = np.int(xml_dict['number_of_dithers'][index])
             instrument = xml_dict['Instrument'][index]
