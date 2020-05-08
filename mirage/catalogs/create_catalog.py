@@ -1841,27 +1841,28 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
     in producing the simulated NIRISS/NIRCam/Guider magnitudes.
     Note that the Besancon model uses a simplified exinction model, and so
     this is carried over into the Mirage point source lists.
-    An email address is required for the besancon call.
+    An email address is required for the besancon call. The KLEH value of
+    2 in the call to the model means that the input coordinates are
+    RA, Dec in units of degrees.
 
     Parameters
     ----------
         ra : float
             Right ascension or galactic longitude for the sky
             position where the model is to be calculated, in degrees.
-            Which it is depends on the "coords" parameter.
 
         dec : float
             Declinatinon or galactic latitude for the sky
             position where the model is to be calculated, in degrees.
-            Which it is depends on the "coords" parameter.
 
         box_width : float
             Size of the (square) sky area to be simulated, in arc-seconds
 
-        coords : str
-            If "ra_dec", the default value, then the input values are assumed to
-            be RA/Dec in degrees.  Otherwise the values are assumed to be (l,b)
-            in degrees.
+        username : str
+            Username associated with the Besanson model website (listed
+            in the docstring above) that will be used to submit the query.
+            The website will prompt for a password before creating the
+            query
 
         kmag_limits : tup
             The range of allowable K magnitudes for the model, given
