@@ -416,7 +416,7 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                     added_size = DISK_USAGE['nircam']['lin_darks']
                     total_download_size += added_size
                     print('Size of NIRCam linearized dark files: {} Gb'.format(added_size))
-                elif dark_current in ['raw', 'both']:
+                if dark_current in ['raw', 'both']:
                     urls.extend(NIRCAM_RAW_DARK_URLS)
                     added_size = DISK_USAGE['nircam']['raw_darks']
                     total_download_size += added_size
@@ -453,7 +453,7 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                     added_size = DISK_USAGE['niriss']['lin_darks']
                     total_download_size += added_size
                     print('Size of NIRISS linearized dark files: {} Gb'.format(added_size))
-                elif dark_current in ['raw', 'both']:
+                if dark_current in ['raw', 'both']:
                     urls.extend(NIRISS_RAW_DARK_URLS)
                     added_size = DISK_USAGE['niriss']['raw_darks']
                     total_download_size += added_size
@@ -486,7 +486,7 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                     added_size = DISK_USAGE['fgs']['lin_darks']
                     total_download_size += added_size
                     print('Size of FGS linearized dark files: {} Gb'.format(added_size))
-                elif dark_current in ['raw', 'both']:
+                if dark_current in ['raw', 'both']:
                     urls.extend(FGS_RAW_DARK_URLS)
                     added_size = DISK_USAGE['fgs']['raw_darks']
                     total_download_size += added_size
