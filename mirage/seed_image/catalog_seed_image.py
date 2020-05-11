@@ -3639,7 +3639,7 @@ class Catalog_seed():
         """
         north_to_east_V3ang = rotations.posangle(self.attitude_matrix, v2_value, v3_value)
         x_posang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - position_angle
-                         + 90. + self.params['Telescope']['rotation'])
+                         + 90. - self.params['Telescope']['rotation'])
         return x_posang
 
     def getExtendedSourceList(self, filename):
@@ -3840,11 +3840,7 @@ class Catalog_seed():
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
 
-        # The definition of position angle is different between the galaxy
-        # source inputs and the extended source inputs. calc_x_position_angle
-        # was created for galaxies, so adjust for the different definition here.
-        rotation_angle = x_pos_ang - 2. * self.params['Telescope']['rotation']
-        rotated = rotate(stamp_image, rotation_angle, mode='constant', cval=0.)
+        rotated = rotate(stamp_image, x_pos_angle, mode='constant', cval=0.)
         return rotated
 
     def make_extended_source_image(self, extSources, extStamps):
