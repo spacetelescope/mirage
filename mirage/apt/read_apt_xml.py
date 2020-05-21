@@ -954,6 +954,7 @@ class ReadAPTXML():
 
         # Find filter parameters for all filter configurations within obs
         ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
+        ga_fgs_configs = template.findall('.//' + ns + 'FgsParameters')
 
         # Check the target type in order to decide whether the tracking should be
         # sidereal or non-sidereal
@@ -985,6 +986,15 @@ class ReadAPTXML():
             else:
                 long_pupil = 'CLEAR'
 
+        for fgs_conf in ga_fgs_configs:
+            fgs_grps = fgs_conf.find(ns + 'Groups').text
+            fgs_ints = fgs_conf.find(ns + 'Integrations').text
+
+        # TODO read guider detector requirement from GuideStarID special requirement in this case
+        guider_det_num = 1  # PLACEHOLDER ONLY
+        fgs_subarr = "FGS{}_FULL".format(guider_det_num)
+
+
         # Repeat for the number of exposures
         for j in range(n_exp):
             # Add all parameters to dictionary
@@ -992,12 +1002,12 @@ class ReadAPTXML():
             if j==2 or j==5:
                 # This is an FGS image as part of GA
 
-                ## TODO update this for FGS parameters instead of NIRCam
+                # Add FGS exposure to the dictionary
                 tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                              science_category, typeflag, mod, subarr, pdithtype,
-                              pdither, sdithtype, sdither, sfilt, lfilt,
-                              rpatt, grps, ints, short_pupil,
-                              long_pupil, grismval, coordparallel,
+                              science_category, typeflag, 'N/A', fgs_subarr, pdithtype,
+                              pdither, sdithtype, sdither, 'N/A', 'N/A',
+                              'FGSRAPID', fgs_grps, fgs_ints, 'N/A',
+                              'N/A', 'N/A', coordparallel,
                               i_obs, j + 1, template_name, 'FGS', obs_label,
                               target_name, tracking)
             else:

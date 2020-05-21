@@ -130,10 +130,12 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
 
     filters : str or list, optional
         Which filters to generate PSF libraries for. Default is ['F212N', 'F480M']
-        (the two filters used for most commissioning activities).
+        (the two NIRCam filters used for most commissioning activities).
+        Note, this parameter is ignored for FGS sims.
 
     detectors : str or list, optional
         Which detectors to generate PSF libraries for. Default is 'all'.
+        Note, this parameter is ignored for FGS sims, which always include both FGS detectors.
 
     fov_pixels : int, optional
         Size of the PSF to generate, in pixels. Default is 1024.
@@ -168,6 +170,10 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
 
     # Create dummy CreatePSFLibrary instance to get lists of filter and detectors
     lib = CreatePSFLibrary
+
+    if instrument.upper()=='FGS':
+        detectors = ['FGS1', 'FGS2']
+        filters = ['FGS']
 
     # Define the filter list to loop through
     if isinstance(filters, str):
