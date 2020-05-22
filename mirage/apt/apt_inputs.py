@@ -284,8 +284,21 @@ class AptInput:
         if self.apt_xml_dict is None:
             raise RuntimeError('self.apt_xml_dict is not defined')
 
+
+
+        for key in self.apt_xml_dict:
+            print(key)
+            print(self.apt_xml_dict[key])
+        stop
+
+
+
+
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
+
+        if 'WfscGlobalAlignment' in self.apt_xml_dict['APTTemplate']:
+            pointing_dictionary = self.global_alignment_pointing(pointing_dictionary)
 
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
@@ -854,6 +867,24 @@ class AptInput:
                     'act_id': activity_id, 'visit_id': visit_id, 'visit_group': visit_grp,
                     'sequence_id': seq_id, 'observation_id': observation_id}
         return pointing
+
+    def global_alignment_pointing(self, pt_dict):
+        """Adjust the pointing dictionary information for global alignment
+        observations. Some of the entries need to be changed from NIRCam to
+        FGS
+
+        Parameters
+        ----------
+        pt_dict : dict
+            Dictionary of pointing file information. Output from
+
+        Returns
+        -------
+        pt_dict : dict
+            Modified pointing dictioanry
+        """
+        modifications depend on the GA_Iteration value of each observation
+        return
 
     def tight_dithers(self, input_dict):
         """
