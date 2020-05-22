@@ -1857,7 +1857,7 @@ class ReadAPTXML():
             # Grism values are listed for each ExposureSequence
             grismval = expseq.find(ns + 'Sequence').text
             if grismval == 'BOTH':
-                grismval = ['GRISM150R', 'GRISM150C']
+                grismval = ['GR150R', 'GR150C']
                 both_grisms = True
                 entry_repeats = [2, 3]
             else:
