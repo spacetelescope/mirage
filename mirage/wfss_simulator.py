@@ -282,6 +282,14 @@ class WFSSSim():
                         dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
 
                     background_done = True
+
+                    # Save the background image to a fits file
+                    hprime = fits.PrimaryHDU()
+                    himg = fits.ImageHDU(background_image)
+                    himg.header['EXTNAME'] = 'BACKGRND'
+                    himg.header['UNITS'] = 'e/s'
+                    hlist = fits.HDUList([hprime, himg])
+                    hlist.writeto(self.background_image_filename, overwrite=True)
                 else:
                     dispersed_objtype_seed.finalize()
                 disp_seed += dispersed_objtype_seed.final
@@ -460,6 +468,9 @@ class WFSSSim():
                 pupil_name = params['Readout']['pupil']
                 dispname = ('{}_dispersed_seed_image.fits'.format(params['Output']['file'].split('.fits')[0]))
                 self.default_dispersed_filename = os.path.join(params['Output']['directory'], dispname)
+
+                bkgd_output_file = '{}_background_image.fits'.format(params['Output']['file'].split('.fits')[0])
+                self.background_image_filename = os.path.join(params['Output']['directory'], bkgd_output_file)
 
                 # In reality, the grism elements are in NIRCam's pupil wheel, and NIRISS's
                 # filter wheel. But in the APT xml file, NIRISS grisms are in the pupil
