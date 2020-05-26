@@ -297,9 +297,6 @@ class AptInput:
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
-        if 'WfscGlobalAlignment' in self.apt_xml_dict['APTTemplate']:
-            pointing_dictionary = self.global_alignment_pointing(pointing_dictionary)
-
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
@@ -324,6 +321,9 @@ class AptInput:
         for j, isparallel in enumerate(self.exposure_tab['ParallelInstrument']):
             if isparallel:
                 self.exposure_tab['sequence_id'][j] = '2'
+
+        if 'WfscGlobalAlignment' in self.exposure_tab['APTTemplate']:
+            self.global_alignment_pointing()
 
         # set exposure number (new sequence for every combination of seq id and act id and observation number and detector)
         temp_table = Table([self.exposure_tab['sequence_id'], self.exposure_tab['exposure'], self.exposure_tab['act_id'], self.exposure_tab['obs_num'], self.exposure_tab['detector']], names=('sequence_id', 'exposure', 'act_id', 'obs_num', 'detector'))
@@ -868,22 +868,88 @@ class AptInput:
                     'sequence_id': seq_id, 'observation_id': observation_id}
         return pointing
 
-    def global_alignment_pointing(self, pt_dict):
+    def global_alignment_pointing(self):
         """Adjust the pointing dictionary information for global alignment
         observations. Some of the entries need to be changed from NIRCam to
-        FGS
-
-        Parameters
-        ----------
-        pt_dict : dict
-            Dictionary of pointing file information. Output from
-
-        Returns
-        -------
-        pt_dict : dict
-            Modified pointing dictioanry
+        FGS. Remember that not all observations in the dictionary will
+        necessarily be WfscGlobalAlignment template. Be sure the leave all
+        other templates unchanged.
         """
-        modifications depend on the GA_Iteration value of each observation
+        # We'll always be changing NIRCam to FGS, so set up the NIRCam siaf
+        # instance outside of loop
+        nrc_siaf = pysiaf.Siaf('nircam')
+
+        ga_index = self.exposure_tab['APTTemplate'] == 'WfscGlobalAlignment'
+        observation_numbers = list(dict.fromkeys(self.exposure_tab['obs_num'][ga_index]))
+
+        for obs_num in observation_numbers:
+            indexes = np.where(self.exposure_tab['obs_num'] == obs_num)
+            ga_iteration = self.exposure_tab['ga_iteration'][indexes][0]
+
+            # Determine which exposures within the observation need to be changed
+            # from NIRCam to FGS
+            inst_order = GLOBAL_ALIGNMENT_INSTRUMENT_OREDER[ga_iteration]
+            to_fgs = np.where(inst_order == 'FGS')
+
+
+
+
+            Quantities that need to be updated:
+            aperture name
+
+            seen in example: base + dither = idl
+
+            BaseX - same value for all dithers/pointings
+            BaseY
+            dithx - very small difference (~0.05) in nrc/nis example, except for the first pointing where nrc and nis are exactly 0.0
+            dithy
+            IdlX - large difference (~-200) in nrc/nis example. values = basex + dithx
+            IdlY
+
+            Quantities that stay the same:
+            RA
+            Dec
+            V2
+            V3
+
+
+
+
+
+
+            # Loop over the exposures to be changed, and update pointing information
+            for change in to_fgs:
+                # Sanity check
+                siaf_instrument = self.exposure_tab['Instrument'][indexes][change]
+                if siaf_instrument.lower() != 'nircam':
+                    raise ValueError(('ERROR: expecting all GA entries to initially be set to NIRCam, '
+                                      'but this one, in observation number {}, is set to {}'.format(obs_num, siaf_instrument)))
+
+                aperture_name = self.exposure_tab['aperture'][indexes][change]
+                pointing_ra = np.float(self.exposure_tab['ra'][indexes][change])
+                pointing_dec = np.float(self.exposure_tab['dec'][indexes][change])
+                pointing_v2 = np.float(self.exposure_tab['v2'][indexes][change])
+                pointing_v3 = np.float(self.exposure_tab['v3'][indexes][change])
+
+                try:
+                    telescope_roll = np.float(self.exposure_tab['pav3'][indexes][change])
+                except KeyError:
+                    telescope_roll = np.float(self.exposure_tab['PAV3'][indexes][change])
+
+                local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                        siaf_interface.get_siaf_information(nrc_siaf, aperture_name,
+                                                            pointing_ra, pointing_dec, telescope_roll,
+                                                            v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+
+                # Define which FGS aperture we are switching to
+                fgs_aperture = ??
+
+                # Calculate RA, Dec of reference location for the detector
+                ra, dec = rotations.pointing(attitude_matrix, fgs_aperture.V2Ref, fgs_aperture.V3Ref)
+
+
+
+
         return
 
     def tight_dithers(self, input_dict):
