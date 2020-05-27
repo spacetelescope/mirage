@@ -23,13 +23,14 @@ import time
 import pkg_resources
 import asdf
 import scipy.signal as s1
+import scipy.special as sp
 from scipy.ndimage import rotate
 import numpy as np
 from photutils import detect_sources
 from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
-from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
+from astropy.modeling.models import Shift, Sersic2D, Sersic1D, Polynomial2D, Mapping
 import astropy.units as u
 import pysiaf
 
@@ -3362,66 +3363,102 @@ class Catalog_seed():
         filteredList.write(filteredOut, format='ascii', overwrite=True)
         return filteredList
 
-    def create_galaxy(self, radius, ellipticity, sersic, posang, totalcounts):
+    def create_galaxy(self, r_Sersic, ellipticity, sersic_index, position_angle, total_counts, floor=1e-6, floor_fraction=0.99):
         """Create a model 2d sersic image with a given radius, eccentricity,
         position angle, and total counts.
 
         Parameters
         ----------
-        radius : float
+        r_Sersic : float
             Half light radius of the sersic profile, in units of pixels
 
         ellipticity : float
             Ellipticity of sersic profile
 
-        sersic : float
+        sersic_index : float
             Sersic index
 
-        posang : float
+        position_angle : float
             Position angle in units of degrees
 
-        totalcounts : float
+        total_counts : float
             Total summed signal of the output image
+
+        floor : float
+            Minimum signal to aim for in the galaxy stamp image. This will
+            be roughly the signal around the edges of the stamp image.
+
+        floor_fraction : float
+            If floor is None, then the minimum signal in the stamp image
+            will be set to this fraction of the signal at very large
+            radius. Very large here is defined as 100 * ```radius```.
 
         Returns
         -------
         img : numpy.ndarray
             2D array containing the 2D sersic profile
         """
+        # As found by Dan Coe, the definition being used in astropy's
+        # functional_models.py for Sersic2D (where a is semi-major axis,
+        # b is semi-minor axis, r_eff is the effective (half-light) radius,
+        # and ellip is ellipticity:
+        # a = r_eff
+        # b = r_eff * (1 - ellip)
+        # r_eff**2 * (1 - ellip) = a * b
+        # r_eff = sqrt(a * b / (1 - ellip))  - but b/(1-ellip) is just a (or r_eff) again.....
+        # so r_eff = r_eff
 
-        # create the grid of pixels
-        meshmax = np.min([np.int(self.ffsize * self.coord_adjust['y']), np.int(radius * 100.)])
+        # So, following astropy's conventions, we treat the input effective radius
+        # as the semi-major axis
 
-        # Make sure the grid has odd dimensions so that the galaxy will
-        # be centered
-        if meshmax % 2 == 0:
-            meshmax += 1
 
-        y, x = np.meshgrid(np.arange(meshmax), np.arange(meshmax))
+        b_n = sp.gammaincinv(2 * sersic_index, 0.5)
+        sersic_total = r_Sersic * r_Sersic * 2 * np.pi * sersic_index * np.exp(b_n)/(b_n**(2 * sersic_index)) * sp.gamma(2 * sersic_index)
 
-        # Center the galaxy in the array
-        xc = (meshmax // 2)
-        yc = (meshmax // 2)
+        amplitude = total_counts / sersic_total
 
-        # Create model
-        mod = Sersic2D(amplitude=1, r_eff=radius, n=sersic, x_0=xc, y_0=yc,
-                       ellip=ellipticity, theta=posang)
+        # Center the galaxy at (0, 0)
+        mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=0., y_0=0.,
+                       ellip=ellipticity, theta=position_angle)
 
-        # Create instance of model
-        img = mod(x, y)
+        mod1D = Sersic1D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index)
 
-        # Scale such that the total number of counts in the galaxy matches the input
-        summedcounts = np.sum(img)
-        if summedcounts == 0:
-            print('Zero counts in image in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
-            factor = 0.
-        else:
-            factor = totalcounts / summedcounts
-        img = img * factor
+        if floor is None:
+            if floor_fraction < 1.0:
+                raise ValueError(('ERROR: floor_fraction must be >= 1.0'))
+            large_radii_signal = mod1D(r_Sersic * 100)
+            floor = large_radii_signal * floor_fraction
 
-        # Crop image down such that it contains 99.95% of the total signal
-        img = self.crop_galaxy_stamp(img, 0.9995)
-        return img
+        # Sample the 1D Sersic profile at increasing radii until you reach the
+        # floor value.
+        radius_factor = 3
+        test_radius = radius_factor * r_Sersic
+        test_amplitude = mod1D(test_radius)
+
+        xsize = self.subarray_bounds[2] - self.subarray_bounds[0]
+        ysize = self.subarray_bounds[3] - self.subarray_bounds[1]
+        image_size = np.max([xsize, ysize])
+
+        while test_amplitude > floor:
+            radius_factor *= 1.1
+            test_radius = radius_factor * r_Sersic
+            test_amplitude = mod1D(test_radius)
+
+            if test_radius > (2. * image_size):
+                break
+
+        n_stamp = radius_factor * r_Sersic
+
+        # Be sure that the length and width have an odd number of
+        # pixels, so that the galaxy will be centered.
+        xmin = int(0 - n_stamp)
+        xmax = int(0 + n_stamp + 1)
+        ymin = int(0 - n_stamp)
+        ymax = int(0 + n_stamp + 1)
+        x_stamp, y_stamp = np.meshgrid(np.arange(xmin, xmax), np.arange(ymin, ymax))
+
+        stamp = mod(x_stamp, y_stamp)
+        return stamp
 
     def crop_galaxy_stamp(self, stamp, threshold):
         """Crop an input stamp image containing a galaxy to a size that
