@@ -31,6 +31,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
 from astropy.modeling.models import Shift, Sersic2D, Sersic1D, Polynomial2D, Mapping
+from astropy.stats import sigma_clipped_stats
 import astropy.units as u
 import pysiaf
 
@@ -3398,20 +3399,6 @@ class Catalog_seed():
         img : numpy.ndarray
             2D array containing the 2D sersic profile
         """
-        # As found by Dan Coe, the definition being used in astropy's
-        # functional_models.py for Sersic2D (where a is semi-major axis,
-        # b is semi-minor axis, r_eff is the effective (half-light) radius,
-        # and ellip is ellipticity:
-        # a = r_eff
-        # b = r_eff * (1 - ellip)
-        # r_eff**2 * (1 - ellip) = a * b
-        # r_eff = sqrt(a * b / (1 - ellip))  - but b/(1-ellip) is just a (or r_eff) again.....
-        # so r_eff = r_eff
-
-        # So, following astropy's conventions, we treat the input effective radius
-        # as the semi-major axis
-
-
         b_n = sp.gammaincinv(2 * sersic_index, 0.5)
         sersic_total = r_Sersic * r_Sersic * 2 * np.pi * sersic_index * np.exp(b_n)/(b_n**(2 * sersic_index)) * sp.gamma(2 * sersic_index)
 
@@ -3455,7 +3442,7 @@ class Catalog_seed():
         xmax = int(0 + n_stamp + 1)
         ymin = int(0 - n_stamp)
         ymax = int(0 + n_stamp + 1)
-        x_stamp, y_stamp = np.meshgrid(np.arange(xmin, xmax), np.arange(ymin, ymax))
+        y_stamp, x_stamp = np.meshgrid(np.arange(ymin, ymax), np.arange(xmin, xmax))
 
         stamp = mod(x_stamp, y_stamp)
         return stamp
@@ -3554,17 +3541,21 @@ class Catalog_seed():
         start_time = time.time()
         times = []
         time_reported = False
+        print("Creating and adding galaxy stamp images...")
         for entry in galaxylist:
             # Warn user of how long this calcuation might take...
-            if len(times) < 30:
+            if len(times) < 50:
                 elapsed_time = time.time() - start_time
                 times.append(elapsed_time)
                 start_time = time.time()
-            elif len(times) == 30 and time_reported is False:
-                avg_time = np.mean(times)
+            elif len(times) == 50 and time_reported is False:
+                mean_time, med_time, stdev_time = sigma_clipped_stats(times, sigma=5)
+                avg_time = mean_time + stdev_time
                 total_time = len(galaxylist) * avg_time
-                print(("Expected time to process {} sources: {:.2f} seconds "
+
+                print(("Rough estimate of time to process {} sources: {:.2f} seconds "
                        "({:.2f} minutes)".format(len(galaxylist), total_time, total_time / 60)))
+                print("This estimate may be very inaccurate if there are larger than average sources within the first 50 objects.")
                 time_reported = True
 
             # Get position angle in the correct units. Inputs for each
@@ -3580,6 +3571,13 @@ class Catalog_seed():
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['countrate_e/s'])
+
+
+
+            print('Stamp total out of create_galaxy: ', np.sum(stamp))
+
+
+
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -3599,6 +3597,13 @@ class Catalog_seed():
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 stamp = self.enlarge_stamp(stamp, psf_shape)
                 galdims = stamp.shape
+
+
+
+                print('Stamp total after enlarging stamp: ', np.sum(stamp))
+
+
+
 
             # Get the PSF which will be convolved with the galaxy profile
             psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
@@ -3634,6 +3639,12 @@ class Catalog_seed():
             if i1 is not None and i2 is not None and j1 is not None and j2 is not None:
                 # Convolve the galaxy image with the PSF image
                 stamp = s1.fftconvolve(stamp, psf_image, mode='same')
+
+
+
+                print('Stamp total after convolving: ', np.sum(stamp))
+
+
 
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
