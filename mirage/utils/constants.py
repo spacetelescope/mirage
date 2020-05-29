@@ -62,6 +62,16 @@ MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.19235
 # to when it is not in the beam
 NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 
+# Lists of the NIRCam/FGS exposure order associated with each type of
+# Global Alignment observation type
+GLOBAL_ALIGNMENT_INSTRUMENT_OREDER = {}
+GLOBAL_ALIGNMENT_INSTRUMENT_OREDER['ADJUST1'] = ['nircam', 'nircam', 'fgs', 'nircam']
+GLOBAL_ALIGNMENT_INSTRUMENT_OREDER['CORRECT'] = ['nircam', 'nircam', 'fgs', 'nircam']
+GLOBAL_ALIGNMENT_INSTRUMENT_OREDER['ADJUST2'] = ['nircam', 'nircam', 'fgs', 'nircam', 'nircam', 'fgs', 'nircam']
+GLOBAL_ALIGNMENT_INSTRUMENT_OREDER['CORRECT+ADJUST'] = ['nircam', 'nircam', 'fgs', 'nircam', 'nircam', 'fgs', 'nircam']
+GLOBAL_ALIGNMENT_INSTRUMENT_OREDER['BSCORRECT'] = ['nircam', 'nircam', 'fgs']
+
+
 # For use in converting background MJy/sr to e-/sec
 PRIMARY_MIRROR_AREA = 25.326 * u.meter * u.meter
 PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second

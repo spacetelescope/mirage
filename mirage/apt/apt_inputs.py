@@ -877,21 +877,41 @@ class AptInput:
         """
         # We'll always be changing NIRCam to FGS, so set up the NIRCam siaf
         # instance outside of loop
-        nrc_siaf = pysiaf.Siaf('nircam')
+        nrc_siaf = pysiaf.Siaf('nircam')['NRCA3_FULL']
 
         ga_index = self.exposure_tab['APTTemplate'] == 'WfscGlobalAlignment'
         observation_numbers = list(dict.fromkeys(self.exposure_tab['obs_num'][ga_index]))
 
         for obs_num in observation_numbers:
             indexes = np.where(self.exposure_tab['obs_num'] == obs_num)
-            ga_iteration = self.exposure_tab['ga_iteration'][indexes][0]
+
+            # Find which GA observation type (e.g. ADJUST2) is used,
+            # as this dictates the number and order of NIRCam and FGS
+            # exposures
+            ga_iteration = self.exposure_tab['ga_iteration'][indexes][0].upper()
 
             # Determine which exposures within the observation need to be changed
             # from NIRCam to FGS
-            inst_order = GLOBAL_ALIGNMENT_INSTRUMENT_OREDER[ga_iteration]
+            inst_order = constants.GLOBAL_ALIGNMENT_INSTRUMENT_OREDER[ga_iteration]
             to_fgs = np.where(inst_order == 'FGS')
 
+            # Determine which FGS detector to be used
+            this needs to come from special requirements in xml
 
+            # Switch the instrument name to FGS in the FGS exposures
+            self.exposure_tab['instrument'][indexes][to_fgs] = 'FGS'
+            fgs_aperture = 'FGS{}_FULL'.format(det_number)
+            self.exposure_tab['aperture'][indexes][to_fgs] = fgs_aperture
+
+            # Update the pointing info for the FGS exposures
+            fgs = pysiaf.Siaf('fgs')[fgs_aperture]   # or FGS2_FULL
+            basex, basey = fgs.tel_to_idl(nrc_siaf.V2Ref, nrc_siaf.V3Ref)
+            idlx = basex + dithx
+            idly = basey + dithy
+            self.exposure_tab['BaseX'][indexes][to_fgs] = basex
+            self.exposure_tab['BaseY'][indexes][to_fgs] = basey
+            self.exposure_tab['IdlX'][indexes][to_fgs] = idlx
+            self.exposure_tab['IdlY'][indexes][to_fgs] = idly
 
 
             Quantities that need to be updated:
@@ -916,7 +936,7 @@ class AptInput:
 
 
 
-
+            """
             # Loop over the exposures to be changed, and update pointing information
             for change in to_fgs:
                 # Sanity check
@@ -946,7 +966,7 @@ class AptInput:
 
                 # Calculate RA, Dec of reference location for the detector
                 ra, dec = rotations.pointing(attitude_matrix, fgs_aperture.V2Ref, fgs_aperture.V3Ref)
-
+            """
 
 
 
