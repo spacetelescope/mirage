@@ -3014,9 +3014,11 @@ class Catalog_seed():
             # Check to see if magnitude system is specified
             # in the comments. If not default to AB mag
             msys = 'abmag'
-            condition = ('stmag' in gtab.meta['comments'][0:4]) | ('vegamag' in gtab.meta['comments'][0:4])
+            condition = ('stmag' in gtab.meta['comments'][0:4]) \
+                        | ('vegamag' in gtab.meta['comments'][0:4]) \
+                        | ('countrate' in gtab.meta['comments'][0:4])
             if condition:
-                msys = [l for l in gtab.meta['comments'][0:4] if 'mag' in l][0]
+                msys = [l for l in gtab.meta['comments'][0:4] if l in ['stmag', 'abmag', 'countrate']][0]
                 msys = msys.lower()
 
         except:
