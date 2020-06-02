@@ -380,9 +380,17 @@ class Catalog_seed():
 
             # For NIRISS POM data, extract the central 2048x2048
             if self.params['Inst']['mode'] in ["pom"]:
+                # Expose the full-sized pom seed image
+                self.pom_seed = copy.deepcopy(self.seedimage)
+                self.pom_segmap = copy.deepcopy(self.seed_segmap)
+
+                # Save the full-sized pom seed image to a file
+                self.pom_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_pom_seed_image.fits')
+                self.saveSeedImage(self.pom_seed, self.pom_segmap, self.pom_file)
+                print('Full POM seed image saved as: {}'.format(self.pom_file))
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
                 # Multiply the mask by the seed image and segmentation map in
                 # order to reflect the fact that reference pixels have no signal
                 # from external sources. Seed images to be dispersed do not have
@@ -888,7 +896,7 @@ class Catalog_seed():
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
-        if self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
+        if self.params['Inst']['mode'] in ['wfss', 'ts_grism', 'pom']:
             kw['NOMXDIM'] = self.ffsize
             kw['NOMYDIM'] = self.ffsize
             kw['NOMXSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
@@ -2457,7 +2465,7 @@ class Catalog_seed():
 
             scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
-                segment_number=segment_number
+                segment_number=segment_number, ignore_detector=True
             )
 
             # Skip sources that fall completely off the detector
@@ -3840,7 +3848,7 @@ class Catalog_seed():
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
 
-        rotated = rotate(stamp_image, x_pos_angle, mode='constant', cval=0.)
+        rotated = rotate(stamp_image, pos_angle, mode='constant', cval=0.)
         return rotated
 
     def make_extended_source_image(self, extSources, extStamps):
