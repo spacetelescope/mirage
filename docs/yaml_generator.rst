@@ -208,19 +208,35 @@ In order to use the Mirage default value (roll angle = 0), simply do not provide
 
 ::
 
-    pav3 = None
+    roll_angle = None
 
-To specify a single roll angle to be used in all observations, supply a single number.
+To specify a single roll angle to be used in all observations, supply a single number in decimal degrees.
 
 ::
 
-    pav3 = 34.5
+    roll_angle = 34.5
 
 In order to simulate epochs and break up your observations, supply a dictionary where the keys are the (3-character string) observation numbers from your APT file, and the values are the roll angles to use for those observations.
 
 ::
 
-    pav3 = {'001': 34.5, '002': 154.5, '003': 37.8}
+    roll_angle = {'001': 34.5, '002': 154.5, '003': 37.8}
+
+
+There are convenience functions to compute the default (i.e., no observatory roll and no special requirements) position angles for an observation on a given hypothetical observing date. These rely on the `JWST general target visibility tool <https://github.com/spacetelescope/jwst_gtvt>`_, which you must have installed to use this feature. There are functions to compute either a single value or a dictionary in the above format for multiple observations.
+
+::
+
+  pointing_filename = "/path/to/your_program.pointing"
+
+  # Compute default PA for one observation
+  obs_num = 2
+  roll_angle = yaml_generator.default_obs_v3pa_on_date(pointing_filename, obs_num, date='2021-12-21')
+
+  # Compute default PA for all observations in that program
+  roll_angle = yaml_generator.default_obs_v3pa_on_date(pointing_filename, date='2022-01-01')
+
+
 
 
 .. _yam_gen_date_inputs:
