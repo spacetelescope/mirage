@@ -3053,13 +3053,25 @@ class Catalog_seed():
         #    else:
         #        usefilt = 'filter'
             filter_name = self.params['Readout'][self.usefilt].lower()
+
+            # Check for weak lens entries. If a weak lens is used, the
+            # magnitude column name will contain the weak lens and filter
+            # name.
+            actual_pupil_name = self.params['Readout']['pupil'].lower()
+            actual_filter_name = self.params['Readout']['filter'].lower()
+            if actual_pupil_name in ['wlp8', 'wlm8']:
+                col_string = 'wlp8_{}'.format(actual_filter_name)
+            elif actual_filter_name == 'wlp4':
+                col_string = actual_filter_name
+            else:
+                col_string = filter_name
+
             # Construct the column header to look for
             specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(),
-                                                        filter_name)
+                                                        col_string)
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
             specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
-            filter_name = 'none'
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
@@ -3073,10 +3085,10 @@ class Catalog_seed():
                    .format(os.path.split(catalog_file_name)[1], specific_mag_col)))
             return "magnitude"
         else:
-            raise ValueError(("WARNING: Catalog {} has no magnitude column specifically for {} {}, "
+            raise ValueError(("WARNING: Catalog {} has no magnitude column for {} specifically called {}, "
                               "nor a generic 'magnitude' column. Unable to proceed."
                               .format(os.path.split(catalog_file_name)[1], self.params['Inst']['instrument'],
-                                      filter_name.upper())))
+                              specific_mag_col)))
 
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string

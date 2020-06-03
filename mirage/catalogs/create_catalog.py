@@ -918,7 +918,14 @@ def read_standard_magnitudes():
                         'nircam_f410m_magnitude', 'nircam_f430m_magnitude',
                         'nircam_f444w_magnitude', 'nircam_f460m_magnitude',
                         'nircam_f466n_magnitude', 'nircam_f470n_magnitude',
-                        'nircam_f480m_magnitude']
+                        'nircam_f480m_magnitude', 'nircam_wlp4_magnitude',
+                        'nircam_wlp8_f070w_magnitude', 'nircam_wlp8_f090w_magnitude',
+                        'nircam_wlp8_f115w_magnitude', 'nircam_wlp8_f140m_magnitude',
+                        'nircam_wlp8_f150w2_magnitude', 'nircam_wlp8_f150w_magnitude',
+                        'nircam_wlp8_f162m_magnitude', 'nircam_wlp8_f164n_magnitude',
+                        'nircam_wlp8_f182m_magnitude', 'nircam_wlp8_f187n_magnitude',
+                        'nircam_wlp8_f200w_magnitude', 'nircam_wlp8_f210m_magnitude',
+                        'nircam_wlp8_f212n_magnitude', 'nircam_wlp8_wlp4_magnitude']
     standard_labels = []
     n1 = 0
     for line in lines:
@@ -1410,7 +1417,8 @@ def make_filter_names(instrument, filters):
                       'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
                       'F212N', 'WLP4',  'F250M', 'F277W', 'F300M', 'F322W2', 'F323N',
                       'F335M', 'F356W', 'F360M', 'F405N', 'F410M', 'F430M',
-                      'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
+                      'F444W', 'F460M', 'F466N', 'F470N', 'F480M', 'WLP4',
+                      ]
     nircam_filter_names = ['nircam_{}_magnitude'.format(filt.lower()) for filt in nircam_filters]
     names1 = [guider_filters, nircam_filters, niriss_filters]
     names2 = [guider_filter_names, nircam_filter_names, niriss_filter_names]
