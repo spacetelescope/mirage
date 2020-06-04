@@ -695,7 +695,7 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     filters : dict
         Dictionary with keys equal to JWST instrument names, and values
         that are lists of filter names. Besancon sources will have magnitudes
-        transformed into thiese filters
+        transformed into these filters
 
     ra_column_name : str
         Name of the column in the input catalog that contains the Right Ascension
