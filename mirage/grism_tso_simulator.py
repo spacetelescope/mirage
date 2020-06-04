@@ -712,6 +712,11 @@ class GrismTSO():
             Nested dictionary contianing observation parameters, as read
             in from an input yaml file
 
+        sub_bounds : list
+            4 element list of subarray boundary locations in full frame
+            coordinates. [xstart, ystart, xend, yend]. Generally created
+            from siaf_interface.get_siaf_information
+
         array : numpy.ndarray
             2D full frame array
 
