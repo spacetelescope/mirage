@@ -111,6 +111,11 @@ class Catalog_seed():
         # with multiple sources having the same index numbers
         self.maxindex = 0
 
+        # Number of sources on the detector
+        self.n_pointsources = 0
+        self.n_galaxies = 0
+        self.n_extend = 0
+
     def make_seed(self):
         """MAIN FUNCTION"""
         print('\n\nRunning catalog_seed_image..\n')
@@ -2247,7 +2252,11 @@ class Catalog_seed():
                              (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts, tso_catalog))
 
         self.n_pointsources = len(pointSourceList)
-        print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+        if self.n_pointsources > 0:
+            print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+        else:
+            print("\nINFO: No point sources present on the detector.")
+
         # close the output file
         pslist.close()
 
@@ -3356,12 +3365,10 @@ class Catalog_seed():
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
-        print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
-
-        if self.n_galaxies == 0:
-            if self.n_pointsources == 0:
-                raise ValueError(('No point sources or galaxies found in input catalog; empty seed image '
-                                  'would be created.'))
+        if self.n_galaxies > 0:
+            print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
+        else:
+            print("\nINFO: No galaxies present within the aperture.")
 
         filteredList.meta['comments'] = [("Field center (degrees): %13.8f %14.8f y axis rotation angle "
                                           "(degrees): %f  image size: %4.4d %4.4d\n" %
@@ -3947,6 +3954,12 @@ class Catalog_seed():
                 indseg = self.seg_from_photutils(stamp[l1:l2, k1:k2] * entry['countrate_e/s'],
                                                  entry['index'], noiseval)
                 segmentation.segmap[j1:j2, i1:i2] += indseg
+                self.n_extend += 1
+
+        if self.n_extend == 0:
+            print("No extended sources present within the aperture.")
+        else:
+            print('Number of extended sources present within the aperture: {}'.format(self.n_extend))
         return extimage, segmentation.segmap
 
     def enlarge_stamp(self, image, dims):
