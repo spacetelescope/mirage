@@ -954,6 +954,9 @@ class ReadAPTXML():
             # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             # self.obs_tuple_list.append(tup_to_add)
 
+        # All exposures are full frame 4 amp readouts
+        exposures_dictionary['NumOutputs'] = [4] * len(exposures_dictionary['NumOutputs'])
+
         return exposures_dictionary, n_exp
 
     def read_coarsephasing_template(self, template, template_name, obs, prop_params):

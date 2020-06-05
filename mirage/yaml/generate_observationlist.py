@@ -481,6 +481,29 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     xml_dict = readxml_obj.read_xml(xml_file, verbose=verbose)
 
+
+
+    from astropy.table import Table
+    from astropy.io import ascii
+    #print('SAVING example_xml_table.txt FOR DEVELOPMENT')
+    #temp = Table()
+    #for key in xml_dict:
+    #    temp[key] = xml_dict[key]
+    #ascii.write(xml_dict, 'example_xml_table.txt', overwrite=True)
+    print('\n\n\nREADING IN modified_xml_table.txt for DEVELOPMENT\n\n\n')
+    temp = ascii.read('modified_xml_table.txt')
+    xml_dict = {}
+    for colname in temp.colnames:
+        xml_dict[colname] = temp[colname]
+        if colname == 'Subpixel_positions':
+            xml_dict[colname] = [str(ele) for ele in temp[colname]]
+
+
+
+
+
+
+
     # if verbose:
     #print('Summary of observation dictionary:')
     #for key in xml_dict.keys():
@@ -488,6 +511,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # create an expanded dictionary that contains lists of parameters expanded for dithers
     xml_dict = expand_for_dithers(xml_dict, verbose=verbose)
+
     #print('Summary of observation dictionary after expanding for dithers:')
     #for key in xml_dict.keys():
     #    print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))

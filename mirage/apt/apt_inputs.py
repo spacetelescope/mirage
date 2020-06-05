@@ -284,16 +284,6 @@ class AptInput:
         if self.apt_xml_dict is None:
             raise RuntimeError('self.apt_xml_dict is not defined')
 
-
-
-        for key in self.apt_xml_dict:
-            print(key)
-            print(self.apt_xml_dict[key])
-        stop
-
-
-
-
         # Read in the pointing file and produce dictionary
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
 
@@ -322,8 +312,24 @@ class AptInput:
             if isparallel:
                 self.exposure_tab['sequence_id'][j] = '2'
 
-        if 'WfscGlobalAlignment' in self.exposure_tab['APTTemplate']:
-            self.global_alignment_pointing()
+
+
+        # Write out the exposure tab as it currently is, so that I can modify it
+        # to simulate what the GA xml reader updates will give, and then read it
+        # in here for testing.
+        #import csv
+        #w = csv.writer(open("example_exposure_tab.csv", "w"))
+        #for key, val in self.exposure_tab.items():
+        #    w.writerow([key, val])
+
+
+
+
+
+
+
+        #if 'WfscGlobalAlignment' in self.exposure_tab['APTTemplate']:
+        #    self.global_alignment_pointing()
 
         # set exposure number (new sequence for every combination of seq id and act id and observation number and detector)
         temp_table = Table([self.exposure_tab['sequence_id'], self.exposure_tab['exposure'], self.exposure_tab['act_id'], self.exposure_tab['obs_num'], self.exposure_tab['detector']], names=('sequence_id', 'exposure', 'act_id', 'obs_num', 'detector'))
@@ -375,7 +381,13 @@ class AptInput:
                     # Handle the one case we understand, for now
                     if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
                         obs_num = self.exposure_tab['obs_num'][i]
-                        guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+
+                        if self.exposure_tab['APTTemplate'][i] == 'WfscGlobalAlignment':
+                            guider_number = self.exposure_tab['FGS_Detector'][i]
+                        elif self.exposure_tab['APTTemplate'][i] == 'FgsExternalCalibration':
+                            guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                        else:
+                            raise ValueError("WARNING: unsupported APT template with Fiducial Override.")
                         guider_aperture = 'FGS{}_FULL'.format(guider_number)
                         fixed_apertures.append(guider_aperture)
                     else:
@@ -448,23 +460,29 @@ class AptInput:
 
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
                     mode = input_dictionary['Mode'][index]
+                    template = input_dictionary['APTTemplate'][index]
                     if (sub == 'FULL'):
 
                         if mode in ['imaging', 'ts_imaging', 'wfss']:
                             # This block should catch full-frame observations
                             # in either imaging (including TS imaging) or
                             # wfss mode
-                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
-                            matched_apertures = []
-                            detectors = []
-                            for ap in matched_aps:
-                                detectors.append(ap[3:5])
-                                split = ap.split('_')
-                                if len(split) == 3:
-                                    ap_string = '{}_{}'.format(split[1], split[2])
-                                elif len(split) == 2:
-                                    ap_string = split[1]
-                                matched_apertures.append(ap_string)
+                            if template != 'WfscGlobalAlignment':
+                                matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
+                                matched_apertures = []
+                                detectors = []
+                                for ap in matched_aps:
+                                    detectors.append(ap[3:5])
+                                    split = ap.split('_')
+                                    if len(split) == 3:
+                                        ap_string = '{}_{}'.format(split[1], split[2])
+                                    elif len(split) == 2:
+                                        ap_string = split[1]
+                                    matched_apertures.append(ap_string)
+                            else:
+                                det_str, ap_str = input_dictionary['aperture'][index].split('_')
+                                matched_apertures = [ap_str]
+                                detectors = [det_str[3:5]]
 
                         elif mode == 'ts_grism':
                             # This block should get Grism Time Series
@@ -561,7 +579,10 @@ class AptInput:
                     detectors = ['NRS']
 
                 elif instrument == 'fgs':
-                    guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                    if input_dictionary['APTTemplate'][index] == 'WfscGlobalAlignment':
+                        guider_number = input_dictionary['FGS_Detector'][index]
+                    elif input_dictionary['APTTemplate'][index] == 'FgsExternalCalibration':
+                        guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                     detectors = ['G{}'.format(guider_number)]
 
                 elif instrument == 'miri':
@@ -868,13 +889,15 @@ class AptInput:
                     'sequence_id': seq_id, 'observation_id': observation_id}
         return pointing
 
+    """
     def global_alignment_pointing(self):
-        """Adjust the pointing dictionary information for global alignment
+
+        Adjust the pointing dictionary information for global alignment
         observations. Some of the entries need to be changed from NIRCam to
         FGS. Remember that not all observations in the dictionary will
         necessarily be WfscGlobalAlignment template. Be sure the leave all
         other templates unchanged.
-        """
+
         # We'll always be changing NIRCam to FGS, so set up the NIRCam siaf
         # instance outside of loop
         nrc_siaf = pysiaf.Siaf('nircam')['NRCA3_FULL']
@@ -936,7 +959,8 @@ class AptInput:
 
 
 
-            """
+
+            THIS SECTION ISN'T NEEDED....I THINK
             # Loop over the exposures to be changed, and update pointing information
             for change in to_fgs:
                 # Sanity check
@@ -966,11 +990,12 @@ class AptInput:
 
                 # Calculate RA, Dec of reference location for the detector
                 ra, dec = rotations.pointing(attitude_matrix, fgs_aperture.V2Ref, fgs_aperture.V3Ref)
-            """
+
 
 
 
         return
+    """
 
     def tight_dithers(self, input_dict):
         """

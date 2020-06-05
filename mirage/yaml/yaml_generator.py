@@ -738,7 +738,7 @@ class SimInput:
             # primarytot = np.int(file_dict['PrimaryDithers'])
             primarytot = np.int(file_dict['number_of_dithers'])
 
-            if file_dict['SubpixelPositions'].upper() == 'NONE':
+            if isinstance(file_dict['SubpixelPositions'], str) and file_dict['SubpixelPositions'].upper() == 'NONE':
                 subpixtot = 1
             else:
                 try:
@@ -2124,7 +2124,9 @@ class SimInput:
             f.write("  subpix_dither_type: {}  # Subpixel dither pattern name\n".format(input['SubpixelDitherType']))
             # For WFSS we need to strip out the '-Points' from
             # the number of subpixel positions entry
-            dash = input['SubpixelPositions'].find('-')
+            dash = -1
+            if isinstance(input['SubpixelPositions'], str):
+                dash = input['SubpixelPositions'].find('-')
             if (dash == -1):
                 val = input['SubpixelPositions']
             else:
