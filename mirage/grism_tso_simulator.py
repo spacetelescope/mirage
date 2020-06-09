@@ -293,9 +293,18 @@ class GrismTSO():
         no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
         background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
-        # Mulitp[ly the dispersed seed images by the flat field
+        # Mulitply the dispersed seed images by the flat field
         no_transit_signal *= tso_direct.flatfield
         background_dispersed *= tso_direct.flatfield
+
+        # Create a reference pixel mask, and crop to the requeted aperture
+        full_maskimage = np.zeros((tso_direct.ffsize, tso_direct.ffsize), dtype=np.int)
+        full_maskimage[4:tso_direct.ffsize-4, 4:tso_direct.ffsize-4] = 1.
+        refpix_mask = self.crop_to_aperture(orig_parameters, tso_direct.subarray_bounds, full_maskimage)
+
+        # Zero-out the signal in the reference pixels
+        background_dispersed *= refpix_mask
+        grism_seed_object.final *= full_maskimage
 
         # Save the dispersed seed images if requested
         if self.save_dispersed_seed:
@@ -692,6 +701,37 @@ class GrismTSO():
         if self.orders not in [["+1"], ["+2"], ["+1", "+2"], None]:
             raise ValueError(("ERROR: Orders to be dispersed must be either None or some combination "
                               "of '+1', '+2'"))
+
+    @staticmethod
+    def crop_to_aperture(params, sub_bounds, array):
+        """Create a mask showing the locations of the reference pixels
+
+        Parameters
+        ----------
+        params : dict
+            Nested dictionary contianing observation parameters, as read
+            in from an input yaml file
+
+        sub_bounds : list
+            4 element list of subarray boundary locations in full frame
+            coordinates. [xstart, ystart, xend, yend]. Generally created
+            from siaf_interface.get_siaf_information
+
+        array : numpy.ndarray
+            2D full frame array
+
+        Returns
+        -------
+        cropped : numpy.ndarray
+            ```array``` cropped to the requested aperture
+        """
+        # Crop the mask to match the requested output array
+        ap_suffix = params['Readout']['array_name'].split('_')[1]
+        if ap_suffix not in ['FULL', 'CEN']:
+            cropped = array[sub_bounds[1]:sub_bounds[3] + 1,
+                            sub_bounds[0]:sub_bounds[2] + 1]
+        return cropped
+
 
     def run_disperser(self, direct_file, orders=["+1", "+2"], add_background=True,
                       background_waves=None, background_fluxes=None, cache=False, finalize=False):
