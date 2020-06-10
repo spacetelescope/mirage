@@ -28,6 +28,8 @@ from astropy.io import ascii
 from astropy.table import Table, Column
 import numpy as np
 
+from mirage.utils.utils import standardize_filters, make_mag_column_names
+
 TSO_GRISM_INDEX = 99999
 
 class PointSourceCatalog():
@@ -109,29 +111,43 @@ class PointSourceCatalog():
         # Update the catalog table if it already exists, so that it is consistent
         self.create_table()
 
-    def add_magnitude_column(self, magnitude_list, magnitude_system='abmag', instrument='', filter_name=''):
+    def add_magnitude_column(self, magnitude_list, magnitude_system='abmag', instrument='', filter_name='', column_name=''):
         """Add a list of magnitudes to the catalog
 
         Parameters
         ----------
-        some_stuff
+        magnitude_list : list
+            Magnitude values corresponding to the input sources
+
+        magnitude_system : str
+            'abmag', 'vegamag', or 'stmag'
+
+        instrument : str
+            Instrument name
+
+        filter_name : str
+            Filter name (e.g. 'F090W')
+
+        column_name : str
+            Name to use for the column name. If this is provided, it will override
+            the instrument and filter_name inputs. (e.g. 'nircam_f090w_wlp8_magnitude')
         """
         # Force magnitude list to be a numpy array
         magnitude_list = np.array(magnitude_list)
 
         # Make sure instrument and filter are allowed values
-        instrument = instrument.lower()
-        filter_name = filter_name.lower()
-        self.filter_check(instrument, filter_name)
+        if column_name == '':
+            instrument = instrument.lower()
+            filter_name = standardize_filters(instrument, [filter_name.upper()])[0]
+            self.filter_check(instrument, filter_name)
 
-        # Create the string for the column header
-        if instrument == '' or filter_name == '':
-            header = 'magnitude'
-        else:
-            if instrument.lower() in ['fgs1', 'fgs2']:
-                header = '{}_magnitude'.format(instrument.lower())
+            # Create the string for the column header
+            if instrument == '' or filter_name == '':
+                header = 'magnitude'
             else:
-                header = '{}_{}_magnitude'.format(instrument, filter_name)
+                header = make_mag_column_names(instrument, [filter_name])[0]
+        else:
+            header = column_name
 
         # Get a list of magnitude_system for the existing catalog. No mixing of
         # magnitude systems is currently allowed.
