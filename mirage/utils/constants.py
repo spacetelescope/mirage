@@ -56,7 +56,7 @@ NIRCAM_FILTERS = NIRCAM_CLEAR_CROSSING_FILTERS + NIRCAM_2_FILTER_CROSSES + NIRCA
                 ['WLM8/{}'.format(element) for element in NIRCAM_WL8_CROSSING_FILTERS]
 
 # For consistency with NIRCam/NIRISS filters
-FGS_FILTERS = ["guider1", "guider2"]
+FGS_FILTERS = ["GUIDER1", "GUIDER2"]
 
 FLAMBDA_CGS_UNITS = u.erg / u.second / u.cm / u.cm / u.AA
 FLAMBDA_MKS_UNITS = u.watt / u.meter**2 / u.micron

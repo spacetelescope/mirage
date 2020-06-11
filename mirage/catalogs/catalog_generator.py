@@ -138,6 +138,12 @@ class PointSourceCatalog():
         # Make sure instrument and filter are allowed values
         if column_name == '':
             instrument = instrument.lower()
+
+
+            print('GOINGINTO ADD_MAG_COL: ', filter_name, instrument)
+
+
+
             filter_name = standardize_filters(instrument, [filter_name.upper()])[0]
             self.filter_check(instrument, filter_name)
 

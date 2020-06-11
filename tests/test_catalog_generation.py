@@ -17,6 +17,7 @@ import numpy as np
 import os
 
 from astropy.io import ascii
+from astropy.table import Table
 import pytest
 
 from mirage.catalogs import catalog_generator
@@ -42,11 +43,12 @@ def test_ptsrc_catalog_creation():
     ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec)
     ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
     ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f200w')
+    ptsrc.add_magnitude_column(mags, column_name='nircam_f090w_wlp8_magnitude')
 
     assert all(ptsrc.ra == ra)
     assert all(ptsrc.dec == dec)
-    assert ptsrc.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'nircam_f090w_magnitude',
-                                    'nircam_f200w_magnitude']
+    assert ptsrc.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'nircam_f090w_clear_magnitude',
+                                    'nircam_f200w_clear_magnitude', 'nircam_f090w_wlp8_magnitude']
 
 
 def test_galaxy_catalog_creation():
@@ -68,7 +70,7 @@ def test_galaxy_catalog_creation():
     as_read_in = ascii.read(output_file)
 
     assert gal.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'pos_angle', 'sersic_index',
-                                  'ellipticity', 'radius', 'nircam_f090w_magnitude']
+                                  'ellipticity', 'radius', 'nircam_f090w_clear_magnitude']
     assert all(gal.radius == radius)
     assert all(gal.ellipticity == ellip)
     assert all(gal.position_angle == posang)
@@ -284,3 +286,53 @@ def test_cat_from_file():
 
 if not ON_TRAVIS:
     os.environ['MIRAGE_DATA'] = orig_mirage_data
+
+
+def test_transform_johnson_to_jwst():
+    jcat = Table()
+    jcat['V'] = [10, 10, 10, 10]
+    jcat['J'] = [10, 11, 12, 13]
+    jcat['H'] = [10, 12, 14, 16]
+    jcat['K'] = [10, 13, 16, 19]
+    jcat['Av'] = [0.05, 0.05, 0.05, 0.05]
+
+    filters = ['nircam_f090w_clear_magnitude', 'niriss_f090w_magnitude', 'fgs_guider1_magnitude']
+    transform = create_catalog.transform_johnson_to_jwst(jcat, filters)
+
+    truth = copy.deepcopy(jcat)
+    truth['nircam_f090w_clear_magnitude'] = [10.015026, 11.381326, 12.881326, 14.381326]
+    truth['niriss_f090w_magnitude'] = [10.016299, 11.379, 12.879, 14.379]
+
+    assert jcat.colnames == truth.colnames
+    assert np.allclose(jcat['nircam_f090w_clear_magnitude'], truth['nircam_f090w_clear_magnitude'])
+    assert np.allclose(jcat['niriss_f090w_magnitude'], truth['niriss_f090w_magnitude'])
+
+
+def test_johnson_catalog_to_mirage_catalog():
+    input_catalog = os.path.join(TEST_DATA_DIR, 'catalog_generation/besancon_example.cat')
+    filters = {'nircam': ['F090W/CLEAR', 'F322W2/F323N'],
+               'niriss': ['F090W', 'F277W'],
+               'fgs': ['GUIDER1']
+               }
+    transformed = create_catalog.johnson_catalog_to_mirage_catalog(input_catalog, filters)
+
+    in_cat = ascii.read(input_catalog)
+    ra_vals = in_cat['RAJ2000'].data
+    dec_vals = in_cat['DECJ2000'].data
+    nrc_090 = [13.484183, 12.336812, 14.283301, 12.838769]
+    nrc_323 = [13.58035, 12.420761, 14.363094, 12.93159]
+    nis_090 = [13.483351, 12.335981, 14.282558, 12.837949]
+    nis_277 = [13.572666, 12.4141, 14.356856, 12.924085]
+    fgs_g1 = [13.490332, 12.341099, 14.287583, 12.844421]
+    truth = catalog_generator.PointSourceCatalog(ra=ra_vals, dec=dec_vals)
+    truth.add_magnitude_column(nrc_090, column_name='nircam_f090w_clear_magnitude')
+    truth.add_magnitude_column(nrc_323, instrument='nircam', filter_name='F323N')
+    truth.add_magnitude_column(nis_090, column_name='niriss_f090w_magnitude')
+    truth.add_magnitude_column(nis_277, instrument='niriss', filter_name='F277W')
+    truth.add_magnitude_column(fgs_g1, column_name='fgs_guider1_magnitude')
+
+    for col in truth.table.colnames:
+        assert np.allclose(truth.table[col].data, transformed.table[col].data)
+
+
+

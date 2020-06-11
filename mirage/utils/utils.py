@@ -714,13 +714,19 @@ def make_mag_column_names(instrument, filters):
     elif instrument == 'fgs':
         possible_filters = FGS_FILTERS
     else:
-        raise ValueError("Unrecognized instrument name: {}".format(instrument))
+        # Allow non-JWST instruments/filters to be used, in order
+        # to keep catalogs with non-JWST magnitude columns complete
+        headerstrs = []
+        for filter_val in filters:
+            headerstrs.append('{}_{}_magnitude'.format(instrument, filter_val.lower()))
+        return headerstrs
 
     headerstrs = []
     for filter_name in filters:
 
         # Check to be sure the filter is supported
         if filter_name.upper() not in possible_filters:
+            print(possible_filters)
             raise ValueError("{} is not recognized or not supported for {}.".format(filter_name, instrument))
 
         if instrument in ['niriss', 'fgs']:
@@ -977,6 +983,11 @@ def standardize_filters(instrument, filter_values):
                                           .format(filter_value)))
                     else:
                         full_names.append(parts[0])
+            else:
+                raise ValueError('{} is an unsupported filter value for NIRISS'.format(filter_value))
+    else:
+        # For instruments other than those on JWST (i.e. JHK), pass the filter name though unchanged
+        full_names.extend(filter_values)
     return full_names
 
 
