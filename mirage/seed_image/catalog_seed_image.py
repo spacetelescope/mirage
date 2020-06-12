@@ -3060,7 +3060,7 @@ class Catalog_seed():
             actual_pupil_name = self.params['Readout']['pupil'].lower()
             actual_filter_name = self.params['Readout']['filter'].lower()
             if actual_pupil_name in ['wlp8', 'wlm8']:
-                col_string = 'wlp8_{}'.format(actual_filter_name)
+                col_string = '{}_wlp8'.format(actual_filter_name)
             elif actual_filter_name == 'wlp4':
                 col_string = actual_filter_name
             else:
