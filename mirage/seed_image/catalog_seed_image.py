@@ -826,7 +826,7 @@ class Catalog_seed():
         # as this is the value DMS looks for.
         if self.params['Readout']['filter'] == "NA":
             self.params['Readout']['filter'] = "N/A"
-            if self.params['Readout']['pupil'] == "NA":
+        if self.params['Readout']['pupil'] == "NA":
             self.params['Readout']['pupil'] = "N/A"
         kw['FILTER'] = self.params['Readout']['filter']
         kw['PUPIL'] = self.params['Readout']['pupil']
@@ -3060,7 +3060,7 @@ class Catalog_seed():
             comb_str = '{}_{}'.format(actual_filter_name.lower(), actual_pupil_name.lower())
 
             # Construct the column header to look for
-            specific_mag_col = "nircam_{}_magnitude".format(comb_string)
+            specific_mag_col = "nircam_{}_magnitude".format(comb_str)
 
             # In order to be backwards compatible, if the newer column
             # name format (above) is not present, look for a column name
@@ -4200,7 +4200,7 @@ class Catalog_seed():
         # Get basic flux calibration information
         self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
             fluxcal_info(self.params['Reffiles']['flux_cal'], self.instrument, self.params['Readout']['filter'],
-                         self.params['Readout']['pupil'] detector, module)
+                         self.params['Readout']['pupil'], detector, module)
 
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings

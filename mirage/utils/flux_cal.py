@@ -60,10 +60,23 @@ def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, 
 
     # Get the photflambda and photfnu values that go with
     # the filter
-    mtch = ((zps['Detector'] == detector) &
-            (zps['Filter'] == filter_value) &
-            (zps['Pupil'] == pupil_value) &
-            (zps['Module'] == module))
+    if instrument.lower() == 'nircam':
+        # WLP8 and WLM8 have the same throughput, so the zeropoint file
+        # contains only the entry for WLP8. If the user gave WLM8, then
+        # be sure to look for the corresponding WLP8 entry.
+        matching_pupil = pupil_value
+        if matching_pupil == 'WLM8':
+            matching_pupil = 'WLP8'
+
+        mtch = ((zps['Detector'] == detector) &
+                (zps['Filter'] == filter_value) &
+                (zps['Pupil'] == matching_pupil) &
+                (zps['Module'] == module))
+
+    elif intrument.lower() in ['niriss', 'fgs']:
+        mtch = ((zps['Detector'] == detector) &
+                (zps['Filter'] == filter_value) &
+                (zps['Module'] == module))
 
     # Make sure the requested filter/pupil is allowed
     if not any(mtch):

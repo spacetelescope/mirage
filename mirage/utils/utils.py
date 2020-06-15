@@ -194,8 +194,8 @@ def check_nircam_filter(old_filter, old_pupil):
     new_pupil : str
         The proper PUPIL parameter for the requested NIRISS filter name
     """
-    filter_combo = '{}/{}'.format(oldfilter, oldpupil)
-    updated_combo = standardize_filters('nircam', [filter_combo])
+    filter_combo = '{}/{}'.format(old_filter, old_pupil)
+    updated_combo = standardize_filters('nircam', [filter_combo])[0]
     new_filter, new_pupil = updated_combo.split('/')
     return new_filter, new_pupil
 
@@ -588,6 +588,11 @@ def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_modul
 
     instrument = instrument.lower()
     if instrument == 'nircam':
+
+        # WLP8 and WLM8 have idenitcal throughput curves, so Mirage carries
+        # only throughput files for WLP8
+        if pupil_name.upper() == 'WLM8':
+            pupil_name = 'WLP8'
         tp_file = '{}_{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
                                                                              pupil_name.upper(),
                                                                              nircam_module.lower())
@@ -600,6 +605,8 @@ def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_modul
         raise ValueError('ERROR: invalid instrument: {}'.format(instrument))
 
     throughput_file = os.path.join(config_path, tp_file)
+    if not os.path.isfile(throughput_file):
+        raise FileNotFoundError('Throughput file {} does not exist.'.format(throughput_file))
     return throughput_file
 
 
