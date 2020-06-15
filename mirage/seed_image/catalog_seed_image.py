@@ -392,7 +392,8 @@ class Catalog_seed():
 
             # Save the combined static + moving targets ramp
             if self.params['Inst']['instrument'].lower() != 'fgs':
-                self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
+                self.seed_file = '{}_{}_{}_final_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                         self.params['Readout']['pupil'])
             else:
                 self.seed_file = '{}_final_seed_image.fits'.format(self.basename)
 
@@ -498,14 +499,14 @@ class Catalog_seed():
 
                 # Save the seed image segment to a file
                 if self.total_seed_segments_and_parts == 1:
-                    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                                  '_seed_image.fits')
+                    self.seed_file = '{}_{}_{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                       self.params['Readout']['pupil'])
                 else:
                     raise ValueError("ERROR: TSO seed file should not be split at this point.")
                     seg_string = str(self.segment_number).zfill(3)
                     part_string = str(self.segment_part_number).zfill(3)
-                    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                                  '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+                    self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                    self.params['Readout']['pupil'], seg_string, part_string)
 
                 self.seed_files.append(self.seed_file)
                 self.saveSeedImage(seed, segmap, self.seed_file)
@@ -559,8 +560,8 @@ class Catalog_seed():
                         print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
                         seg_string = str(self.segment_number).zfill(3)
                         part_string = str(self.segment_part_number).zfill(3)
-                        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                                      '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+                        self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout'][filter],
+                                                                                        self.params['Readout']['pupil'], seg_string, part_string)
 
                         self.saveSeedImage(seed, segmap, self.seed_file)
                         self.seed_files.append(self.seed_file)
@@ -823,9 +824,12 @@ class Catalog_seed():
 
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
-        if self.params['Readout'][self.usefilt] == "NA":
-            self.params['Readout'][self.usefilt] = "N/A"
-        kw['FILTER'] = self.params['Readout'][self.usefilt]
+        if self.params['Readout']['filter'] == "NA":
+            self.params['Readout']['filter'] = "N/A"
+            if self.params['Readout']['pupil'] == "NA":
+            self.params['Readout']['pupil'] = "N/A"
+        kw['FILTER'] = self.params['Readout']['filter']
+        kw['PUPIL'] = self.params['Readout']['pupil']
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
@@ -1906,7 +1910,8 @@ class Catalog_seed():
 
             # Save the point source seed image
             if instrument_name != 'fgs':
-                self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+                self.ptsrc_seed_filename = '{}_{}_{}_ptsrc_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                   self.params['Readout']['pupil'])
             else:
                 self.ptsrc_seed_filename = '{}_ptsrc_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.point_source_seed, self.point_source_seg_map, self.ptsrc_seed_filename)
@@ -1947,7 +1952,8 @@ class Catalog_seed():
 
             # Save the galaxy source seed image
             if instrument_name != 'fgs':
-                self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+                self.galaxy_seed_filename = '{}_{}_{}_galaxy_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                     self.params['Readout']['pupil'])
             else:
                 self.galaxy_seed_filename = '{}_galaxy_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.galaxy_source_seed, self.galaxy_source_seg_map, self.galaxy_seed_filename)
@@ -1995,7 +2001,8 @@ class Catalog_seed():
 
             # Save the extended source seed image
             if instrument_name != 'fgs':
-                self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+                self.extended_seed_filename = '{}_{}_{}_extended_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                         self.params['Readout']['pupil'])
             else:
                 self.extended_seed_filename = '{}_extended_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.extended_source_seed, self.extended_source_seg_map, self.extended_seed_filename)
@@ -3047,28 +3054,38 @@ class Catalog_seed():
             The name of the catalog column to use for source magnitudes
         """
         # Determine the filter name to look for
-        if self.params['Inst']['instrument'].lower() in ['nircam', 'niriss']:
-        #    if self.params['Readout']['pupil'][0].upper() == 'F':
-        #        usefilt = 'pupil'
-        #    else:
-        #        usefilt = 'filter'
-            filter_name = self.params['Readout'][self.usefilt].lower()
-
-            # Check for weak lens entries. If a weak lens is used, the
-            # magnitude column name will contain the weak lens and filter
-            # name.
+        if self.params['Inst']['instrument'].lower() == 'nircam':
             actual_pupil_name = self.params['Readout']['pupil'].lower()
             actual_filter_name = self.params['Readout']['filter'].lower()
-            if actual_pupil_name in ['wlp8', 'wlm8']:
-                col_string = '{}_wlp8'.format(actual_filter_name)
-            elif actual_filter_name == 'wlp4':
-                col_string = actual_filter_name
-            else:
-                col_string = filter_name
+            comb_str = '{}_{}'.format(actual_filter_name.lower(), actual_pupil_name.lower())
 
             # Construct the column header to look for
-            specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(),
-                                                        col_string)
+            specific_mag_col = "nircam_{}_magnitude".format(comb_string)
+
+            # In order to be backwards compatible, if the newer column
+            # name format (above) is not present, look for a column name
+            # that follows the old format, which uses just the filter name
+            # for cases where a filter is paired with CLEAR in the pupil
+            # wheel, or where only the name of the narrower filter is used
+            # for cases where a narrow filter in the pupil wheel is crossed
+            # with a wide filter in the filter wheel
+            if specific_mag_col not in catalog.colnames:
+                if actual_pupil_name == 'clear':
+                    specific_mag_col = "nircam_{}_magnitude".format(actual_filter_name)
+                elif actual_pupil_name[0] == 'f' and actual_filter_name[0] == 'f':
+                    specific_mag_col = "nircam_{}_magnitude".format(actual_pupil_name)
+                elif actual_pupil_name in ['wlp8', 'wlm8']:
+                    # Weak lenses were not supported with the old column
+                    # name format, so if the new format column name is not
+                    # present, then we can only fall back to looking for
+                    # a generic 'magnitude' column.
+                    pass
+
+        elif self.params['Inst']['instrument'].lower() == 'niriss':
+            if self.params['Readout']['pupil'][0].upper() == 'F':
+                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['pupil'][0].lower())
+            else:
+                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['filter'][0].lower())
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
             specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
@@ -4163,16 +4180,15 @@ class Catalog_seed():
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
         if self.instrument == 'niriss':
-            newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
+            newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],
+                                                            self.params['Readout']['pupil'])
             self.params['Readout']['filter'] = newfilter
             self.params['Readout']['pupil'] = newpupil
-
-        # Make sure the requested filter is allowed. For imaging, all filters
-        # are allowed. In the future, other modes will be more restrictive
-        if self.params['Readout']['pupil'][0].upper() == 'F':
-            self.usefilt = 'pupil'
-        else:
-            self.usefilt = 'filter'
+        elif self.instrument == 'nircam':
+            newfilter, newpupil = utils.check_nircam_filter(self.params['Readout']['filter'],
+                                                            self.params['Readout']['pupil'])
+            self.params['Readout']['filter'] = newfilter
+            self.params['Readout']['pupil'] = newpupil
 
         # If instrument is FGS, then force filter to be 'NA' for the purposes
         # of constructing the correct PSF input path name. Then change to be
@@ -4183,7 +4199,8 @@ class Catalog_seed():
 
         # Get basic flux calibration information
         self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
-            fluxcal_info(self.params, self.usefilt, detector, module)
+            fluxcal_info(self.params['Reffiles']['flux_cal'], self.instrument, self.params['Readout']['filter'],
+                         self.params['Readout']['pupil'] detector, module)
 
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -4240,7 +4257,8 @@ class Catalog_seed():
                 # Find the appropriate filter throughput file
                 if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
                     filter_file = utils.get_filter_throughput_file(self.params['Inst']['instrument'].lower(),
-                                                                   self.params['Readout'][self.usefilt],
+                                                                   self.params['Readout']['filter'],
+                                                                   self.params['Readout']['pupil'],
                                                                    fgs_detector=detector, nircam_module=module)
                 else:
                     filter_file = self.params['Reffiles']['filter_throughput']

@@ -171,10 +171,38 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xdim / amps + colpad) * (ydim + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter(oldfilter, oldpupil):
+def check_nircam_filter(old_filter, old_pupil):
+    """This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRCam the filter and pupil names are correct, relieving the user of the need to remember which of the
+    filters are in the filter wheel and which are in the pupil wheel.
+
+    Parameters
+    ----------
+
+    old_filter :  str
+        Assumed to be the self.params['Readout']['filter'] value from the .yaml file
+
+    old_pupil :  str
+        Assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+
+    Returns
+    -------
+
+    new_filter : str
+        The proper FILTER parameter for the requested NIRISS filter name
+
+    new_pupil : str
+        The proper PUPIL parameter for the requested NIRISS filter name
     """
-    This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
-    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
+    filter_combo = '{}/{}'.format(oldfilter, oldpupil)
+    updated_combo = standardize_filters('nircam', [filter_combo])
+    new_filter, new_pupil = updated_combo.split('/')
+    return new_filter, new_pupil
+
+
+def check_niriss_filter(oldfilter, oldpupil):
+    """This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRISS the filter and pupil names are correct, relieving the user of the need to remember which of the 12
     filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and
     pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil
     parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a
@@ -527,7 +555,7 @@ def get_frame_count_info(numints, numgroups, numframes, numskips, numresets):
     return frames_per_group, frames_per_integration, total_frames
 
 
-def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_detector=None):
+def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_module=None, fgs_detector=None):
     """Locate the filter throughput file in the config directory that
     corresponds to the given instrument/module/filter
 
@@ -538,6 +566,10 @@ def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_
 
     filter_name : str
         Name of the filter. Ignored in the case of FGS.
+
+    pupil_name : str
+        Name of the optical element in the pupil wheel.
+        Only used for NIRCam cases.
 
     nircam_module : str
         Name of module. Ignored except in the case of NIRCam
@@ -556,8 +588,9 @@ def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_
 
     instrument = instrument.lower()
     if instrument == 'nircam':
-        tp_file = '{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
-                                                                          nircam_module.lower())
+        tp_file = '{}_{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
+                                                                             pupil_name.upper(),
+                                                                             nircam_module.lower())
     elif instrument == 'niriss':
         tp_file = '{}_niriss_throughput1.txt'.format(filter_name.lower())
     elif instrument == 'fgs':

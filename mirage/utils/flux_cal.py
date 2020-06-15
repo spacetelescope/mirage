@@ -34,7 +34,7 @@ def add_detector_to_zeropoints(detector, zeropoint_table):
     return base_table
 
 
-def fluxcal_info(params, usefilt, detector, module):
+def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, module):
     """Retrive basic flux calibration information from the ascii file in
     the repository
 
@@ -43,35 +43,33 @@ def fluxcal_info(params, usefilt, detector, module):
     params : dict
         Nested dictionary containing the input yaml file parameters
 
-    usefile : str
-        Either 'filter' or 'pupil', corresponding to which yaml
-        parameter contains the optical element to use for flux cal
-
     Returns
     -------
     detector : str
         Name of the detector (e.g. NRCA1)
     """
-    zpts = read_zeropoint_file(params['Reffiles']['flux_cal'])
+    zpts = read_zeropoint_file(fluxcal_file)
 
     # In the future we expect zeropoints to be detector dependent, as they
     # currently are for FGS. So if we are working with NIRCAM or NIRISS,
     # manually add a Detector key to the dictionary as a placeholder.
-    if params["Inst"]["instrument"].lower() in ["nircam", "niriss"]:
+    if instrument.lower() in ["nircam", "niriss"]:
         zps = add_detector_to_zeropoints(detector, zpts)
     else:
         zps = copy.deepcopy(zpts)
 
-    # Make sure the requested filter is allowed
-    if params['Readout'][usefilt] not in zps['Filter']:
-        raise ValueError(("WARNING: requested filter {} is not in the list of "
-                          "possible filters.".format(params['Readout'][usefilt])))
-
     # Get the photflambda and photfnu values that go with
     # the filter
     mtch = ((zps['Detector'] == detector) &
-            (zps['Filter'] == params['Readout'][usefilt]) &
+            (zps['Filter'] == filter_value) &
+            (zps['Pupil'] == pupil_value) &
             (zps['Module'] == module))
+
+    # Make sure the requested filter/pupil is allowed
+    if not any(mtch):
+        raise ValueError(("WARNING: requested filter and pupil values of {} and {} are not in the list of "
+                          "possible options.".format(filter_value, pupil_value)))
+
     vegazeropoint = zps['VEGAMAG'][mtch][0]
     photflam = zps['PHOTFLAM'][mtch][0]
     photfnu = zps['PHOTFNU'][mtch][0]
