@@ -47,10 +47,10 @@ def test_make_mag_column_names():
 
 def test_standardize_filters():
     instrument = 'nircam'
-    filters = ['F090W', 'F070W/CLEAR', 'CLEAR/F444W', 'F090W/WLP8', 'WLM8/F115W', 'F322W2/F323N', 'F470N/F444W']
+    filters = ['F090W', 'F070W/CLEAR', 'CLEAR/F444W', 'F090W/WLP8', 'WLM8/F115W', 'F322W2/F323N', 'F470N/F444W', 'F405N']
     std_nircam = utils.standardize_filters(instrument, filters)
 
-    truth = ['F090W/CLEAR', 'F070W/CLEAR', 'F444W/CLEAR', 'F090W/WLP8', 'F115W/WLM8', 'F322W2/F323N', 'F444W/F470N']
+    truth = ['F090W/CLEAR', 'F070W/CLEAR', 'F444W/CLEAR', 'F090W/WLP8', 'F115W/WLM8', 'F322W2/F323N', 'F444W/F470N', 'F444W/F405N']
     for std, expected in zip(std_nircam, truth):
         assert std == expected
 

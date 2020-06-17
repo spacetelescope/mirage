@@ -73,9 +73,13 @@ def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, 
                 (zps['Pupil'] == matching_pupil) &
                 (zps['Module'] == module))
 
-    elif intrument.lower() in ['niriss', 'fgs']:
+    elif instrument.lower() in ['niriss', 'fgs']:
+        matching_filter = filter_value
+        if filter_value.upper() in ['CLEAR', 'CLEARP']:
+            matching_filter = pupil_value
+
         mtch = ((zps['Detector'] == detector) &
-                (zps['Filter'] == filter_value) &
+                (zps['Filter'] == matching_filter) &
                 (zps['Module'] == module))
 
     # Make sure the requested filter/pupil is allowed

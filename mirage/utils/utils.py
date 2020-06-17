@@ -658,6 +658,17 @@ def get_subarray_info(params, subarray_table):
     return params
 
 
+def normalize_filters(instrument, filter_name, pupil_name):
+    """Modify filter/pupil values to be consistent with the filter/pupil wheels
+    that they are in.
+    """
+    if instrument.lower() == 'niriss':
+        newfilter, newpupil = check_niriss_filter(filter_name, pupil_name)
+    elif instrument.lower() == 'nircam':
+        newfilter, newpupil = check_nircam_filter(filter_name, pupil_name)
+    return newfilter, newpupil
+
+
 def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam=None,
                            vegamag_zeropoint=None):
     """Convert a given source magnitude into count rate

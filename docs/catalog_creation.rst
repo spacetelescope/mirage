@@ -17,7 +17,9 @@ Point Source Catalog
 
 The examples below create point source catalogs containing 10 sources. By supplying source locations via the `ra` and `dec` keywords, `Mirage` assumes that the locations are Right Ascention and Declination values given in decimal degrees. If you wish to specify source locations in units of row and column indexes on the detector, then the `x` and `y` keywords should be used, as seen in the second example below.
 
-Columns containing AB magnitudes in the NIRCam F200W and F212N filters, as well as the NIRISS F090W filter are added to the catalog using the `add_magnitude_column` method. Note that the instrument and filter names associated with the magnitude values must be supplied in these calls. The `mag_sys` keyword is optional and allows uses to specify the magnitude system. Allowed values are "abmag", "stmag", and "vegamag". The default is "abmag". **Note that all magnitude columns in a given catalog MUST be in the same magnitude system.**
+Columns containing AB magnitudes in the NIRCam F200W and F212N filters, as well as the NIRISS F090W filter are added to the catalog using the `add_magnitude_column` method. Note that the instrument and filter names associated with the magnitude values must be supplied in these calls. The filter value can be a string containing the filter wheel and pupil wheel values to be used, separated by a "/" (e.g. "F444W/F405N", "F444W/CLEAR", "F150W/WLM8"). As a shorthand, in cases where the CLEAR element in the pupil wheel is used, you can provide only the filter wheel value in the string (e.g. "F444W", "F090W"). Similarly, for the "standard" narrow band filter combinations (defined here: XXXXXX), you can provide only the name of the narrow band filter, and Mirage will assume that you are using one of the standard cases (e.g. specifying "F405N" will have Mirage assume you mean F405N crossed with F444W). For non-standard filter crossing, use the "/" format above and specify both filters.
+
+The `mag_sys` keyword is optional and allows uses to specify the magnitude system. Allowed values are "abmag", "stmag", and "vegamag". The default is "abmag". **Note that all magnitude columns in a given catalog MUST be in the same magnitude system.**
 
 Once the catalog has been created and at least one magnitude column has been added, the table can be printed to the screen using the `table` method.
 
@@ -33,11 +35,15 @@ The `save` method will save the table in an ascii file in the appropriate format
 
     nrc_f200w_mag = np.random.random(10) + 16.
     nrc_f212n_mag = np.random.random(10) + 19.
+    nrc_f405n_mag = np.random.random(10) + 20.
+    nrc_f150_wlp8_mag = np.random.random(10) + 19.
     nis_f090w_mag = np.random.random(10) + 15.5
 
     ptsrc = catalog_generator.PointSourceCatalog(ra=ra_list, dec=dec_list)
     ptsrc.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
+    ptsrc.add_magnitude_column(nrc_f405n_mag, instrument='nircam', filter='F444W/F405N', mag_sys='abmag')
+    ptsrc.add_magnitude_column(nrc_f150_wlp8_mag, intsrument='nircam', filter='F150W/WLP8', mag_sys='abmag')
     ptsrc.add_magnitude_column(nis_f090w_mag, instrument='niriss', filter='F090W', mag_sys='abmag')
     ptsrc.save('point_sources.cat')
     ptsrc.table()
@@ -100,7 +106,7 @@ The **get_all_catalogs** function takes the RA and Dec of a particular pointing 
     ra = 80.4  # degrees
     dec = -69.8  # degrees
     box_width = 120  # arcseconds
-    filter_list = ['F444W', 'F480M']
+    filter_list = ['F444W', 'F480M', 'F150W/WLM8', 'F444W/F405N']
     cat, mag_column_names = create_catalog.get_all_catalogs(ra, dec, box_width, besancon_catalog_file='besancon.cat',
                                                             instrument='NIRCAM', filters=filter_list
                                                             )

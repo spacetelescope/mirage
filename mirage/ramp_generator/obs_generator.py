@@ -1037,6 +1037,10 @@ class Observation():
         # Read in the parameter file
         self.read_parameter_file()
 
+        # Make filter/pupil values respect the filter/pupil wheel they are in
+        self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
+            utils.normalize_filters(self.params['Inst']['instrument'], self.params['Readout']['filter'], self.params['Readout']['pupil'])
+
         # Create dictionary to use when looking in CRDS for reference files
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 

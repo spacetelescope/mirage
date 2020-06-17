@@ -119,6 +119,10 @@ class Catalog_seed():
         self.seed_files = []
         self.readParameterFile()
 
+        # Make filter/pupil values respect the filter/pupil wheel they are in
+        self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
+            utils.normalize_filters(self.params['Inst']['instrument'], self.params['Readout']['filter'], self.params['Readout']['pupil'])
+
         # Create dictionary to use when looking in CRDS for reference files
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
@@ -241,15 +245,8 @@ class Catalog_seed():
 
         # Read in the PSF library file corresponding to the detector and filter
         # For WFSS simulations, use the PSF libraries with the appropriate CLEAR element
-        self.psf_pupil = self.params['Readout']['pupil']
-        self.psf_filter = self.params['Readout']['filter']
-        if self.params['Readout']['pupil'].lower() in ['grismr', 'grismc']:
-            self.psf_pupil = 'CLEAR'
-        if self.params['Readout']['filter'].lower() in ['gr150r', 'gr150c']:
-            self.psf_filter = 'CLEAR'
+        self.prepare_psf_entries()
 
-        # If reading in a normal PSF, use get_gridded_psf_library to get a
-        # single photutils.griddedPSFModel object
         if not self.expand_catalog_for_segments:
             self.psf_library = get_gridded_psf_library(
                 self.params['Inst']['instrument'], self.detector, self.psf_filter, self.psf_pupil,
@@ -667,6 +664,17 @@ class Catalog_seed():
         if len(data.shape) != 2:
             data, header = fits.getdata(filename, 1)
         return data, header
+
+    def prepare_psf_entries(self):
+        """Get the correct filter and pupil values to use when searching
+        for gridded psf libraries
+        """
+        self.psf_pupil = self.params['Readout']['pupil']
+        self.psf_filter = self.params['Readout']['filter']
+        if self.params['Readout']['pupil'].lower() in ['grismr', 'grismc']:
+            self.psf_pupil = 'CLEAR'
+        if self.params['Readout']['filter'].lower() in ['gr150r', 'gr150c']:
+            self.psf_filter = 'CLEAR'
 
     def prepare_flat(self):
         """
@@ -3083,12 +3091,12 @@ class Catalog_seed():
 
         elif self.params['Inst']['instrument'].lower() == 'niriss':
             if self.params['Readout']['pupil'][0].upper() == 'F':
-                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['pupil'][0].lower())
+                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['pupil'].lower())
             else:
-                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['filter'][0].lower())
+                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['filter'].lower())
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
-            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
+            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_').lower())
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
@@ -4178,17 +4186,6 @@ class Catalog_seed():
                 module = detector[0]
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
-
-        if self.instrument == 'niriss':
-            newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],
-                                                            self.params['Readout']['pupil'])
-            self.params['Readout']['filter'] = newfilter
-            self.params['Readout']['pupil'] = newpupil
-        elif self.instrument == 'nircam':
-            newfilter, newpupil = utils.check_nircam_filter(self.params['Readout']['filter'],
-                                                            self.params['Readout']['pupil'])
-            self.params['Readout']['filter'] = newfilter
-            self.params['Readout']['pupil'] = newpupil
 
         # If instrument is FGS, then force filter to be 'NA' for the purposes
         # of constructing the correct PSF input path name. Then change to be
