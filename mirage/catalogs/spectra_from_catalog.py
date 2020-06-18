@@ -287,20 +287,7 @@ def get_filter_info(column_names, magsys):
 
     if instrument in ['nircam', 'niriss']:
         for entry in column_names:
-
-            column_parts = entry.split('_')
-            if len(column_parts) == 4:
-                filt_pup_str = '{}/{}'.format(column_parts[1], column_parts[2])
-            elif len(column_parts) == 3:
-                filt_pup_str = column_parts[1]
-
-            std_filt_pup_str = standardize_filters(instrument, [filt_pup_str])
-            std_parts = std_filt_pup_str[0].split('/')
-            if len(std_parts) == 2:
-                filter_name, pupil_name = std_parts
-            elif len(std_parts) == 1:
-                filter_name = std_parts[0]
-                pupil_name = 'none'
+            filter_name, pupil_name = mag_col_name_to_filter_pupil(entry)
 
             # NIRCam zeropoint files have entries for WLP8 but not WLM8 since
             # they are identical
