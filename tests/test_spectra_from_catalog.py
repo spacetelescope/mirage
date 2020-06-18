@@ -233,6 +233,7 @@ def test_spectra_rescaling():
     # Instrument info
     instrument = ['nircam', 'niriss']  # , 'fgs']
     filter_name = ['F322W2', 'F090W']  # , 'N/A']
+    pupil_name = ['CLEAR', 'none']
     module = ['B', 'N']  # , 'F']
     detector = ['NRCA1', 'NIS']  # , 'GUIDER1']
 
@@ -240,7 +241,7 @@ def test_spectra_rescaling():
     mag_sys = ['vegamag', 'abmag', 'stmag']
 
     # Loop over options and test each
-    for inst, filt, mod, det in zip(instrument, filter_name, module, detector):
+    for inst, filt, pup, mod, det in zip(instrument, filter_name, pupil_name, module, detector):
 
         # Extract the appropriate column from the catalog information
         magcol = [col for col in catalog.colnames if inst in col]
@@ -248,7 +249,8 @@ def test_spectra_rescaling():
 
         # Filter throughput files
         filter_thru_file = get_filter_throughput_file(instrument=inst, filter_name=filt,
-                                                      nircam_module=mod, fgs_detector=det)
+                                                      pupil_name=pup, nircam_module=mod,
+                                                      fgs_detector=det)
 
         # Retrieve the correct gain value that goes with the fluxcal info
         if inst == 'nircam':

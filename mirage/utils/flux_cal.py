@@ -7,6 +7,8 @@ from astropy.table import Column
 import copy
 import numpy as np
 
+from mirage.utils.utils import standardize_filters
+
 
 def add_detector_to_zeropoints(detector, zeropoint_table):
     """Manually add detector dependence to the zeropoint table for
@@ -93,6 +95,41 @@ def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, 
     pivot = zps['Pivot_wave'][mtch][0]
 
     return vegazeropoint, photflam, photfnu, pivot
+
+
+def mag_col_name_to_filter_pupil(colname):
+    """Given a magnitude column name from a source catalog
+    find the filter and pupil name
+
+    Parameters
+    ----------
+    colname : str
+        Column name (e.g 'nircam_f090w_magnitude', 'nircam_f090w_clear_magnitude')
+
+    Returns
+    -------
+    filter_name : str
+        Name of filter (e.g. 'f090w')
+
+    pupil_name : str
+        Name of pupil (e.g. 'clear')
+    """
+    mag_parts = colname.split('_')
+    instrument = mag_parts[0].lower()
+    if len(mag_parts) == 4:
+        filt_pup_str = '{}/{}'.format(mag_parts[1], mag_parts[2])
+    elif len(mag_parts) == 3:
+        filt_pup_str = mag_parts[1]
+
+    std_filt_pup_str = standardize_filters(instrument, [filt_pup_str])
+    std_parts = std_filt_pup_str[0].split('/')
+    if len(std_parts) == 2:
+        filter_name = std_parts[0].lower()
+        pupil_name = std_parts[1].lower()
+    elif len(std_parts) == 1:
+        filter_name = std_parts
+        pupil_name = 'NONE'
+    return filter_name, pupil_name
 
 
 def read_zeropoint_file(filename):
