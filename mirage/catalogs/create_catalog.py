@@ -736,10 +736,6 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
         filt_list = make_mag_column_names(instrument.lower(), filters[instrument])
         all_filters.extend(filt_list)
 
-
-    print('all_filters: ', all_filters)
-
-
     # Read in the input catalog
     catalog = ascii.read(catalog_file)
 
@@ -2237,7 +2233,10 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             seedvalue = seed
     np.random.seed(seedvalue)
     threshold = outarea/goodss_area
-    filter_names = make_mag_column_names(instrument, filters)
+
+    # Standardize the input filter names
+    std_filters = standardize_filters(instrument, filters)
+    filter_names = make_mag_column_names(instrument, std_filters)
     nfilters = len(filter_names)
     if nfilters < 1:
         print('Error matching filters to standard list.  Inputs are:')
@@ -2252,21 +2251,21 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     filterinds = {'niriss_f090w_magnitude': 0, 'niriss_f115w_magnitude': 1,
                   'niriss_f150w_magnitude': 2, 'niriss_f200w_magnitude': 3,
                   'niriss_f140m_magnitude': 4, 'niriss_f158m_magnitude': 5,
-                  'nircam_f070w_magnitude': 6, 'nircam_f090w_magnitude': 7,
-                  'nircam_f115w_magnitude': 8, 'nircam_f150w_magnitude': 9,
-                  'nircam_f200w_magnitude': 10, 'nircam_f150w2_magnitude': 11,
-                  'nircam_f140m_magnitude': 12, 'nircam_f162m_magnitude': 13,
-                  'nircam_f182m_magnitude': 14, 'nircam_f210m_magnitude': 15,
-                  'nircam_f164n_magnitude': 16, 'nircam_f187n_magnitude': 17,
-                  'nircam_f212n_magnitude': 18, 'nircam_f277w_magnitude': 19,
-                  'nircam_f356w_magnitude': 20, 'nircam_f444w_magnitude': 21,
-                  'nircam_f322w2_magnitude': 22, 'nircam_f250m_magnitude': 23,
-                  'nircam_f300m_magnitude': 24, 'nircam_f335m_magnitude': 25,
-                  'nircam_f360m_magnitude': 26, 'nircam_f410m_magnitude': 27,
-                  'nircam_f430m_magnitude': 28, 'nircam_f460m_magnitude': 29,
-                  'nircam_f480m_magnitude': 30, 'nircam_f323n_magnitude': 31,
-                  'nircam_f405n_magnitude': 32, 'nircam_f466n_magnitude': 33,
-                  'nircam_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
+                  'nircam_f070w_clear_magnitude': 6, 'nircam_f090w_clear_magnitude': 7,
+                  'nircam_f115w_clear_magnitude': 8, 'nircam_f150w_clear_magnitude': 9,
+                  'nircam_f200w_clear_magnitude': 10, 'nircam_f150w2_clear_magnitude': 11,
+                  'nircam_f140m_clear_magnitude': 12, 'nircam_f150w2_f162m_magnitude': 13,
+                  'nircam_f182m_clear_magnitude': 14, 'nircam_f210m_clear_magnitude': 15,
+                  'nircam_f150w2_f164n_magnitude': 16, 'nircam_f187n_clear_magnitude': 17,
+                  'nircam_f212n_clear_magnitude': 18, 'nircam_f277w_clear_magnitude': 19,
+                  'nircam_f356w_clear_magnitude': 20, 'nircam_f444w_clear_magnitude': 21,
+                  'nircam_f322w2_clear_magnitude': 22, 'nircam_f250m_clear_magnitude': 23,
+                  'nircam_f300m_clear_magnitude': 24, 'nircam_f335m_clear_magnitude': 25,
+                  'nircam_f360m_clear_magnitude': 26, 'nircam_f410m_clear_magnitude': 27,
+                  'nircam_f430m_clear_magnitude': 28, 'nircam_f460m_clear_magnitude': 29,
+                  'nircam_f480m_clear_magnitude': 30, 'nircam_f322w2_f323n_magnitude': 31,
+                  'nircam_f444w_f405n_magnitude': 32, 'nircam_f444w_f466n_magnitude': 33,
+                  'nircam_f444w_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
                   'niriss_f356w_magnitude': 20, 'niriss_f380m_magnitude': 26,
                   'niriss_f430m_magnitude': 28, 'niriss_f444w_magnitude': 21,
                   'niriss_f480m_magnitude': 30, 'fgs_guider1_magnitude': 11,
@@ -2281,7 +2280,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             outinds[loop] = filterinds[filter] + 8
             loop = loop+1
     except:
-        print('Error matching filter %s to standard list.' % (filter))
+        print('Error matching filter %s to those available in 3D-HST catalog.' % (filter))
         return None, None
     # The following variables hold the Sersic profile index values
     # (radius [arc-seconds], sersic index, ellipticity, position angle)
@@ -2338,16 +2337,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
         mag1 = catalog_values[outputinds, outinds[loop]]
         dmag1 = -0.2*np.random.random(nout)+0.1
         mag1 = mag1 + dmag1
-        if 'niriss' in filter_names[loop]:
-            inst1 = 'NIRISS'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        elif 'nircam' in filter_names[loop]:
-            inst1 = 'NIRCam'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        else:
-            inst1 = 'FGS'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        galaxy_cat.add_magnitude_column(mag1, instrument=inst1,
-                                        filter_name=filter_name,
+
+        galaxy_cat.add_magnitude_column(mag1, #instrument=inst1,
+                                        column_name=filter_name,
                                         magnitude_system='abmag')
     return galaxy_cat, seedvalue
