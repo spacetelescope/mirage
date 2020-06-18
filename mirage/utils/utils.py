@@ -597,7 +597,10 @@ def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_modul
                                                                              pupil_name.upper(),
                                                                              nircam_module.lower())
     elif instrument == 'niriss':
-        tp_file = '{}_niriss_throughput1.txt'.format(filter_name.lower())
+        element = filter_name
+        if filter_name in ['CLEAR', 'CLEARP', 'GR150R', 'GR150C']:
+            element = pupil_name
+        tp_file = '{}_niriss_throughput1.txt'.format(element.lower())
     elif instrument == 'fgs':
         det_number = fgs_detector[-1]
         tp_file = 'guider{}_throughput_py.txt'.format(det_number)
@@ -978,7 +981,7 @@ def standardize_filters(instrument, filter_values):
     if instrument.lower() == 'fgs':
         return filter_values
     elif instrument.lower() == 'nircam':
-        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR']
+        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC']
         reverse_nircam_2_filter_crosses = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in NIRCAM_2_FILTER_CROSSES]
         wlp8_combinations = ['{}/WLP8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
         wlm8_combinations = ['{}/WLM8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]

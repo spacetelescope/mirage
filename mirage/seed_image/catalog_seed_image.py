@@ -3065,6 +3065,11 @@ class Catalog_seed():
         if self.params['Inst']['instrument'].lower() == 'nircam':
             actual_pupil_name = self.params['Readout']['pupil'].lower()
             actual_filter_name = self.params['Readout']['filter'].lower()
+
+            # If a grism is in the pupil wheel, replace it with a filter
+            if actual_pupil_name.lower() in ['grismr', 'grismc']:
+                actual_pupil_name = 'clear'
+
             comb_str = '{}_{}'.format(actual_filter_name.lower(), actual_pupil_name.lower())
 
             # Construct the column header to look for
@@ -3877,7 +3882,7 @@ class Catalog_seed():
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
 
-        rotated = rotate(stamp_image, x_pos_angle, mode='constant', cval=0.)
+        rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
 
     def make_extended_source_image(self, extSources, extStamps):
