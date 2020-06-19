@@ -111,6 +111,11 @@ class Catalog_seed():
         # with multiple sources having the same index numbers
         self.maxindex = 0
 
+        # Number of sources on the detector
+        self.n_pointsources = 0
+        self.n_galaxies = 0
+        self.n_extend = 0
+
     def make_seed(self):
         """MAIN FUNCTION"""
         print('\n\nRunning catalog_seed_image..\n')
@@ -377,9 +382,17 @@ class Catalog_seed():
 
             # For NIRISS POM data, extract the central 2048x2048
             if self.params['Inst']['mode'] in ["pom"]:
+                # Expose the full-sized pom seed image
+                self.pom_seed = copy.deepcopy(self.seedimage)
+                self.pom_segmap = copy.deepcopy(self.seed_segmap)
+
+                # Save the full-sized pom seed image to a file
+                self.pom_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_pom_seed_image.fits')
+                self.saveSeedImage(self.pom_seed, self.pom_segmap, self.pom_file)
+                print('Full POM seed image saved as: {}'.format(self.pom_file))
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
                 # Multiply the mask by the seed image and segmentation map in
                 # order to reflect the fact that reference pixels have no signal
                 # from external sources. Seed images to be dispersed do not have
@@ -900,7 +913,7 @@ class Catalog_seed():
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
-        if self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
+        if self.params['Inst']['mode'] in ['wfss', 'ts_grism', 'pom']:
             kw['NOMXDIM'] = self.ffsize
             kw['NOMYDIM'] = self.ffsize
             kw['NOMXSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
@@ -2254,7 +2267,11 @@ class Catalog_seed():
                              (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts, tso_catalog))
 
         self.n_pointsources = len(pointSourceList)
-        print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+        if self.n_pointsources > 0:
+            print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+        else:
+            print("\nINFO: No point sources present on the detector.")
+
         # close the output file
         pslist.close()
 
@@ -2472,7 +2489,7 @@ class Catalog_seed():
 
             scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
-                segment_number=segment_number
+                segment_number=segment_number, ignore_detector=True
             )
 
             # Skip sources that fall completely off the detector
@@ -3390,12 +3407,10 @@ class Catalog_seed():
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
-        print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
-
-        if self.n_galaxies == 0:
-            if self.n_pointsources == 0:
-                raise ValueError(('No point sources or galaxies found in input catalog; empty seed image '
-                                  'would be created.'))
+        if self.n_galaxies > 0:
+            print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
+        else:
+            print("\nINFO: No galaxies present within the aperture.")
 
         filteredList.meta['comments'] = [("Field center (degrees): %13.8f %14.8f y axis rotation angle "
                                           "(degrees): %f  image size: %4.4d %4.4d\n" %
@@ -3881,7 +3896,6 @@ class Catalog_seed():
         # if no WCS:
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
-
         rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
 
@@ -3981,6 +3995,12 @@ class Catalog_seed():
                 indseg = self.seg_from_photutils(stamp[l1:l2, k1:k2] * entry['countrate_e/s'],
                                                  entry['index'], noiseval)
                 segmentation.segmap[j1:j2, i1:i2] += indseg
+                self.n_extend += 1
+
+        if self.n_extend == 0:
+            print("No extended sources present within the aperture.")
+        else:
+            print('Number of extended sources present within the aperture: {}'.format(self.n_extend))
         return extimage, segmentation.segmap
 
     def enlarge_stamp(self, image, dims):

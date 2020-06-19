@@ -2178,6 +2178,113 @@ class SimInput:
         return parser
 
 
+def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
+    """Call JWST GTVT to retrieve nominal observatory position angle (V3 PA) for given coordinates and date
+
+    This is a lower-level util function; most MIRAGE users should typically use default_obs_v3pa_on_date or
+    all_obs_v3pa_on_date instead.
+
+    Parameters
+    ----------
+    ra, dec : strings
+        RA and Dec in sexagesimal format
+    date : string
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+    return_range : bool
+        Return tuple including the range accessible via observatory roll, i.e. (v3pa, min_v3pa, max_v3pa)
+
+    Returns
+    -------
+    pa_v3 : float
+        V3PA in degrees
+    """
+    import jwst_gtvt.find_tgt_info
+
+    if date is None:
+        start_date = datetime.date.today()
+    else:
+        start_date = datetime.date.fromisoformat(date)
+    # note, get_table requires distinct start and end dates, different by at least 1 day
+    end_date = start_date + datetime.timedelta(days=1)
+
+    tbl = jwst_gtvt.find_tgt_info.get_table(ra=ra, dec=dec, instrument='NIRCam',
+                                            start_date=start_date.isoformat(), end_date=end_date.isoformat(),
+                                            verbose=False)
+    row = tbl[0]
+
+    if return_range:
+        return row['V3PA'], row['V3PA min'], row['V3PA max']
+    return row['V3PA']
+
+
+def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=False, pointing_table=None):
+    """Find the nominal/default V3PA for an observation on a given date.
+
+    Note, this relies on the JWST Generalized Target Visibility Tool (GTVT), and as such it
+    just considers the basic spherical geometry of the sky. It does *NOT* take into account
+    any special requirements defined in APT.
+
+    Parameters
+    ----------
+    pointing_filename : string
+        Pointing file filename exported by APT
+    obs_num : int
+        Observation number.
+    date : str or None
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+    pointing_table : dict, optional
+        Dictionary of info read from pointing filename; alternate input for this in case it's already been read from disk
+
+    Returns
+    -------
+    pa : float
+        V3PA in decimal degrees. Provide this to the `roll_angle` argument to mirage.yaml_generator()
+    """
+
+    if pointing_table is None:
+        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+    for i in range(len(pointing_table['obs_num'])):
+        if pointing_table['obs_num'][i] == f"{obs_num:03d}":
+            ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
+            if verbose:
+                print(f"Pointing table row {i} is for obs {obs_num}")
+                print(f" Coords from APT pointing file: {ra_deg} {dec_deg} deg")
+            break
+    else:
+        raise RuntimeError(f"Could not find any info for an observation number {obs_num} in the pointing table.")
+
+    result = _gtvt_v3pa_on_date(ra_deg, dec_deg, date=date)
+    if np.isnan(result):
+        raise RuntimeError("Obs {obs_num} is not observable on date {date}. Target not in the field of regard.")
+    return result
+
+
+def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
+    """Find the nominal/default V3PA for all observations in a program.
+
+    Parameters
+    ----------
+    pointing_filename : string
+        Pointing file filename exported by APT
+    date : str or None
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+
+
+    Returns
+    -------
+    pas : dict
+        Dict of V3PAs, in the format for passing to the `roll_angle` argument to mirage.yaml_generator()
+
+    """
+    results = {}
+    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+    obsnums = sorted(list(set(pointing_table['obs_num'])))
+    for obs_num in obsnums:
+        results[obs_num] = default_obs_v3pa_on_date(pointing_filename, int(obs_num), date=date, verbose=verbose,
+                                                    pointing_table=pointing_table)
+    return results
+
+
 if __name__ == '__main__':
 
     usagestring = 'USAGE: yaml_generator.py NIRCam_obs.xml NIRCam_obs.pointing'
