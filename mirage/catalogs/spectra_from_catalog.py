@@ -289,6 +289,12 @@ def get_filter_info(column_names, magsys):
         for entry in column_names:
             filter_name, pupil_name = mag_col_name_to_filter_pupil(entry)
 
+
+            print('XXXXXXXXXXX')
+            print(entry)
+            print(filter_name, pupil_name)
+            print('CCCCCCCCCCCC')
+
             # NIRCam zeropoint files have entries for WLP8 but not WLM8 since
             # they are identical
             if pupil_name.upper() == 'WLM8':
