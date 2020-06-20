@@ -3118,7 +3118,7 @@ class Catalog_seed():
                 specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['filter'].lower())
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
-            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_').lower())
+            specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:

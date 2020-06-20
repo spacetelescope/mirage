@@ -669,6 +669,9 @@ def normalize_filters(instrument, filter_name, pupil_name):
         newfilter, newpupil = check_niriss_filter(filter_name, pupil_name)
     elif instrument.lower() == 'nircam':
         newfilter, newpupil = check_nircam_filter(filter_name, pupil_name)
+    elif instrument.lower() == 'fgs':
+        newfilter = filter_name
+        newpupil = pupil_name
     return newfilter, newpupil
 
 
