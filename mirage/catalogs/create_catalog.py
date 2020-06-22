@@ -2338,7 +2338,6 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
         dmag1 = -0.2*np.random.random(nout)+0.1
         mag1 = mag1 + dmag1
 
-        galaxy_cat.add_magnitude_column(mag1, #instrument=inst1,
-                                        column_name=filter_name,
+        galaxy_cat.add_magnitude_column(mag1, column_name=filter_names[loop],
                                         magnitude_system='abmag')
     return galaxy_cat, seedvalue
