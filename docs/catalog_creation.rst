@@ -136,3 +136,44 @@ Background Galaxies
 +++++++++++++++++++
 
 For a given pointing, Mirage can also generate a catalog containing a **representative sample** of background galaxies. Similar to the Besancon query described above, Mirage will generate a catalog containing a realistic density of galaxies across the field at reasonable magnitudes. To accomplish this, Mirage queries the `GOODS-S catalog from 3DHST <https://3dhst.research.yale.edu/Data.php>`_ and extracts an appropriate number of galaxies to populate the catalog at a reasonable density. Currently this function will fail if the user requests a catalog with an area larger than the GOODS-S field: 606,909 arcsec :sup:`2`. An example is shown below. The resulting file can then be placed in the :ref:`galaxyListFile <galaxylistfile>` entry of the :ref:`yaml input file <example_yaml>`.
+
+
+::
+
+    from mirage.catalogs import create_catalog
+
+    xml_file = 'my_nircam_program.xml'
+    pointing_file = xml_file.replace('.xml', '.pointing')
+
+    # Pointing information
+    ra = 224.2  # degrees
+    dec = -65.54  # degrees
+    box_width = 200  # arcseconds
+    roll_angle = 0.  # degrees E of N
+
+    # Filters to include in the galaxy catalog
+    filter_list = ['F115W', 'F444W']
+
+    # Create the catalog
+    gal_cat, gal_seed = create_catalog.galaxy_background(ra, dec, roll_angle, box_width,
+                                                         'nircam', filter_list)
+    galaxy_catalog = 'galaxies.cat'
+    gal_cat.save(galaxy_catalog)
+
+    # Run the yaml_generator In this case, assume a target name in the APT
+    # file of HD-9999-B1, and assume we have a point source catalog called
+    # ptsrcs.cat
+    cat_dict = {'HD-99999-B1': {'point_source':'ptsrcs.cat', 'galaxy': galaxy_catalog}}
+    background = 'low'
+    output_dir = 'yaml_files'
+    simulation_dir = 'sim_data'
+    datatype = 'raw'
+
+    yam = yaml_generator.SimInput(input_xml=xml_file, pointing_file=pointing_file,
+                                  catalogs=cat_dict,
+                                  background=background,
+                                  verbose=True, output_dir=output_dir,
+                                  simdata_output_dir=simulation_dir,
+                                  datatype=datatype)
+    yam.create_inputs()
+
