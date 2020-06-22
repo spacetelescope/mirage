@@ -37,7 +37,8 @@ from synphot.models import Empirical1D
 
 from . import hdf5_catalog
 from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES
-from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file
+from mirage.utils.flux_cal import mag_col_name_to_filter_pupil
+from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file, standardize_filters
 
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
 CONFIG_PATH = os.path.join(MODULE_PATH, 'config')
@@ -257,7 +258,7 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
 def get_filter_info(column_names, magsys):
     """Given a list of catalog columns names (e.g. 'nircam_f480m_magnitude')
     get the corresponding PHOTFLAM, PHOTFNU, filter zeropoint and pivot
-    wavelength values
+    wavelength values.
 
     Parameters
     ----------
@@ -286,11 +287,17 @@ def get_filter_info(column_names, magsys):
 
     if instrument in ['nircam', 'niriss']:
         for entry in column_names:
-            filter_name = entry.split('_')[1].upper()
+            filter_name, pupil_name = mag_col_name_to_filter_pupil(entry)
+
+            # NIRCam zeropoint files have entries for WLP8 but not WLM8 since
+            # they are identical
+            if pupil_name.upper() == 'WLM8':
+                pupil_name = 'WLP8'
+
             if instrument == 'nircam':
-                match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
+                match = ((zp_table['Filter'] == filter_name.upper()) & (zp_table['Pupil'] == pupil_name.upper()) & (zp_table['Module'] == 'B'))
             elif instrument == 'niriss':
-                match = zp_table['Filter'] == filter_name
+                match = zp_table['Filter'] == filter_name.upper()
 
             if not np.any(match):
                 raise ValueError("ERROR: no filter matching {} in {}.".format(filter_name, zp_file))
@@ -304,58 +311,11 @@ def get_filter_info(column_names, magsys):
     # For FGS, just use the values for GUIDER1 detector.
     elif instrument == 'fgs':
         line = zp_table[0]
-        # detector = line['Detector']
         zp = line[magsys]
         photflam = line['PHOTFLAM'] * FLAMBDA_CGS_UNITS
         photfnu = line['PHOTFNU'] * FNU_CGS_UNITS
         pivot = line['Pivot_wave'] * u.micron
         info[column_names[0]] = (photflam, photfnu, zp, pivot)
-
-    """
-    This code block works for columns that contain a mix of instruments
-    magsys = magsys.upper()
-    info = {}
-
-    # Get the list of instruments in the column names
-    instrument_names = [col.split('_')[0].lower() for col in column_names]
-
-    # Identify the list of unique files so we only need to open each once
-    unique_insts = list(set(instrument_names))
-
-    # Create a dcitionary of zeropoint tables for each instrument
-    zp_tables = {}
-    for inst in unique_insts:
-        zpfile = ZEROPOINT_FILES[inst]
-        tab = ascii.read(zpfile)
-        zp_tables[inst] = tab
-
-    # For each magnitude column, look up the info from the appropriate
-    # dictionary
-    for inst in instrument_names:
-        zp_table = zp_tables[inst]
-        if instrument in ['nircam', 'niriss']:
-            for entry in column_names:
-                filter_name = entry.split('_')[1].upper()
-                if instrument == 'nircam':
-                    match = ((zp_table['Filter'] == filter_name) & (zp_table['Module'] == 'B'))
-                elif instrument == 'niriss':
-                    match = zp_table['Filter'] == filter_name
-                zp = zp_table[magsys].data[match][0]
-                photflam = zp_table['PHOTFLAM'].data[match][0] * FLAMBDA_CGS_UNITS
-                photfnu = zp_table['PHOTFNU'].data[match][0] * FNU_CGS_UNITS
-                pivot = zp_table['Pivot_wave'].data[match][0] * u.micron
-                info[entry] = (photflam, photfnu, zp, pivot)
-
-        # For FGS, just use the values for GUIDER1 detector.
-        elif instrument == 'fgs':
-            line = zp_table[0]
-            # detector = line['Detector']
-            zp = line[magsys]
-            photflam = line['PHOTFLAM'] * FLAMBDA_CGS_UNITS
-            photfnu = line['PHOTFNU'] * FNU_CGS_UNITS
-            pivot = line['Pivot_wave'] * u.micron
-            info[column_names[0]] = (photflam, photfnu, zp, pivot)
-    """
 
     return info
 
@@ -419,10 +379,13 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     if normalizing_mag_column is not None:
         instrument = normalizing_mag_column.split('_')[0].lower()
         filter_name = 'none'
-        if instrument != 'fgs':
+        pupil_name = 'none'
+        if instrument == 'niriss':
             filter_name = normalizing_mag_column.split('_')[1]
+            gain = MEAN_GAIN_VALUES['niriss']
 
-        if instrument == 'nircam':
+        elif instrument == 'nircam':
+            filter_name, pupil_name = mag_col_name_to_filter_pupil(normalizing_mag_column)
             filter_val = int(filter_name[1:4])
             if filter_val > 230.:
                 channel = 'lw'
@@ -430,8 +393,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                 channel = 'sw'
             selector = '{}{}'.format(channel, module.lower())
             gain = MEAN_GAIN_VALUES['nircam'][selector]
-        elif instrument == 'niriss':
-            gain = MEAN_GAIN_VALUES['niriss']
+
         elif instrument == 'fgs':
             gain = MEAN_GAIN_VALUES['fgs'][detector.lower()]
 
@@ -478,7 +440,8 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
             # Note that nircam_module is ignored for non-NIRCam requests.
             # fgs_detector is ignored for non-FGS requests
             filter_thru_file = get_filter_throughput_file(instrument=instrument, filter_name=filter_name,
-                                                          nircam_module=module, fgs_detector=detector)
+                                                          pupil_name=pupil_name, nircam_module=module,
+                                                          fgs_detector=detector)
             all_input_spectra = rescale_normalized_spectra(all_input_spectra, rescaling_magnitudes,
                                                            mag_sys, filter_thru_file, gain)
 

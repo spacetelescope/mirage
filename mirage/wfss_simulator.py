@@ -203,15 +203,13 @@ class WFSSSim():
 
             if isinstance(self.params['simSignals']['bkgdrate'], str):
                 if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                    #scaling_factor = backgrounds.niriss_background_scaling(self.params, self.detector, self.module)
-
-                    usefilt = 'pupil'
-
                     siaf_instance = pysiaf.Siaf('niriss')[self.params['Readout']['array_name']]
-                    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params, usefilt, self.detector, self.module)
+                    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params['Reffiles']['flux_cal'], self.instrument,
+                                                                               self.params['Readout']['filter'], self.params['Readout']['pupil'],
+                                                                               self.detector, self.module)
 
                     if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt' or self.params['Reffiles']['filter_throughput'] == 'config':
-                        filter_file = get_filter_throughput_file(self.instrument, self.params['Readout'][usefilt])
+                        filter_file = get_filter_throughput_file(self.instrument, 'CLEAR', self.params['Readout']['pupil'])
                     else:
                         filter_file = self.params['Reffiles']['filter_throughput']
 
@@ -354,25 +352,6 @@ class WFSSSim():
         else:
             self.read_dark_product()
             obslindark = self.darkPrep
-
-        # Using the first of the imaging seed image yaml
-        # files as a base, adjust to create the yaml file
-        # for the creation of the final dispersed
-        # integration
-
-        # I think we won't need this anymore assuming that
-        # one of the input yaml files is for wfss mode
-        #y = yaml_update.YamlUpdate()
-        #y.file = self.paramfiles[0]
-        #if self.instrument == 'nircam':
-        #    y.filter = self.crossing_filter
-        #    y.pupil = 'GRISM' + self.direction
-        #elif self.instrument == 'niriss':
-        #    y.filter = 'GR150' + self.direction
-        #    y.pupil = self.crossing_filter
-        #y.outname = ("wfss_dispersed_{}_{}.yaml"
-        #             .format(dmode, self.crossing_filter))
-        #y.run()
 
         # Combine into final observation
         obs = obs_generator.Observation(offline=self.offline)

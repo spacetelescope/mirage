@@ -19,7 +19,7 @@ F164N      SW                  999                                    999
 FLAT       SW                  999                                    999
 PINHOLES   SW                  999                                    999
 WLP8       SW                  999                                    999
-WML8       SW                  999                                    999
+WLM8       SW                  999                                    999
 GDHS0      SW                  999                                    999
 GDHS60     SW                  999                                    999
 MASKRND    SW                  999                                    999
