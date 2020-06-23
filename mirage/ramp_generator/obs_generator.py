@@ -140,7 +140,7 @@ class Observation():
             print("Therefore there will be no crosstalk. Skipping this step.")
         return exposure
 
-    def add_crs_and_noise(self, seed):
+    def add_crs_and_noise(self, seed, num_integrations=None):
         """Given a noiseless seed ramp, add cosmic
         rays and poisson noise
 
@@ -156,23 +156,42 @@ class Observation():
 
         sim_zero : numpy.ndarray
             Zeroth read(s) of exposure
+
+        num_integrations : int
+            Number of integrations to create from the seed image
         """
         yd, xd = seed.shape[-2:]
         seeddim = len(seed.shape)
 
-        # Run one integration at a time
-        # because each needs its own collection
-        # of cosmic rays and poisson noise realization
-        if seeddim == 2:
-            nint = self.params['Readout']['nint']
-            ngroups = self.params['Readout']['ngroup']
-        elif seeddim == 4:
-            nint = seed.shape[0]
-            ngroups = int(seed.shape[1] / (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
+        # Find the number of integrations to make from the seed image.
+        if num_integrations is None:
+            # Imaging mode where there is no file splitting
+            if seeddim == 2:
+                nint = self.params['Readout']['nint']
+                ngroups = self.params['Readout']['ngroup']
+            # TSO and moving targets
+            elif seeddim == 4:
+                nint = seed.shape[0]
+                ngroups = int(seed.shape[1] / (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
+        else:
+            nint = num_integrations
+            # Imaging mode where there may be file splitting
+            if seeddim == 2:
+                ngroups = self.params['Readout']['ngroup']
+            # TSO and moving targets
+            elif seeddim == 4:
+                if num_integrations != seed.shape[0]:
+                    raise ValueError(('The number of integrations reported for the dark ({}) does not match that '
+                                      'implied by the size of the 1st dimension of the seed image ({}). Not sure '
+                                      'which to use.'.format(num_integrations, seed.shape[0])))
+                ngroups = int(seed.shape[1] / (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
 
         sim_exposure = np.zeros((nint, ngroups, yd, xd))
         sim_zero = np.zeros((nint, yd, xd))
 
+        # Run one integration at a time
+        # because each needs its own collection
+        # of cosmic rays and poisson noise realization
         for integ in range(nint):
             print("Integration {}:".format(integ))
             if seeddim == 2:
@@ -1053,31 +1072,10 @@ class Observation():
         #print('self.seed:', self.seed)
 
         # Get the input dark if a filename is supplied
-        if self.linDark is None:
-            # If no linearized dark is provided, assume the entry in the
-            # yaml file is the proper format
-            self.linDark = [self.params['Reffiles']['linearized_darkfile']]
-            seed_dict = {self.linDark[0]: self.seed}
-            print('Reading in dark file from param file: {}'.format(self.linDark))
-            self.linear_dark = self.read_dark_file(self.linDark[0])
-        elif isinstance(self.linDark, list):
-            # Case where dark is split amongst multiple files due to high
-            # data volume
-            print('Dark file list: {}'.format(self.linDark))
-            seed_dict = self.map_seeds_to_dark()
-            self.linear_dark = self.read_dark_file(self.linDark[0])
-        elif isinstance(self.linDark, str):
-            # If a single filename is given, read in the file
-            print('Reading in dark file: {}'.format(self.linDark))
-            self.linDark = [self.linDark]
-            seed_dict = {self.linDark[0]: self.seed}
-            self.linear_dark = self.read_dark_file(self.linDark[0])
-        else:
-            # Case where user has provided a catalogSeed object
-            print('Dark object provided')
-            self.linear_dark = copy.deepcopy(self.linDark)
-            self.linDark = ['none']
-            seed_dict = {self.linDark[0]: self.seed}
+        self.dark_setup()
+
+        # Create a mapping of the seed image and the dark data
+        seed_dict = self.seed_mapping()
 
         # Finally, collect information about the detector,
         # which will be needed for astrometry later
@@ -1178,13 +1176,23 @@ class Observation():
             if i > 0:
                 self.linear_dark = self.read_dark_file(self.linDark[i])
 
+            # Find how many integrations are held in the dark. The same
+            # number of integrations should be produced from the seed image.
+            # In the case where the same seed image is matched to multiple
+            # dark files (e.g. imaging mode obs that needs to have file-
+            # splitting) we can only get this info from the dark.
+            try:
+                num_integrations = self.linear_dark.header['NINTS']
+            except KeyError:
+                num_integrations = None
+
             seed_files = seed_dict[linDark]
             if isinstance(seed_files[0], str):
                 print('\nSeed files:')
                 print(seed_files)
             # Get the corresponding input seed image(s)
             if isinstance(seed_files, str):
-                # If a single filename is suppliedself.read_seed(seed_files)
+                # If a single filename is supplied
                 self.seed_image, self.segmap, self.seedheader = self.read_seed(seed_files)
             elif isinstance(seed_files, list):
                 # If the seed image is a list of files (due to high data
@@ -1214,7 +1222,7 @@ class Observation():
             # Add poisson noise and cosmic rays
             # Rearrange into requested read pattern
             # All done in one function to save memory
-            simexp, simzero = self.add_crs_and_noise(self.seed_image)
+            simexp, simzero = self.add_crs_and_noise(self.seed_image, num_integrations=num_integrations)
 
             # Multiply flat fields
             simexp = self.add_flatfield_effects(simexp)
@@ -1576,6 +1584,34 @@ class Observation():
             phdu.writeto(xtalkout, overwrite=True)
 
         return xtalk_corr_im
+
+    def dark_setup(self):
+        """The input value for self.linDark can be one of several types.
+        Deal with that here and get self.linear_dark
+        """
+        # Get the input dark if a filename is supplied
+        if isinstance(self.linDark, mirage.utils.read_fits.Read_fits):
+            # Case where user has provided a Read_fits object
+            print('Dark object provided')
+            self.linear_dark = copy.deepcopy(self.linDark)
+            self.linDark = ['none']
+        else:
+            if self.linDark is None:
+                # If no linearized dark is provided, assume the entry in the
+                # yaml file is the proper format
+                self.linDark = [self.params['Reffiles']['linearized_darkfile']]
+            elif isinstance(self.linDark, list):
+                # Case where dark is split amongst multiple files due to high
+                # data volume
+                print('Dark file list: {}'.format(self.linDark))
+            elif isinstance(self.linDark, str):
+                # If a single filename is given, read in the file
+                print('Reading in dark file: {}'.format(self.linDark))
+                self.linDark = [self.linDark]
+            else:
+                raise TypeError('Unsupported type for self.linDark: {}'.format(type(self.linDark)))
+
+            self.linear_dark = self.read_dark_file(self.linDark[0])
 
     def do_cosmic_rays(self, image, ngroup, iframe, ncr, seedval):
         """Add cosmic rays to input data
@@ -3242,6 +3278,30 @@ class Observation():
                                                                    n_int, n_group, n_y, n_x)
         outModel.writeto(filename, overwrite=True)
         return filename
+
+    def seed_mapping(self):
+        """Create a mapping of the seed images to the dark data. Take into
+        account that self.seed can be either a list of filenames or a numpy
+        array. self.linDark should be a list of filenames.
+        """
+        mapping = {}
+        if isinstance(self.seed, list):
+            if len(self.linDark) == len(self.seed):
+                if len(self.linDark) == 1:
+                    mapping[self.linDark[0]] = self.seed
+                else:
+                    mapping = self.map_seeds_to_dark()
+            elif ((len(self.linDark) > 1) and (len(self.seed) == 1)):
+                for dark_element in self.linDark:
+                    mapping[dark_element] = self.seed
+            else:
+                raise ValueError("Unsupported length of self.linDark ({}) and self.seed ({})."
+                                 .format(len(self.linDark), len(self.seed)))
+        elif isinstance(self.seed, np.ndarray):
+            for dark_element in self.linDark:
+                mapping[dark_element] = self.seed
+        return mapping
+
 
     def simple_get_image(self, name):
         """Read in an array from a fits file and crop using subarray_bounds

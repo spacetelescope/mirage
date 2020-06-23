@@ -391,30 +391,6 @@ class DarkPrep():
         for ref in rlist:
             self.ref_check(ref)
 
-    def file_splits(self):
-        """Check to see whether the final dark file will need to be
-        split into segments due to large file size
-        """
-        # Let's declare the equivalent of a 100 group full frame ramp
-        # as the upper limit for observation file size
-        pixel_limit = 2048 * 2048 * 100
-
-        xd = self.subarray_bounds[3] - self.subarray_bounds[1]
-        yd = self.subarray_bounds[2] - self.subarray_bounds[0]
-        pix_per_int = self.numgroups * yd * xd
-        observation = pix_per_int * self.numints
-
-        split = False
-        int_list = [0, self.numints]
-        if observation > pixel_limit:
-            split = True
-            ints_per_split = np.int(pixel_limit / pix_per_int)
-            #num_splits = self.numints / ints_per_split
-            int_list = np.arange(0, self.numints, ints_per_split)
-            if int_list[-1] != self.numints:
-                int_list = np.append(int_list, self.numints)
-        return split, int_list
-
     def get_base_dark(self, input_file):
         """Read in the dark current ramp that will serve as the
         base for the simulated ramp"""
