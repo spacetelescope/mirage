@@ -3474,6 +3474,7 @@ class Catalog_seed():
             factor = 0.
         else:
             factor = totalcounts / summedcounts
+
         img = img * factor
 
         # Crop image down such that it contains 99.95% of the total signal
