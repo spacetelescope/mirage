@@ -3475,16 +3475,6 @@ class Catalog_seed():
         else:
             factor = totalcounts / summedcounts
 
-
-
-
-        print('\n\nin create_galaxy:')
-        print(radius, ellipticity, sersic, posang, totalcounts, summedcounts)
-        print(np.nanmin(img), np.nanmax(img), np.min(img), np.max(img))
-        print('\n\n')
-
-
-
         img = img * factor
 
         # Crop image down such that it contains 99.95% of the total signal
