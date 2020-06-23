@@ -1684,7 +1684,7 @@ class Observation():
             signalgain[neg] = 0.
 
         # Add poisson noise
-        newimage = np.random.poisson(signalgain, signalgain.shape).astype(np.float)
+        newimage = np.random.poisson(signalgain, signalgain.shape).astype(np.float64)
 
         if np.nanmin(signalgain) < 0.:
             newimage[neg] = negatives[neg]

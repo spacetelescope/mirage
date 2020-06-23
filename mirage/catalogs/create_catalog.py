@@ -2273,6 +2273,11 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     module_path = pkg_resources.resource_filename('mirage', '')
     catalog_file = os.path.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
     catalog_values = np.loadtxt(catalog_file, comments='#')
+
+    # Force positive values for radius, sersic index, and ellipticity
+    good = ((catalog_values[:, 59] >= 0.) & (catalog_values[:, 61] > 0.) & (catalog_values[:, 63] >= 0.))
+    catalog_values = catalog_values[good, :]
+
     outinds = np.zeros((nfilters), dtype=np.int16)
     try:
         loop = 0
@@ -2314,14 +2319,19 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     drout = np.copy(catalog_values[outputinds, sersicerrorinds[0]])
     rout = rout+2.*drout*np.random.normal(0., 1., nout)
     rout[rout < 0.01] = 0.01
+    max_rad = np.max(catalog_values[:, sersicinds[0]])
+    rout[rout > max_rad] = max_rad
     elout = np.copy(catalog_values[outputinds, sersicinds[2]])
     delout = np.copy(catalog_values[outputinds, sersicerrorinds[2]])
     elout = elout+delout*np.random.normal(0., 1., nout)
     elout[elout > 0.98] = 0.98
+    elout[elout < 0.] = 0.0
     sindout = np.copy(catalog_values[outputinds, sersicinds[1]])
     dsindout = np.copy(catalog_values[outputinds, sersicinds[1]])
     sindout = sindout+dsindout*np.random.normal(0., 1., nout)
     sindout[sindout < 0.1] = 0.1
+    max_sersic = np.max(catalog_values[:, sersicinds[1]])
+    sindout[sindout > max_sersic] = max_sersic
     paout = np.copy(catalog_values[outputinds, sersicinds[3]])
     dpaout = np.copy(catalog_values[outputinds, sersicinds[3]])
     paout = paout+dpaout*np.random.normal(0., 1., nout)
