@@ -1166,8 +1166,12 @@ class Observation():
                 try:
                     print("Creating output file name with segment number.")
                     parts = basename.split('_')
-                    basename = '{}_{}_{}-seg{}_{}_{}'.format(parts[0], parts[1], parts[2], seg_str,
-                                                             parts[3], parts[4])
+
+                    if len(parts) == 5:
+                        basename = '{}_{}_{}-seg{}_{}_{}'.format(parts[0], parts[1], parts[2], seg_str,
+                                                                 parts[3], parts[4])
+                    else:
+                        basename = basename.replace('.fits', '-seg{}.fits'.format(seg_str))
                 except IndexError:
                     # Non-standard filename format
                     basename = basename.replace('.fits', '-seg{}.fits'.format(seg_str))
