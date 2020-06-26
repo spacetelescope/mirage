@@ -325,7 +325,7 @@ observation numbers from your APT file. Each entry should then contain a diction
 JWST Calibration Reference Files
 ++++++++++++++++++++++++++++++++
 
-Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ and `pixel to pixel flat field <https://jwst-pipeline.readthedocs.io/en/stable/jwst/flatfield/reference_files.html#flat-reference-file>`_ files.
+Mirage makes use of a handful of the `reference file types <https://jwst-pipeline.readthedocs.io/en/stable/jwst/introduction.html#reference-files>`_ used by the JWST calibration pipeline. This includes the `bad pixel mask <https://jwst-pipeline.readthedocs.io/en/stable/jwst/dq_init/reference_files.html#mask-reffile>`_, `saturation level map <https://jwst-pipeline.readthedocs.io/en/stable/jwst/saturation/reference_files.html#saturation-reffile>`_, `superbias <https://jwst-pipeline.readthedocs.io/en/stable/jwst/superbias/reference_files.html#superbias-reffile>`_, `gain <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/gain_reffile.html#gain-reffile>`_, `interpixel capacitance <https://jwst-pipeline.readthedocs.io/en/stable/jwst/ipc/reference_files.html#ipc-reffile>`_, `linearity correction  <https://jwst-pipeline.readthedocs.io/en/stable/jwst/linearity/reference_files.html#linearity-reffile>`_, `distortion correction <https://jwst-pipeline.readthedocs.io/en/stable/jwst/references_general/distortion_reffile.html#distortion-reffile>`_ `pixel to pixel flat field <https://jwst-pipeline.readthedocs.io/en/stable/jwst/flatfield/reference_files.html#flat-reference-file>`_ and `photom <https://jwst-pipeline.readthedocs.io/en/stable/jwst/photom/reference_files.html#photom-reference-file>`_ files.
 
 Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.html>`_ package from STScI to identify the appropriate reference files for a given exposure. These files are automatically downloaded to the user's machine at one of two times:
 
@@ -369,7 +369,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'ipc':        {detector_name: 'reffile_name.fits'},
                            'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
                            'badpixmask': {detector_name: 'reffile_name.fits'},
-                           'pixelflat':  {detector_name: {filter: {pupil: 'reffile_name.fits'}}}
+                           'pixelflat':  {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
+                           'photom':     {detector_name: 'reffile_name.fits'}
                            },
                 'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
                            'linearity':  'reffile_name.fits',
@@ -379,7 +380,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'ipc':        'reffile_name.fits',
                            'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
                            'badpixmask': 'reffile_name.fits',
-                           'pixelflat':  {filter: {pupil: 'reffile_name.fits'}}
+                           'pixelflat':  {filter: {pupil: 'reffile_name.fits'}},
+                           'photom':     {detector_name: 'reffile_name.fits'}
                            },
                 'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
                            'linearity':  {detector_name: 'reffile_name.fits'},
@@ -389,7 +391,8 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'ipc':        {detector_name: 'reffile_name.fits'},
                            'area':       {detector_name: 'reffile_name.asdf'},
                            'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'pixelflat':  {detector_name: {exposure_type: 'reffile_name.fits'}}
+                           'pixelflat':  {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'photom':     {detector_name: 'reffile_name.fits'}
                            }
 
 
@@ -423,9 +426,26 @@ Here we show an example dictionary for a particular set of observations.
                                                                }
                                                     },
                                           'nrcb4': {'f070w': {'clear': 'my_SW_favs/sw_flat.fits'}}
-                                          }
+                                          },
+                            'photom':    {'nrca5': 'my_favorites/photom_file.fits'}
                             }
                 }
+
+
+.. _segmap_limits:
+
+Signal Limits for the Segmentation Map
+++++++++++++++++++++++++++++++++++++++
+
+Accompanying the noiseless seed image, Mirage will also produce a segmentation map containing all sources on the detector. Mirage makes use of this segmentation map only when producing spectroscopic data (i.e. WFSS or grism TSO mode). For all other modes, the segmentation map is informational only. In order to save time when making spectroscopic data, only pixels identified in the segmentation map as belonging to a source are run through the disperser code. Mirage uses a simple threshold value to determine which pixels to add to each source in the segmentation map. Pixles with signal values equal to or above the threshold are added. Mirage uses a default value of 0.031 ADU/sec as the floor value. Depending on the brightness and size of your targets, you may want to focus only on the brighter targets, or include everything. Therefore, this is a tunable parameter which users can specify in a variety of units. To specify your own segmentation map signal threshold when creating yaml files, provide your values to the yaml_generator. Note that if you omit these keywords, Mirage will use the default value.
+
+::
+
+    minimum_signal = 0.08
+    minimum_signal_units = 'MJy/sr'
+
+The allowed units for the threshold value are: ADU/sec, e/sec, MJy/sr, erg/cm2/A, erg/cm2/Hz
+Note that these are case insensitive.
 
 
 .. _yaml_generator:
@@ -457,7 +477,9 @@ Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
                                   simdata_output_dir='/location/to/place/simulated_data',
                                   cosmic_rays=crs, background=background, roll_angle=pav3,
                                   dates=dates, datatype='raw', dateobs_for_background=False,
-                                  reffile_defaults='crds', reffile_overrides=reffile_overrides)
+                                  reffile_defaults='crds', reffile_overrides=reffile_overrides,
+                                  segmap_flux_limit=minmum_signal, segmap_flux_limit_units=minimum_signal_units
+                                  )
     yam.use_linearized_darks = True
     yam.create_inputs()
 

@@ -82,7 +82,8 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'pixelAreaMap': 'area',
                    'saturation': 'saturation',
                    'superbias': 'superbias',
-                   'pixelflat': 'flat'}
+                   'pixelflat': 'flat',
+                   'photom': 'photom'}
 
 MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192,
                                'nrca1': 2.4926066, 'nrca2': 2.5222762, 'nrca3': 2.4837794, 'nrca4': 2.2748423,
@@ -95,6 +96,10 @@ MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.19235
 # Factor by which throughput is decreased when the Grism is used compared
 # to when it is not in the beam
 NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
+
+# Minimum signal rate for a pixel to be included in the segmentation map.
+SEGMENTATION_MIN_SIGNAL_RATE = 0.031  # ADU/sec
+SUPPORTED_SEGMENTATION_THRESHOLD_UNITS = ['adu/s', 'adu/sec', 'e/s', 'e/sec', 'mjy/str', 'mjy/sr', 'erg/cm2/a', 'erg/cm2/hz']
 
 # For use in converting background MJy/sr to e-/sec
 PRIMARY_MIRROR_AREA = 25.326 * u.meter * u.meter

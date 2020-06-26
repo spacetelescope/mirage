@@ -110,7 +110,7 @@ from ..reference_files import crds_tools
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
-from ..utils.constants import CRDS_FILE_TYPES
+from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE
 from ..utils import utils
 
 ENV_VAR = 'MIRAGE_DATA'
@@ -121,7 +121,8 @@ class SimInput:
                  reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
                  background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
-                 dateobs_for_background=False, offline=False):
+                 dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
+                 offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -226,6 +227,15 @@ class SimInput:
             when calculating the background level for the observation.
             If False, the value from ``background`` will be used.
 
+        segmap_flux_limit : float
+            Lower signal limit for pixels that will be added to the segmentation
+            map. Pixels with signals larger than or equal to this value will be
+            added to the segmentation map.
+
+        segmap_flux_limit_units : str
+            Units corresponding to the value in ```segmap_flux_limit```. Can be
+            'ADU/sec', 'e/sec', 'MJy/sr', 'ergs/cm2/A', 'ergs/cm2/Hz'
+
         offline : bool
             Whether the class is being called with or without access to
             Mirage reference data. Used primarily for testing.
@@ -260,6 +270,14 @@ class SimInput:
         self.dateobs_for_background = dateobs_for_background
         self.add_psf_wings = True
         self.offline = offline
+
+        if ((segmap_flux_limit is not None) and (segmap_flux_limit_units is None)):
+            raise ValueError("If segmap_flux_limit is provided, segmap_flux_units must also be provided.")
+
+        if segmap_flux_limit is None:
+            self.segmentation_threshold = SEGMENTATION_MIN_SIGNAL_RATE
+        if segmap_flux_limit_units is None:
+            self.segmentation_threshold_units = 'ADU/sec'
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=self.offline)
@@ -441,6 +459,7 @@ class SimInput:
             saturation_arr[match] = reffiles['saturation']
             gain_arr[match] = reffiles['gain']
             distortion_arr[match] = reffiles['distortion']
+            photom_arr[match] = reffiles['photom']
             ipc_arr[match] = reffiles['ipc']
             ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
@@ -452,6 +471,7 @@ class SimInput:
         self.info['saturation'] = list(saturation_arr)
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
+        self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
@@ -475,6 +495,7 @@ class SimInput:
         saturation_arr = deepcopy(empty_col)
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
+        photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
@@ -507,6 +528,7 @@ class SimInput:
             saturation_arr[match] = manual_reffiles['saturation']
             gain_arr[match] = manual_reffiles['gain']
             distortion_arr[match] = manual_reffiles['distortion']
+            photom_arr[match] = manual_reffiles['photom']
             ipc_arr[match] = manual_reffiles['ipc']
             pixelAreaMap_arr[match] = manual_reffiles['area']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
@@ -517,6 +539,7 @@ class SimInput:
         self.info['saturation'] = list(saturation_arr)
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
+        self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
@@ -624,6 +647,7 @@ class SimInput:
             self.info['saturation'] = column_data
             self.info['gain'] = column_data
             self.info['astrometric'] = column_data
+            self.info['photom'] = column_data
             self.info['ipc'] = column_data
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
@@ -1533,7 +1557,7 @@ class SimInput:
             self.psfbasename[instrument] = 'N/A'
 
         # create empty dictionaries
-        list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
+        list_names = 'superbias linearity gain saturation ipc astrometric photom pam dark lindark'.split()
         for list_name in list_names:
             setattr(self, '{}_list'.format(list_name), {})
 
@@ -1808,6 +1832,12 @@ class SimInput:
         except KeyError:
             files['pixelflat'] = 'none'
 
+        # photom reference file
+        try:
+            files['photom'] = self.reffile_overrides[instrument]['photom'][detector]
+        except KeyError:
+            files['photom'] = 'none'
+
         return files
 
     def table_to_dict(self, tab):
@@ -1934,6 +1964,7 @@ class SimInput:
             f.write('  pixelflat: {}    # Flat field file to use for un-flattening output\n'.format(input['pixelflat']))
             f.write('  illumflat: None                               # Illumination flat field file\n')
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
+            f.write('  photom: {}   # cal pipeline photom reference file\n'.format(input['photom']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
             f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
                      'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(input['invert_ipc'])))
@@ -1951,6 +1982,7 @@ class SimInput:
             f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
                      'used when making direct image outputs to be fed into the grism disperser code.\n'.format(input['flux_cal_file'] )))
             f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.configfiles[instrument.lower()]['filter_throughput']))
+            f.write('  ')
             f.write('\n')
             f.write('nonlin:\n')
             f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')
@@ -2055,7 +2087,10 @@ class SimInput:
                     .format(self.expand_catalog_for_segments))
             f.write('  use_dateobs_for_background: {}          # Use date_obs below to deternine background. If False, bkgdrate is used.\n'
                     .format(self.dateobs_for_background))
-
+            f.write('  signal_low_limit_for_segmap: {}         # Lower signal limit to include pix in segmentation map. See below for units.\n'
+                    .format(self.segmentation_threshold))
+            f.write(('  signal_low_limit_for_segmap_units: {}  # Units of signal_low_limit_for_segmap. Can be: [ADU/sec, e/sec, MJy/sr, '
+                     'ergs/cm2/a, ergs/cm2/hz]\n'.format(self.segmentation_threshold_units)))
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
