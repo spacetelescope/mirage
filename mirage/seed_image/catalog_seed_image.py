@@ -4463,7 +4463,8 @@ class Catalog_seed():
         elif len(good) == 0:
             raise ValueError("No matching row in the photom reference file for {} and {}".format(self.params['Readout']['filter'], self.params['Readout']['pupil']))
 
-        self.surface_brightness_fluxcal = photom_values[good[0]]
+        surf_bright_fluxcal = photom_values[good[0]]
+        return surf_bright_fluxcal
 
     def set_segmentation_threshold(self):
         """Determine the threshold value to use when determining which pixels
@@ -4491,9 +4492,9 @@ class Catalog_seed():
             pass
         elif segmentation_threshold_units == ['e/s', 'e/sec']:
             self.segmentation_threshold /= self.gain_value
-        elif segmentation_threshold_units == ['mjy/sr', 'mjy/sr']:
-            self.get_surface_brightness_fluxcal()
-            self.segmentation_threshold /= self.surface_brightness_fluxcal
+        elif segmentation_threshold_units == ['mjy/sr', 'mjy/str']:
+            surface_brightness_fluxcal = self.get_surface_brightness_fluxcal()
+            self.segmentation_threshold /= surface_brightness_fluxcal
         elif segmentation_threshold_units in ['erg/cm2/a']:
             self.segmentation_threshold /= self.photflam
         elif segmentation_threshold_units in ['erg/cm2/hz']:
