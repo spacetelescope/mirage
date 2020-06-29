@@ -570,7 +570,7 @@ class Catalog_seed():
                         print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
                         seg_string = str(self.segment_number).zfill(3)
                         part_string = str(self.segment_part_number).zfill(3)
-                        self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout'][filter],
+                        self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
                                                                                         self.params['Readout']['pupil'], seg_string, part_string)
 
                         self.saveSeedImage(seed, segmap, self.seed_file)

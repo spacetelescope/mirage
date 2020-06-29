@@ -348,7 +348,11 @@ class WFSSSim():
             d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.wfss_yaml
             d.prepare()
-            obslindark = d.prepDark
+
+            if len(d.dark_files) == 1:
+                obslindark = d.prepDark
+            else:
+                obslindark = d.dark_files
         else:
             self.read_dark_product()
             obslindark = self.darkPrep
