@@ -1145,10 +1145,18 @@ class Observation():
         for i, linDark in enumerate(self.linDark):
             temp_outdir, basename = os.path.split(self.params['Output']['file'])
 
+
+            print('initial basename: ', basename)
+
             # Get the segment number of the file if present
-            seg_location = linDark.find('_seg')
+            linDarkfile = os.path.basename(linDark)
+            seg_location = linDarkfile.find('_seg')
+
+            print(linDark)
+            print('seg_location: ', seg_location)
+
             if seg_location != -1:
-                seg_str = linDark[seg_location+4:seg_location+7]
+                seg_str = linDarkfile[seg_location+4:seg_location+7]
                 #print('first segment string: ', seg_str)
             else:
                 try:

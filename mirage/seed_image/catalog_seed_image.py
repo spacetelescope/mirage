@@ -43,7 +43,8 @@ from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
-from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES
+from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SEGMENTATION_MIN_SIGNAL_RATE, \
+                              SUPPORTED_SEGMENTATION_THRESHOLD_UNITS
 from ..utils.flux_cal import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
@@ -1549,15 +1550,8 @@ class Catalog_seed():
                                       self.frametime, newdimsx, newdimsy)
                 mt_integration[integ, :, :, :] += mt_source
 
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                    noiseval += self.grism_background
-
-                if input_type in ['pointSource', 'galaxies']:
-                    moving_segmap.add_object_noise(mt_source[-1, :, :], 0, 0, index, noiseval)
-                else:
-                    indseg = self.seg_from_photutils(mt_source[-1, :, :], np.int(index), noiseval)
-                    moving_segmap.segmap += indseg
+                # Add object to segmentation map
+                moving_segmap.add_object_threshold(mt_source[-1, :, :], 0, 0, index, self.segmentation_threshold)
 
             # Check the elapsed time for creating each object
             elapsed_time = time.time() - start_time
@@ -2530,11 +2524,8 @@ class Catalog_seed():
             try:
                 psfimage[j1:j2, i1:i2] += scaled_psf[l1:l2, k1:k2]
 
-                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                    noiseval += self.grism_background
-                ptsrc_segmap.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+                # Add source to segmentation map
+                ptsrc_segmap.add_object_threshold(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], self.segmentation_threshold)
             except IndexError:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
@@ -3659,11 +3650,8 @@ class Catalog_seed():
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     galimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
-                    # Divide readnoise by 100 sec, which is a 10 group RAPID ramp
-                    noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                    if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                        noiseval += self.grism_background
-                    segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+                    # Add source to segmentation map
+                    segmentation.add_object_threshold(stamp[l1:l2, k1:k2], j1, i1, entry['index'], self.segmentation_threshold)
 
                 else:
                     pass
@@ -3987,15 +3975,9 @@ class Catalog_seed():
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     extimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
 
-                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                    noiseval += self.grism_background
-
-                # Make segmentation map
-                indseg = self.seg_from_photutils(stamp[l1:l2, k1:k2] * entry['countrate_e/s'],
-                                                 entry['index'], noiseval)
-                segmentation.segmap[j1:j2, i1:i2] += indseg
+                # Add source to segmentation map
+                segmentation.add_object_threshold(stamp[l1:l2, k1:k2], j1, i1, entry['index'],
+                                                  self.segmentation_threshold)
                 self.n_extend += 1
 
         if self.n_extend == 0:
@@ -4225,6 +4207,11 @@ class Catalog_seed():
             fluxcal_info(self.params['Reffiles']['flux_cal'], self.instrument, self.params['Readout']['filter'],
                          self.params['Readout']['pupil'], detector, module)
 
+        # Get the threshold signal value for pixels to be included in the
+        # segmentation map. Pixels with signals greater than or equal to
+        # this level will be included in the segmap
+        self.set_segmentation_threshold()
+
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings
         try:
@@ -4296,11 +4283,11 @@ class Catalog_seed():
                         shorthand = 'lw{}'.format(module.lower())
                     else:
                         shorthand = 'sw{}'.format(module.lower())
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][shorthand]
+                    self.gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][shorthand]
                 elif self.params['Inst']['instrument'].lower() == 'niriss':
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
+                    self.gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
                 elif self.params['Inst']['instrument'].lower() == 'fgs':
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector.lower()]
+                    self.gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector.lower()]
 
                 if self.params['simSignals']['use_dateobs_for_background']:
                     bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
@@ -4308,7 +4295,7 @@ class Catalog_seed():
                                                                                        self.params['Output']['date_obs'])
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, True,
-                                                                                             gain_value, self.siaf,
+                                                                                             self.gain_value, self.siaf,
                                                                                              back_wave=bkgd_wave,
                                                                                              back_sig=bkgd_spec)
                     print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
@@ -4317,7 +4304,7 @@ class Catalog_seed():
                     orig_level = copy.deepcopy(self.params['simSignals']['bkgdrate'])
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, False,
-                                                                                             gain_value, self.siaf,
+                                                                                             self.gain_value, self.siaf,
                                                                                              level=self.params['simSignals']['bkgdrate'].lower())
                     print("Background rate determined using {} level: {}".format(orig_level, self.params['simSignals']['bkgdrate']))
             else:
@@ -4460,6 +4447,59 @@ class Catalog_seed():
                                       "{}. Not present in directory tree specified by "
                                       "the {} environment variable."
                                       .format(pth, self.env_var)))
+
+    def get_surface_brightness_fluxcal(self):
+        """Get the conversion value for MJy/sr to ADU/sec from the jwst
+        calibration pipeline photom reference file. The value is based
+        on the filter and pupil value of the observation.
+        """
+        photom_data = fits.getdata(self.params['Reffiles']['photom'])
+        photom_filters = np.array([elem['filter'] for elem in photom_data])
+        photom_pupils = np.array([elem['pupil'] for elem in photom_data])
+        photom_values = np.array([elem['photmjsr'] for elem in photom_data])
+
+        good = np.where((photom_filters == self.params['Readout']['filter'].upper()) & (photom_pupils == self.params['Readout']['pupil'].upper()))[0]
+        if len(good) > 1:
+            raise ValueError("More than one matching row in the photom reference file for {} and {}".format(self.params['Readout']['filter'], self.params['Readout']['pupil']))
+        elif len(good) == 0:
+            raise ValueError("No matching row in the photom reference file for {} and {}".format(self.params['Readout']['filter'], self.params['Readout']['pupil']))
+
+        surf_bright_fluxcal = photom_values[good[0]]
+        return surf_bright_fluxcal
+
+    def set_segmentation_threshold(self):
+        """Determine the threshold value to use when determining which pixels
+        to include in the segmentation map. Final units for the threshold
+        should be ADU/sec, but inputs (in the input yaml file) can be:
+        ADU/sec, electrons/sec, or MJy/str
+        """
+        # First, set the default, in case the input yaml does not have the
+        # threshold entry
+        self.segmentation_threshold = SEGMENTATION_MIN_SIGNAL_RATE
+        segmentation_threshold_units = 'adu/s'
+
+        #Now see if there is an entry in the yaml file
+        try:
+            self.segmentation_threshold = self.params['simSignals']['signal_low_limit_for_segmap']
+            segmentation_threshold_units = self.params['simSignals']['signal_low_limit_for_segmap_units'].lower()
+        except KeyError:
+            print(('simSignals:signal_low_limit_for_segmap and/or simSignals:signal_low_limit_for_segmap_units '
+                   'not present in input yaml file. Using the default value of: {} ADU/sec'.format(self.segmentation_threshold)))
+
+        if segmentation_threshold_units not in SUPPORTED_SEGMENTATION_THRESHOLD_UNITS:
+            raise ValueError(('Unsupported unit for the segmentation map lower signal limit: {}.\n'
+                              'Supported units are: {}'.format(segmentation_threshold_units, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS)))
+        if segmentation_threshold_units in ['adu/s', 'adu/sec']:
+            pass
+        elif segmentation_threshold_units == ['e/s', 'e/sec']:
+            self.segmentation_threshold /= self.gain_value
+        elif segmentation_threshold_units == ['mjy/sr', 'mjy/str']:
+            surface_brightness_fluxcal = self.get_surface_brightness_fluxcal()
+            self.segmentation_threshold /= surface_brightness_fluxcal
+        elif segmentation_threshold_units in ['erg/cm2/a']:
+            self.segmentation_threshold /= self.photflam
+        elif segmentation_threshold_units in ['erg/cm2/hz']:
+            self.segmentation_threshold /= self.photfnu
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In

@@ -366,7 +366,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                              'crosstalk', 'occult', 'pixelAreaMap',
                              'subarray_defs', 'filtpupilcombo',
                              'flux_cal', 'readpattdefs', 'filter_throughput',
-                             'filter_wheel_positions'],
+                             'filter_wheel_positions', 'photom'],
                 'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
                                'extended', 'movingTargetList', 'movingTargetSersic',
                                'movingTargetExtended', 'movingTargetToTrack',
