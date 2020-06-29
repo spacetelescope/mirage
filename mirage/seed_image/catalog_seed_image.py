@@ -4209,7 +4209,6 @@ class Catalog_seed():
         # Get the threshold signal value for pixels to be included in the
         # segmentation map. Pixels with signals greater than or equal to
         # this level will be included in the segmap
-        self.get_surface_brightness_fluxcal()
         self.set_segmentation_threshold()
 
         # Convert the input RA and Dec of the pointing position into floats
@@ -4493,6 +4492,7 @@ class Catalog_seed():
         elif segmentation_threshold_units == ['e/s', 'e/sec']:
             self.segmentation_threshold /= self.gain_value
         elif segmentation_threshold_units == ['mjy/sr', 'mjy/sr']:
+            self.get_surface_brightness_fluxcal()
             self.segmentation_threshold /= self.surface_brightness_fluxcal
         elif segmentation_threshold_units in ['erg/cm2/a']:
             self.segmentation_threshold /= self.photflam
