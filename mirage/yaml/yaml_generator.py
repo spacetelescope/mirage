@@ -384,6 +384,7 @@ class SimInput:
         saturation_arr = deepcopy(empty_col)
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
+        photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
