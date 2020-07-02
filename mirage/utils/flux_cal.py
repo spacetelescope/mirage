@@ -6,6 +6,7 @@ from astropy.io import ascii
 from astropy.table import Column
 import copy
 import numpy as np
+import scipy.special as sp
 
 
 def add_detector_to_zeropoints(detector, zeropoint_table):
@@ -96,3 +97,70 @@ def read_zeropoint_file(filename):
     """
     flux_table = ascii.read(filename)
     return flux_table
+
+
+def sersic_total_signal(effective_radius, sersic_index):
+    """Calculate the total signal (out to infinity) associated with a 2D
+    Sersic. Equation taken from JWST ETC. See here for more info:
+    http://ned.ipac.caltech.edu/level5/March05/Graham/Graham2.html
+
+    Parameters
+    ----------
+    effective_radius : float
+        Radius that contains half the flux. R_e
+
+    sersic_index : float
+        Sersic index
+
+    Returns
+    -------
+    sersic_total : float
+        Total signal associated with the 2D Sersic profile
+    """
+    b_n = sp.gammaincinv(2 * sersic_index, 0.5)
+    sersic_total = effective_radius**2 * 2 * np.pi * sersic_index * np.exp(b_n)/(b_n**(2 * sersic_index)) * sp.gamma(2 * sersic_index)
+    return sersic_total
+
+
+def sersic_fractional_radius(effective_radius, sersic_index, fraction_of_total, ellipticity):
+    """For a 2D Sersic profile, calculate the semi-major and semi-minor axes
+    lengths that contain a specified fraction of the total signal.
+    See here for more info:
+    http://ned.ipac.caltech.edu/level5/March05/Graham/Graham2.html
+
+    Parameters
+    ----------
+    effective_radius : float
+        Radius that contains half the flux. R_e
+
+    sersic_index : float
+        Sersic index
+
+    fraction_of_total : float
+        Fraction of the total signal desired within the calculated
+        semi-major and semi-minor axes
+
+    ellipticity : float
+        Ellipticity of the 2D Sersic profile
+
+    Returns
+    -------
+    radius : float
+        Effective radius that encompasses the requested signal, assuming a circular profile
+
+    semi_major : float
+        Semi-major axis size that encompasses the requested signal
+
+    semi-minor : float
+        Semi-minor axis size that encompasses the requested signal
+    """
+    if fraction_of_total > 1.0:
+        raise ValueError("fraction_of_total must be <= 1")
+
+    b_n = sp.gammaincinv(2 * sersic_index, 0.5)
+    x = sp.gammaincinv(2*sersic_index, fraction_of_total)
+    sersic_total = effective_radius**2 * 2 * np.pi * sersic_index * np.exp(b_n)/(b_n**(2 * sersic_index)) * sp.gammainc(2 * sersic_index, x)
+    radius = effective_radius * (x / b_n)**sersic_index
+    semi_major = np.sqrt(radius**2 /  (1. - ellipticity))
+    semi_minor = semi_major * (1. - ellipticity)
+    return radius, semi_major, semi_minor

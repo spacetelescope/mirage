@@ -45,7 +45,7 @@ from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
-from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES
+from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL
 from ..utils.flux_cal import fluxcal_info
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
@@ -3399,15 +3399,38 @@ class Catalog_seed():
         img : numpy.ndarray
             2D array containing the 2D sersic profile
         """
-        b_n = sp.gammaincinv(2 * sersic_index, 0.5)
-        sersic_total = r_Sersic * r_Sersic * 2 * np.pi * sersic_index * np.exp(b_n)/(b_n**(2 * sersic_index)) * sp.gamma(2 * sersic_index)
 
+        # Calculate the total signal associated with the source
+        sersic_total = flux_cal.sersic_total_signal(r_Sersic, sersic_index)
+
+        # Amplitude to be input into Sersic2D to properly scale the source
         amplitude = total_counts / sersic_total
+
+        # Find the effective radius, semi-major, and semi-minor axes sizes
+        # needed to encompass SERSIC_FRACTIONAL_SIGNAL of the total flux
+        sersic_rad, semi_major_axis, semi_minor_axis = flux_cal.sersic_fractional_radius(r_Sersic, sersic_index, SERSIC_FRACTIONAL_SIGNAL, ellipticity)
+
+        # Using the position angle, calculate the size of the source in the
+        # x and y directions
+        y_full_length = np.max([2 * semi_major_axis * np.cos(position_angle), 2 * semi_minor_axis])
+        x_full_length = np.max([2 * semi_major_axis * np.sin(position_angle), 2 * semi_minor_axis])
+
+        # Create the mesh grid to hold the realized source
+
+
+
+
+
+        #b_n = sp.gammaincinv(2 * sersic_index, 0.5)
+        #sersic_total = r_Sersic * r_Sersic * 2 * np.pi * sersic_index * np.exp(b_n)/(b_n**(2 * sersic_index)) * sp.gamma(2 * sersic_index)
+
 
         # Center the galaxy at (0, 0)
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=0., y_0=0.,
                        ellip=ellipticity, theta=position_angle)
 
+
+        """
         mod1D = Sersic1D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index)
 
         if floor is None:
@@ -3442,6 +3465,16 @@ class Catalog_seed():
         xmax = int(0 + n_stamp + 1)
         ymin = int(0 - n_stamp)
         ymax = int(0 + n_stamp + 1)
+        """
+
+        x_half_length = x_full_length // 2
+        xmin = int(0 - x_half_length)
+        xmax = int(0 + x_half_length + 1)
+
+        y_half_length = y_full_length // 2
+        ymin = int(0 - y_half_length)
+        ymax = int(0 + y_half_length + 1)
+
         y_stamp, x_stamp = np.meshgrid(np.arange(ymin, ymax), np.arange(xmin, xmax))
 
         stamp = mod(x_stamp, y_stamp)
