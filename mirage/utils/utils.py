@@ -900,12 +900,6 @@ def read_pattern_check(parameters):
                .format(parameters['Readout']['readpatt'],
                        parameters['Readout']['nframe'],
                        parameters['Readout']['nskip'])))
-
-        print('in read_pattern_check, nframe and nskip are:')
-        print(parameters['Readout']['nframe'], parameters['Readout']['nskip'])
-        print(type(parameters['Readout']['nframe']), type(parameters['Readout']['nskip']))
-        print('maxiter', parameters['nonlin']['maxiter'], type(parameters['nonlin']['maxiter']))
-
     else:
         # If the read pattern is not present in the definition file
         # then quit.
