@@ -419,6 +419,14 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
 
     for key1 in pathdict:
         for key2 in pathdict[key1]:
+
+            # For those using an old or incomplete yaml file, if any of the
+            # CRDS keywords are missing, create them and set equal to 'crds'.
+            if key2 not in params[key1].keys():
+                if key2 in CRDS_FILE_TYPES.keys():
+                    print('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
+                    params[key1][key2] = 'crds'
+
             if params[key1][key2].lower() not in ['none', 'config', 'crds']:
                 params[key1][key2] = os.path.abspath(os.path.expandvars(params[key1][key2]))
             elif params[key1][key2].lower() == 'config':
