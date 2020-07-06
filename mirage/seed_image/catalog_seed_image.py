@@ -2271,7 +2271,7 @@ class Catalog_seed():
 
         # If no good point sources were found in the requested array, alert the user
         if len(pointSourceList) < 1:
-            print("INFO: no point sources within the requested array.")
+            print("INFO: No point sources within the requested aperture.")
             # print("The point source image option is being turned off")
             # self.runStep['pointsource']=False
             # if self.runStep['extendedsource'] == False and self.runStep['cosmicray'] == False:

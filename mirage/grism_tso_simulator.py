@@ -205,12 +205,6 @@ class GrismTSO():
         print('Running background sources through catalog_seed_image')
         print('background param file is:', self.background_paramfile)
 
-        # Run the catalog_seed_generator on the non-TSO (background) sources
-        background_direct = catalog_seed_image.Catalog_seed()
-        background_direct.paramfile = self.background_paramfile
-        background_direct.make_seed()
-        background_segmentation_map = background_direct.seed_segmap
-
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
         self.final_SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
@@ -222,30 +216,47 @@ class GrismTSO():
         bkgd_waves, bkgd_fluxes = backgrounds.nircam_background_spectrum(orig_parameters,
                                                                          self.detector, self.module)
 
-        # Run the disperser on the background sources. Add the background
-        # signal here as well
-        print('\n\nDispersing background sources\n\n')
+        # Run the catalog_seed_generator on the non-TSO (background) sources if present
+        if not self._dummy_catalog:
+            background_direct = catalog_seed_image.Catalog_seed()
+            background_direct.paramfile = self.background_paramfile
+            background_direct.make_seed()
+            background_segmentation_map = background_direct.seed_segmap
 
-        background_done = False
-        background_seed_files = [background_direct.ptsrc_seed_filename,
-                                 background_direct.galaxy_seed_filename,
-                                 background_direct.extended_seed_filename]
-        for seed_file in background_seed_files:
-            if seed_file is not None:
-                print("Dispersing seed image:", seed_file)
-                disp = self.run_disperser(seed_file, orders=self.orders,
-                                          add_background=not background_done,
-                                          background_waves=bkgd_waves,
-                                          background_fluxes=bkgd_fluxes,
-                                          finalize=True)
-                if not background_done:
-                    # Background is added at the first opportunity. At this
-                    # point, create an array to hold the final combined
-                    # dispersed background
-                    background_done = True
-                    background_dispersed = copy.deepcopy(disp.final)
-                else:
-                    background_dispersed += disp.final
+            # Run the disperser on the background sources. Add the background
+            # signal here as well
+            uniq_objs = np.unique(background_segmentation_map)
+            if ((len(uniq_objs) != 1) or (uniq_objs[0] != 0)):
+                print('\n\nDispersing background sources\n\n')
+
+                background_done = False
+                background_seed_files = [background_direct.ptsrc_seed_filename,
+                                         background_direct.galaxy_seed_filename,
+                                         background_direct.extended_seed_filename]
+                for seed_file in background_seed_files:
+                    if seed_file is not None:
+                        print("Dispersing seed image:", seed_file)
+                        disp = self.run_disperser(seed_file, orders=self.orders,
+                                                  add_background=not background_done,
+                                                  background_waves=bkgd_waves,
+                                                  background_fluxes=bkgd_fluxes,
+                                                  finalize=True)
+                        if not background_done:
+                            # Background is added at the first opportunity. At this
+                            # point, create an array to hold the final combined
+                            # dispersed background
+                            background_done = True
+                            background_dispersed = copy.deepcopy(disp.final)
+                        else:
+                            background_dispersed += disp.final
+            else:
+                print("No background sources present on the detector.")
+                background_dispersed = np.zeros((2048, 2048))
+        else:
+            # In this case there are no true background sources. The
+            # disperser always works on full frame data, so create an
+            # empty full frame image.
+            background_dispersed = np.zeros((2048, 2048))
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -253,7 +264,10 @@ class GrismTSO():
         tso_direct.make_seed()
         tso_segmentation_map = tso_direct.seed_segmap
         outside_tso_source = tso_segmentation_map == 0
-        tso_segmentation_map[outside_tso_source] = background_segmentation_map[outside_tso_source]
+
+        # Add any background sources to the segmentation map
+        if not self._dummy_catalog:
+            tso_segmentation_map[outside_tso_source] = background_segmentation_map[outside_tso_source]
 
         # Dimensions are (y, x)
         self.seed_dimensions = tso_direct.nominal_dims
@@ -570,6 +584,9 @@ class GrismTSO():
         # Expand reference file entries to be full path names
         parameters = utils.full_paths(parameters, self.modpath, crds_dict)
 
+        # Find which background source catalogs are present
+        supported_bkgd_types = ['pointsource', 'galaxyListFile', 'extended']
+
         try:
             CATALOG_YAML_ENTRIES.remove('tso_grism_catalog')
         except ValueError:
@@ -579,10 +596,20 @@ class GrismTSO():
             CATALOG_YAML_ENTRIES.remove('tso_imaging_catalog')
         except ValueError:
             pass
-        cats = [parameters['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
-        cats = [e for e in cats if e.lower() != 'none']
+
+        cats = []
+        for cattype in CATALOG_YAML_ENTRIES:
+            if cattype in supported_bkgd_types:
+                if parameters['simSignals'][cattype].lower() != 'none':
+                    cats.append(parameters['simSignals'][cattype])
+            else:
+                if parameters['simSignals'][cattype].lower() != 'none':
+                    print(parameters['simSignals'][cattype].lower(), type(parameters['simSignals'][cattype]))
+                    raise ValueError('{} catalog: {} is unsupported in grism TSO mode.'.format(cattype, parameters['simSignals'][cattype]))
+
         self.catalog_files.extend(cats)
 
+        self._dummy_catalog = False
         if len(self.catalog_files) == 0:
             # If no background source catalogs are given, create a dummy point
             # source catalog and add it to the list. Without this, the
@@ -596,6 +623,7 @@ class GrismTSO():
             dummy_ptsrc.save(dummy_cat)
             self.catalog_files.append(dummy_cat)
             parameters['simSignals']['pointsource'] = dummy_cat
+            self._dummy_catalog = True
 
         self.instrument = parameters['Inst']['instrument'].lower()
         self.aperture = parameters['Readout']['array_name']
@@ -932,20 +960,30 @@ class GrismTSO():
         file_dir, filename = os.path.split(self.paramfile)
         suffix = filename.split('.')[-1]
 
+        # Check to see if there are any catalogs for background objects
+        bkgd_cats = ['pointsource', 'galaxyListFile', 'extended']
+        present = [True if params['simSignals'][cat] is not None else False for cat in bkgd_cats]
+
         # Copy #1 - contains all source catalogs other than TSO sources
         # and be set to wfss mode.
-        background_params = copy.deepcopy(params)
-        background_params['simSignals']['tso_grism_catalog'] = 'None'
-        background_params['Inst']['mode'] = 'wfss'
-        background_params['Output']['grism_source_image'] = True
-        background_params['Output']['file'] = params['Output']['file'].replace('.fits',
-                                                                               '_background_sources.fits')
-        self.background_paramfile = self.paramfile.replace('.{}'.format(suffix),
-                                                           '_background_sources.{}'.format(suffix))
-        utils.write_yaml(background_params, self.background_paramfile)
+        if any(present):
+            background_params = copy.deepcopy(params)
+            background_params['simSignals']['tso_grism_catalog'] = 'None'
+            background_params['Inst']['mode'] = 'wfss'
+            background_params['Output']['grism_source_image'] = True
+            background_params['Output']['file'] = params['Output']['file'].replace('.fits',
+                                                                                   '_background_sources.fits')
+            self.background_paramfile = self.paramfile.replace('.{}'.format(suffix),
+                                                               '_background_sources.{}'.format(suffix))
+            utils.write_yaml(background_params, self.background_paramfile)
+        else:
+            self.background_paramfile = None
 
         # Copy #2 - contaings only the TSO grism source catalog,
         # is set to wfss mode, and has no background
+        if params['simSignals']['tso_grism_catalog'] is None:
+            raise ValueError("tso_grism_catalog is not populated in the input yaml. No TSO source to simulate.")
+
         tso_params = copy.deepcopy(params)
         tso_params['Inst']['mode'] = 'wfss'
         tso_params['Output']['grism_source_image'] = True
