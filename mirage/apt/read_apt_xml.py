@@ -1877,6 +1877,15 @@ class ReadAPTXML():
 
                 # Collect info on the direct exposure
                 directexp = expseq.find(ns + 'DiExposure')
+
+                # Check to see if the user requested extra direct dithers.
+                # Handle xml files from older versions of APT where ShouldDither
+                # is not present
+                try:
+                    extra_direct_dithers = directexp.find(ns + 'ShouldDither').text
+                except AttributeError:
+                    extra_direct_dithers = 'false'
+
                 typeflag = 'imaging'
                 if dither_direct == 'NO_DITHERING':
                     pdither = '1'  # direct image has no dithers
@@ -1920,14 +1929,24 @@ class ReadAPTXML():
                 exp_seq_dict['TileNumber'] = [tile] * repeats
                 exp_seq_dict['APTTemplate'] = [template_name] * repeats
                 exp_seq_dict['ObservationName'] = [proposal_param_dict['ObservationName']] * repeats
-                #exp_seq_dict['FilterWheel'] = [filter_name] * repeats
                 exp_seq_dict['PupilWheel'] = [filter_name] * repeats
                 exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * repeats
 
                 if not both_grisms:
+                    if extra_direct_dithers == 'true':
+                        primary_dither_list = [pdither, pdither_grism, str(int(pdither)+2)]
+                        num_of_dither_list = [str(int(pdither)*int(sdither)),
+                                              str(int(pdither_grism)*int(sdither_grism)),
+                                              str(int(pdither) * int(sdither) * 3)]
+                    else:
+                        primary_dither_list = [pdither, pdither_grism, pdither]
+                        num_of_dither_list = [str(int(pdither)*int(sdither)),
+                                              str(int(pdither_grism)*int(sdither_grism)),
+                                              str(int(pdither)*int(sdither))]
+
                     exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]
                     exp_seq_dict['PrimaryDitherType'] = [pdither_type, pdither_type_grism, pdither_type]
-                    exp_seq_dict['PrimaryDithers'] = [pdither, pdither_grism, pdither]
+                    exp_seq_dict['PrimaryDithers'] = primary_dither_list
                     exp_seq_dict['SubpixelPositions'] = [sdither, sdither_grism, sdither]
                     exp_seq_dict['SubpixelDitherType'] = [sdither_type, sdither_type_grism, sdither_type]
                     exp_seq_dict['ReadoutPattern'] = [rpatt, grism_rpatt, rpatt]
@@ -1935,10 +1954,7 @@ class ReadAPTXML():
                     exp_seq_dict['Integrations'] = [ints, grism_ints, ints]
                     exp_seq_dict['ShortPupil'] = [pupil, grism_pupil, pupil]
                     exp_seq_dict['Grism'] = [direct_grismvalue, grism, direct_grismvalue]
-                    exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
-                                                         str(int(pdither_grism)*int(sdither_grism)),
-                                                         str(int(pdither)*int(sdither))]
-                    #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                    exp_seq_dict['number_of_dithers'] = num_of_dither_list
                     exp_seq_dict['FilterWheel'] = [pupil, grism_pupil, pupil]
                 else:
                     if grism_number == 0:
@@ -1954,12 +1970,22 @@ class ReadAPTXML():
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism]
                         exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
                                                              str(int(pdither_grism)*int(sdither_grism))]
-                        #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil]
                         exp_seq_dict['FilterWheel'] = [pupil, grism_pupil]
                     elif grism_number == 1:
+                        if extra_direct_dithers == 'true':
+                            primary_dither_list = [str(int(pdither)+3), pdither_grism, str(int(pdither)+2)]
+                            num_of_dither_list = [str((int(pdither)*int(sdither))*4),
+                                                  str(int(pdither_grism)*int(sdither_grism)),
+                                                  str(int(pdither)*int(sdither)*3)]
+                        else:
+                            primary_dither_list = [str(int(pdither)+1), pdither_grism, pdither]
+                            num_of_dither_list = [str((int(pdither)*int(sdither))*2),
+                                                  str(int(pdither_grism)*int(sdither_grism)),
+                                                  str(int(pdither)*int(sdither))]
+
                         exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]
                         exp_seq_dict['PrimaryDitherType'] = [pdither_type, pdither_type_grism, pdither_type]
-                        exp_seq_dict['PrimaryDithers'] = [str(int(pdither)+1), pdither_grism, pdither]
+                        exp_seq_dict['PrimaryDithers'] = primary_dither_list
                         exp_seq_dict['SubpixelPositions'] = [sdither, sdither_grism, sdither]
                         exp_seq_dict['SubpixelDitherType'] = [sdither_type, sdither_type_grism, sdither_type]
                         exp_seq_dict['ReadoutPattern'] = [rpatt, grism_rpatt, rpatt]
@@ -1967,10 +1993,7 @@ class ReadAPTXML():
                         exp_seq_dict['Integrations'] = [ints, grism_ints, ints]
                         exp_seq_dict['ShortPupil'] = [pupil, grism_pupil, pupil]
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism, direct_grismvalue]
-                        exp_seq_dict['number_of_dithers'] = [str((int(pdither)*int(sdither))*2),
-                                                             str(int(pdither_grism)*int(sdither_grism)),
-                                                             str(int(pdither)*int(sdither))]
-                        #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                        exp_seq_dict['number_of_dithers'] = num_of_dither_list
                         exp_seq_dict['FilterWheel'] = [pupil, grism_pupil, pupil]
                 #######################################################################
                 # Update exposure dictionary to return
