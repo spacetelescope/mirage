@@ -1877,7 +1877,15 @@ class ReadAPTXML():
 
                 # Collect info on the direct exposure
                 directexp = expseq.find(ns + 'DiExposure')
-                extra_direct_dithers = directexp.find(ns + 'ShouldDither').text
+
+                # Check to see if the user requested extra direct dithers.
+                # Handle xml files from older versions of APT where ShouldDither
+                # is not present
+                try:
+                    extra_direct_dithers = directexp.find(ns + 'ShouldDither').text
+                except AttributeError:
+                    extra_direct_dithers = 'false'
+
                 typeflag = 'imaging'
                 if dither_direct == 'NO_DITHERING':
                     pdither = '1'  # direct image has no dithers
