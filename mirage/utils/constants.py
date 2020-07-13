@@ -67,7 +67,7 @@ PRIMARY_MIRROR_AREA = 25.326 * u.meter * u.meter
 PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
 
 # Fraction of the total Sersic
-SERSIC_FRACTIONAL_SIGNAL = 0.995
+SERSIC_FRACTIONAL_SIGNAL = 0.9995
 
 
 def grism_factor(instrument_name):
