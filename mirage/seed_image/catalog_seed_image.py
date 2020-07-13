@@ -3565,7 +3565,12 @@ class Catalog_seed():
         times = []
         time_reported = False
         print("Creating and adding galaxy stamp images...")
-        for entry in galaxylist:
+
+        ###########
+        fobj = open('galaxy_stamp_sizes.txt', 'w')
+        ###########
+
+        for itemp, entry in enumerate(galaxylist):
             # Warn user of how long this calcuation might take...
             if len(times) < 50:
                 elapsed_time = time.time() - start_time
@@ -3596,18 +3601,30 @@ class Catalog_seed():
             # be convolved with a PSF that is centered at the center of the
             # requested pixel on the detector. This will result in a convolved
             # galaxy centered at the correct location.
-            pix_x = np.floor(entry['pixelx'])
-            pix_y = np.floor(entry['pixely'])
-            sub_x = entry['pixelx'] - pix_x
-            sub_y = entry['pixely'] - pix_y
+            #pix_x = np.floor(entry['pixelx'])
+            #pix_y = np.floor(entry['pixely'])
+            #sub_x = entry['pixelx'] - pix_x
+            #sub_y = entry['pixely'] - pix_y
+
+            sub_x = 0.
+            sub_y = 0.
+
 
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['countrate_e/s'], sub_x, sub_y)
 
 
-
+            print('\n\nStamp dimensions:', stamp.shape)
             print('Stamp total out of create_galaxy: ', np.sum(stamp))
+
+            fobj.write('{} {} {} {}\n'.format(entry['pixelx'], entry['pixely'], stamp.shape[1], stamp.shape[0]))
+            if itemp == 5:
+                fobj.close()
+                stop
+            #hp = fits.PrimaryHDU(stamp)
+            #hl = fits.HDUList([hp])
+            #hl.writeto('gal_before_convolution_{}_{}.fits'.format(pix_x, pix_y))
 
 
 
@@ -3631,16 +3648,9 @@ class Catalog_seed():
                 stamp = self.enlarge_stamp(stamp, psf_shape)
                 galdims = stamp.shape
 
-
-
-                print('Stamp total after enlarging stamp: ', np.sum(stamp))
-
-
-
-
             # Get the PSF which will be convolved with the galaxy profile
             # The PSF should be centered in the pixel containing the galaxy center
-            psf_image, min_x, min_y, wings_added = self.create_psf_stamp(pix_x, pix_y, psf_shape[1], psf_shape[0],
+            psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'], psf_shape[1], psf_shape[0],
                                                                          ignore_detector=True)
 
             # Skip sources that fall completely off the detector
@@ -4046,19 +4056,26 @@ class Catalog_seed():
         """
         dim_y, dim_x = dims
         image_size_y, image_size_x = image.shape
-        if dim_y % 2 != image_size_y % 2:
-            dim_y += 1
-        if dim_x % 2 != image_size_x % 2:
-            dim_x += 1
+
+        if image_size_x < dim_x:
+            if dim_x % 2 != image_size_x % 2:
+                dim_x += 1
+            dx = dim_x - image_size_x
+            dx = np.int(dx / 2)
+        else:
+            dx = 0
+            dim_x = image_size_x
+
+        if image_size_y < dim_y:
+            if dim_y % 2 != image_size_y % 2:
+                dim_y += 1
+            dy = dim_y - image_size_y
+            dy = np.int(dy / 2)
+        else:
+            dy = 0
+            dim_y = image_size_y
 
         array = np.zeros((dim_y, dim_x))
-
-        dx = dim_x - image_size_x
-        dx = np.int(dx / 2)
-
-        dy = dim_y - image_size_y
-        dy = np.int(dy / 2)
-
         array[dy:dim_y-dy, dx:dim_x-dx] = image
         return array
 
