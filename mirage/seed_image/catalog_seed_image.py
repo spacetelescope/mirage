@@ -3420,8 +3420,34 @@ class Catalog_seed():
 
         # Using the position angle, calculate the size of the source in the
         # x and y directions
-        y_full_length = np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])
-        x_full_length = np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])
+        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+
+        num_pix = x_full_length * y_full_length
+
+        delta_limit = 0.005
+        limit = SERSIC_FRACTIONAL_SIGNAL
+        while num_pix > (2000.**2):
+            limit -= delta_limit
+
+            #print('\n\n      Decreasing limit')
+
+            # Find the effective radius, semi-major, and semi-minor axes sizes
+            # needed to encompass SERSIC_FRACTIONAL_SIGNAL of the total flux
+            sersic_rad, semi_major_axis, semi_minor_axis = sersic_fractional_radius(r_Sersic, sersic_index,
+                                                                                    limit,
+                                                                                    ellipticity)
+
+            # Using the position angle, calculate the size of the source in the
+            # x and y directions
+            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+
+            num_pix = x_full_length * y_full_length
+
+
+        #print('Final limit: ', limit)
+        #print('Final dimensions: ', x_full_length, y_full_length)
 
         # Make sure the dimensions are odd, so that the galaxy center will
         # be in the center pixel
@@ -3463,9 +3489,9 @@ class Catalog_seed():
         # level should be correct.
         sig_diff = np.absolute(1. - np.sum(stamp) / total_counts)
         if sig_diff > signal_matching_threshold:
-            print(("Signal difference is {}%. This is greater than the threshold of > {}%. "
-                   "Falling back to manual flux scaling."
-                   .format(sig_diff*100, signal_matching_threshold*100)))
+            #print(("Signal difference is {}%. This is greater than the threshold of > {}%. "
+            #       "Falling back to manual flux scaling."
+            #       .format(sig_diff*100, signal_matching_threshold*100)))
             stamp = stamp / np.sum(stamp) * total_counts
 
         return stamp
@@ -3567,7 +3593,7 @@ class Catalog_seed():
         print("Creating and adding galaxy stamp images...")
 
         ###########
-        fobj = open('galaxy_stamp_sizes.txt', 'w')
+        #fobj = open('galaxy_stamp_sizes.txt', 'w')
         ###########
 
         for itemp, entry in enumerate(galaxylist):
@@ -3615,13 +3641,14 @@ class Catalog_seed():
                                        xposang*np.pi/180., entry['countrate_e/s'], sub_x, sub_y)
 
 
-            print('\n\nStamp dimensions:', stamp.shape)
-            print('Stamp total out of create_galaxy: ', np.sum(stamp))
+            #print('Stamp dimensions:', stamp.shape)
+            #print('Stamp total out of create_galaxy: ', np.sum(stamp))
 
-            fobj.write('{} {} {} {}\n'.format(entry['pixelx'], entry['pixely'], stamp.shape[1], stamp.shape[0]))
-            if itemp == 5:
-                fobj.close()
-                stop
+            #fobj.write('{} {} {} {}\n'.format(entry['pixelx'], entry['pixely'], stamp.shape[1], stamp.shape[0]))
+            #if itemp == 50:
+            #    fobj.close()
+            #    stop
+
             #hp = fits.PrimaryHDU(stamp)
             #hl = fits.HDUList([hp])
             #hl.writeto('gal_before_convolution_{}_{}.fits'.format(pix_x, pix_y))
@@ -3686,7 +3713,7 @@ class Catalog_seed():
 
 
 
-                print('Stamp total after convolving: ', np.sum(stamp))
+                #print('Stamp total after convolving: ', np.sum(stamp), '\n\n')
 
 
 
