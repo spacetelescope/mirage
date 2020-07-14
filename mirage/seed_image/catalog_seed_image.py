@@ -3460,8 +3460,14 @@ class Catalog_seed():
         # Create model. Add 90 degrees to the position_angle because the definition
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
+
+
+        orientation still does not agree with Master, but the position_angle vsalues are the same! (without the pi/2 below)
+
+
+
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
-                       ellip=ellipticity, theta=position_angle) # +np.pi/2)
+                       ellip=ellipticity, theta=position_angle+np.pi/2)
 
         x_half_length = x_full_length // 2
         xmin = int(0 - x_half_length)
