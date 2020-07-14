@@ -3381,7 +3381,7 @@ class Catalog_seed():
             Sersic index
 
         position_angle : float
-            Position angle in units of degrees
+            Position angle in units of radians
 
         total_counts : float
             Total summed signal of the output image
@@ -3403,9 +3403,6 @@ class Catalog_seed():
         img : numpy.ndarray
             2D array containing the 2D sersic profile
         """
-        # Convert position_angle to radians
-        position_angle = np.deg2rad(position_angle)
-
         # Calculate the total signal associated with the source
         sersic_total = sersic_total_signal(r_Sersic, sersic_index)
 
@@ -3464,7 +3461,7 @@ class Catalog_seed():
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
-                       ellip=ellipticity, theta=position_angle+np.pi/2)
+                       ellip=ellipticity, theta=position_angle) # +np.pi/2)
 
         x_half_length = x_full_length // 2
         xmin = int(0 - x_half_length)
