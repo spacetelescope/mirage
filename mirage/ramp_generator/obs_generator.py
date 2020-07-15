@@ -1384,13 +1384,12 @@ class Observation():
 
             # If there is more than one segment, provide an estimate of processing time
             if len(self.linDark) > 1:
-                time_per_segment = 0.
-                for key in self.timer.timers:
-                    if 'seg_' in key:
-                        time_per_segment += self.timer.timers[key]
-                time_per_segment /= (i+1)
+                time_per_segment = self.timer.sum(key_str='seg_') / (i+1)
                 estimated_remaining_time = time_per_segment * (len(self.linDark) - (i+1)) * u.second
-                print('Estimated time remaining in obs_generator: {} minutes.\n\n'.format(estimated_remaining_time.to(u.minute).value))
+                time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                print(('Estimated time remaining to in obs_generator: {} minutes. '
+                       'Projected finish time: {}'.format(time_remaining, finish_time)))
 
         print("Observation generation complete.")
 

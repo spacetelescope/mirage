@@ -46,6 +46,7 @@ from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SEGMENTATION_MIN_SIGNAL_RATE, \
                               SUPPORTED_SEGMENTATION_THRESHOLD_UNITS
 from ..utils.flux_cal import fluxcal_info
+from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
@@ -116,6 +117,9 @@ class Catalog_seed():
         self.n_pointsources = 0
         self.n_galaxies = 0
         self.n_extend = 0
+
+        # Initialize timer
+        self.timer = Timer()
 
     def make_seed(self):
         """MAIN FUNCTION"""
@@ -2203,23 +2207,7 @@ class Catalog_seed():
         mag_column = self.select_magnitude_column(lines, filename)
 
         print('Filtering point sources to keep only those on the detector')
-        start_time = time.time()
-        times = []
-        time_reported = False
-        # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
-            # Warn user of how long this calcuation might take...
-            if len(times) < 100:
-                elapsed_time = time.time() - start_time
-                times.append(elapsed_time)
-                start_time = time.time()
-            elif len(times) == 100 and time_reported is False:
-                avg_time = np.mean(times)
-                total_time = len(indexes) * avg_time
-                print(("Expected time to process {} sources: {:.2f} seconds "
-                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
-                time_reported = True
-
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
                                                                           pixelflag, 4096)
@@ -2474,6 +2462,8 @@ class Catalog_seed():
 
         # Loop over the entries in the point source list
         for i, entry in enumerate(pointSources):
+            # Start timer
+            self.timer.start()
 
             # Find the PSF size to use based on the countrate
             psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
@@ -2534,8 +2524,18 @@ class Catalog_seed():
                 # the stamp may shift off of the detector.
                 pass
 
-            if ((len(pointSources) > 100) and (np.mod(i, 100))) == 0:
-                print('{}: Working on source {}'.format(str(datetime.datetime.now()), i))
+            # Stop timer
+            self.timer.stop(name='ptsrc_{}'.format(str(i).zfill(6)))
+
+            # If there are more than 100 point sources, provide an estimate of processing time
+            if len(pointSources) > 100:
+                if ((i == 20) or ((i > 0) and (np.mod(i, 100) == 0))):
+                    time_per_ptsrc = self.timer.sum(key_str='ptsrc_') / (i+1)
+                    estimated_remaining_time = time_per_ptsrc * (len(pointSources) - (i+1)) * u.second
+                    time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                    finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                    print(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
+                           'Projected finish time: {}'.format(i, time_remaining, finish_time)))
 
         return psfimage, ptsrc_segmap
 
@@ -3562,22 +3562,9 @@ class Catalog_seed():
         if self.add_psf_wings is True:
             self.translate_psf_table(magsys)
 
-        # For each entry, create an image, and place it onto the final output image
-        start_time = time.time()
-        times = []
-        time_reported = False
-        for entry in galaxylist:
-            # Warn user of how long this calcuation might take...
-            if len(times) < 30:
-                elapsed_time = time.time() - start_time
-                times.append(elapsed_time)
-                start_time = time.time()
-            elif len(times) == 30 and time_reported is False:
-                avg_time = np.mean(times)
-                total_time = len(galaxylist) * avg_time
-                print(("Expected time to process {} sources: {:.2f} seconds "
-                       "({:.2f} minutes)".format(len(galaxylist), total_time, total_time / 60)))
-                time_reported = True
+        for entry_index, entry in enumerate(galaxylist):
+            # Start timer
+            self.timer.start()
 
             # Get position angle in the correct units. Inputs for each
             # source are degrees east of north. So we need to find the
@@ -3658,6 +3645,18 @@ class Catalog_seed():
                     # print("Source located entirely outside the field of view. Skipping.")
             else:
                 pass
+
+            self.timer.stop(name='gal_{}'.format(str(entry_index).zfill(6)))
+
+            # If there are more than 30 galaxies, provide an estimate of processing time
+            if len(galaxylist) > 100:
+                if ((entry_index == 20) or ((entry_index > 0) and (np.mod(entry_index, 100) == 0))):
+                    time_per_galaxy = self.timer.sum(key_str='gal_') / (entry_index+1)
+                    estimated_remaining_time = time_per_galaxy * (len(galaxylist) - (entry_index+1)) * u.second
+                    time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                    finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                    print(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
+                           'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
 
         return galimage, segmentation.segmap
 
