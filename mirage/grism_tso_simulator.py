@@ -216,47 +216,38 @@ class GrismTSO():
         bkgd_waves, bkgd_fluxes = backgrounds.nircam_background_spectrum(orig_parameters,
                                                                          self.detector, self.module)
 
-        # Run the catalog_seed_generator on the non-TSO (background) sources if present
-        if not self._dummy_catalog:
-            background_direct = catalog_seed_image.Catalog_seed()
-            background_direct.paramfile = self.background_paramfile
-            background_direct.make_seed()
-            background_segmentation_map = background_direct.seed_segmap
+        # Run the catalog_seed_generator on the non-TSO (background) sources. Even if
+        # no source catalogs are given, we run using the dummy catalog created earlier,
+        # because we need to add the 2D dispersed background at this point.
+        background_direct = catalog_seed_image.Catalog_seed()
+        background_direct.paramfile = self.background_paramfile
+        background_direct.make_seed()
+        background_segmentation_map = background_direct.seed_segmap
 
-            # Run the disperser on the background sources. Add the background
-            # signal here as well
-            uniq_objs = np.unique(background_segmentation_map)
-            if ((len(uniq_objs) != 1) or (uniq_objs[0] != 0)):
-                print('\n\nDispersing background sources\n\n')
+        # Run the disperser on the background sources. Add the background
+        # signal here as well
+        print('\n\nDispersing background sources\n\n')
 
-                background_done = False
-                background_seed_files = [background_direct.ptsrc_seed_filename,
-                                         background_direct.galaxy_seed_filename,
-                                         background_direct.extended_seed_filename]
-                for seed_file in background_seed_files:
-                    if seed_file is not None:
-                        print("Dispersing seed image:", seed_file)
-                        disp = self.run_disperser(seed_file, orders=self.orders,
-                                                  add_background=not background_done,
-                                                  background_waves=bkgd_waves,
-                                                  background_fluxes=bkgd_fluxes,
-                                                  finalize=True)
-                        if not background_done:
-                            # Background is added at the first opportunity. At this
-                            # point, create an array to hold the final combined
-                            # dispersed background
-                            background_done = True
-                            background_dispersed = copy.deepcopy(disp.final)
-                        else:
-                            background_dispersed += disp.final
-            else:
-                print("No background sources present on the detector.")
-                background_dispersed = np.zeros((2048, 2048))
-        else:
-            # In this case there are no true background sources. The
-            # disperser always works on full frame data, so create an
-            # empty full frame image.
-            background_dispersed = np.zeros((2048, 2048))
+        background_done = False
+        background_seed_files = [background_direct.ptsrc_seed_filename,
+                                 background_direct.galaxy_seed_filename,
+                                 background_direct.extended_seed_filename]
+        for seed_file in background_seed_files:
+            if seed_file is not None:
+                print("Dispersing seed image:", seed_file)
+                disp = self.run_disperser(seed_file, orders=self.orders,
+                                          add_background=not background_done,
+                                          background_waves=bkgd_waves,
+                                          background_fluxes=bkgd_fluxes,
+                                          finalize=True)
+                if not background_done:
+                    # Background is added at the first opportunity. At this
+                    # point, create an array to hold the final combined
+                    # dispersed background
+                    background_done = True
+                    background_dispersed = copy.deepcopy(disp.final)
+                else:
+                    background_dispersed += disp.final
 
         # Run the catalog_seed_generator on the TSO source
         tso_direct = catalog_seed_image.Catalog_seed()
@@ -266,8 +257,7 @@ class GrismTSO():
         outside_tso_source = tso_segmentation_map == 0
 
         # Add any background sources to the segmentation map
-        if not self._dummy_catalog:
-            tso_segmentation_map[outside_tso_source] = background_segmentation_map[outside_tso_source]
+        tso_segmentation_map[outside_tso_source] = background_segmentation_map[outside_tso_source]
 
         # Dimensions are (y, x)
         self.seed_dimensions = tso_direct.nominal_dims
@@ -609,7 +599,6 @@ class GrismTSO():
 
         self.catalog_files.extend(cats)
 
-        self._dummy_catalog = False
         if len(self.catalog_files) == 0:
             # If no background source catalogs are given, create a dummy point
             # source catalog and add it to the list. Without this, the
@@ -623,7 +612,6 @@ class GrismTSO():
             dummy_ptsrc.save(dummy_cat)
             self.catalog_files.append(dummy_cat)
             parameters['simSignals']['pointsource'] = dummy_cat
-            self._dummy_catalog = True
 
         self.instrument = parameters['Inst']['instrument'].lower()
         self.aperture = parameters['Readout']['array_name']
