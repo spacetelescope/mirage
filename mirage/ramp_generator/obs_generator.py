@@ -51,6 +51,7 @@ from mirage.reference_files import crds_tools
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES
+from mirage.utils.timer import Timer
 
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
@@ -94,6 +95,9 @@ class Observation():
 
         # Check that CRDS-related environment variables are set correctly
         self.crds_datadir = crds_tools.env_variables()
+
+        # Initialize timer
+        self.timer = Timer()
 
     def add_crosstalk(self, exposure):
         """Add crosstalk effects to the input exposure
@@ -1142,22 +1146,22 @@ class Observation():
         # Read in superbias file if present
         self.read_superbias_file()
 
+        if len(self.linDark) > 1:
+            print(('An estimate of the remaining processing time will be provided after the first '
+                   'segment file has been created.\n\n'))
         for i, linDark in enumerate(self.linDark):
+            # Run the timer over each segment in order to come up with
+            # a rough estimate of computation time
+            self.timer.start()
+
             temp_outdir, basename = os.path.split(self.params['Output']['file'])
-
-
-            print('initial basename: ', basename)
 
             # Get the segment number of the file if present
             linDarkfile = os.path.basename(linDark)
             seg_location = linDarkfile.find('_seg')
 
-            print(linDark)
-            print('seg_location: ', seg_location)
-
             if seg_location != -1:
                 seg_str = linDarkfile[seg_location+4:seg_location+7]
-                #print('first segment string: ', seg_str)
             else:
                 try:
                     seg_location = seed_dict[linDark][0].find('_seg')
@@ -1167,7 +1171,6 @@ class Observation():
                     seg_str = seed_dict[linDark][0][seg_location+4:seg_location+7]
                 else:
                     seg_str = ''
-                #print('second segment string: ', seg_str)
 
             if seg_str != '':
                 # Assume standard JWST filename format
@@ -1375,6 +1378,19 @@ class Observation():
                     raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
                                       "with the superbias and reference pixels is not present in "
                                       "the dark current data object. Quitting."))
+
+            # Stop the timer and record the elapsed time
+            self.timer.stop(name='seg_{}'.format(str(i+1).zfill(4)))
+
+            # If there is more than one segment, provide an estimate of processing time
+            if len(self.linDark) > 1:
+                time_per_segment = 0.
+                for key in self.timer.timers:
+                    if 'seg_' in key:
+                        time_per_segment += self.timer.timers[key]
+                time_per_segment /= (i+1)
+                estimated_remaining_time = time_per_segment * (len(self.linDark) - (i+1)) * u.second
+                print('Estimated time remaining in obs_generator: {} minutes.\n\n'.format(estimated_remaining_time.to(u.minute).value))
 
         print("Observation generation complete.")
 
