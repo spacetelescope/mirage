@@ -49,6 +49,7 @@ import copy
 import os
 import sys
 import argparse
+import datetime
 import yaml
 
 from astropy.io import ascii, fits
@@ -70,6 +71,7 @@ from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from mirage.utils import utils, file_io, backgrounds
+from mirage.utils.timer import Timer
 from mirage.yaml import yaml_update
 
 
@@ -152,6 +154,9 @@ class GrismTSO():
         # Make sure the right combination of parameter files and SED file
         # are given
         self.param_checks()
+
+        # Initialize timer
+        self.timer = Timer()
 
     def calculate_exposure_time(self):
         """Calculate the total exposure time of the observation being
@@ -375,6 +380,10 @@ class GrismTSO():
         for i, int_dim in enumerate(ints_per_segment):
             int_start = self.int_segment_indexes[i]
             int_end = self.int_segment_indexes[i+1]
+
+            # Start timer
+            self.timer.start()
+
             for j, grp_dim in enumerate(groups_per_segment):
                 initial_frame = self.grp_segment_indexes[j]
                 # int_dim and grp_dim are the number of integrations and
@@ -475,6 +484,19 @@ class GrismTSO():
                 tso_seed_header = fits.getheader(tso_direct.seed_file)
                 self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters) #,
                                #segment_number, segment_part_number)
+
+            # Stop the timer and record the elapsed time
+            self.timer.stop(name='seg_{}'.format(str(i+1).zfill(4)))
+
+            # If there is more than one segment, provide an estimate of processing time
+            print('\n\nSegment {} out of {} complete.'.format(i+1, len(ints_per_segment)))
+            if len(ints_per_segment) > 1:
+                time_per_segment = self.timer.sum(key_str='seg_') / (i+1)
+                estimated_remaining_time = time_per_segment * (len(ints_per_segment) - (i+1)) * u.second
+                time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                print(('\nEstimated time remaining in this exposure: {} minutes. '
+                       'Projected finish time: {}\n'.format(time_remaining, finish_time)))
 
         # Prepare dark current exposure if
         # needed.

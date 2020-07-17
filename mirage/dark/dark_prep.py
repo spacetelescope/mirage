@@ -26,6 +26,7 @@ Use:
 import sys
 import os
 import argparse
+import datetime
 from math import floor
 from glob import glob
 
@@ -33,6 +34,7 @@ import yaml
 import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
+import astropy.units as u
 
 import mirage
 from mirage.utils import read_fits, utils, siaf_interface
@@ -970,12 +972,13 @@ class DarkPrep():
             self.timer.stop(name='seg_{}'.format(str(seg_index+1).zfill(4)))
 
             # If there is more than one segment, provide an estimate of processing time
+            print('\n\nSegment {} out of {} complete.'.format(seg_index+1, len(integration_segment_indexes[:-1])))
             if len(integration_segment_indexes[:-1]) > 1:
-                time_per_segment = self.timer.sum(key_str='seg_') / (file_index+1)
-                estimated_remaining_time = time_per_segment * (len(integration_segment_indexes[:-1]) - (file_index+1)) * u.second
+                time_per_segment = self.timer.sum(key_str='seg_') / (seg_index+1)
+                estimated_remaining_time = time_per_segment * (len(integration_segment_indexes[:-1]) - (seg_index+1)) * u.second
                 time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
                 finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
-                print(('Estimated time remaining to in dark_prep: {} minutes. '
+                print(('Estimated time remaining in dark_prep: {} minutes. '
                        'Projected finish time: {}'.format(time_remaining, finish_time)))
 
         # If only one dark current file is needed, return just the file
