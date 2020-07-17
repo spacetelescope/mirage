@@ -26,6 +26,7 @@ Use:
 import sys
 import os
 import argparse
+import datetime
 from math import floor
 from glob import glob
 
@@ -33,10 +34,12 @@ import yaml
 import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
+import astropy.units as u
 
 import mirage
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils.file_splitting import find_file_splits
+from mirage.utils.timer import Timer
 from mirage.reference_files import crds_tools
 
 
@@ -68,6 +71,9 @@ class DarkPrep():
 
         # Check that CRDS-related environment variables are set correctly
         self.crds_datadir = crds_tools.env_variables()
+
+        # Initialize timer
+        self.timer = Timer()
 
     def check_params(self):
         """Check for acceptible values for the input parameters in the
@@ -710,8 +716,15 @@ class DarkPrep():
         # (within data_volume_check). So at that point, a DEEP exposure with 20 groups
         # will have 400 frames open. This is also an unlikely situation, but it could
         # be a problem.
+        if len(integration_segment_indexes[:-1]) > 1:
+            print(('An estimate of processing time remaining will be provided after the first segment '
+                   'has been completed.\n\n'))
+
         self.dark_files = []
         for seg_index, segment in enumerate(integration_segment_indexes[:-1]):
+            # Start timer
+            self.timer.start()
+
             # Get the number of integrations being simulated
             if split_seed:
                 number_of_ints = integration_segment_indexes[seg_index+1] - segment
@@ -954,6 +967,19 @@ class DarkPrep():
                    "This can be used as input to the observation "
                    "generator.".format(objname)))
             self.dark_files.append(objname)
+
+            # Timing information
+            self.timer.stop(name='seg_{}'.format(str(seg_index+1).zfill(4)))
+
+            # If there is more than one segment, provide an estimate of processing time
+            print('\n\nSegment {} out of {} complete.'.format(seg_index+1, len(integration_segment_indexes[:-1])))
+            if len(integration_segment_indexes[:-1]) > 1:
+                time_per_segment = self.timer.sum(key_str='seg_') / (seg_index+1)
+                estimated_remaining_time = time_per_segment * (len(integration_segment_indexes[:-1]) - (seg_index+1)) * u.second
+                time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                print(('Estimated time remaining in dark_prep: {} minutes. '
+                       'Projected finish time: {}'.format(time_remaining, finish_time)))
 
         # If only one dark current file is needed, return just the file
         # name rather than a list.
