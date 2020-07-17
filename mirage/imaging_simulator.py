@@ -6,20 +6,6 @@ simulated integrations easier, combine the 3 relevant stages
 of the simulator (seed image generator, dark prep,
 obervation generator) into a single script.
 
-Inputs:
-paramfile - Name of yaml file to be used as simulator input.
-            For details  on the information contained in the
-            yaml files, see the readme file associated with
-            the mirage github repo:
-            https://github.com/spacetelescope/mirage.git
-
-override_dark - If you wish to use a dark current file that
-                has already gone through the dark_prep step
-                of the pipeline and wish to use that for the
-                simulation, set override_dark equal to the
-                dark's filename. The dark_prep step will then
-                be skipped.
-
 HISTORY:
 13 November 2017 - created, Bryan Hilbert
 13 July 2018 - updated for name change to Mirage, Bryan Hilbert
@@ -36,6 +22,23 @@ from .utils.utils import expand_environment_variable
 
 
 class ImgSim():
+    """Class to hold a simulated exposure
+
+    Parameters
+    ----------
+    paramfile : str
+        Name of yaml file to be used as simulator input.
+        For details  on the information contained in the
+        yaml files, see:
+        https://mirage-data-simulator.readthedocs.io/en/latest/example_yaml.html
+
+    override_dark : str or list
+        List (or single filename) of outputs from a prior run of ``dark_prep`` to
+        use when creating simulation. If set, the call to ``dark_prep`` will be
+        skipped and these darks will be used instead. If None, ``dark_prep`` will
+        be called and new dark objects will be created.
+
+    """
     def __init__(self, paramfile=None, override_dark=None, offline=False):
         self.env_var = 'MIRAGE_DATA'
         datadir = expand_environment_variable(self.env_var, offline=offline)
@@ -66,8 +69,12 @@ class ImgSim():
             else:
                 obs.linDark = d.dark_files
         else:
-            self.read_dark_product(self.override_dark)
-            obs.linDark = self.prepDark
+            print('\n\noverride_dark has been set. Skipping dark_prep.')
+            if isinstance(self.override_dark, str):
+                self.read_dark_product(self.override_dark)
+                obs.linDark = self.prepDark
+            elif isinstance(self.override_dark, list):
+                obs.linDark = self.override_dark
 
         # Combine into final observation
         obs.paramfile = self.paramfile

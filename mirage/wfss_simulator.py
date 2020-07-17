@@ -354,8 +354,12 @@ class WFSSSim():
             else:
                 obslindark = d.dark_files
         else:
-            self.read_dark_product()
-            obslindark = self.darkPrep
+            print('\n\noverride_dark has been set. Skipping dark_prep.')
+            if isinstance(self.override_dark, str):
+                self.read_dark_product()
+                obslindark = self.prepDark
+            elif isinstance(self.override_dark, list):
+                obslindark = self.override_dark
 
         # Combine into final observation
         obs = obs_generator.Observation(offline=self.offline)
@@ -411,10 +415,14 @@ class WFSSSim():
 
         # ###################Dark File to Use##################
         if self.override_dark is not None:
-            avail = os.path.isfile(self.override_dark)
-            if not avail:
-                raise FileNotFoundError(("WARNING: {} does not exist."
-                                         .format(self.override_dark)))
+            dark_list = self.override_dark
+            if isinstance(self.override_dark, str):
+                dark_list = [self.override_dark]
+            for darkfile in dark_list:
+                avail = os.path.isfile(darkfile)
+                if not avail:
+                    raise FileNotFoundError(("WARNING: {} does not exist."
+                                             .format(darkfile)))
 
     def find_param_info(self):
         """Extract dispersion direction and crossing filter from the input
