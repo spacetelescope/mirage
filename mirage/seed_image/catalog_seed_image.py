@@ -146,9 +146,14 @@ class Catalog_seed():
         self.check_params()
         self.params = utils.get_subarray_info(self.params, self.subdict)
         self.coord_transform = self.read_distortion_reffile()
-        self.grism_direct_factor = grism_factor(self.params['Inst']['instrument'].lower())
         self.expand_catalog_for_segments = bool(self.params['simSignals']['expand_catalog_for_segments'])
         self.add_psf_wings = self.params['simSignals']['add_psf_wings']
+
+        # Read in the transmission file so it can be used later
+        self.prepare_transmission_file()
+
+        # Find the factor by which the transmission image is larger than full frame
+        self.grism_factor()
 
         # If the output is a direct image to be dispersed, expand the size
         # of the nominal FOV so the disperser can account for sources just
@@ -162,12 +167,9 @@ class Catalog_seed():
         self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],
                                                           self.coord_adjust['x']])).astype(np.int)
 
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
-        print('output dimensions are: {}'.format(self.output_dims))
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
-
-        # Read in the flat field file so it can be used later
-        self.prepare_flat()
+        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+        print('Seed image output dimensions (x, y) are: ({}, {})'.format(self.output_dims[1], self.output_dims[0]))
+        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
 
         # calculate the exposure time of a single frame, based on the size of the subarray
         self.frametime = utils.calc_frame_time(self.params['Inst']['instrument'],
@@ -475,8 +477,8 @@ class Catalog_seed():
                 # Create the seed image contribution from each source
                 ptsrc_seed, ptsrc_seg = self.make_point_source_image(t)
 
-                # Multiply by the flat field
-                ptsrc_seed *= self.flatfield
+                # Multiply by the transmission image
+                ptsrc_seed *= self.transmission_image
 
                 # Add to the list of sources (even though the list will
                 # always have only one item)
@@ -683,6 +685,14 @@ class Catalog_seed():
             data, header = fits.getdata(filename, 1)
         return data, header
 
+    def grism_factor(self):
+        """Find the factor by which grism images are oversized compared
+        to full frame images
+        """
+        gy, gx = self.transmission_image.shape
+        self.grism_direct_factor_x = gx / 2048.
+        self.grism_direct_factor_y = gy / 2048.
+
     def prepare_psf_entries(self):
         """Get the correct filter and pupil values to use when searching
         for gridded psf libraries
@@ -760,6 +770,39 @@ class Catalog_seed():
             # back to the nominal detector/aperture shape.
             self.flatfield = flat
 
+    def prepare_transmission_file(self):
+        """Read in the transmission file and get into the correct shape in
+        order to apply it to the seed image
+        """
+        filename = self.params['Reffiles']['transmission']
+
+        # Read in file
+        try:
+            transmission, header = fits.getdata(filename, header=True)
+        except:
+            raise IOError('WARNING: unable to read in {}'.format(filename))
+
+        # Get the coordinates in the transmission file that correspond to (0,0)
+        # on the detector (full frame aperture)
+        self.trans_ff_xmin = header['XOFFSET']
+        self.trans_ff_ymin = header['YOFFSET']
+
+        if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss", "ts_grism"]):
+            pass
+        else:
+            # Imaging modes here. Cut the transmission file down to full frame,
+            # and then down to the requested aperture
+            transmission = transmission[self.trans_ff_ymin: self.trans_ff_ymin+2048, self.trans_ff_xmin: self.trans_ff_xmin+2048]
+
+            # Crop to expected subarray
+            try:
+                transmission = transmission[self.subarray_bounds[1]:self.subarray_bounds[3]+1,
+                                            self.subarray_bounds[0]:self.subarray_bounds[2]+1]
+            except:
+                raise ValueError("Unable to crop transmission image to expected subarray.")
+
+        self.transmission_image = transmission
+
     def pad_wfss_subarray(self, seed, seg):
         """
         WFSS seed images that are to go into the disperser
@@ -776,26 +819,28 @@ class Catalog_seed():
         Padded seed image and segmentation map
         """
         seeddim = seed.shape
-        nx = np.int(2048 * self.grism_direct_factor)
-        ffextra = np.int((nx - 2048) / 2)
+        nx = np.int(2048 * self.grism_direct_factor_x)
+        ny = np.int(2048 * self.grism_direct_factor_y)
+        ffextrax = np.int((nx - 2048) / 2)
+        ffextray = np.int((ny - 2048) / 2)
         bounds = np.array(self.subarray_bounds)
 
         subextrax = np.int((seeddim[-1] - bounds[2]) / 2)
         subextray = np.int((seeddim[-2] - bounds[3]) / 2)
 
-        extradiffy = ffextra - subextray
-        extradiffx = ffextra - subextrax
+        extradiffy = ffextray - subextray
+        extradiffx = ffextrax - subextrax
         exbounds = [extradiffx, extradiffy, extradiffx+seeddim[-1]-1, extradiffy+seeddim[-2]-1]
 
         if len(seeddim) == 2:
-            padded_seed = np.zeros((nx, nx))
+            padded_seed = np.zeros((ny, nx))
             padded_seed[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
-            padded_seg = np.zeros((nx, nx), dtype=np.int)
+            padded_seg = np.zeros((ny, nx), dtype=np.int)
             padded_seg[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
         elif len(seeddim) == 4:
-            padded_seed = np.zeros((seeddim[0], seeddim[1], nx, nx))
+            padded_seed = np.zeros((seeddim[0], seeddim[1], ny, nx))
             padded_seed[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
-            padded_seg = np.zeros((seeddim[0], seeddim[1], nx, nx), dtype=np.int)
+            padded_seg = np.zeros((seeddim[0], seeddim[1], ny, nx), dtype=np.int)
             padded_seg[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
         else:
             raise ValueError("Seed image is not 2D or 4D. It should be.")
@@ -917,13 +962,14 @@ class Catalog_seed():
         kw['PTFRMSRT'] = self.part_frame_start_number
 
         # Seed images provided to disperser are always embedded in an array
-        # with dimensions equal to full frame * self.grism_direct_factor
+        # that is larger than full frame. These keywords describe where the
+        # detector is within this oversized array
         if self.params['Inst']['mode'] in ['wfss', 'ts_grism', 'pom']:
             kw['NOMXDIM'] = self.ffsize
             kw['NOMYDIM'] = self.ffsize
-            kw['NOMXSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
+            kw['NOMXSTRT'] = self.trans_ff_xmin
             kw['NOMXEND'] = kw['NOMXSTRT'] + self.ffsize - 1
-            kw['NOMYSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
+            kw['NOMYSTRT'] = self.trans_ff_ymin
             kw['NOMYEND'] = kw['NOMYSTRT'] + self.ffsize - 1
 
         # TSO-specific header keywords
@@ -935,7 +981,8 @@ class Catalog_seed():
         kw['XREF_SCI'] = self.siaf.XSciRef
         kw['YREF_SCI'] = self.siaf.YSciRef
 
-        kw['GRISMPAD'] = self.grism_direct_factor
+        kw['GRISMPDX'] = self.grism_direct_factor_x
+        kw['GRISMPDY'] = self.grism_direct_factor_y
         self.seedinfo = kw
         self.saveSingleFits(seed_image, seed_file_name, key_dict=kw, image2=segmentation_map, image2type='SEGMAP')
 
@@ -995,11 +1042,11 @@ class Catalog_seed():
                                                                        MT_tracking=tracking,
                                                                        tracking_ra_vel=ra_vel,
                                                                        tracking_dec_vel=dec_vel)
-            # Multiply by flat field since these sources are trailed across detector
+            # Multiply by the transmission image since these sources are trailed across detector
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                mov_targs_ptsrc *= self.flatfield
+                mov_targs_ptsrc *= self.transmission_image
             mov_targs_ramps.append(mov_targs_ptsrc)
             mov_targs_segmap = np.copy(mt_ptsrc_segmap)
 
@@ -1015,7 +1062,7 @@ class Catalog_seed():
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                mov_targs_sersic *= self.flatfield
+                mov_targs_sersic *= self.transmission_image
             mov_targs_ramps.append(mov_targs_sersic)
             if mov_targs_segmap is None:
                 mov_targs_segmap = np.copy(mt_galaxy_segmap)
@@ -1034,7 +1081,7 @@ class Catalog_seed():
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                mov_targs_ext *= self.flatfield
+                mov_targs_ext *= self.transmission_image
             mov_targs_ramps.append(mov_targs_ext)
             if mov_targs_segmap is None:
                 mov_targs_segmap = np.copy(mt_ext_segmap)
@@ -1055,18 +1102,17 @@ class Catalog_seed():
         # offsets between the nominal output array and the input lists if the observation being
         # modeled is wfss
 
-        dtor = math.radians(1.)
         instrument = self.params['Inst']['instrument']
 
         # Normal imaging with grism image requested
         if (instrument.lower() == 'nircam' and self.params['Output']['grism_source_image']) or \
            (instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image'])):
-            self.coord_adjust['x'] = self.grism_direct_factor
-            self.coord_adjust['y'] = self.grism_direct_factor
-            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor - 1.) *
+            self.coord_adjust['x'] = self.grism_direct_factor_x
+            self.coord_adjust['y'] = self.grism_direct_factor_y
+            self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor_x - 1.) *
                                                   (self.subarray_bounds[2] -
                                                    self.subarray_bounds[0] + 1) / 2.)
-            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor - 1.) *
+            self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor_y - 1.) *
                                                   (self.subarray_bounds[3] -
                                                    self.subarray_bounds[1] + 1) / 2.)
 
@@ -1112,12 +1158,12 @@ class Catalog_seed():
                                                                   tracking_ra_vel=self.ra_vel,
                                                                   tracking_dec_vel=self.dec_vel,
                                                                   trackingPixVelFlag=vel_flag)
-            # Multiply by flat field since these sources are trailed
+            # Multiply by transmission image since these sources are trailed
             # across detector
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                mtt_ptsrc *= self.flatfield
+                mtt_ptsrc *= self.transmission_image
             mtt_data_list.append(mtt_ptsrc)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ptsrc_segmap)
@@ -1134,11 +1180,11 @@ class Catalog_seed():
                                                                         tracking_ra_vel=self.ra_vel,
                                                                         tracking_dec_vel=self.dec_vel,
                                                                         trackingPixVelFlag=vel_flag)
-            # Multiply by flat field
+            # Multiply by transmission image
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                mtt_galaxies *= self.flatfield
+                mtt_galaxies *= self.transmission_image
             mtt_data_list.append(mtt_galaxies)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_galaxies_segmap)
@@ -1156,11 +1202,11 @@ class Catalog_seed():
                                                               tracking_ra_vel=self.ra_vel,
                                                               tracking_dec_vel=self.dec_vel,
                                                               trackingPixVelFlag=vel_flag)
-            # Multiply by flat field
+            # Multiply by transmission image
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                mtt_ext *= self.flatfield
+                mtt_ext *= self.transmission_image
             mtt_data_list.append(mtt_ext)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ext_segmap)
@@ -1757,7 +1803,7 @@ class Catalog_seed():
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                ptsrcCRImage *= self.flatfield
+                ptsrcCRImage *= self.transmission_image
 
             totalCRList.append(ptsrcCRImage)
             totalSegList.append(ptsrcCRSegmap)
@@ -1785,7 +1831,7 @@ class Catalog_seed():
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                galaxyCRImage *= self.flatfield
+                galaxyCRImage *= self.transmission_image
 
             totalCRList.append(galaxyCRImage)
             totalSegList.append(galaxySegmap)
@@ -1816,7 +1862,7 @@ class Catalog_seed():
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
             else:
-                extCRImage *= self.flatfield
+                extCRImage *= self.transmission_image
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
@@ -1899,12 +1945,8 @@ class Catalog_seed():
 
                     psfimage += seg_psfimage
 
-            # Multiply by the flat field unless it is a NIRCam observation
-            # that is going to be dispersed
-            if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
-                pass
-            else:
-                psfimage *= self.flatfield
+            # Multiply by the transmission image
+            psfimage *= self.transmission_image
 
             ptsrc_segmap = ptsrc_segmap.segmap
 
@@ -1947,12 +1989,9 @@ class Catalog_seed():
         if self.runStep['galaxies'] is True:
             galaxyCRImage, galaxy_segmap = self.make_galaxy_image(self.params['simSignals']['galaxyListFile'])
 
-            # Multiply by the flat field unless it is a NIRCam observation
+            # Multiply by the transmission image unless it is a NIRCam observation
             # that is going to be dispersed
-            if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
-                pass
-            else:
-                galaxyCRImage *= self.flatfield
+            galaxyCRImage *= self.transmission_image
 
             # To avoid problems with overlapping sources between source
             # types in observations to be dispersed, make the galaxy-
@@ -1998,10 +2037,7 @@ class Catalog_seed():
 
             # Multiply by the flat field unless it is a NIRCam observation
             # that is going to be dispersed
-            if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
-                pass
-            else:
-                extimage *= self.flatfield
+            extimage *= self.transmission_image
 
             # To avoid problems with overlapping sources between source
             # types in observations to be dispersed, make the point
@@ -2047,11 +2083,8 @@ class Catalog_seed():
             zodiangle = self.params['Telescope']['rotation']
             zodiacalimage, zodiacalheader = self.getImage(self.params['simSignals']['zodiacal'], arrayshape, True, zodiangle, arrayshape/2)
 
-            # Multiply by the flat field
-            if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
-                pass
-            else:
-                zodiacalimage *= self.flatfield
+            # Multiply by the transmission image
+            zodiacalimage *= self.transmission_image
 
             signalimage = signalimage + zodiacalimage*self.params['simSignals']['zodiscale']
 
@@ -2061,17 +2094,13 @@ class Catalog_seed():
                                                             arrayshape, False, 0.0, arrayshape/2)
 
             # Multiply by the flat field
-            if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
-                pass
-            else:
-                scatteredimage *= self.flatfield
+            scatteredimage *= self.transmission_image
 
             signalimage = signalimage + scatteredimage*self.params['simSignals']['scatteredscale']
 
         # CONSTANT BACKGROUND - multiply by flat field unless it is a NIRCam
         # observation that is going to be dispersed
-        if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
-            signalimage = signalimage + (self.params['simSignals']['bkgdrate'] * self.flatfield)
+        signalimage = signalimage + (self.params['simSignals']['bkgdrate'] * self.transmission_image)
 
         # Save the final rate image of added signals
         if self.params['Output']['save_intermediates'] is True:
@@ -3325,15 +3354,15 @@ class Catalog_seed():
 
         # Expand the limits if a grism direct image is being made
         if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
-            extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor - 1.))
+            extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor_y - 1.))
             miny -= extrapixy
             maxy += extrapixy
-            extrapixx = np.int((maxx + 1)/2 * (self.grism_direct_factor - 1.))
+            extrapixx = np.int((maxx + 1)/2 * (self.grism_direct_factor_x - 1.))
             minx -= extrapixx
             maxx += extrapixx
 
-            nx = np.int(nx * self.grism_direct_factor)
-            ny = np.int(ny * self.grism_direct_factor)
+            nx = np.int(nx * self.grism_direct_factor_x)
+            ny = np.int(ny * self.grism_direct_factor_y)
 
         # If an index column is present use that, otherwise
         # create one
