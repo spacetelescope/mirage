@@ -112,11 +112,11 @@ class GrismTSO():
             done if the wavelength range covered by the filter magnitudes
             does not cover the entire wavelength range of the grism+filter
 
-        override_dark : str
-            Name of file containing a Mirage dark current object appropriate
-            for the simulation. If provided, the ``dark_prep`` step will be
-            skipped. If ``None``, then a new dark current object will be
-            constructed
+        override_dark : list
+            List of outputs from a prior run of ``dark_prep`` to use when creating
+            simulation. If set, the call to ``dark_prep`` will be skipped and these
+            darks will be used instead. If None, ``dark_prep`` will be called and
+            new dark objects will be created.
 
         disp_seed_filename : str
             Name of the file to save the dispsersed seed image into
@@ -146,10 +146,14 @@ class GrismTSO():
         self.save_dispersed_seed = save_dispersed_seed
         self.source_stamps_file = source_stamps_file
         self.extrapolate_SED = extrapolate_SED
-        self.override_dark = override_dark
         self.disp_seed_filename = disp_seed_filename
         self.orders = orders
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
+
+        if isinstance(override_dark, list):
+            self.override_dark = override_dark
+        else:
+            raise TypeError('override_dark should be a list of dark_prep files.')
 
         # Make sure the right combination of parameter files and SED file
         # are given
@@ -490,15 +494,20 @@ class GrismTSO():
 
         # Prepare dark current exposure if
         # needed.
-        print('Running dark prep')
-        d = dark_prep.DarkPrep()
-        d.paramfile = self.paramfile
-        d.prepare()
+        if not self.override_dark:
+            print('Running dark prep')
+            d = dark_prep.DarkPrep()
+            d.paramfile = self.paramfile
+            d.prepare()
+            use_darks = d.dark_files
+        else:
+            print('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
+            use_darks = self.override_dark
 
         # Combine into final observation
         print('Running observation generator')
         obs = obs_generator.Observation()
-        obs.linDark = d.dark_files
+        obs.linDark = use_darks
         obs.seed = self.seed_files
         obs.segmap = tso_segmentation_map
         obs.seedheader = tso_direct.seedinfo

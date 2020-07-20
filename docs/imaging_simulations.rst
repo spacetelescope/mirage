@@ -14,8 +14,26 @@ The imaging simulator has only two possible inputs: the yaml parameter file, and
     sim = ImgSim(paramfile='my_yaml_file.yaml')
     sim.create()
 
+.. _img_provide_segmented_darks:
 
-If you have a fits file containing a dark current exposure that is the proper format (linearized, with the correct readout pattern and array size) for the simulated data you are creating, you can provide this via the ``override_dark`` keyword parameter. This will cause the dark current preparation step to be skipped, which will save some time. In practice, the only way to have a fits file with the properly formatted dark current exposure will be from previous runs of the imaging simulator (or :ref:`dark prep <dark_prep>` step).
+If you have dark current products for your simulation from a previous run of Mirage, it is possible to provide these files to *imaging_simulator.py* as inputs using the **override_dark** parameter. In this case, the call to *dark_prep.py* will be skipped, which will save some computing time. Note that the dark current products must be specific to your exoposure, in that they must contain arrays of the proper shape. So in practice, this detail is useful if you are repeating a previous call to Mirage. In that case, the darks can be provided as shown below. In the case where a single dark file is needed, it can be provided as a string or a 1-element list. In cases where the exposure is broken into segments and there are multiple dark files, these files must be provided as a list.
+
+::
+
+    from mirage.imaging_simulator import ImgSim
+
+    # Single dark file
+    dark = 'jw09996001001_01101_00001_nrcb5_uncal_linear_dark_prep_object.fits'
+    m = ImgSim(override_dark=dark)
+    m.paramfile = 'jw09996001001_01101_00001_nrcb5.yaml'
+    m.create()
+
+    # Exposure broken into multiple segments
+    dark = ['jw09996001001_01101_00001_nrcb5_uncal_seg001_linear_dark_prep_object.fits',
+            'jw09996001001_01101_00001_nrcb5_uncal_seg002_linear_dark_prep_object.fits']
+    m = ImgSim(override_dark=dark)
+    m.paramfile = 'jw09996001001_01101_00001_nrcb5.yaml'
+    m.create()
 
 .. tip::
 
