@@ -104,23 +104,3 @@ SUPPORTED_SEGMENTATION_THRESHOLD_UNITS = ['adu/s', 'adu/sec', 'e/s', 'e/sec', 'm
 # For use in converting background MJy/sr to e-/sec
 PRIMARY_MIRROR_AREA = 25.326 * u.meter * u.meter
 PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
-
-
-def grism_factor(instrument_name):
-    """Return the factor by which the field of view is expanded when
-    creating grism simulations compared to direct image simulations
-
-    Parameters
-    ----------
-    instrument_name : str
-        JWST instrument name
-
-    Returns
-    -------
-    factor : float
-        Multiplicative factor by which the fov is enlarged
-    """
-    if instrument_name.lower() == 'nircam':
-        return np.sqrt(2.)
-    elif instrument_name.lower() == 'niriss':
-        return 2322./2048.

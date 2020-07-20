@@ -48,7 +48,7 @@ from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SEGMENTATION_MI
 from ..utils.flux_cal import fluxcal_info
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
-from ..utils.constants import grism_factor, TSO_MODES
+from ..utils.constants import TSO_MODES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
