@@ -238,6 +238,7 @@ def test_get_all_catalogs():
             assert False, "Retrieved catalog does not match expected."
 
 
+@pytest.mark.skip(reason="Repeated HTML response errors.")
 def test_gaia_query():
     """Test the GAIA query and transformation into a Mirage-format catalog"""
     ra = 80.4
