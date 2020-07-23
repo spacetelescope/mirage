@@ -423,13 +423,11 @@ class SimInput:
                     updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # Query CRDS
-            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
+            # Exclude transmission file for now
+            files_no_transmission = list(CRDS_FILE_TYPES.values())
+            files_no_transmission.remove('transmission')
+            reffiles = crds_tools.get_reffiles(status_dict, files_no_transmission,
                                                download=not self.offline)
-
-            # Transmission image file
-            # For the moment, this file is retrieved from NIRCAM_GRISM or NIRISS_GRISM
-            # Down the road it will become part of CRDS, at which point
-            reffiles['transmission'] = get_transmission_file(status_dict)
 
             # If the user entered reference files in self.reffile_defaults
             # use those over what comes from the CRDS query
@@ -449,6 +447,12 @@ class SimInput:
                         else:
                             crds_key = key
                         reffiles[crds_key] = manual_reffiles[key]
+
+            # Transmission image file
+            # For the moment, this file is retrieved from NIRCAM_GRISM or NIRISS_GRISM
+            # Down the road it will become part of CRDS, at which point
+            if 'transmission' not in reffiles.keys():
+                reffiles['transmission'] = get_transmission_file(status_dict)
 
             # Check to see if a version of the inverted IPC kernel file
             # exists already in the same directory. If so, use that and
