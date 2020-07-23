@@ -716,8 +716,8 @@ class Catalog_seed():
 
         # Get the coordinates in the transmission file that correspond to (0,0)
         # on the detector (full frame aperture)
-        self.trans_ff_xmin = header['XOFFSET']
-        self.trans_ff_ymin = header['YOFFSET']
+        self.trans_ff_xmin = int(header['XOFFSET'])
+        self.trans_ff_ymin = int(header['YOFFSET'])
 
         # Check that the transmission image contains the entire detector
         if ((xd < 2048) or (yd < 2048)):
@@ -731,6 +731,8 @@ class Catalog_seed():
         else:
             # Imaging modes here. Cut the transmission file down to full frame,
             # and then down to the requested aperture
+            print(transmission.shape)
+            print(self.trans_ff_ymin, self.trans_ff_xmin)
             transmission = transmission[self.trans_ff_ymin: self.trans_ff_ymin+2048, self.trans_ff_xmin: self.trans_ff_xmin+2048]
 
             # Crop to expected subarray

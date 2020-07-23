@@ -51,7 +51,8 @@ def get_transmission_file(parameter_dict):
     elif parameter_dict['INSTRUME'].lower() == 'fgs':
         return 'create_in_place.fits'
 
-    dirname = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../{}'.format(repo)))
+    datadir = os.environ.get('MIRAGE_DATA')
+    dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), repo)
     transmission_files = glob(os.path.join(dirname, '*transmission*fits'))
 
     filt = parameter_dict['FILTER']

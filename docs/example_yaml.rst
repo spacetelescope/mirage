@@ -49,6 +49,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
 	  pixelAreaMap_: crds        #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+	  transmission_: crds        # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
 	  crosstalk_:       config   #File containing crosstalk coefficients
@@ -456,6 +457,18 @@ Fits file containing the pixel area map for the detector to be simulated. If pro
 
 .. hint::
 	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
+
+.. _transmission:
+
+Transmission Image
+++++++++++++++++++
+
+*Reffiles:transmission*
+
+Fits file containing the transmission image for the detector/filter/pupil to be simulated. The values in this image are the transmission fraction for each pixel, and the image is multiplied in to the seed image (prior to dispersing if simulating WFSS data). This image is designed to contain occulters/masks that are present within the field of view.
+
+.. hint::
+    Setting this entry equal to 'crds' will cause Mirage to get the appropriate file from the collection of Mirage reference files. The ultimate source of these files are the `GRISM_NIRCAM <https://github.com/npirzkal/GRISM_NIRCAM>`_ and `GRISM_NIRISS <https://github.com/npirzkal/GRISM_NIRISS>`_ repositories, which must be cloned from github during the Mirage installation process and placed within the Mirage reference files directory structure. In the future, we anticipate that the transmission files will be hosted by the CRDS system, which is why they are treated similarly to the current CRDS reference files.
 
 .. _subarray_defs:
 

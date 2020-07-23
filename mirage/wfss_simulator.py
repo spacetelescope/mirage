@@ -306,6 +306,7 @@ class WFSSSim():
             # Segmentation map will be centered in a frame that is larger
             # than full frame by a factor of sqrt(2), so crop appropriately
             print("Need to make this work for subarrays...")
+            print('\n\n\nfix me!\n\n\n\n')
             segy, segx = cat.seed_segmap.shape
             dx = int((segx - 2048) / 2)
             dy = int((segy - 2048) / 2)

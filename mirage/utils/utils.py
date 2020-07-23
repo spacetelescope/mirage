@@ -29,6 +29,7 @@ from astropy.io import ascii as asc
 import numpy as np
 from scipy.stats import sigmaclip
 
+from mirage.reference_files.utils import get_transmission_file
 from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
                                    NIRCAM_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
                                    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, NIRCAM_FILTERS, \
@@ -363,7 +364,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
     pathdict = {'Reffiles': ['dark', 'linearized_darkfile', 'badpixmask',
                              'superbias', 'linearity', 'saturation', 'gain',
                              'pixelflat', 'illumflat', 'ipc', 'astrometric',
-                             'crosstalk', 'occult', 'pixelAreaMap',
+                             'crosstalk', 'occult', 'pixelAreaMap', 'transmission',
                              'subarray_defs', 'filtpupilcombo',
                              'flux_cal', 'readpattdefs', 'filter_throughput',
                              'filter_wheel_positions', 'photom'],
@@ -456,9 +457,15 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                         raise ValueError('WFSS or GrismTSO sim, but Pupil is not set to one of the grisms.')
                     query_dictionary = img_dict
 
-                mapping = crds_tools.get_reffiles(query_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
-                params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
-                print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                if key2 != 'transmission':
+                    mapping = crds_tools.get_reffiles(query_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
+                    params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
+                    print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                else:
+                    # For the moment, the transmission files are stored in the GRISM_NIRCAM and
+                    # GRISM_NIRISS repos. Longer-term they will become CRDS files and this else
+                    # statement can be deleted.
+                    params[key1][key2] = get_transmission_file(query_dictionary)
 
                 # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
                 if key2 == 'ipc':

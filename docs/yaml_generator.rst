@@ -336,6 +336,10 @@ Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.
 
     In order to specify a location on your machine to store the downloaded reference files, you must have the CRDS_PATH environment variable set to that location. If this environment variable is not set, Mirage will default to use $HOME/crds_cache/
 
+.. tip::
+
+    Even though the transmission image reference files are not currently hosted by CRDS, for the purposes of user input options, Mirage treats them as if they are. Placing "crds" for these files in the input yaml files will cause Mirage to search the collection of Mirage reference files for them, rather than searching CRDS. We anticipate the transmission image files will be moved into CRDS in the future, which is why we treat them in this way.
+
 .. important::
 
     Due to a limitation of the **CRDS** package, the CRDS_PATH and CRDS_SERVER_URL environment variables must be set BEFORE importing the **CRDS** package. If you are running Mirage using code that imports **CRDS** *or any other packages that import CRDS* (such as Mirage's **dark_prep** module or the **jwst** package, which contains the calibration pipeline) prior to running Mirage, you should explicitly set the environment variables before importing those packages. If you do not, you will get the following error:
@@ -361,16 +365,17 @@ Here is a view of the dictionary structure required when specifying reference fi
 
 ::
 
-    override = {'nircam': {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
-                           'linearity':  {detector_name: 'reffile_name.fits'},
-                           'saturation': {detector_name: 'reffile_name.fits'},
-                           'gain':       {detector_name: 'reffile_name.fits'},
-                           'distortion': {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
-                           'ipc':        {detector_name: 'reffile_name.fits'},
-                           'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
-                           'badpixmask': {detector_name: 'reffile_name.fits'},
-                           'pixelflat':  {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
-                           'photom':     {detector_name: 'reffile_name.fits'}
+    override = {'nircam': {'superbias':    {detector_name: {readpattern: 'reffile_name.fits'}},
+                           'linearity':    {detector_name: 'reffile_name.fits'},
+                           'saturation':   {detector_name: 'reffile_name.fits'},
+                           'gain':         {detector_name: 'reffile_name.fits'},
+                           'distortion':   {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
+                           'ipc':          {detector_name: 'reffile_name.fits'},
+                           'area':         {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
+                           'transmission': {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
+                           'badpixmask':   {detector_name: 'reffile_name.fits'},
+                           'pixelflat':    {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
+                           'photom':       {detector_name: 'reffile_name.fits'}
                            },
                 'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
                            'linearity':  'reffile_name.fits',
@@ -379,20 +384,22 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {pupil: {exposure_type: 'reffile_name.fits'}},
                            'ipc':        'reffile_name.fits',
                            'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
+                           'transmission': {filter: {pupil: 'reffile_name.fits'}},
                            'badpixmask': 'reffile_name.fits',
                            'pixelflat':  {filter: {pupil: 'reffile_name.fits'}},
                            'photom':     {detector_name: 'reffile_name.fits'}
                            },
-                'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
-                           'linearity':  {detector_name: 'reffile_name.fits'},
-                           'saturation': {detector_name: 'reffile_name.fits'},
-                           'gain':       {detector_name: 'reffile_name.fits'},
-                           'distortion': {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'ipc':        {detector_name: 'reffile_name.fits'},
-                           'area':       {detector_name: 'reffile_name.asdf'},
-                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'pixelflat':  {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'photom':     {detector_name: 'reffile_name.fits'}
+                'fgs':    {'superbias':    {detector_name: {readpattern: 'reffile_name.fits'}},
+                           'linearity':    {detector_name: 'reffile_name.fits'},
+                           'saturation':   {detector_name: 'reffile_name.fits'},
+                           'gain':         {detector_name: 'reffile_name.fits'},
+                           'distortion':   {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'ipc':          {detector_name: 'reffile_name.fits'},
+                           'area':         {detector_name: 'reffile_name.asdf'},
+                           'transmission': {detector_name: 'reffile_name.fits'},
+                           'badpixmask':   {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'pixelflat':    {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'photom':       {detector_name: 'reffile_name.fits'}
                            }
 
 
@@ -418,6 +425,7 @@ Here we show an example dictionary for a particular set of observations.
                                           'nrcb4': 'my_reffiles/my_ipc_for_b4.fits'},
                            'area':       {'nrcb5': {'f322w2': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b5.asdf'}}},
                                           'nrcb4': {'f444w':  {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.asdf'}}}},
+                           'transmission': {'nrcb5': {'f356w': {'clear': 'my_reffiles/my_transmission_for_b5.fits'}}},
                            'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                           'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
                            'pixelflat':  {'nrcb5': {'f322w2': {'clear': 'my_favorites/lw_flat.fits',
