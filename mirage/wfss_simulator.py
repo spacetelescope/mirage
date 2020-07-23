@@ -241,9 +241,6 @@ class WFSSSim():
         background_done = False
         for seed_files in [ptsrc_seeds, galaxy_seeds, extended_seeds]:
             if seed_files[0] is not None:
-
-                print('Seed_files: ', seed_files)
-
                 dispersed_objtype_seed = Grism_seed(seed_files, self.crossing_filter,
                                                     dmode, config_path=loc, instrument=self.instrument.upper(),
                                                     extrapolate_SED=self.extrapolate_SED, SED_file=self.SED_file,

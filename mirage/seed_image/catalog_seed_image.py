@@ -1864,11 +1864,6 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            #if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
-            #     (aperture_suffix not in ['FULL', 'CEN'])):
-            #    self.point_source_seed, self.point_source_seg_map = self.pad_wfss_subarray(self.point_source_seed,
-            #                                                                               self.point_source_seg_map)
-            print('delete these lines above!!!!!!!')
 
             # Save the point source seed image
             if instrument_name != 'fgs':
@@ -1900,12 +1895,6 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            #if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
-            #     (aperture_suffix not in ['FULL', 'CEN'])):
-            #    self.galaxy_source_seed, self.galaxy_source_seg_map = self.pad_wfss_subarray(self.galaxy_source_seed,
-            #
-            #                                                                                 self.galaxy_source_seg_map)
-            print('delete these lines above!!!!!!!')
 
             # Save the galaxy source seed image
             if instrument_name != 'fgs':
@@ -1944,11 +1933,6 @@ class Catalog_seed():
             # embed the seed image in a full frame array. The disperser
             # tool does not work on subarrays
             aperture_suffix = self.params['Readout']['array_name'].split('_')[-1]
-            #if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) & \
-            #     (aperture_suffix not in ['FULL', 'CEN'])):
-            #    self.extended_source_seed, self.extended_source_seg_map = self.pad_wfss_subarray(self.extended_source_seed,
-            #                                                                                     self.extended_source_seg_map)
-            print('delete these lines above!!!!!!!')
 
             # Save the extended source seed image
             if instrument_name != 'fgs':
@@ -2113,27 +2097,13 @@ class Catalog_seed():
 
         # Expand the limits if a grism direct image is being made
         if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
-            #extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
-            #miny -= extrapixy
-            #maxy += extrapixy
-            #extrapixx = np.int((maxx + 1)/2 * (self.coord_adjust['x'] - 1.))
-            #minx -= extrapixx
-            #maxx += extrapixx
-            print('delete these lines above!!!!!!!!')
-
             transmission_ydim, transmission_xdim = self.transmission_image.shape
-
             miny = miny - self.subarray_bounds[1] - self.trans_ff_ymin
             minx = minx - self.subarray_bounds[0] - self.trans_ff_xmin
             maxx = minx + transmission_xdim
             maxy = miny + transmission_ydim
             nx = transmission_xdim
             ny = transmission_ydim
-
-
-
-
-
 
         # Write out the RA and Dec of the field center to the output file
         # Also write out column headers to prepare for source list
@@ -3754,27 +3724,13 @@ class Catalog_seed():
 
             # Expand the limits if a grism direct image is being made
             if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
-                #extrapixy = np.int((maxy + 1)/2 * (self.coord_adjust['y'] - 1.))
-                #miny -= extrapixy
-                #maxy += extrapixy
-                #extrapixx = np.int((maxx + 1)/2 * (self.coord_adjust['x'] - 1.))
-                #minx -= extrapixx
-                #maxx += extrapixx
-                print('delete these lines above!!')
-
-
                 transmission_ydim, transmission_xdim = self.transmission_image.shape
-
                 miny = miny - self.subarray_bounds[1] - self.trans_ff_ymin
                 minx = minx - self.subarray_bounds[0] - self.trans_ff_xmin
                 maxx = minx + transmission_xdim
                 maxy = miny + transmission_ydim
                 nx = transmission_xdim
                 ny = transmission_ydim
-
-
-
-
 
             # Now, expand the dimensions again to include point sources that fall only partially on the
             # subarray
