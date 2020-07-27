@@ -300,17 +300,6 @@ class WFSSSim():
             print("Dispersed seed image size: {}".format(disp_seed.shape))
             disp_seed = self.crop_to_subarray(disp_seed, cat.subarray_bounds)
 
-            # Segmentation map will be centered in a frame that is larger
-            # than full frame by a factor of sqrt(2), so crop appropriately
-            print("Need to make this work for subarrays...")
-            print('\n\n\nfix me!\n\n\n\n')
-            segy, segx = cat.seed_segmap.shape
-            dx = int((segx - 2048) / 2)
-            dy = int((segy - 2048) / 2)
-            segbounds = [cat.subarray_bounds[0] + dx, cat.subarray_bounds[1] + dy,
-                         cat.subarray_bounds[2] + dx, cat.subarray_bounds[3] + dy]
-            cat.seed_segmap = self.crop_to_subarray(cat.seed_segmap, segbounds)
-
         # Save the dispersed seed image if requested
         # Save in units of e/s, under the idea that this should be a
         # "perfect" noiseless view of the scene that does not depend on

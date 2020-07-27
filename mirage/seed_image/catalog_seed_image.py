@@ -3271,9 +3271,6 @@ class Catalog_seed():
             nx = transmission_xdim
             ny = transmission_ydim
 
-
-
-
         # If an index column is present use that, otherwise
         # create one
         indexes = self.get_index_numbers(galaxylist)
