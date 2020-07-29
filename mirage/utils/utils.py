@@ -707,14 +707,19 @@ def normalize_filters(instrument, filter_name, pupil_name):
     return newfilter, newpupil
 
 
-def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam=None,
+def magnitude_to_countrate(instrument, filter_name, magsys, mag, photfnu=None, photflam=None,
                            vegamag_zeropoint=None):
     """Convert a given source magnitude into count rate
 
     Parameters
     ----------
-    observation_mode : str
-        e.g. 'imaging', 'wfss'
+    instrument : str
+        e.g. 'nircam'
+
+    filter_name : str
+        Filter used in the observation. Only used in the case of
+        NIRISS, where filters in the filter wheel have their
+        throughput modified.
 
     magsys : str
         Magnitude system of the input magnitudes. Allowed values are:
@@ -742,15 +747,17 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
         Count rate (e/s) corresponding to the input magnutude(s)
 
     """
-    # For NIRISS AMI mode, the count rate values calculated need to be
-    # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
-    # throughput of the NRM, while the 0.84 value is the throughput of the
-    # imaging CLEARP element that is in place in the pupil wheel for the
-    # normal imaging observations.
-    if observation_mode in ['ami', 'AMI']:
-        count_scale = 0.15 / 0.84
+    # For NIRISS filters in the filter wheel, we increase the count rate by a
+    # factor of 1/0.84. This is because the throughput of the CLEARP element
+    # in the pupil wheel (which will be used in combination with the filter)
+    # is 0.84, and is included in the PSFs produced by WebbPSF, but also in
+    # the throughput curves used by Mirage. So we need to remove one of these
+    # two factors of 0.84
+    if ((instrument.lower() == 'niriss') and (filter_name.upper() in NIRISS_FILTER_WHEEL_FILTERS)):
+        count_scale = 1. / 0.84
     else:
-        count_scale = 1.
+        count_scale = 1.0
+
     if magsys.lower() == 'abmag':
         try:
             return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)

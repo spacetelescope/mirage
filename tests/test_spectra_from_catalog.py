@@ -155,7 +155,7 @@ def test_convert_to_flam():
     pivot = 4.44 * u.micron
     params = (photflam, photfnu, zeropoint, pivot)
     mag_sys = 'abmag'
-    flam = spec.convert_to_flam(magnitudes, params, mag_sys)
+    flam = spec.convert_to_flam('nircam', 'F000W', magnitudes, params, mag_sys)
     truth = np.array([5.51426449e-17, 5.51426449e-19])
     assert np.allclose(flam, truth, atol=1e-25)
 
@@ -291,7 +291,7 @@ def test_spectra_rescaling():
                     filt_info = spec.get_filter_info([mag_col], magsys)
                     magnitude = catalog[mag_col][dataset - 1]
                     photflam, photfnu, zeropoint, pivot = filt_info[mag_col]
-                    check_counts = magnitude_to_countrate('imaging', magsys, magnitude, photfnu=photfnu.value,
+                    check_counts = magnitude_to_countrate(inst, filt, magsys, magnitude, photfnu=photfnu.value,
                                                           photflam=photflam.value, vegamag_zeropoint=zeropoint)
 
                     if magsys != 'vegamag':

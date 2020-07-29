@@ -1386,7 +1386,7 @@ class Catalog_seed():
 
             # Get countrate and PSF size info
             if entry[mag_column] is not None:
-                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'],
+                rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
                                                     magsys, entry[mag_column],
                                                     photfnu=self.photfnu,
                                                     photflam=self.photflam)
@@ -2135,8 +2135,8 @@ class Catalog_seed():
 
             # Get the input magnitude and countrate of the point source
             mag = float(values[mag_column])
-            countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
-                                                     photfnu=self.photfnu, photflam=self.photflam,
+            countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                     magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                      vegamag_zeropoint=self.vegazeropoint)
 
             psf_len = self.find_psf_size(countrate)
@@ -2208,8 +2208,8 @@ class Catalog_seed():
         magnitudes = self.psf_wing_sizes[magnitude_system].data
 
         # Calculate corresponding countrates
-        countrates = utils.magnitude_to_countrate(self.params['Inst']['mode'], magnitude_system,
-                                                  magnitudes, photfnu=self.photfnu,
+        countrates = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                  magnitude_system, magnitudes, photfnu=self.photfnu,
                                                   photflam=self.photflam,
                                                   vegamag_zeropoint=self.vegazeropoint)
         self.psf_wing_sizes['countrate'] = countrates
@@ -3319,8 +3319,8 @@ class Catalog_seed():
                 entry.append(mag)
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsystem, mag,
-                                                    photfnu=self.photfnu, photflam=self.photflam,
+                rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                    magsystem, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                     vegamag_zeropoint=self.vegazeropoint)
                 framecounts = rate * self.frametime
 
@@ -3750,8 +3750,8 @@ class Catalog_seed():
                 # If a magnitude is given then adjust the countrate to match it
                 if mag is not None:
                     # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                    countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
-                                                             photfnu=self.photfnu, photflam=self.photflam,
+                    countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                             magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                              vegamag_zeropoint=self.vegazeropoint)
                     framecounts = countrate * self.frametime
                     magwrite = mag

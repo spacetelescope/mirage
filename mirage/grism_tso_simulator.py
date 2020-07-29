@@ -149,11 +149,7 @@ class GrismTSO():
         self.disp_seed_filename = disp_seed_filename
         self.orders = orders
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
-
-        if isinstance(override_dark, list):
-            self.override_dark = override_dark
-        else:
-            raise TypeError('override_dark should be a list of dark_prep files.')
+        self.override_dark = override_dark
 
         # Make sure the right combination of parameter files and SED file
         # are given
