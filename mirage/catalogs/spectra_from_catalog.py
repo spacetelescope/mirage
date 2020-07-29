@@ -100,18 +100,30 @@ def add_flam_columns(cat, mag_sys):
     for key in parameters:
         tmp_adjusted_key = key.split('_mod')[0]
         magnitude_values = cat[tmp_adjusted_key].data
-        flam_values = convert_to_flam(magnitude_values, parameters[key], mag_sys)
+        parts = key.split('_')
+        instrument = parts[0]
+        filter_value = parts[1]
+        flam_values = convert_to_flam(instrument, filter_value, magnitude_values,
+                                      parameters[key], mag_sys)
         new_column_name = key.replace('magnitude', 'flam')
         cat[new_column_name] = flam_values
     return cat, parameters
 
 
-def convert_to_flam(magnitudes, param_tuple, magnitude_system):
+def convert_to_flam(instrument, filter_name, magnitudes, param_tuple, magnitude_system):
     """Convert the magnitude values for a given magnitude column into
     units of f_lambda.
 
     Parameters
     ----------
+    instrument : str
+        e.g. 'nircam'
+
+    filter_name : str
+        Name of filter associated with observation. Only passed to
+        ``magnitude_to_countrate`` where it is only used for scaling
+        in the case of NIRISS filter wheel filters
+
     magnitudes : list
         List of magnitude values to be converted
 
@@ -130,7 +142,8 @@ def convert_to_flam(magnitudes, param_tuple, magnitude_system):
     photflam, photfnu, zeropoint, pivot = param_tuple
 
     if magnitude_system in ['stmag', 'vegamag']:
-        countrate = magnitude_to_countrate('wfss', magnitude_system, magnitudes, photfnu=photfnu,
+        countrate = magnitude_to_countrate(instrument, filter_name, magnitude_system,
+                                           magnitudes, photfnu=photfnu,
                                            photflam=photflam, vegamag_zeropoint=zeropoint)
         flam = countrate * photflam
 
