@@ -207,9 +207,9 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # saves at least a handful of seconds.
     if instrument.lower() == 'fgs':
         default_file_pattern = '{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
-                                                                                        detector.lower(),
-                                                                                        wavefront_error.lower(),
-                                                                                        wavefront_error_group)
+                                                                                      detector.lower(),
+                                                                                      wavefront_error.lower(),
+                                                                                      wavefront_error_group)
     else:
         # NIRISS gridded library names don't follow standard filter/pupil rules.
         # The filenames are all <filter>_<clear>, where <clear> is clear if it
@@ -221,16 +221,20 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
             elif pupilname.lower() == 'clearp':
                 filename_filter = filtername
                 filename_pupil = pupilname
+            # filter=clear, pupil=nrm is currently not allowed
+            if pupilname.lower() == 'nrm':
+                filename_filter = filtername
+                filename_pupil = 'mask_nrm'
         elif instrument.lower() == 'nircam':
             filename_filter = filtername
             filename_pupil = pupilname
 
         default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
-                                                                                        detector.lower(),
-                                                                                        filename_filter.lower(),
-                                                                                        filename_pupil.lower(),
-                                                                                        wavefront_error.lower(),
-                                                                                        wavefront_error_group)
+                                                                                            detector.lower(),
+                                                                                            filename_filter.lower(),
+                                                                                            filename_pupil.lower(),
+                                                                                            wavefront_error.lower(),
+                                                                                            wavefront_error_group)
     default_matches = glob(os.path.join(library_path, default_file_pattern))
     library_file = None
     if len(default_matches) == 1:
