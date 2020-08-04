@@ -145,13 +145,24 @@ class ReadAPTXML():
         targs = tree.find(self.apt + 'Targets')
         target_elements = targs.findall(self.apt + 'Target')
         self.target_info = {}
+        self.target_type = {}
         for target in target_elements:
             t_name = target.find(self.apt + 'TargetName').text
-            t_coords = target.find(self.apt + 'EquatorialCoordinates').items()[0][1]
+            try:
+                t_coords = target.find(self.apt + 'EquatorialCoordinates').items()[0][1]
+            except AttributeError:
+                # Non-sidereal targets do not have EquatorialCoordinates entries in the xml
+                t_coords = '00 00 00 00 00 00'
             ra_hour, ra_min, ra_sec, dec_deg, dec_arcmin, dec_arcsec = t_coords.split(' ')
             ra = '{}:{}:{}'.format(ra_hour, ra_min, ra_sec)
             dec = '{}:{}:{}'.format(dec_deg, dec_arcmin, dec_arcsec)
             self.target_info[t_name] = (ra, dec)
+
+            type_key = [key for key in target.attrib.keys() if 'type' in key]
+            if 'SolarSystem' in target.attrib[type_key[0]]:
+                self.target_type[t_name] = 'non-sidereal'
+            else:
+                self.target_type[t_name] = 'sidereal'
         print('target_info:')
         print(self.target_info)
 
@@ -506,6 +517,18 @@ class ReadAPTXML():
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
 
+        # Check the target type in order to decide whether the mode should be
+        # imaging or moving_target
+        target_id = obs.find(self.apt + 'TargetID').text
+        targname = target_id.split(' ')[1]
+        matched_key = [key for key in self.target_type if targname in key]
+        if len(matched_key) == 0:
+            raise ValueError('No matching target name for {} in self.target_type'.format(targname))
+        elif len(matched_key) > 1:
+            raise ValueError('Multiple matching target names for {} in self.target_type.'.format(targname))
+        else:
+            tracking = self.target_type[matched_key[0]]
+
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
 
@@ -618,10 +641,8 @@ class ReadAPTXML():
                         value = template_name
                     else:
                         value = str(None)
-
                     if (key == 'Mode'):
                         value = 'imaging'
-
                     exposures_dictionary[key].append(value)
 
             ##########################################################
