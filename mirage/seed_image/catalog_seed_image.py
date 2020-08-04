@@ -4079,7 +4079,8 @@ class Catalog_seed():
 
         if adjust_file:
             # Make a copy of the original file and then delete it
-            yaml_copy = 'orig_{}'.format(self.paramfile)
+            param_dir, param_file = os.path.split(self.paramfile)
+            yaml_copy = os.path.join(param_dir, 'orig_{}'.format(param_file))
             shutil.copy2(self.paramfile, yaml_copy)
             os.remove(self.paramfile)
 
