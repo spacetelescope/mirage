@@ -593,11 +593,14 @@ class ReadAPTXML():
                     if key == 'ShortFilter':
                         ShortPupil, ShortFilter = self.separate_pupil_and_filter(value)
                         filter_config_dict['ShortPupil'] = ShortPupil
+                        filter_config_dict['ShortFilter'] = ShortFilter
                     elif key == 'LongFilter':
                         LongPupil, LongFilter = self.separate_pupil_and_filter(value)
                         filter_config_dict['LongPupil'] = LongPupil
+                        filter_config_dict['LongFilter'] = LongFilter
 
-                    filter_config_dict[key] = value
+                    if key not in ['ShortFilter', 'ShortPupil', 'LongFilter', 'LongPupil']:
+                        filter_config_dict[key] = value
 
                 for key in self.APTObservationParams_keys:
                     if key in filter_config_dict.keys():
@@ -772,6 +775,11 @@ class ReadAPTXML():
         for key, item in exposures_dictionary.items():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
+
+
+        print(exposures_dictionary['ShortFilter'])
+        print(exposures_dictionary['LongFilter'])
+
 
         return exposures_dictionary
 
