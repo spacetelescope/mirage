@@ -2222,10 +2222,15 @@ def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
 
     Parameters
     ----------
-    ra, dec : strings
-        RA and Dec in sexagesimal format
+    ra : str
+        RA in sexagesimal format e.g. '00:00:00.0'
+
+    dec : str
+        Dec in sexagesimal format e.g. '00:00:00.0'
+
     date : string
         Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+
     return_range : bool
         Return tuple including the range accessible via observatory roll, i.e. (v3pa, min_v3pa, max_v3pa)
 
@@ -2237,14 +2242,18 @@ def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
     import jwst_gtvt.find_tgt_info
 
     if date is None:
-        start_date = datetime.date.today()
+        start_date_obj = datetime.date.today()
+        start_date = start_date_obj.isoformat()
     else:
-        start_date = datetime.date.fromisoformat(date)
+        start_date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+        start_date = start_date_obj.isoformat().split('T')[0]
+
     # note, get_table requires distinct start and end dates, different by at least 1 day
-    end_date = start_date + datetime.timedelta(days=1)
+    end_date_obj = start_date_obj + datetime.timedelta(days=1)
+    end_date = end_date_obj.isoformat().split('T')[0]
 
     tbl = jwst_gtvt.find_tgt_info.get_table(ra=ra, dec=dec, instrument='NIRCam',
-                                            start_date=start_date.isoformat(), end_date=end_date.isoformat(),
+                                            start_date=start_date, end_date=end_date,
                                             verbose=False)
     row = tbl[0]
 
