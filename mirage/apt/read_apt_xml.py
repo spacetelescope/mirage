@@ -60,7 +60,7 @@ class ReadAPTXML():
                             'IntegrationsShort', 'GroupsShort', 'Dither',  # MIRI
                             'GroupsLong', 'ReadoutPatternShort', 'IntegrationsLong',
                             'Exposures', 'Wavelength', 'ReadoutPatternLong', 'Filter',
-                            'EtcIdLong', 'EtcIdShort', 'EtcId',
+                            'EtcIdLong', 'EtcIdShort', 'EtcId', 'Tracking'
                             ]
 
         self.APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
@@ -70,6 +70,32 @@ class ReadAPTXML():
             self.APTObservationParams[key] = []
         self.empty_exposures_dictionary = copy.deepcopy(self.APTObservationParams)
         self.observation_info = OrderedDict()
+
+    def get_tracking_type(self, observation):
+        """Deetermine whether the observation uses sidereal or non-sidereal
+        tracking
+
+        Parameters
+        ----------
+        observation : etree xml element
+            xml content of observation
+
+        Returns
+        -------
+        tracking_type : str
+            "sidereal" or "non-sidereal" based on the target used in the
+            observation
+        """
+        target_id = observation.find(self.apt + 'TargetID').text
+        targname = target_id.split(' ')[1]
+        matched_key = [key for key in self.target_type if targname in key]
+        if len(matched_key) == 0:
+            raise ValueError('No matching target name for {} in self.target_type'.format(targname))
+        elif len(matched_key) > 1:
+            raise ValueError('Multiple matching target names for {} in self.target_type.'.format(targname))
+        else:
+            tracking_type = self.target_type[matched_key[0]]
+        return tracking_type
 
     def read_xml(self, infile, verbose=False):
         """Main function. Read in the .xml file from APT, and output dictionary of parameters.
@@ -517,8 +543,11 @@ class ReadAPTXML():
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
 
-        # Check the target type in order to decide whether the mode should be
-        # imaging or moving_target
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
+
+        """
         target_id = obs.find(self.apt + 'TargetID').text
         targname = target_id.split(' ')[1]
         matched_key = [key for key in self.target_type if targname in key]
@@ -528,6 +557,7 @@ class ReadAPTXML():
             raise ValueError('Multiple matching target names for {} in self.target_type.'.format(targname))
         else:
             tracking = self.target_type[matched_key[0]]
+        """
 
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
@@ -639,6 +669,8 @@ class ReadAPTXML():
                         value = str(FiducialPointOverride)
                     elif key == 'APTTemplate':
                         value = template_name
+                    elif key == 'Tracking':
+                        value = tracking
                     else:
                         value = str(None)
                     if (key == 'Mode'):
@@ -756,6 +788,8 @@ class ReadAPTXML():
                                 value = str(FiducialPointOverride)
                             elif key == 'APTTemplate':
                                 value = template_name
+                            elif key == 'Tracking':
+                                value = tracking
                             else:
                                 value = str(None)
 
