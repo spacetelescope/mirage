@@ -264,7 +264,6 @@ class SimInput:
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
-        self.tracking = 'sidereal'
         self.psf_paths = None
         self.expand_catalog_for_segments = False
         self.dateobs_for_background = dateobs_for_background
@@ -2101,7 +2100,7 @@ class SimInput:
             else:
                 pav3_value = input['PAV3']
             f.write('  rotation: {}                    # PA_V3 in degrees, i.e. the position angle of the V3 axis at V1 (V2=0, V3=0) measured from N to E.\n'.format(pav3_value))
-            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
+            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(input['Tracking']))
             f.write('\n')
             f.write('newRamp:\n')
             f.write('  dq_configfile: {}\n'.format(self.configfiles[instrument.lower()]['dq_init_config']))
