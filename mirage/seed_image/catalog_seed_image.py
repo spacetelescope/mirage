@@ -4343,6 +4343,10 @@ class Catalog_seed():
                                 "It should be a comma-separated list of x and y pixel positions."
                                 .format(self.params['simSignals']['extendedCenter'])))
 
+        # Check for consistency between the mode and grism_source_image value
+        if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) and (not self.params['Output']['grism_source_image'])):
+            raise ValueError('Input yaml file has WFSS or TSO grism mode, but Output:grism_source_image is set to False. Must be True.')
+
     def checkRunStep(self, filename):
         # check to see if a filename exists in the parameter file.
         if ((len(filename) == 0) or (filename.lower() == 'none')):
