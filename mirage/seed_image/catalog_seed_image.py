@@ -389,6 +389,7 @@ class Catalog_seed():
             # For NIRISS POM data, extract the central 2048x2048
             if self.params['Inst']['mode'] in ["pom"]:
                 # Expose the full-sized pom seed image
+                self.seedimage *= self.transmission_image
                 self.pom_seed = copy.deepcopy(self.seedimage)
                 self.pom_segmap = copy.deepcopy(self.seed_segmap)
 
@@ -405,6 +406,11 @@ class Catalog_seed():
                 # this step applied.
                 self.seedimage *= self.maskimage
                 self.seed_segmap *= self.maskimage
+
+            # For data that will not be dispersed, multiply by the transmission image
+            # pom data have already been multiplied by the transmission image above
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
+                self.seedimage *= self.transmission_image
 
             # Save the combined static + moving targets ramp
             if self.params['Inst']['instrument'].lower() != 'fgs':
@@ -510,6 +516,9 @@ class Catalog_seed():
                 seed *= self.maskimage
                 segmap *= self.maskimage
 
+                # Multiply by the transmission image
+                seed *= self.transmission_image
+
                 # Save the seed image segment to a file
                 if self.total_seed_segments_and_parts == 1:
                     self.seed_file = '{}_{}_{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
@@ -557,6 +566,9 @@ class Catalog_seed():
                         # Zero out the reference pixels
                         seed *= self.maskimage
                         segmap *= self.maskimage
+
+                        # Multiply by the transmission image
+                        seed *= self.transmission_image
 
                         # Get metadata values to save in seed image header
                         self.segment_number = split_meta.segment_number[counter]
@@ -706,24 +718,29 @@ class Catalog_seed():
         """
         filename = self.params['Reffiles']['transmission']
 
-        # Read in file
-        try:
-            transmission, header = fits.getdata(filename, header=True)
-        except:
-            raise IOError('WARNING: unable to read in {}'.format(filename))
+        if filename is not None:
+            # Read in file
+            try:
+                transmission, header = fits.getdata(filename, header=True)
+            except:
+                raise IOError('WARNING: unable to read in {}'.format(filename))
+        else:
+            print('No transmission file for this mode. Assuming full transmission for all pixels. (no e.g. occulters blocking any pixels.')
+            transmission = np.ones((2048, 2048))
+            header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
 
         yd, xd = transmission.shape
 
         # Get the coordinates in the transmission file that correspond to (0,0)
         # on the detector (full frame aperture)
-        self.trans_ff_xmin = int(header['XOFFSET'])
-        self.trans_ff_ymin = int(header['YOFFSET'])
+        self.trans_ff_xmin = int(header['NOMXSTRT'])
+        self.trans_ff_ymin = int(header['NOMYSTRT'])
 
         # Check that the transmission image contains the entire detector
         if ((xd < 2048) or (yd < 2048)):
             raise ValueError("Transmission image is not large enough to contain the entire detector.")
         if (((self.trans_ff_xmin + 2048) > xd) or ((self.trans_ff_ymin + 2048) > yd)):
-            raise ValueError(("XOFFSET, YOFFSET in transmission image indicate the entire detector is "
+            raise ValueError(("NOMXSTRT, NOMYSTRT in transmission image indicate the entire detector is "
                               "not contained in the image."))
 
         if (self.params['Output']['grism_source_image']) or (self.params['Inst']['mode'] in ["pom", "wfss", "ts_grism"]):
@@ -731,8 +748,6 @@ class Catalog_seed():
         else:
             # Imaging modes here. Cut the transmission file down to full frame,
             # and then down to the requested aperture
-            print(transmission.shape)
-            print(self.trans_ff_ymin, self.trans_ff_xmin)
             transmission = transmission[self.trans_ff_ymin: self.trans_ff_ymin+2048, self.trans_ff_xmin: self.trans_ff_xmin+2048]
 
             # Crop to expected subarray
@@ -1513,7 +1528,6 @@ class Catalog_seed():
                 mt_source = mt.create(stamp, x_frames[framestart:frameend],
                                       y_frames[framestart:frameend],
                                       self.frametime, newdimsx, newdimsy)
-                mt_source *= self.transmission_image
                 mt_integration[integ, :, :, :] += mt_source
 
                 # Add object to segmentation map
@@ -1969,9 +1983,6 @@ class Catalog_seed():
             if zodiacalimage.shape != self.transmission_image.shape:
                 raise IndexError("Zodiacal light image must have the same shape as the transmission image: {}".format(self.transmission_image.shape))
 
-            # Multiply by the transmission image
-            zodiacalimage *= self.transmission_image
-
             signalimage = signalimage + zodiacalimage*self.params['simSignals']['zodiscale']
 
         # SCATTERED LIGHT - no rotation here.
@@ -1985,13 +1996,10 @@ class Catalog_seed():
             if scatteredimage.shape != self.transmission_image.shape:
                 raise IndexError("Scattered light image must have the same shape as the transmission image: {}".format(self.transmission_image.shape))
 
-            # Multiply by the flat field
-            scatteredimage *= self.transmission_image
-
             signalimage = signalimage + scatteredimage*self.params['simSignals']['scatteredscale']
 
         # CONSTANT BACKGROUND - multiply by transmission image
-        signalimage = signalimage + (self.params['simSignals']['bkgdrate'] * self.transmission_image)
+        signalimage = signalimage + self.params['simSignals']['bkgdrate']
 
         # Save the final rate image of added signals
         if self.params['Output']['save_intermediates'] is True:
@@ -2433,7 +2441,7 @@ class Catalog_seed():
                 continue
 
             try:
-                psf_to_add = scaled_psf[l1:l2, k1:k2] * self.transmission_image[j1:j2, i1:i2]
+                psf_to_add = scaled_psf[l1:l2, k1:k2]
                 psfimage[j1:j2, i1:i2] += psf_to_add
 
                 # Add source to segmentation map
@@ -3572,7 +3580,7 @@ class Catalog_seed():
 
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
-                    stamp_to_add = stamp[l1:l2, k1:k2] * self.transmission_image[j1:j2, i1:i2]
+                    stamp_to_add = stamp[l1:l2, k1:k2]
                     galimage[j1:j2, i1:i2] += stamp_to_add
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
@@ -3910,7 +3918,7 @@ class Catalog_seed():
 
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
-                    stamp_to_add = stamp[l1:l2, k1:k2] * self.transmission_image[j1:j2, i1:i2]
+                    stamp_to_add = stamp[l1:l2, k1:k2]
                     extimage[j1:j2, i1:i2] += stamp_to_add
 
                 # Add source to segmentation map

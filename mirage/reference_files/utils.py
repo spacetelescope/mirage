@@ -43,6 +43,8 @@ def get_transmission_file(parameter_dict):
     if parameter_dict['INSTRUME'].lower() == 'nircam':
         dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRCAM')
 
+        module = parameter_dict['DETECTOR'][3]
+
         # Assume that detector names in the transmission file names will
         # use 'NRCA5' rather than 'NRCALONG'
         if 'LONG' in parameter_dict['DETECTOR']:
@@ -50,12 +52,15 @@ def get_transmission_file(parameter_dict):
 
         if parameter_dict['DETECTOR'] not in ['NRCA5', 'NRCB5', 'NRCALONG', 'NRCBLONG']:
             # For NIRCam SW, we use the same file for all detectors/filters/pupils
-            transmission_filename = os.path.join(dirname, 'NIRCam_SW_transmission_image.fits')
+            transmission_filename = None
         elif parameter_dict['PUPIL'] not in ['GRISMR', 'GRISMC']:
             # For LW imaging, we use the same file for all detectors/filters/pupils
-            transmission_filename = os.path.join(dirname, 'NIRCam_LW_imaging_transmission_image.fits')
+            transmission_filename = None
         else:
-            transmission_filename = search_transmission_files(dirname, parameter_dict)
+            if module == 'A':
+                transmission_filename = os.path.join(dirname, 'NIRCAM_LW_POM_ModA.fits')
+            elif module == 'B':
+                transmission_filename = os.path.join(dirname, 'NIRCAM_LW_POM_ModB.fits')
 
     # For NIRISS we search for a detector/filter/pupil-dependent file
     elif parameter_dict['INSTRUME'].lower() == 'niriss':
