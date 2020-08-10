@@ -3424,7 +3424,8 @@ class Catalog_seed():
 
         delta_limit = 0.005
         limit = SERSIC_FRACTIONAL_SIGNAL
-        while num_pix > (2000.**2):
+        # Limit the maximum size of the stamp in order to save computation time
+        while num_pix > (2500.**2):
             limit -= delta_limit
 
             # Find the effective radius, semi-major, and semi-minor axes sizes
@@ -3478,9 +3479,9 @@ class Catalog_seed():
         # enough (which it should be given the size calculations above), then the signal
         # outside the stamp should be negligible and scaling the stamp to the requested signal
         # level should be correct.
-        sig_diff = np.absolute(1. - np.sum(stamp) / total_counts)
+        sig_diff = np.absolute(1. - np.sum(stamp) / (total_counts * limit))
         if sig_diff > signal_matching_threshold:
-            stamp = stamp / np.sum(stamp) * total_counts
+            stamp = stamp / np.sum(stamp) * (total_counts * limit)
 
         return stamp
 
