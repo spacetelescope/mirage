@@ -45,8 +45,10 @@ from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
-from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL
+from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
+                              SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
+from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
@@ -113,6 +115,14 @@ class Catalog_seed():
         # with multiple sources having the same index numbers
         self.maxindex = 0
 
+        # Number of sources on the detector
+        self.n_pointsources = 0
+        self.n_galaxies = 0
+        self.n_extend = 0
+
+        # Initialize timer
+        self.timer = Timer()
+
     def make_seed(self):
         """MAIN FUNCTION"""
         print('\n\nRunning catalog_seed_image..\n')
@@ -120,6 +130,10 @@ class Catalog_seed():
         # Read in input parameters and quality check
         self.seed_files = []
         self.readParameterFile()
+
+        # Make filter/pupil values respect the filter/pupil wheel they are in
+        self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
+            utils.normalize_filters(self.params['Inst']['instrument'], self.params['Readout']['filter'], self.params['Readout']['pupil'])
 
         # Create dictionary to use when looking in CRDS for reference files
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
@@ -243,15 +257,8 @@ class Catalog_seed():
 
         # Read in the PSF library file corresponding to the detector and filter
         # For WFSS simulations, use the PSF libraries with the appropriate CLEAR element
-        self.psf_pupil = self.params['Readout']['pupil']
-        self.psf_filter = self.params['Readout']['filter']
-        if self.params['Readout']['pupil'].lower() in ['grismr', 'grismc']:
-            self.psf_pupil = 'CLEAR'
-        if self.params['Readout']['filter'].lower() in ['gr150r', 'gr150c']:
-            self.psf_filter = 'CLEAR'
+        self.prepare_psf_entries()
 
-        # If reading in a normal PSF, use get_gridded_psf_library to get a
-        # single photutils.griddedPSFModel object
         if not self.expand_catalog_for_segments:
             self.psf_library = get_gridded_psf_library(
                 self.params['Inst']['instrument'], self.detector, self.psf_filter, self.psf_pupil,
@@ -382,9 +389,17 @@ class Catalog_seed():
 
             # For NIRISS POM data, extract the central 2048x2048
             if self.params['Inst']['mode'] in ["pom"]:
+                # Expose the full-sized pom seed image
+                self.pom_seed = copy.deepcopy(self.seedimage)
+                self.pom_segmap = copy.deepcopy(self.seed_segmap)
+
+                # Save the full-sized pom seed image to a file
+                self.pom_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_pom_seed_image.fits')
+                self.saveSeedImage(self.pom_seed, self.pom_segmap, self.pom_file)
+                print('Full POM seed image saved as: {}'.format(self.pom_file))
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
                 # Multiply the mask by the seed image and segmentation map in
                 # order to reflect the fact that reference pixels have no signal
                 # from external sources. Seed images to be dispersed do not have
@@ -394,7 +409,8 @@ class Catalog_seed():
 
             # Save the combined static + moving targets ramp
             if self.params['Inst']['instrument'].lower() != 'fgs':
-                self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_final_seed_image.fits')
+                self.seed_file = '{}_{}_{}_final_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                         self.params['Readout']['pupil'])
             else:
                 self.seed_file = '{}_final_seed_image.fits'.format(self.basename)
 
@@ -500,14 +516,14 @@ class Catalog_seed():
 
                 # Save the seed image segment to a file
                 if self.total_seed_segments_and_parts == 1:
-                    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                                  '_seed_image.fits')
+                    self.seed_file = '{}_{}_{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                       self.params['Readout']['pupil'])
                 else:
                     raise ValueError("ERROR: TSO seed file should not be split at this point.")
                     seg_string = str(self.segment_number).zfill(3)
                     part_string = str(self.segment_part_number).zfill(3)
-                    self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                                  '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+                    self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                    self.params['Readout']['pupil'], seg_string, part_string)
 
                 self.seed_files.append(self.seed_file)
                 self.saveSeedImage(seed, segmap, self.seed_file)
@@ -561,8 +577,8 @@ class Catalog_seed():
                         print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
                         seg_string = str(self.segment_number).zfill(3)
                         part_string = str(self.segment_part_number).zfill(3)
-                        self.seed_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] +
-                                                      '_seg{}_part{}_seed_image.fits'.format(seg_string, part_string))
+                        self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                        self.params['Readout']['pupil'], seg_string, part_string)
 
                         self.saveSeedImage(seed, segmap, self.seed_file)
                         self.seed_files.append(self.seed_file)
@@ -668,6 +684,17 @@ class Catalog_seed():
         if len(data.shape) != 2:
             data, header = fits.getdata(filename, 1)
         return data, header
+
+    def prepare_psf_entries(self):
+        """Get the correct filter and pupil values to use when searching
+        for gridded psf libraries
+        """
+        self.psf_pupil = self.params['Readout']['pupil']
+        self.psf_filter = self.params['Readout']['filter']
+        if self.params['Readout']['pupil'].lower() in ['grismr', 'grismc']:
+            self.psf_pupil = 'CLEAR'
+        if self.params['Readout']['filter'].lower() in ['gr150r', 'gr150c']:
+            self.psf_filter = 'CLEAR'
 
     def prepare_flat(self):
         """
@@ -825,9 +852,12 @@ class Catalog_seed():
 
         # Set FGS filter to "N/A" in the output file
         # as this is the value DMS looks for.
-        if self.params['Readout'][self.usefilt] == "NA":
-            self.params['Readout'][self.usefilt] = "N/A"
-        kw['FILTER'] = self.params['Readout'][self.usefilt]
+        if self.params['Readout']['filter'] == "NA":
+            self.params['Readout']['filter'] = "N/A"
+        if self.params['Readout']['pupil'] == "NA":
+            self.params['Readout']['pupil'] = "N/A"
+        kw['FILTER'] = self.params['Readout']['filter']
+        kw['PUPIL'] = self.params['Readout']['pupil']
         kw['PHOTFLAM'] = self.photflam
         kw['PHOTFNU'] = self.photfnu
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
@@ -890,7 +920,7 @@ class Catalog_seed():
 
         # Seed images provided to disperser are always embedded in an array
         # with dimensions equal to full frame * self.grism_direct_factor
-        if self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
+        if self.params['Inst']['mode'] in ['wfss', 'ts_grism', 'pom']:
             kw['NOMXDIM'] = self.ffsize
             kw['NOMYDIM'] = self.ffsize
             kw['NOMXSTRT'] = np.int(self.ffsize * (self.grism_direct_factor - 1) / 2.)
@@ -1397,7 +1427,7 @@ class Catalog_seed():
 
             # Get countrate and PSF size info
             if entry[mag_column] is not None:
-                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'],
+                rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
                                                     magsys, entry[mag_column],
                                                     photfnu=self.photfnu,
                                                     photflam=self.photflam)
@@ -1526,15 +1556,8 @@ class Catalog_seed():
                                       self.frametime, newdimsx, newdimsy)
                 mt_integration[integ, :, :, :] += mt_source
 
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                    noiseval += self.grism_background
-
-                if input_type in ['pointSource', 'galaxies']:
-                    moving_segmap.add_object_noise(mt_source[-1, :, :], 0, 0, index, noiseval)
-                else:
-                    indseg = self.seg_from_photutils(mt_source[-1, :, :], np.int(index), noiseval)
-                    moving_segmap.segmap += indseg
+                # Add object to segmentation map
+                moving_segmap.add_object_threshold(mt_source[-1, :, :], 0, 0, index, self.segmentation_threshold)
 
             # Check the elapsed time for creating each object
             elapsed_time = time.time() - start_time
@@ -1908,7 +1931,8 @@ class Catalog_seed():
 
             # Save the point source seed image
             if instrument_name != 'fgs':
-                self.ptsrc_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_ptsrc_seed_image.fits')
+                self.ptsrc_seed_filename = '{}_{}_{}_ptsrc_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                   self.params['Readout']['pupil'])
             else:
                 self.ptsrc_seed_filename = '{}_ptsrc_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.point_source_seed, self.point_source_seg_map, self.ptsrc_seed_filename)
@@ -1949,7 +1973,8 @@ class Catalog_seed():
 
             # Save the galaxy source seed image
             if instrument_name != 'fgs':
-                self.galaxy_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_galaxy_seed_image.fits')
+                self.galaxy_seed_filename = '{}_{}_{}_galaxy_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                     self.params['Readout']['pupil'])
             else:
                 self.galaxy_seed_filename = '{}_galaxy_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.galaxy_source_seed, self.galaxy_source_seg_map, self.galaxy_seed_filename)
@@ -1997,7 +2022,8 @@ class Catalog_seed():
 
             # Save the extended source seed image
             if instrument_name != 'fgs':
-                self.extended_seed_filename = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_extended_seed_image.fits')
+                self.extended_seed_filename = '{}_{}_{}_extended_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
+                                                                                         self.params['Readout']['pupil'])
             else:
                 self.extended_seed_filename = '{}_extended_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.extended_source_seed, self.extended_source_seg_map, self.extended_seed_filename)
@@ -2183,31 +2209,15 @@ class Catalog_seed():
         mag_column = self.select_magnitude_column(lines, filename)
 
         print('Filtering point sources to keep only those on the detector')
-        start_time = time.time()
-        times = []
-        time_reported = False
-        # Loop over input lines in the source list
         for index, values in zip(indexes, lines):
-            # Warn user of how long this calcuation might take...
-            if len(times) < 100:
-                elapsed_time = time.time() - start_time
-                times.append(elapsed_time)
-                start_time = time.time()
-            elif len(times) == 100 and time_reported is False:
-                avg_time = np.mean(times)
-                total_time = len(indexes) * avg_time
-                print(("Expected time to process {} sources: {:.2f} seconds "
-                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
-                time_reported = True
-
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
                                                                           pixelflag, 4096)
 
             # Get the input magnitude and countrate of the point source
             mag = float(values[mag_column])
-            countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
-                                                     photfnu=self.photfnu, photflam=self.photflam,
+            countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                     magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                      vegamag_zeropoint=self.vegazeropoint)
 
             psf_len = self.find_psf_size(countrate)
@@ -2241,13 +2251,17 @@ class Catalog_seed():
                              (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts, tso_catalog))
 
         self.n_pointsources = len(pointSourceList)
-        print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+        if self.n_pointsources > 0:
+            print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+        else:
+            print("\nINFO: No point sources present on the detector.")
+
         # close the output file
         pslist.close()
 
         # If no good point sources were found in the requested array, alert the user
         if len(pointSourceList) < 1:
-            print("INFO: no point sources within the requested array.")
+            print("INFO: No point sources within the requested aperture.")
             # print("The point source image option is being turned off")
             # self.runStep['pointsource']=False
             # if self.runStep['extendedsource'] == False and self.runStep['cosmicray'] == False:
@@ -2275,8 +2289,8 @@ class Catalog_seed():
         magnitudes = self.psf_wing_sizes[magnitude_system].data
 
         # Calculate corresponding countrates
-        countrates = utils.magnitude_to_countrate(self.params['Inst']['mode'], magnitude_system,
-                                                  magnitudes, photfnu=self.photfnu,
+        countrates = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                  magnitude_system, magnitudes, photfnu=self.photfnu,
                                                   photflam=self.photflam,
                                                   vegamag_zeropoint=self.vegazeropoint)
         self.psf_wing_sizes['countrate'] = countrates
@@ -2450,6 +2464,8 @@ class Catalog_seed():
 
         # Loop over the entries in the point source list
         for i, entry in enumerate(pointSources):
+            # Start timer
+            self.timer.start()
 
             # Find the PSF size to use based on the countrate
             psf_x_dim = self.find_psf_size(entry['countrate_e/s'])
@@ -2459,7 +2475,7 @@ class Catalog_seed():
 
             scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
-                segment_number=segment_number
+                segment_number=segment_number, ignore_detector=True
             )
 
             # Skip sources that fall completely off the detector
@@ -2500,11 +2516,8 @@ class Catalog_seed():
             try:
                 psfimage[j1:j2, i1:i2] += scaled_psf[l1:l2, k1:k2]
 
-                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                    noiseval += self.grism_background
-                ptsrc_segmap.add_object_noise(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+                # Add source to segmentation map
+                ptsrc_segmap.add_object_threshold(scaled_psf[l1:l2, k1:k2], j1, i1, entry['index'], self.segmentation_threshold)
             except IndexError:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
@@ -2513,8 +2526,18 @@ class Catalog_seed():
                 # the stamp may shift off of the detector.
                 pass
 
-            if ((len(pointSources) > 100) and (np.mod(i, 100))) == 0:
-                print('{}: Working on source {}'.format(str(datetime.datetime.now()), i))
+            # Stop timer
+            self.timer.stop(name='ptsrc_{}'.format(str(i).zfill(6)))
+
+            # If there are more than 100 point sources, provide an estimate of processing time
+            if len(pointSources) > 100:
+                if ((i == 20) or ((i > 0) and (np.mod(i, 100) == 0))):
+                    time_per_ptsrc = self.timer.sum(key_str='ptsrc_') / (i+1)
+                    estimated_remaining_time = time_per_ptsrc * (len(pointSources) - (i+1)) * u.second
+                    time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                    finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                    print(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
+                           'Projected finish time: {}'.format(i, time_remaining, finish_time)))
 
         return psfimage, ptsrc_segmap
 
@@ -3049,19 +3072,46 @@ class Catalog_seed():
             The name of the catalog column to use for source magnitudes
         """
         # Determine the filter name to look for
-        if self.params['Inst']['instrument'].lower() in ['nircam', 'niriss']:
-        #    if self.params['Readout']['pupil'][0].upper() == 'F':
-        #        usefilt = 'pupil'
-        #    else:
-        #        usefilt = 'filter'
-            filter_name = self.params['Readout'][self.usefilt].lower()
+        if self.params['Inst']['instrument'].lower() == 'nircam':
+            actual_pupil_name = self.params['Readout']['pupil'].lower()
+            actual_filter_name = self.params['Readout']['filter'].lower()
+
+            # If a grism is in the pupil wheel, replace it with a filter
+            if actual_pupil_name.lower() in ['grismr', 'grismc']:
+                actual_pupil_name = 'clear'
+
+            comb_str = '{}_{}'.format(actual_filter_name.lower(), actual_pupil_name.lower())
+
             # Construct the column header to look for
-            specific_mag_col = "{}_{}_magnitude".format(self.params['Inst']['instrument'].lower(),
-                                                        filter_name)
+            specific_mag_col = "nircam_{}_magnitude".format(comb_str)
+
+            # In order to be backwards compatible, if the newer column
+            # name format (above) is not present, look for a column name
+            # that follows the old format, which uses just the filter name
+            # for cases where a filter is paired with CLEAR in the pupil
+            # wheel, or where only the name of the narrower filter is used
+            # for cases where a narrow filter in the pupil wheel is crossed
+            # with a wide filter in the filter wheel
+            if specific_mag_col not in catalog.colnames:
+                if actual_pupil_name == 'clear':
+                    specific_mag_col = "nircam_{}_magnitude".format(actual_filter_name)
+                elif actual_pupil_name[0] == 'f' and actual_filter_name[0] == 'f':
+                    specific_mag_col = "nircam_{}_magnitude".format(actual_pupil_name)
+                elif actual_pupil_name in ['wlp8', 'wlm8']:
+                    # Weak lenses were not supported with the old column
+                    # name format, so if the new format column name is not
+                    # present, then we can only fall back to looking for
+                    # a generic 'magnitude' column.
+                    pass
+
+        elif self.params['Inst']['instrument'].lower() == 'niriss':
+            if self.params['Readout']['pupil'][0].upper() == 'F':
+                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['pupil'].lower())
+            else:
+                specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['filter'].lower())
 
         elif self.params['Inst']['instrument'].lower() == 'fgs':
             specific_mag_col = "{}_magnitude".format(self.params['Readout']['array_name'].split('_')[0].lower())
-            filter_name = 'none'
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
@@ -3075,10 +3125,10 @@ class Catalog_seed():
                    .format(os.path.split(catalog_file_name)[1], specific_mag_col)))
             return "magnitude"
         else:
-            raise ValueError(("WARNING: Catalog {} has no magnitude column specifically for {} {}, "
+            raise ValueError(("WARNING: Catalog {} has no magnitude column for {} specifically called {}, "
                               "nor a generic 'magnitude' column. Unable to proceed."
                               .format(os.path.split(catalog_file_name)[1], self.params['Inst']['instrument'],
-                                      filter_name.upper())))
+                              specific_mag_col)))
 
     def makePos(self, alpha1, delta1):
         # given a numerical RA/Dec pair, convert to string
@@ -3335,8 +3385,8 @@ class Catalog_seed():
                 entry.append(mag)
 
                 # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                rate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsystem, mag,
-                                                    photfnu=self.photfnu, photflam=self.photflam,
+                rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                    magsystem, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                     vegamag_zeropoint=self.vegazeropoint)
                 framecounts = rate * self.frametime
 
@@ -3350,12 +3400,10 @@ class Catalog_seed():
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
-        print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
-
-        if self.n_galaxies == 0:
-            if self.n_pointsources == 0:
-                raise ValueError(('No point sources or galaxies found in input catalog; empty seed image '
-                                  'would be created.'))
+        if self.n_galaxies > 0:
+            print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
+        else:
+            print("\nINFO: No galaxies present within the aperture.")
 
         filteredList.meta['comments'] = [("Field center (degrees): %13.8f %14.8f y axis rotation angle "
                                           "(degrees): %f  image size: %4.4d %4.4d\n" %
@@ -3575,27 +3623,9 @@ class Catalog_seed():
         if self.add_psf_wings is True:
             self.translate_psf_table(magsys)
 
-        # For each entry, create an image, and place it onto the final output image
-        start_time = time.time()
-        times = []
-        time_reported = False
-        print("Creating and adding galaxy stamp images...")
-
-        for itemp, entry in enumerate(galaxylist):
-            # Warn user of how long this calcuation might take...
-            if len(times) < 50:
-                elapsed_time = time.time() - start_time
-                times.append(elapsed_time)
-                start_time = time.time()
-            elif len(times) == 50 and time_reported is False:
-                mean_time, med_time, stdev_time = sigma_clipped_stats(times, sigma=5)
-                avg_time = mean_time + stdev_time
-                total_time = len(galaxylist) * avg_time
-
-                print(("Rough estimate of time to process {} sources: {:.2f} seconds "
-                       "({:.2f} minutes)".format(len(galaxylist), total_time, total_time / 60)))
-                print("This estimate may be very inaccurate if there are larger than average sources within the first 50 objects.")
-                time_reported = True
+        for entry_index, entry in enumerate(galaxylist):
+            # Start timer
+            self.timer.start()
 
             # Get position angle in the correct units. Inputs for each
             # source are degrees east of north. So we need to find the
@@ -3672,17 +3702,26 @@ class Catalog_seed():
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     galimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
-                    # Divide readnoise by 100 sec, which is a 10 group RAPID ramp
-                    noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                    if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                        noiseval += self.grism_background
-                    segmentation.add_object_noise(stamp[l1:l2, k1:k2], j1, i1, entry['index'], noiseval)
+                    # Add source to segmentation map
+                    segmentation.add_object_threshold(stamp[l1:l2, k1:k2], j1, i1, entry['index'], self.segmentation_threshold)
 
                 else:
                     pass
                     # print("Source located entirely outside the field of view. Skipping.")
             else:
                 pass
+
+            self.timer.stop(name='gal_{}'.format(str(entry_index).zfill(6)))
+
+            # If there are more than 30 galaxies, provide an estimate of processing time
+            if len(galaxylist) > 100:
+                if ((entry_index == 20) or ((entry_index > 0) and (np.mod(entry_index, 100) == 0))):
+                    time_per_galaxy = self.timer.sum(key_str='gal_') / (entry_index+1)
+                    estimated_remaining_time = time_per_galaxy * (len(galaxylist) - (entry_index+1)) * u.second
+                    time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                    finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                    print(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
+                           'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
 
         return galimage, segmentation.segmap
 
@@ -3838,8 +3877,8 @@ class Catalog_seed():
                 # If a magnitude is given then adjust the countrate to match it
                 if mag is not None:
                     # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                    countrate = utils.magnitude_to_countrate(self.params['Inst']['mode'], magsys, mag,
-                                                             photfnu=self.photfnu, photflam=self.photflam,
+                    countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                             magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                              vegamag_zeropoint=self.vegazeropoint)
                     framecounts = countrate * self.frametime
                     magwrite = mag
@@ -3910,8 +3949,7 @@ class Catalog_seed():
         # if no WCS:
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
-
-        rotated = rotate(stamp_image, x_pos_angle, mode='constant', cval=0.)
+        rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
 
     def make_extended_source_image(self, extSources, extStamps):
@@ -4001,15 +4039,15 @@ class Catalog_seed():
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     extimage[j1:j2, i1:i2] += stamp[l1:l2, k1:k2]
 
-                # Divide readnoise by 100 sec, which is a 10 group RAPID ramp?
-                noiseval = self.single_ron / 100. + self.params['simSignals']['bkgdrate']
-                if self.params['Inst']['mode'].lower() in ['wfss', 'ts_grism']:
-                    noiseval += self.grism_background
+                # Add source to segmentation map
+                segmentation.add_object_threshold(stamp[l1:l2, k1:k2], j1, i1, entry['index'],
+                                                  self.segmentation_threshold)
+                self.n_extend += 1
 
-                # Make segmentation map
-                indseg = self.seg_from_photutils(stamp[l1:l2, k1:k2] * entry['countrate_e/s'],
-                                                 entry['index'], noiseval)
-                segmentation.segmap[j1:j2, i1:i2] += indseg
+        if self.n_extend == 0:
+            print("No extended sources present within the aperture.")
+        else:
+            print('Number of extended sources present within the aperture: {}'.format(self.n_extend))
         return extimage, segmentation.segmap
 
     def enlarge_stamp(self, image, dims):
@@ -4113,7 +4151,8 @@ class Catalog_seed():
 
         if adjust_file:
             # Make a copy of the original file and then delete it
-            yaml_copy = 'orig_{}'.format(self.paramfile)
+            param_dir, param_file = os.path.split(self.paramfile)
+            yaml_copy = os.path.join(param_dir, 'orig_{}'.format(param_file))
             shutil.copy2(self.paramfile, yaml_copy)
             os.remove(self.paramfile)
 
@@ -4228,18 +4267,6 @@ class Catalog_seed():
         except IndexError:
             raise ValueError('Unable to determine the detector/module in aperture {}'.format(aper_name))
 
-        if self.instrument == 'niriss':
-            newfilter, newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
-            self.params['Readout']['filter'] = newfilter
-            self.params['Readout']['pupil'] = newpupil
-
-        # Make sure the requested filter is allowed. For imaging, all filters
-        # are allowed. In the future, other modes will be more restrictive
-        if self.params['Readout']['pupil'][0].upper() == 'F':
-            self.usefilt = 'pupil'
-        else:
-            self.usefilt = 'filter'
-
         # If instrument is FGS, then force filter to be 'NA' for the purposes
         # of constructing the correct PSF input path name. Then change to be
         # the DMS-required "N/A" when outputs are saved
@@ -4249,7 +4276,13 @@ class Catalog_seed():
 
         # Get basic flux calibration information
         self.vegazeropoint, self.photflam, self.photfnu, self.pivot = \
-            fluxcal_info(self.params, self.usefilt, detector, module)
+            fluxcal_info(self.params['Reffiles']['flux_cal'], self.instrument, self.params['Readout']['filter'],
+                         self.params['Readout']['pupil'], detector, module)
+
+        # Get the threshold signal value for pixels to be included in the
+        # segmentation map. Pixels with signals greater than or equal to
+        # this level will be included in the segmap
+        self.set_segmentation_threshold()
 
         # Convert the input RA and Dec of the pointing position into floats
         # Check to see if the inputs are in decimal units or hh:mm:ss strings
@@ -4306,7 +4339,8 @@ class Catalog_seed():
                 # Find the appropriate filter throughput file
                 if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
                     filter_file = utils.get_filter_throughput_file(self.params['Inst']['instrument'].lower(),
-                                                                   self.params['Readout'][self.usefilt],
+                                                                   self.params['Readout']['filter'],
+                                                                   self.params['Readout']['pupil'],
                                                                    fgs_detector=detector, nircam_module=module)
                 else:
                     filter_file = self.params['Reffiles']['filter_throughput']
@@ -4321,11 +4355,11 @@ class Catalog_seed():
                         shorthand = 'lw{}'.format(module.lower())
                     else:
                         shorthand = 'sw{}'.format(module.lower())
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][shorthand]
+                    self.gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][shorthand]
                 elif self.params['Inst']['instrument'].lower() == 'niriss':
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
+                    self.gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()]
                 elif self.params['Inst']['instrument'].lower() == 'fgs':
-                    gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector.lower()]
+                    self.gain_value = MEAN_GAIN_VALUES[self.params['Inst']['instrument'].lower()][detector.lower()]
 
                 if self.params['simSignals']['use_dateobs_for_background']:
                     bkgd_wave, bkgd_spec = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
@@ -4333,7 +4367,7 @@ class Catalog_seed():
                                                                                        self.params['Output']['date_obs'])
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, True,
-                                                                                             gain_value, self.siaf,
+                                                                                             self.gain_value, self.siaf,
                                                                                              back_wave=bkgd_wave,
                                                                                              back_sig=bkgd_spec)
                     print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
@@ -4342,7 +4376,7 @@ class Catalog_seed():
                     orig_level = copy.deepcopy(self.params['simSignals']['bkgdrate'])
                     self.params['simSignals']['bkgdrate'] = backgrounds.calculate_background(self.ra, self.dec,
                                                                                              filter_file, False,
-                                                                                             gain_value, self.siaf,
+                                                                                             self.gain_value, self.siaf,
                                                                                              level=self.params['simSignals']['bkgdrate'].lower())
                     print("Background rate determined using {} level: {}".format(orig_level, self.params['simSignals']['bkgdrate']))
             else:
@@ -4380,6 +4414,10 @@ class Catalog_seed():
             raise RuntimeError(("WARNING: not able to parse the extendedCenter list {}. "
                                 "It should be a comma-separated list of x and y pixel positions."
                                 .format(self.params['simSignals']['extendedCenter'])))
+
+        # Check for consistency between the mode and grism_source_image value
+        if ((self.params['Inst']['mode'] in ['wfss', 'ts_grism']) and (not self.params['Output']['grism_source_image'])):
+            raise ValueError('Input yaml file has WFSS or TSO grism mode, but Output:grism_source_image is set to False. Must be True.')
 
     def checkRunStep(self, filename):
         # check to see if a filename exists in the parameter file.
@@ -4485,6 +4523,59 @@ class Catalog_seed():
                                       "{}. Not present in directory tree specified by "
                                       "the {} environment variable."
                                       .format(pth, self.env_var)))
+
+    def get_surface_brightness_fluxcal(self):
+        """Get the conversion value for MJy/sr to ADU/sec from the jwst
+        calibration pipeline photom reference file. The value is based
+        on the filter and pupil value of the observation.
+        """
+        photom_data = fits.getdata(self.params['Reffiles']['photom'])
+        photom_filters = np.array([elem['filter'] for elem in photom_data])
+        photom_pupils = np.array([elem['pupil'] for elem in photom_data])
+        photom_values = np.array([elem['photmjsr'] for elem in photom_data])
+
+        good = np.where((photom_filters == self.params['Readout']['filter'].upper()) & (photom_pupils == self.params['Readout']['pupil'].upper()))[0]
+        if len(good) > 1:
+            raise ValueError("More than one matching row in the photom reference file for {} and {}".format(self.params['Readout']['filter'], self.params['Readout']['pupil']))
+        elif len(good) == 0:
+            raise ValueError("No matching row in the photom reference file for {} and {}".format(self.params['Readout']['filter'], self.params['Readout']['pupil']))
+
+        surf_bright_fluxcal = photom_values[good[0]]
+        return surf_bright_fluxcal
+
+    def set_segmentation_threshold(self):
+        """Determine the threshold value to use when determining which pixels
+        to include in the segmentation map. Final units for the threshold
+        should be ADU/sec, but inputs (in the input yaml file) can be:
+        ADU/sec, electrons/sec, or MJy/str
+        """
+        # First, set the default, in case the input yaml does not have the
+        # threshold entry
+        self.segmentation_threshold = SEGMENTATION_MIN_SIGNAL_RATE
+        segmentation_threshold_units = 'adu/s'
+
+        #Now see if there is an entry in the yaml file
+        try:
+            self.segmentation_threshold = self.params['simSignals']['signal_low_limit_for_segmap']
+            segmentation_threshold_units = self.params['simSignals']['signal_low_limit_for_segmap_units'].lower()
+        except KeyError:
+            print(('simSignals:signal_low_limit_for_segmap and/or simSignals:signal_low_limit_for_segmap_units '
+                   'not present in input yaml file. Using the default value of: {} ADU/sec'.format(self.segmentation_threshold)))
+
+        if segmentation_threshold_units not in SUPPORTED_SEGMENTATION_THRESHOLD_UNITS:
+            raise ValueError(('Unsupported unit for the segmentation map lower signal limit: {}.\n'
+                              'Supported units are: {}'.format(segmentation_threshold_units, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS)))
+        if segmentation_threshold_units in ['adu/s', 'adu/sec']:
+            pass
+        elif segmentation_threshold_units == ['e/s', 'e/sec']:
+            self.segmentation_threshold /= self.gain_value
+        elif segmentation_threshold_units == ['mjy/sr', 'mjy/str']:
+            surface_brightness_fluxcal = self.get_surface_brightness_fluxcal()
+            self.segmentation_threshold /= surface_brightness_fluxcal
+        elif segmentation_threshold_units in ['erg/cm2/a']:
+            self.segmentation_threshold /= self.photflam
+        elif segmentation_threshold_units in ['erg/cm2/hz']:
+            self.segmentation_threshold /= self.photfnu
 
     def input_check(self, inparam):
         # Check for the existence of the input file. In

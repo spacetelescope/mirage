@@ -16,23 +16,24 @@ Readout:
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
   dark: $MIRAGE_DATA/fgs/darks/raw/30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal.fits #Dark current integration used as the base
   linearized_darkfile: None # Linearized dark ramp to use as input. Supercedes dark above
-  badpixmask: $MIRAGE_DATA/fgs/reference_files/badpix/jwst_fgs_mask_0018.fits  # If linearized dark is used, populate output DQ extensions using this file
-  superbias: $MIRAGE_DATA/fgs/reference_files/superbias/jwst_fgs_superbias_0033.fits  #Superbias file. Set to None or leave blank if not using
-  linearity: $MIRAGE_DATA/fgs/reference_files/linearity/jwst_fgs_linearity_0014.fits  #linearity correction coefficients
-  saturation: $MIRAGE_DATA/fgs/reference_files/saturation/jwst_fgs_saturation_0018.fits  #well depth reference files
-  gain: $MIRAGE_DATA/fgs/reference_files/gain/jwst_fgs_gain_0010.fits
-  pixelflat: None
+  badpixmask: crds  # If linearized dark is used, populate output DQ extensions using this file
+  superbias: crds  #Superbias file. Set to None or leave blank if not using
+  linearity: crds  #linearity correction coefficients
+  saturation: crds  #well depth reference files
+  gain: crds
+  pixelflat: crds
   illumflat: None                               #Illumination flat field file
-  astrometric: $MIRAGE_DATA/fgs/reference_files/distortion/jwst_fgs_distortion_0004.asdf #Astrometric distortion file (asdf)
+  astrometric: crds #Astrometric distortion file (asdf)
   distortion_coeffs: $MIRAGE_DATA/fgs/reference_files/SIAF/FGS_SIAF_09-28-2017.csv  #CSV file containing distortion coefficients
-  ipc: $MIRAGE_DATA/fgs/reference_files/ipc/Kernel_to_add_IPC_effects_from_jwst_fgs_ipc_0003.fits  #File containing IPC kernel to apply
+  ipc: crds  #File containing IPC kernel to apply
   invertIPC: False      #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
   occult: None                                    #Occulting spots correction image
-  pixelAreaMap: $MIRAGE_DATA/fgs/reference_files/pam/jwst_fgs_area_0010.fits  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+  pixelAreaMap: crds  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
   subarray_defs:   config   #File that contains a list of all possible subarray names and coordinates
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
+  filter_wheel_positions: /Users/hilbert/python_repos/mirage/mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
 
@@ -78,6 +79,7 @@ simSignals:
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
   expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
+  use_dateobs_for_background: False          # Use date_obs below to deternine background. If False, bkgdrate is used.
 
 Telescope:
   ra: 53.1                     #RA of simulated pointing
@@ -115,6 +117,9 @@ Output:
   activity_id: '2o'    #Activity ID. Increment with each exposure.
   exposure_number: '00001'    #Exposure Number
   obs_id: 'jw01111024002_0112o_00001'   #Observation ID number
+  target_name: PG-1657+344  # Name of target
+  target_ra: 53.11  # RA of the target, from APT file.
+  target_dec: -27.81  # Dec of the target, from APT file.
   date_obs: '2019-10-15'  #Date of observation
   time_obs: '06:29:11.852'  #Time of observation
   obs_template: 'FGS Imaging'  #Observation template

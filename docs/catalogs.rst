@@ -71,7 +71,7 @@ For moving targets (both those that are moving across the field of view, as well
 
 Point Sources
 -------------
-Point sources are specified using a catalog that includes the locations of the sources in RA and Dec (or x,y pixel locations on the detector) and the corresponding magnitudes through the filter specified by the user. Currently the simulator supports the use of ABMAG [Oke, 1983]_, STMAG [Stone, 1996]_ , and VEGAMAG () systems, with ABMAG as the default.
+Point sources are specified using a catalog that includes the locations of the sources in RA and Dec (or x,y pixel locations on the detector) and the corresponding magnitudes through the filter or filter/pupil combination specified by the user. Currently the simulator supports the use of ABMAG [Oke, 1983]_, STMAG [Stone, 1996]_ , and VEGAMAG () systems, with ABMAG as the default.
 
 An example point source catalog is shown below with the positions given in RA and Dec.
 
@@ -83,7 +83,7 @@ An example point source catalog is shown below with the positions given in RA an
 	# abmag
 	#
 	# Magnitudes are converted from input flux densities.
-	x_or_RA          y_or_Dec      nircam_f200w_magnitude
+	x_or_RA          y_or_Dec      nircam_f200w_clear_magnitude
 	53.0886395   -27.8399952              20.0
 	53.0985009   -27.8398137              19.2
 
@@ -112,7 +112,7 @@ The simulator software looks for the exact column names shown below when reading
 	# abmag
 	#
 	# Magnitudes are converted from input flux densities.
-	x_or_RA         y_or_Dec     radius    ellipticity    pos_angle       sersic_index      niriss_f200w_magnitude
+	x_or_RA         y_or_Dec     radius    ellipticity    pos_angle       sersic_index      niriss_f200w_clear_magnitude
 	53.05           -27.83        0.17        0.46         104.35              3.3                 18.06
 	53.10           -27.83        0.73        0.01         195.50              2.7                 16.86
 
@@ -142,7 +142,7 @@ For stamp images where it may not make sense to specify a magnitude (such as a g
 	#
 	#
 	#
-	x_or_RA        y_or_Dec       pos_angle      nircam_f200w_magnitude       filename
+	x_or_RA        y_or_Dec       pos_angle      nircam_f200w_clear_magnitude       filename
 	359.65          0.0006           20                 16.000             ring_nebula.fits
 
 
@@ -169,7 +169,7 @@ This catalog is used when creating non-sidereal simulated exposures. In this cas
 	# x_or_RA_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# if the units are pixels per hour, include 'velocity pixels' in line 2 above.
-	object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_magnitude
+	object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_clear_magnitude
 	pointSource  53.101      -27.801       2103840.              0.0                       17.
 
 .. _moving_point_source:
@@ -196,7 +196,7 @@ Below is an example catalog:
 	# strictly correct because in reality distortion will cause object's
 	# velocities to vary in pixels/hour. Velocities in arcsec/hour will be
 	# constant.
-	x_or_RA    y_or_Dec   nircam_f200w_magnitude  x_or_RA_velocity   y_or_Dec_velocity
+	x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude  x_or_RA_velocity   y_or_Dec_velocity
 	53.0985    -27.8015       14                        180                 180
 
 .. _moving_sersic:
@@ -222,7 +222,7 @@ This option may be useful for simulating moving moons around a primary target th
 	#
 	# pos_angle is the position angle of the semimajor axis, in degrees.
 	# 0 causes the semi-major axis to be horizontal.
-	x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  nircam_f200w_magnitude  x_or_RA_velocity  y_or_Dec_velocity
+	x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  nircam_f200w_clear_magnitude  x_or_RA_velocity  y_or_Dec_velocity
 	354.765   0.00064    1.0       0.25         20          2.0            16.000                  -0.5              -0.02
 
 
@@ -248,7 +248,7 @@ Similar to the catalog of static extended targets, this catalog contains a fits 
 	# strictly correct because in reality distortion will cause object's
 	# velocities to vary in pixels/sec. Velocities in arcsec/hour will be
 	# constant.
-	filename            x_or_RA    y_or_Dec   nircam_f200w_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity
+	filename            x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity
 	ring_nebula.fits    0.007       0.003             12.0               0.0             -0.5               -0.02
 
 
@@ -271,7 +271,7 @@ Finally, this catalog contains magnitude columns similar to those in other catal
     # vegamag
     #
     #
-    index   x_or_RA     y_or_Dec   Semimajor_axis_in_stellar_radii  Orbital_inclination_deg  Eccentricity  Longitude_of_periastron  Limb_darkening_model  Limb_darkening_coeffs  Time_units  Start_time  End_time  Time_of_inferior_conjunction  Orbital_period      Transmission_spectrum      nircam_f444w_magnitude  nircam_f322w2_magnitude
+    index   x_or_RA     y_or_Dec   Semimajor_axis_in_stellar_radii  Orbital_inclination_deg  Eccentricity  Longitude_of_periastron  Limb_darkening_model  Limb_darkening_coeffs  Time_units  Start_time  End_time  Time_of_inferior_conjunction  Orbital_period      Transmission_spectrum      nircam_f444w_clear_magnitude  nircam_f322w2_clear_magnitude
     99999 66.37090333 -30.60044722             9.37                        83.3                   0.0               90.0                 nonlinear        "0.5, 0.1, 0.1, -0.1"     second       0.0       580.0             280.0                   3162.24     ./transmission_spectrum.txt             9.0                     9.05
 
 
@@ -292,5 +292,5 @@ Finally, this catalog contains magnitude columns similar to those in other catal
     # vegamag
     #
     #
-    index    x_or_RA     y_or_Dec         lightcurve_file       nircam_f182m_magnitude  nircam_f210m_magnitude   nircam_f470n_magnitude
+    index    x_or_RA     y_or_Dec         lightcurve_file       nircam_f182m_magnitude  nircam_f210m_clear_magnitude   nircam_f444w_f470n_magnitude
     99999  66.37090333 -30.60044722 ./example_lightcurve.hdf5          10.0                       9.5                    9.0

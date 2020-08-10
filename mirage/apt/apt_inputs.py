@@ -53,6 +53,7 @@ import yaml
 
 from . import read_apt_xml
 from ..utils import siaf_interface, constants, utils
+from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES
 
 
 class AptInput:
@@ -1021,25 +1022,19 @@ def get_filters(pointing_info):
     for inst in instrument_list:
         good = np.where(np.array(pointing_info['Instrument']) == inst.upper())[0]
         if inst.upper() == 'NIRCAM':
+            filter_list = []
             short_filters = np.array(pointing_info['ShortFilter'])[good]
             long_filters = np.array(pointing_info['LongFilter'])[good]
             short_pupils = np.array(pointing_info['ShortPupil'])[good]
             long_pupils = np.array(pointing_info['LongPupil'])[good]
 
-            short_filter_only = np.where(short_pupils == 'CLEAR')[0]
-            long_filter_only = np.where(long_pupils == 'CLEAR')[0]
-
-            filter_list = list(set(short_pupils))
-            filter_list.remove('CLEAR')
-            for wfsc_optic in  ['WLP8', 'WLM8', 'GDHS0', 'GDHS60']:
-                if wfsc_optic in filter_list:
-                    filter_list.remove(wfsc_optic)
-
-            filter_list.extend(list(set(long_pupils)))
-            filter_list.remove('CLEAR')
-
-            filter_list.extend(list(set(short_filters[short_filter_only])))
-            filter_list.extend(list(set(long_filters[long_filter_only])))
+            for s_filt, s_pup, l_filt, l_pup in zip(short_filters, short_pupils, long_filters, long_pupils):
+                if s_pup not in NIRCAM_UNSUPPORTED_PUPIL_VALUES:
+                    filter_list.append('{}/{}'.format(s_filt, s_pup))
+                if l_pup not in NIRCAM_UNSUPPORTED_PUPIL_VALUES:
+                    if 'GRISM' in l_pup:
+                        l_pup = 'CLEAR'
+                    filter_list.append('{}/{}'.format(l_filt, l_pup))
 
         elif inst.upper() == 'FGS':
             filter_list = ['guider1', 'guider2']

@@ -43,10 +43,11 @@ def test_fluxcal_info():
               'Reffiles': {'flux_cal': os.path.join(CONFIG_DIR, 'NIRCam_zeropoints.list')}
               }
 
-    usefilt = 'filter'
     detector = 'NRCA1'
     module = 'A'
-    vegazp, photflam, photfnu, pivot = flux_cal.fluxcal_info(params, usefilt, detector, module)
+    vegazp, photflam, photfnu, pivot = flux_cal.fluxcal_info(params['Reffiles']['flux_cal'], 'NIRCAM',
+                                                             params['Readout']['filter'],
+                                                             params['Readout']['pupil'], detector, module)
 
     assert vegazp == 25.3677
     assert photflam == 4.1652e-21

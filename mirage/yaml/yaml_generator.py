@@ -110,7 +110,7 @@ from ..reference_files import crds_tools
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
-from ..utils.constants import CRDS_FILE_TYPES
+from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE
 from ..utils import utils
 
 ENV_VAR = 'MIRAGE_DATA'
@@ -121,7 +121,8 @@ class SimInput:
                  reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
                  background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
-                 dateobs_for_background=False, offline=False):
+                 dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
+                 offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -226,6 +227,15 @@ class SimInput:
             when calculating the background level for the observation.
             If False, the value from ``background`` will be used.
 
+        segmap_flux_limit : float
+            Lower signal limit for pixels that will be added to the segmentation
+            map. Pixels with signals larger than or equal to this value will be
+            added to the segmentation map.
+
+        segmap_flux_limit_units : str
+            Units corresponding to the value in ```segmap_flux_limit```. Can be
+            'ADU/sec', 'e/sec', 'MJy/sr', 'ergs/cm2/A', 'ergs/cm2/Hz'
+
         offline : bool
             Whether the class is being called with or without access to
             Mirage reference data. Used primarily for testing.
@@ -254,12 +264,19 @@ class SimInput:
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
-        self.tracking = 'sidereal'
         self.psf_paths = None
         self.expand_catalog_for_segments = False
         self.dateobs_for_background = dateobs_for_background
         self.add_psf_wings = True
         self.offline = offline
+
+        if ((segmap_flux_limit is not None) and (segmap_flux_limit_units is None)):
+            raise ValueError("If segmap_flux_limit is provided, segmap_flux_units must also be provided.")
+
+        if segmap_flux_limit is None:
+            self.segmentation_threshold = SEGMENTATION_MIN_SIGNAL_RATE
+        if segmap_flux_limit_units is None:
+            self.segmentation_threshold_units = 'ADU/sec'
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=self.offline)
@@ -366,6 +383,7 @@ class SimInput:
         saturation_arr = deepcopy(empty_col)
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
+        photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
@@ -441,6 +459,7 @@ class SimInput:
             saturation_arr[match] = reffiles['saturation']
             gain_arr[match] = reffiles['gain']
             distortion_arr[match] = reffiles['distortion']
+            photom_arr[match] = reffiles['photom']
             ipc_arr[match] = reffiles['ipc']
             ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
@@ -452,6 +471,7 @@ class SimInput:
         self.info['saturation'] = list(saturation_arr)
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
+        self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
@@ -475,6 +495,7 @@ class SimInput:
         saturation_arr = deepcopy(empty_col)
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
+        photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
@@ -507,6 +528,7 @@ class SimInput:
             saturation_arr[match] = manual_reffiles['saturation']
             gain_arr[match] = manual_reffiles['gain']
             distortion_arr[match] = manual_reffiles['distortion']
+            photom_arr[match] = manual_reffiles['photom']
             ipc_arr[match] = manual_reffiles['ipc']
             pixelAreaMap_arr[match] = manual_reffiles['area']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
@@ -517,6 +539,7 @@ class SimInput:
         self.info['saturation'] = list(saturation_arr)
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
+        self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
@@ -624,6 +647,7 @@ class SimInput:
             self.info['saturation'] = column_data
             self.info['gain'] = column_data
             self.info['astrometric'] = column_data
+            self.info['photom'] = column_data
             self.info['ipc'] = column_data
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
@@ -1533,7 +1557,7 @@ class SimInput:
             self.psfbasename[instrument] = 'N/A'
 
         # create empty dictionaries
-        list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
+        list_names = 'superbias linearity gain saturation ipc astrometric photom pam dark lindark'.split()
         for list_name in list_names:
             setattr(self, '{}_list'.format(list_name), {})
 
@@ -1808,6 +1832,12 @@ class SimInput:
         except KeyError:
             files['pixelflat'] = 'none'
 
+        # photom reference file
+        try:
+            files['photom'] = self.reffile_overrides[instrument]['photom'][detector]
+        except KeyError:
+            files['photom'] = 'none'
+
         return files
 
     def table_to_dict(self, tab):
@@ -1934,6 +1964,7 @@ class SimInput:
             f.write('  pixelflat: {}    # Flat field file to use for un-flattening output\n'.format(input['pixelflat']))
             f.write('  illumflat: None                               # Illumination flat field file\n')
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
+            f.write('  photom: {}   # cal pipeline photom reference file\n'.format(input['photom']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
             f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
                      'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(input['invert_ipc'])))
@@ -1951,6 +1982,7 @@ class SimInput:
             f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
                      'used when making direct image outputs to be fed into the grism disperser code.\n'.format(input['flux_cal_file'] )))
             f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.configfiles[instrument.lower()]['filter_throughput']))
+            f.write('  ')
             f.write('\n')
             f.write('nonlin:\n')
             f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')
@@ -2055,7 +2087,10 @@ class SimInput:
                     .format(self.expand_catalog_for_segments))
             f.write('  use_dateobs_for_background: {}          # Use date_obs below to deternine background. If False, bkgdrate is used.\n'
                     .format(self.dateobs_for_background))
-
+            f.write('  signal_low_limit_for_segmap: {}         # Lower signal limit to include pix in segmentation map. See below for units.\n'
+                    .format(self.segmentation_threshold))
+            f.write(('  signal_low_limit_for_segmap_units: {}  # Units of signal_low_limit_for_segmap. Can be: [ADU/sec, e/sec, MJy/sr, '
+                     'ergs/cm2/a, ergs/cm2/hz]\n'.format(self.segmentation_threshold_units)))
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
@@ -2065,7 +2100,7 @@ class SimInput:
             else:
                 pav3_value = input['PAV3']
             f.write('  rotation: {}                    # PA_V3 in degrees, i.e. the position angle of the V3 axis at V1 (V2=0, V3=0) measured from N to E.\n'.format(pav3_value))
-            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
+            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(input['Tracking']))
             f.write('\n')
             f.write('newRamp:\n')
             f.write('  dq_configfile: {}\n'.format(self.configfiles[instrument.lower()]['dq_init_config']))
@@ -2176,6 +2211,122 @@ class SimInput:
         parser.add_argument("--tracking", help="Type of telescope tracking: 'sidereal' or 'non-sidereal'", default='sidereal')
 
         return parser
+
+
+def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
+    """Call JWST GTVT to retrieve nominal observatory position angle (V3 PA) for given coordinates and date
+
+    This is a lower-level util function; most MIRAGE users should typically use default_obs_v3pa_on_date or
+    all_obs_v3pa_on_date instead.
+
+    Parameters
+    ----------
+    ra : str
+        RA in sexagesimal format e.g. '00:00:00.0'
+
+    dec : str
+        Dec in sexagesimal format e.g. '00:00:00.0'
+
+    date : string
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+
+    return_range : bool
+        Return tuple including the range accessible via observatory roll, i.e. (v3pa, min_v3pa, max_v3pa)
+
+    Returns
+    -------
+    pa_v3 : float
+        V3PA in degrees
+    """
+    import jwst_gtvt.find_tgt_info
+
+    if date is None:
+        start_date_obj = datetime.date.today()
+        start_date = start_date_obj.isoformat()
+    else:
+        start_date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+        start_date = start_date_obj.isoformat().split('T')[0]
+
+    # note, get_table requires distinct start and end dates, different by at least 1 day
+    end_date_obj = start_date_obj + datetime.timedelta(days=1)
+    end_date = end_date_obj.isoformat().split('T')[0]
+
+    tbl = jwst_gtvt.find_tgt_info.get_table(ra=ra, dec=dec, instrument='NIRCam',
+                                            start_date=start_date, end_date=end_date,
+                                            verbose=False)
+    row = tbl[0]
+
+    if return_range:
+        return row['V3PA'], row['V3PA min'], row['V3PA max']
+    return row['V3PA']
+
+
+def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=False, pointing_table=None):
+    """Find the nominal/default V3PA for an observation on a given date.
+
+    Note, this relies on the JWST Generalized Target Visibility Tool (GTVT), and as such it
+    just considers the basic spherical geometry of the sky. It does *NOT* take into account
+    any special requirements defined in APT.
+
+    Parameters
+    ----------
+    pointing_filename : string
+        Pointing file filename exported by APT
+    obs_num : int
+        Observation number.
+    date : str or None
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+    pointing_table : dict, optional
+        Dictionary of info read from pointing filename; alternate input for this in case it's already been read from disk
+
+    Returns
+    -------
+    pa : float
+        V3PA in decimal degrees. Provide this to the `roll_angle` argument to mirage.yaml_generator()
+    """
+
+    if pointing_table is None:
+        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+    for i in range(len(pointing_table['obs_num'])):
+        if pointing_table['obs_num'][i] == f"{obs_num:03d}":
+            ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
+            if verbose:
+                print(f"Pointing table row {i} is for obs {obs_num}")
+                print(f" Coords from APT pointing file: {ra_deg} {dec_deg} deg")
+            break
+    else:
+        raise RuntimeError(f"Could not find any info for an observation number {obs_num} in the pointing table.")
+
+    result = _gtvt_v3pa_on_date(ra_deg, dec_deg, date=date)
+    if np.isnan(result):
+        raise RuntimeError("Obs {obs_num} is not observable on date {date}. Target not in the field of regard.")
+    return result
+
+
+def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
+    """Find the nominal/default V3PA for all observations in a program.
+
+    Parameters
+    ----------
+    pointing_filename : string
+        Pointing file filename exported by APT
+    date : str or None
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+
+
+    Returns
+    -------
+    pas : dict
+        Dict of V3PAs, in the format for passing to the `roll_angle` argument to mirage.yaml_generator()
+
+    """
+    results = {}
+    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+    obsnums = sorted(list(set(pointing_table['obs_num'])))
+    for obs_num in obsnums:
+        results[obs_num] = default_obs_v3pa_on_date(pointing_filename, int(obs_num), date=date, verbose=verbose,
+                                                    pointing_table=pointing_table)
+    return results
 
 
 if __name__ == '__main__':

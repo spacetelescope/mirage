@@ -50,5 +50,27 @@ In order to create simulated data with more realistic spectra, users can provide
 
     The `NIRISS WFSS example notebook <https://github.com/spacetelescope/mirage/blob/master/examples/NIRISS_WFSS_data_creation_example.ipynb>`_ shows examples of how to create your own hdf5 catalog file, and how to create WFSS data using the methods described above.
 
+Skip the dark current prep step
++++++++++++++++++++++++++++++++
+
+Similar to the case for imaging mode simulations, if you have dark current products for your simulation from a previous run of Mirage, it is possible to provide these files to *wfss_simulator.py* as inputs using the **override_dark** parameter. In this case, the call to *dark_prep.py* will be skipped, which will save some computing time. Note that the dark current products must be specific to your exoposure, in that they must contain arrays of the proper shape. So in practice, this detail is useful if you are repeating a previous call to Mirage. In that case, the darks can be provided as shown below. In the case where a single dark file is needed, it can be provided as a string or a 1-element list. In cases where the exposure is broken into segments and there are multiple dark files, these files must be provided as a list.
+
+::
+
+    from mirage.wfss_simulator import WFSSSim
+
+    # Single file
+    darks = ['jw01345007001_01101_00010_nrca5_uncal_linear_dark_prep_object.fits']
+    yfile = 'jw01345007001_01101_00010_nrca5.yaml'
+    c = WFSSSim(yfile, override_dark=darks)
+    c.create()
+
+    # File broken into multiple segments
+    darks = ['jw01345007001_01101_00010_nrca5_uncal_seg001_linear_dark_prep_object.fits',
+             'jw01345007001_01101_00010_nrca5_uncal_seg002_linear_dark_prep_object.fits']
+    yfile = 'jw01345007001_01101_00010_nrca5.yaml'
+    c = WFSSSim(yfile, override_dark=darks)
+    c.create()
+
 
 

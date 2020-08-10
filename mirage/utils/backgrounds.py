@@ -210,15 +210,11 @@ def low_med_high_background_spectrum(param_dict, detector, module):
     # Generate background spectra for all days
     background = jbt.background(param_dict['Telescope']['ra'], param_dict['Telescope']['dec'], 4.)
 
-    # Determine which optical element wheel contains the filter we want
-    # to use for background estimation
-    if param_dict['Readout']['pupil'][0].upper() == 'F':
-        usefilt = 'pupil'
-    else:
-        usefilt = 'filter'
-
     # Get basic flux calibration information
-    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(param_dict, usefilt, detector, module)
+    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(param_dict['Reffiles']['flux_cal'],
+                                                               param_dict['Inst']['instrument'],
+                                                               param_dict['Readout']['filter'],
+                                                               param_dict['Readout']['pupil'], detector, module)
 
     # Extract the spectrum value across all days at the pivot wavelength
     wave_diff = np.abs(background.bkg_data['wave_array'] - pivot_wavelength)
@@ -390,15 +386,10 @@ def niriss_background_scaling(param_dict, detector, module):
     # Generate background spectra for all days
     background = jbt.background(param_dict['Telescope']['ra'], param_dict['Telescope']['dec'], 4.)
 
-    # Determine which optical element wheel contains the filter we want
-    # to use for background estimation
-    if param_dict['Readout']['pupil'][0].upper() == 'F':
-        usefilt = 'pupil'
-    else:
-        usefilt = 'filter'
-
     # Get basic flux calibration information
-    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(param_dict, usefilt, detector, module)
+    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(param_dict['Reffiles']['flux_cal'], 'niriss',
+                                                               param_dict['Readout']['filter'],
+                                                               param_dict['Readout']['pupil'], detector, module)
 
     # Extract the spectrum value across all days at the pivot wavelength
     wave_diff = np.abs(background.bkg_data['wave_array'] - pivot_wavelength)

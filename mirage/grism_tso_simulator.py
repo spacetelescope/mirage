@@ -49,6 +49,7 @@ import copy
 import os
 import sys
 import argparse
+import datetime
 import yaml
 
 from astropy.io import ascii, fits
@@ -70,6 +71,7 @@ from mirage.utils import read_fits
 from mirage.utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from mirage.utils import utils, file_io, backgrounds
+from mirage.utils.timer import Timer
 from mirage.yaml import yaml_update
 
 
@@ -110,11 +112,11 @@ class GrismTSO():
             done if the wavelength range covered by the filter magnitudes
             does not cover the entire wavelength range of the grism+filter
 
-        override_dark : str
-            Name of file containing a Mirage dark current object appropriate
-            for the simulation. If provided, the ``dark_prep`` step will be
-            skipped. If ``None``, then a new dark current object will be
-            constructed
+        override_dark : list
+            List of outputs from a prior run of ``dark_prep`` to use when creating
+            simulation. If set, the call to ``dark_prep`` will be skipped and these
+            darks will be used instead. If None, ``dark_prep`` will be called and
+            new dark objects will be created.
 
         disp_seed_filename : str
             Name of the file to save the dispsersed seed image into
@@ -144,14 +146,17 @@ class GrismTSO():
         self.save_dispersed_seed = save_dispersed_seed
         self.source_stamps_file = source_stamps_file
         self.extrapolate_SED = extrapolate_SED
-        self.override_dark = override_dark
         self.disp_seed_filename = disp_seed_filename
         self.orders = orders
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
+        self.override_dark = override_dark
 
         # Make sure the right combination of parameter files and SED file
         # are given
         self.param_checks()
+
+        # Initialize timer
+        self.timer = Timer()
 
     def calculate_exposure_time(self):
         """Calculate the total exposure time of the observation being
@@ -205,12 +210,6 @@ class GrismTSO():
         print('Running background sources through catalog_seed_image')
         print('background param file is:', self.background_paramfile)
 
-        # Run the catalog_seed_generator on the non-TSO (background) sources
-        background_direct = catalog_seed_image.Catalog_seed()
-        background_direct.paramfile = self.background_paramfile
-        background_direct.make_seed()
-        background_segmentation_map = background_direct.seed_segmap
-
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
         self.final_SED_file = spectra_from_catalog.make_all_spectra(self.catalog_files,
@@ -221,6 +220,14 @@ class GrismTSO():
 
         bkgd_waves, bkgd_fluxes = backgrounds.nircam_background_spectrum(orig_parameters,
                                                                          self.detector, self.module)
+
+        # Run the catalog_seed_generator on the non-TSO (background) sources. Even if
+        # no source catalogs are given, we run using the dummy catalog created earlier,
+        # because we need to add the 2D dispersed background at this point.
+        background_direct = catalog_seed_image.Catalog_seed()
+        background_direct.paramfile = self.background_paramfile
+        background_direct.make_seed()
+        background_segmentation_map = background_direct.seed_segmap
 
         # Run the disperser on the background sources. Add the background
         # signal here as well
@@ -253,6 +260,8 @@ class GrismTSO():
         tso_direct.make_seed()
         tso_segmentation_map = tso_direct.seed_segmap
         outside_tso_source = tso_segmentation_map == 0
+
+        # Add any background sources to the segmentation map
         tso_segmentation_map[outside_tso_source] = background_segmentation_map[outside_tso_source]
 
         # Dimensions are (y, x)
@@ -293,9 +302,18 @@ class GrismTSO():
         no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
         background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
-        # Mulitp[ly the dispersed seed images by the flat field
+        # Mulitply the dispersed seed images by the flat field
         no_transit_signal *= tso_direct.flatfield
         background_dispersed *= tso_direct.flatfield
+
+        # Create a reference pixel mask, and crop to the requeted aperture
+        full_maskimage = np.zeros((tso_direct.ffsize, tso_direct.ffsize), dtype=np.int)
+        full_maskimage[4:tso_direct.ffsize-4, 4:tso_direct.ffsize-4] = 1.
+        refpix_mask = self.crop_to_aperture(orig_parameters, tso_direct.subarray_bounds, full_maskimage)
+
+        # Zero-out the signal in the reference pixels
+        background_dispersed *= refpix_mask
+        grism_seed_object.final *= full_maskimage
 
         # Save the dispersed seed images if requested
         if self.save_dispersed_seed:
@@ -352,6 +370,10 @@ class GrismTSO():
         for i, int_dim in enumerate(ints_per_segment):
             int_start = self.int_segment_indexes[i]
             int_end = self.int_segment_indexes[i+1]
+
+            # Start timer
+            self.timer.start()
+
             for j, grp_dim in enumerate(groups_per_segment):
                 initial_frame = self.grp_segment_indexes[j]
                 # int_dim and grp_dim are the number of integrations and
@@ -453,17 +475,35 @@ class GrismTSO():
                 self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters) #,
                                #segment_number, segment_part_number)
 
+            # Stop the timer and record the elapsed time
+            self.timer.stop(name='seg_{}'.format(str(i+1).zfill(4)))
+
+            # If there is more than one segment, provide an estimate of processing time
+            print('\n\nSegment {} out of {} complete.'.format(i+1, len(ints_per_segment)))
+            if len(ints_per_segment) > 1:
+                time_per_segment = self.timer.sum(key_str='seg_') / (i+1)
+                estimated_remaining_time = time_per_segment * (len(ints_per_segment) - (i+1)) * u.second
+                time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
+                finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
+                print(('\nEstimated time remaining in this exposure: {} minutes. '
+                       'Projected finish time: {}\n'.format(time_remaining, finish_time)))
+
         # Prepare dark current exposure if
         # needed.
-        print('Running dark prep')
-        d = dark_prep.DarkPrep()
-        d.paramfile = self.paramfile
-        d.prepare()
+        if not self.override_dark:
+            print('Running dark prep')
+            d = dark_prep.DarkPrep()
+            d.paramfile = self.paramfile
+            d.prepare()
+            use_darks = d.dark_files
+        else:
+            print('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
+            use_darks = self.override_dark
 
         # Combine into final observation
         print('Running observation generator')
         obs = obs_generator.Observation()
-        obs.linDark = d.dark_files
+        obs.linDark = use_darks
         obs.seed = self.seed_files
         obs.segmap = tso_segmentation_map
         obs.seedheader = tso_direct.seedinfo
@@ -561,6 +601,9 @@ class GrismTSO():
         # Expand reference file entries to be full path names
         parameters = utils.full_paths(parameters, self.modpath, crds_dict)
 
+        # Find which background source catalogs are present
+        supported_bkgd_types = ['pointsource', 'galaxyListFile', 'extended']
+
         try:
             CATALOG_YAML_ENTRIES.remove('tso_grism_catalog')
         except ValueError:
@@ -570,8 +613,17 @@ class GrismTSO():
             CATALOG_YAML_ENTRIES.remove('tso_imaging_catalog')
         except ValueError:
             pass
-        cats = [parameters['simSignals'][cattype] for cattype in CATALOG_YAML_ENTRIES]
-        cats = [e for e in cats if e.lower() != 'none']
+
+        cats = []
+        for cattype in CATALOG_YAML_ENTRIES:
+            if cattype in supported_bkgd_types:
+                if parameters['simSignals'][cattype].lower() != 'none':
+                    cats.append(parameters['simSignals'][cattype])
+            else:
+                if parameters['simSignals'][cattype].lower() != 'none':
+                    print(parameters['simSignals'][cattype].lower(), type(parameters['simSignals'][cattype]))
+                    raise ValueError('{} catalog: {} is unsupported in grism TSO mode.'.format(cattype, parameters['simSignals'][cattype]))
+
         self.catalog_files.extend(cats)
 
         if len(self.catalog_files) == 0:
@@ -692,6 +744,37 @@ class GrismTSO():
         if self.orders not in [["+1"], ["+2"], ["+1", "+2"], None]:
             raise ValueError(("ERROR: Orders to be dispersed must be either None or some combination "
                               "of '+1', '+2'"))
+
+    @staticmethod
+    def crop_to_aperture(params, sub_bounds, array):
+        """Create a mask showing the locations of the reference pixels
+
+        Parameters
+        ----------
+        params : dict
+            Nested dictionary contianing observation parameters, as read
+            in from an input yaml file
+
+        sub_bounds : list
+            4 element list of subarray boundary locations in full frame
+            coordinates. [xstart, ystart, xend, yend]. Generally created
+            from siaf_interface.get_siaf_information
+
+        array : numpy.ndarray
+            2D full frame array
+
+        Returns
+        -------
+        cropped : numpy.ndarray
+            ```array``` cropped to the requested aperture
+        """
+        # Crop the mask to match the requested output array
+        ap_suffix = params['Readout']['array_name'].split('_')[1]
+        if ap_suffix not in ['FULL', 'CEN']:
+            cropped = array[sub_bounds[1]:sub_bounds[3] + 1,
+                            sub_bounds[0]:sub_bounds[2] + 1]
+        return cropped
+
 
     def run_disperser(self, direct_file, orders=["+1", "+2"], add_background=True,
                       background_waves=None, background_fluxes=None, cache=False, finalize=False):
@@ -892,20 +975,30 @@ class GrismTSO():
         file_dir, filename = os.path.split(self.paramfile)
         suffix = filename.split('.')[-1]
 
+        # Check to see if there are any catalogs for background objects
+        bkgd_cats = ['pointsource', 'galaxyListFile', 'extended']
+        present = [True if params['simSignals'][cat] is not None else False for cat in bkgd_cats]
+
         # Copy #1 - contains all source catalogs other than TSO sources
         # and be set to wfss mode.
-        background_params = copy.deepcopy(params)
-        background_params['simSignals']['tso_grism_catalog'] = 'None'
-        background_params['Inst']['mode'] = 'wfss'
-        background_params['Output']['grism_source_image'] = True
-        background_params['Output']['file'] = params['Output']['file'].replace('.fits',
-                                                                               '_background_sources.fits')
-        self.background_paramfile = self.paramfile.replace('.{}'.format(suffix),
-                                                           '_background_sources.{}'.format(suffix))
-        utils.write_yaml(background_params, self.background_paramfile)
+        if any(present):
+            background_params = copy.deepcopy(params)
+            background_params['simSignals']['tso_grism_catalog'] = 'None'
+            background_params['Inst']['mode'] = 'wfss'
+            background_params['Output']['grism_source_image'] = True
+            background_params['Output']['file'] = params['Output']['file'].replace('.fits',
+                                                                                   '_background_sources.fits')
+            self.background_paramfile = self.paramfile.replace('.{}'.format(suffix),
+                                                               '_background_sources.{}'.format(suffix))
+            utils.write_yaml(background_params, self.background_paramfile)
+        else:
+            self.background_paramfile = None
 
         # Copy #2 - contaings only the TSO grism source catalog,
         # is set to wfss mode, and has no background
+        if params['simSignals']['tso_grism_catalog'] is None:
+            raise ValueError("tso_grism_catalog is not populated in the input yaml. No TSO source to simulate.")
+
         tso_params = copy.deepcopy(params)
         tso_params['Inst']['mode'] = 'wfss'
         tso_params['Output']['grism_source_image'] = True
