@@ -142,6 +142,7 @@ from mirage.psf import tools
 from mirage.seed_image.save_seed import save
 from mirage.reference_files import crds_tools
 from mirage.utils.constants import EXPTYPES
+from mirage.utils.flux_cal import fluxcal_info
 from mirage.utils.siaf_interface import get_siaf_information
 
 
@@ -309,11 +310,11 @@ class ImgSeed:
 
         # Flux calibration information
         self.flux_cal_file = self.expand_config_paths(self.flux_cal_file, 'flux_cal')
-        if self.pupil[0].upper() == 'F':
-            usefilt = self.pupil.upper()
-        else:
-            usefilt = self.filter.upper()
-        self.fluxcal_info(usefilt, module)
+        vegazp, self.photflam, self.photfnu, self.pivot = fluxcal_info(self.flux_cal_file,
+                                                                       self.instrument,
+                                                                       self.filter,
+                                                                       self.pupil, self.detector,
+                                                                       module)
 
         # Get information on the instrument used to create the mosaic
         self.mosaic_metadata = tools.get_psf_metadata(self.mosaic_file)
@@ -503,27 +504,6 @@ class ImgSeed:
         meta_output = {}
         meta_output['instrument'] = self.instrument
         return tools.get_JWST_pixel_scale(meta_output, aperture=self.aperture)
-
-    def fluxcal_info(self, filter_name, module):
-        """Get the flux calibration-related information from the flux
-        cal reference file.
-
-        Parameters
-        ----------
-        filter_name : str
-            Name of the filter to look up the flux cal info for
-
-        module : str
-            Module name to use for the look-up 'A' or 'B' for
-            NIRCam, and 'N' for NIRISS
-        """
-        # Read in list of zeropoints/photflam/photfnu
-        self.zps = ascii.read(self.flux_cal_file)
-        mtch = ((self.zps['Filter'] == filter_name) \
-                & (self.zps['Module'] == module))
-        self.photflam = self.zps['PHOTFLAM'][mtch][0]
-        self.photfnu = self.zps['PHOTFNU'][mtch][0]
-        self.pivot = self.zps['Pivot_wave'][mtch][0]
 
     def grism_coord_adjust(self):
         """Calculate the factors by which to expand the

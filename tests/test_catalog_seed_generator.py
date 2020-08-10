@@ -22,6 +22,7 @@ import os
 import webbpsf
 
 from mirage.seed_image import catalog_seed_image
+from mirage.catalogs.catalog_generator import PointSourceCatalog
 
 # Determine if tests are being run on Travis
 ON_TRAVIS = 'travis' in os.path.expanduser('~')
@@ -38,6 +39,37 @@ def create_dummy_psf_grid():
     grid = nrc.psf_grid(num_psfs=1, all_detectors=False, oversample=1, fov_pixels=301,
                         add_distortion=False, save=False)
     return grid
+
+
+def test_select_magnitude_column():
+    sim = catalog_seed_image.Catalog_seed()
+
+    instrument_list = ['nircam', 'nircam', 'nircam', 'nircam', 'nircam']
+    cat_filter_list = ['f090w', 'F322W2/F323N', 'F115W/WLP8', 'WLM8/F090W', 'F405N']
+    param_filter_list = ['f090w', 'F322W2', 'F115W', 'F090W', 'F444W', 'F444W']
+    pupil_list = ['clear', 'F323N', 'WLP8', 'WLM8', 'F405N', 'F470N']
+
+    truth_list = ['nircam_f090w_clear_magnitude', 'nircam_f322w2_f323n_magnitude',
+                  'nircam_f115w_wlp8_magnitude', 'nircam_f090w_wlm8_magnitude',
+                  'nircam_f444w_f405n_magnitude', 'nircam_f470n_magnitude']
+
+    catalog = PointSourceCatalog(ra=[0.], dec=[0.])
+    for inst, filt in zip(instrument_list, cat_filter_list):
+        catalog.add_magnitude_column([15.], instrument=inst, filter_name=filt)
+
+    # Add an old-style magnitude column to check for backwards compatibility
+    catalog.add_magnitude_column([15.], instrument='nircam', filter_name='F470N')
+
+    for inst, filt, pup, truth in zip(instrument_list, param_filter_list, pupil_list, truth_list):
+        sim.params = {}
+        sim.params['Inst'] = {}
+        sim.params['Readout'] = {}
+        sim.params['Inst']['instrument'] = inst
+        sim.params['Readout']['pupil'] = pup
+        sim.params['Readout']['filter'] = filt
+
+        col = sim.select_magnitude_column(catalog.table, 'junk.cat')
+        assert col == truth
 
 
 def test_overlap_coordinates_full_frame():

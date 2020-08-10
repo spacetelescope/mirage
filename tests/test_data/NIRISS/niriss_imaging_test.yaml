@@ -20,7 +20,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   linearity: crds #linearity correction coefficients
   saturation: crds #well depth reference files
   gain: crds
-  pixelflat: None
+  pixelflat: crds
   illumflat: None                               #Illumination flat field file
   astrometric: crds #Astrometric distortion file (asdf)
   ipc: crds  #File containing IPC kernel to apply
@@ -31,6 +31,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
+  filter_wheel_positions: /Users/hilbert/python_repos/mirage/mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
 
@@ -77,6 +78,7 @@ simSignals:
   photonyield: True                         #Apply photon yield in simulation
   pymethod: True                            #Use double Poisson simulation for photon yield
   expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
+  use_dateobs_for_background: False          # Use date_obs below to deternine background. If False, bkgdrate is used.
 
 Telescope:
   ra: 53.1                     #RA of simulated pointing
@@ -114,6 +116,9 @@ Output:
   activity_id: '2o'    #Activity ID. Increment with each exposure.
   exposure_number: '00001'    #Exposure Number
   obs_id: 'V88888024002P000000000112o'   #Observation ID number
+  target_name: PG-1657+344  # Name of target
+  target_ra: 53.11 # RA of the target, from APT file.
+  target_dec: -27.81  # Dec of the target, from APT file.
   date_obs: '2019-10-15'  #Date of observation
   time_obs: '06:29:11.852'  #Time of observation
   obs_template: 'NIRISS Imaging'  #Observation template
