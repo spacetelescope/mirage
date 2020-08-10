@@ -3427,8 +3427,6 @@ class Catalog_seed():
         while num_pix > (2000.**2):
             limit -= delta_limit
 
-            #print('\n\n      Decreasing limit')
-
             # Find the effective radius, semi-major, and semi-minor axes sizes
             # needed to encompass SERSIC_FRACTIONAL_SIGNAL of the total flux
             sersic_rad, semi_major_axis, semi_minor_axis = sersic_fractional_radius(r_Sersic, sersic_index,
@@ -3441,10 +3439,6 @@ class Catalog_seed():
             x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
             num_pix = x_full_length * y_full_length
-
-
-        #print('Final limit: ', limit)
-        #print('Final dimensions: ', x_full_length, y_full_length)
 
         # Make sure the dimensions are odd, so that the galaxy center will
         # be in the center pixel
@@ -3486,9 +3480,6 @@ class Catalog_seed():
         # level should be correct.
         sig_diff = np.absolute(1. - np.sum(stamp) / total_counts)
         if sig_diff > signal_matching_threshold:
-            #print(("Signal difference is {}%. This is greater than the threshold of > {}%. "
-            #       "Falling back to manual flux scaling."
-            #       .format(sig_diff*100, signal_matching_threshold*100)))
             stamp = stamp / np.sum(stamp) * total_counts
 
         return stamp
@@ -3589,10 +3580,6 @@ class Catalog_seed():
         time_reported = False
         print("Creating and adding galaxy stamp images...")
 
-        ###########
-        #fobj = open('galaxy_stamp_sizes.txt', 'w')
-        ###########
-
         for itemp, entry in enumerate(galaxylist):
             # Warn user of how long this calcuation might take...
             if len(times) < 50:
@@ -3619,39 +3606,12 @@ class Catalog_seed():
             # measured from V3 towards V2.
             xposang = self.calc_x_position_angle(entry['V2'], entry['V3'], entry['pos_angle'])
 
-            # Get the sub-pixel position of the galaxy. The model galaxy
-            # will be centered at the sub-pixel location. Later, this will
-            # be convolved with a PSF that is centered at the center of the
-            # requested pixel on the detector. This will result in a convolved
-            # galaxy centered at the correct location.
-            #pix_x = np.floor(entry['pixelx'])
-            #pix_y = np.floor(entry['pixely'])
-            #sub_x = entry['pixelx'] - pix_x
-            #sub_y = entry['pixely'] - pix_y
-
             sub_x = 0.
             sub_y = 0.
-
 
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['countrate_e/s'], sub_x, sub_y)
-
-
-            #print('Stamp dimensions:', stamp.shape)
-            #print('Stamp total out of create_galaxy: ', np.sum(stamp))
-
-            #fobj.write('{} {} {} {}\n'.format(entry['pixelx'], entry['pixely'], stamp.shape[1], stamp.shape[0]))
-            #if itemp == 50:
-            #    fobj.close()
-            #    stop
-
-            #hp = fits.PrimaryHDU(stamp)
-            #hl = fits.HDUList([hp])
-            #hl.writeto('gal_before_convolution_{}_{}.fits'.format(pix_x, pix_y))
-
-
-
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -3707,12 +3667,6 @@ class Catalog_seed():
             if i1 is not None and i2 is not None and j1 is not None and j2 is not None:
                 # Convolve the galaxy image with the PSF image
                 stamp = s1.fftconvolve(stamp, psf_image, mode='same')
-
-
-
-                #print('Stamp total after convolving: ', np.sum(stamp), '\n\n')
-
-
 
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
