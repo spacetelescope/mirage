@@ -3460,12 +3460,6 @@ class Catalog_seed():
         # Create model. Add 90 degrees to the position_angle because the definition
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
-
-
-        orientation still does not agree with Master, but the position_angle vsalues are the same! (without the pi/2 below)
-
-
-
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
                        ellip=ellipticity, theta=position_angle+np.pi/2)
 
@@ -3482,6 +3476,20 @@ class Catalog_seed():
 
         # Create model instance
         stamp = mod(x_stamp, y_stamp)
+
+
+
+        h0 = fits.PrimaryHDU(stamp)
+        hl = fits.HDUList([h0])
+        hl.writeto('galaxy_stamp.fits', overwrite=True)
+        stop
+
+
+
+
+
+
+
 
         # Check the total signal in the stamp. In some cases (high ellipticity, high sersic index)
         # a source centered at or close to the pixel center results in a bad scaling from Sersic2D.
