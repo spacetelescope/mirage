@@ -2898,25 +2898,9 @@ class Observation():
                                          outModel.data.shape[0])
         outModel.int_times = int_times
 
-        if self.runStep['fwpw']:
-            fwpw = ascii.read(self.params['Reffiles']['filtpupilcombo'])
-        else:
-            print(("WARNING: Filter wheel element/pupil wheel element combo reffile not specified. "
-                   "Proceeding by saving {} in FILTER keyword, and {} in PUPIL keyword".
-                   format(self.params['Readout']['filter'], self.params['Readout']['pupil'])))
-            fwpw = Table()
-            fwpw['filter_wheel'] = self.params['Readout']['filter']
-            fwpw['pupil_wheel'] = self.params['Readout']['pupil']
-
-        # get the proper filter wheel and pupil wheel values for the header
-        if ((self.params['Inst']['instrument'].lower() == 'nircam') and
-           (self.params['Inst']['mode'].lower() not in ['wfss', 'ts_grism'])):
-            mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
-            fw = str(fwpw['filter_wheel'].data[mtch][0])
-            pw = str(fwpw['pupil_wheel'].data[mtch][0])
-        else:
-            pw = self.params['Readout']['pupil']
-            fw = self.params['Readout']['filter']
+        # Set filter and pupil values
+        pw = self.params['Readout']['pupil']
+        fw = self.params['Readout']['filter']
 
         # Get FGS filter/pupil in proper format
         if fw == 'NA':
@@ -3205,24 +3189,9 @@ class Observation():
                                          outModel['SCI'].data.shape[0])
         outModel['INT_TIMES'].data = int_times
 
-        if self.runStep['fwpw']:
-            fwpw = ascii.read(self.params['Reffiles']['filtpupilcombo'])
-        else:
-            print(("WARNING: Filter wheel element/pupil wheel element combo reffile not specified. "
-                   "Proceeding by saving {} in FILTER keyword, and {} in PUPIL keyword".
-                   format(self.params['Readout']['filter'], self.params['Readout']['pupil'])))
-            fwpw = Table()
-            fwpw['filter_wheel'] = self.params['Readout']['filter']
-            fwpw['pupil_wheel'] = self.params['Readout']['pupil']
-
-        # get the proper filter wheel and pupil wheel values for the header
-        if self.params['Inst']['mode'].lower() not in ['wfss', 'ts_grism']:
-            mtch = fwpw['filter'] == self.params['Readout']['filter'].upper()
-            fw = str(fwpw['filter_wheel'].data[mtch][0])
-            pw = str(fwpw['pupil_wheel'].data[mtch][0])
-        else:
-            pw = self.params['Readout']['pupil']
-            fw = self.params['Readout']['filter']
+        # Set filter and pupil values
+        pw = self.params['Readout']['pupil']
+        fw = self.params['Readout']['filter']
 
         # Get FGS filter/pupil in proper format
         if fw == 'NA':
