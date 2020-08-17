@@ -23,13 +23,15 @@ import time
 import pkg_resources
 import asdf
 import scipy.signal as s1
+import scipy.special as sp
 from scipy.ndimage import rotate
 import numpy as np
 from photutils import detect_sources
 from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column
-from astropy.modeling.models import Shift, Sersic2D, Polynomial2D, Mapping
+from astropy.modeling.models import Shift, Sersic2D, Sersic1D, Polynomial2D, Mapping
+from astropy.stats import sigma_clipped_stats
 import astropy.units as u
 import pysiaf
 
@@ -43,9 +45,9 @@ from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
-from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SEGMENTATION_MIN_SIGNAL_RATE, \
-                              SUPPORTED_SEGMENTATION_THRESHOLD_UNITS
-from ..utils.flux_cal import fluxcal_info
+from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
+                              SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS
+from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from ..utils.constants import grism_factor, TSO_MODES
@@ -3410,67 +3412,126 @@ class Catalog_seed():
         filteredList.write(filteredOut, format='ascii', overwrite=True)
         return filteredList
 
-    def create_galaxy(self, radius, ellipticity, sersic, posang, totalcounts):
+    def create_galaxy(self, r_Sersic, ellipticity, sersic_index, position_angle, total_counts, subpixx, subpixy,
+                      signal_matching_threshold=0.02):
         """Create a model 2d sersic image with a given radius, eccentricity,
         position angle, and total counts.
 
         Parameters
         ----------
-        radius : float
+        r_Sersic : float
             Half light radius of the sersic profile, in units of pixels
 
         ellipticity : float
             Ellipticity of sersic profile
 
-        sersic : float
+        sersic_index : float
             Sersic index
 
-        posang : float
-            Position angle in units of degrees
+        position_angle : float
+            Position angle in units of radians
 
-        totalcounts : float
+        total_counts : float
             Total summed signal of the output image
+
+        subpixx : float
+            Subpixel x-coordinate of the galaxy center.
+
+        subpixy : float
+            Subpixel y-coordinate of the galaxy center.
+
+        signal_matching_threshold : float
+            Maximum allowed fractional difference between the requested
+            total signal and the total signal in the model. If the model
+            signal is incorrect by more than this threshold, fall back to
+            manual scaling of the galaxy stamp.
 
         Returns
         -------
         img : numpy.ndarray
             2D array containing the 2D sersic profile
         """
+        # Calculate the total signal associated with the source
+        sersic_total = sersic_total_signal(r_Sersic, sersic_index)
 
-        # create the grid of pixels
-        meshmax = np.min([np.int(self.ffsize * self.coord_adjust['y']), np.int(radius * 100.)])
+        # Amplitude to be input into Sersic2D to properly scale the source
+        amplitude = total_counts / sersic_total
 
-        # Make sure the grid has odd dimensions so that the galaxy will
-        # be centered
-        if meshmax % 2 == 0:
-            meshmax += 1
+        # Find the effective radius, semi-major, and semi-minor axes sizes
+        # needed to encompass SERSIC_FRACTIONAL_SIGNAL of the total flux
+        sersic_rad, semi_major_axis, semi_minor_axis = sersic_fractional_radius(r_Sersic, sersic_index,
+                                                                                SERSIC_FRACTIONAL_SIGNAL,
+                                                                                ellipticity)
 
-        y, x = np.meshgrid(np.arange(meshmax), np.arange(meshmax))
+        # Using the position angle, calculate the size of the source in the
+        # x and y directions
+        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
-        # Center the galaxy in the array
-        xc = (meshmax // 2)
-        yc = (meshmax // 2)
+        num_pix = x_full_length * y_full_length
 
-        # Create model
-        mod = Sersic2D(amplitude=1, r_eff=radius, n=sersic, x_0=xc, y_0=yc,
-                       ellip=ellipticity, theta=posang)
+        delta_limit = 0.005
+        limit = SERSIC_FRACTIONAL_SIGNAL
+        # Limit the maximum size of the stamp in order to save computation time
+        while num_pix > (2500.**2):
+            limit -= delta_limit
 
-        # Create instance of model
-        img = mod(x, y)
+            # Find the effective radius, semi-major, and semi-minor axes sizes
+            # needed to encompass SERSIC_FRACTIONAL_SIGNAL of the total flux
+            sersic_rad, semi_major_axis, semi_minor_axis = sersic_fractional_radius(r_Sersic, sersic_index,
+                                                                                    limit,
+                                                                                    ellipticity)
 
-        # Scale such that the total number of counts in the galaxy matches the input
-        summedcounts = np.sum(img)
-        if summedcounts == 0:
-            print('Zero counts in image in create_galaxy: ', radius, ellipticity, sersic, posang, totalcounts)
-            factor = 0.
-        else:
-            factor = totalcounts / summedcounts
+            # Using the position angle, calculate the size of the source in the
+            # x and y directions
+            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
-        img = img * factor
+            num_pix = x_full_length * y_full_length
 
-        # Crop image down such that it contains 99.95% of the total signal
-        img = self.crop_galaxy_stamp(img, 0.9995)
-        return img
+        # Make sure the dimensions are odd, so that the galaxy center will
+        # be in the center pixel
+        if y_full_length % 2 == 0:
+            y_full_length += 1
+        if x_full_length % 2 == 0:
+            x_full_length += 1
+
+        # Center the galaxy within (0, 0) at the requested subpixel location
+        if ((subpixx > 1) or (subpixx < -1) or (subpixy > 1) or (subpixy < -1)):
+            raise ValueError('Subpixel x and y poistions must be -1 < subpix < 1')
+
+        # Create model. Add 90 degrees to the position_angle because the definition
+        # Mirage has been using is that the PA is degrees east of north of the
+        # semi-major axis
+        mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
+                       ellip=ellipticity, theta=position_angle+np.pi/2)
+
+        x_half_length = x_full_length // 2
+        xmin = int(0 - x_half_length)
+        xmax = int(0 + x_half_length + 1)
+
+        y_half_length = y_full_length // 2
+        ymin = int(0 - y_half_length)
+        ymax = int(0 + y_half_length + 1)
+
+        # Create grid to hold model instance
+        x_stamp, y_stamp = np.meshgrid(np.arange(xmin, xmax), np.arange(ymin, ymax))
+
+        # Create model instance
+        stamp = mod(x_stamp, y_stamp)
+
+        # Check the total signal in the stamp. In some cases (high ellipticity, high sersic index)
+        # a source centered at or close to the pixel center results in a bad scaling from Sersic2D.
+        # The bad model may have significantly less or more signal than requested. If this is true,
+        # rescale manually to the requested signal level. As long as the stamp is large
+        # enough (which it should be given the size calculations above), then the signal
+        # outside the stamp should be negligible and scaling the stamp to the requested signal
+        # level should be correct.
+        sig_diff = np.absolute(1. - np.sum(stamp) / (total_counts * limit))
+        if sig_diff > signal_matching_threshold:
+            stamp = stamp / np.sum(stamp) * (total_counts * limit)
+
+        return stamp
 
     def crop_galaxy_stamp(self, stamp, threshold):
         """Crop an input stamp image containing a galaxy to a size that
@@ -3576,9 +3637,12 @@ class Catalog_seed():
             # measured from V3 towards V2.
             xposang = self.calc_x_position_angle(entry['V2'], entry['V3'], entry['pos_angle'])
 
+            sub_x = 0.
+            sub_y = 0.
+
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
-                                       xposang*np.pi/180., entry['countrate_e/s'])
+                                       xposang*np.pi/180., entry['countrate_e/s'], sub_x, sub_y)
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -3600,8 +3664,9 @@ class Catalog_seed():
                 galdims = stamp.shape
 
             # Get the PSF which will be convolved with the galaxy profile
-            psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                                         psf_shape[1], psf_shape[0], ignore_detector=True)
+            # The PSF should be centered in the pixel containing the galaxy center
+            psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'], psf_shape[1], psf_shape[0],
+                                                                         ignore_detector=True)
 
             # Skip sources that fall completely off the detector
             if psf_image is None:
@@ -4008,19 +4073,26 @@ class Catalog_seed():
         """
         dim_y, dim_x = dims
         image_size_y, image_size_x = image.shape
-        if dim_y % 2 != image_size_y % 2:
-            dim_y += 1
-        if dim_x % 2 != image_size_x % 2:
-            dim_x += 1
+
+        if image_size_x < dim_x:
+            if dim_x % 2 != image_size_x % 2:
+                dim_x += 1
+            dx = dim_x - image_size_x
+            dx = np.int(dx / 2)
+        else:
+            dx = 0
+            dim_x = image_size_x
+
+        if image_size_y < dim_y:
+            if dim_y % 2 != image_size_y % 2:
+                dim_y += 1
+            dy = dim_y - image_size_y
+            dy = np.int(dy / 2)
+        else:
+            dy = 0
+            dim_y = image_size_y
 
         array = np.zeros((dim_y, dim_x))
-
-        dx = dim_x - image_size_x
-        dx = np.int(dx / 2)
-
-        dy = dim_y - image_size_y
-        dy = np.int(dy / 2)
-
         array[dy:dim_y-dy, dx:dim_x-dx] = image
         return array
 
