@@ -134,8 +134,8 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         Note, this parameter is ignored for FGS sims.
 
     detectors : str or list, optional
-        Which detectors to generate PSF libraries for. Default is 'all'.
-        Note, this parameter is ignored for FGS sims, which always include both FGS detectors.
+        Which detectors to generate PSF libraries for. Default is 'all', which will generate all
+        detectors for whichever of NIRCam or FGS is specified by the instrument parameter.
 
     fov_pixels : int, optional
         Size of the PSF to generate, in pixels. Default is 1024.
@@ -171,23 +171,20 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     # Create dummy CreatePSFLibrary instance to get lists of filter and detectors
     lib = CreatePSFLibrary
 
-    if instrument.upper()=='FGS':
-        detectors = ['FGS1', 'FGS2']
-        filters = ['FGS']
-
     # Define the filter list to loop through
-    if isinstance(filters, str):
-        filters = [filters]
-    elif not isinstance(filters, list):
-        raise TypeError('Please define filters as a string or list, not {}'.format(type(filters)))
+    if instrument.upper()=='FGS':
+        # FGS does not have an option for filters
+        filters = ['FGS']
+    else:
+        # NIRCam can have one or more named filters specified
+        if isinstance(filters, str):
+            filters = [filters]
+        elif not isinstance(filters, list):
+            raise TypeError('Please define filters as a string or list, not {}'.format(type(filters)))
 
     # Define the detector list to loop through
     if detectors == 'all':
-        if instrument.upper()=='NIRCAM':
-            detectors = ['NRCA1', 'NRCA2', 'NRCA3', 'NRCA4', 'NRCA5',
-                         'NRCB1', 'NRCB2', 'NRCB3', 'NRCB4', 'NRCB5',]
-        if instrument.upper()=='FGS':
-            detectors = ['FGS1', 'FGS2']
+        detectors = inst.detector_list
     elif isinstance(detectors, str):
         detectors = [detectors]
     elif not isinstance(detectors, list):
