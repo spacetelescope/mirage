@@ -994,7 +994,6 @@ class ReadAPTXML():
         guider_det_num = 1  # PLACEHOLDER ONLY
         fgs_subarr = "FGS{}_FULL".format(guider_det_num)
 
-
         # Repeat for the number of exposures
         for j in range(n_exp):
             # Add all parameters to dictionary
@@ -2158,6 +2157,7 @@ class ReadAPTXML():
 
 def get_guider_number(xml_file, observation_number):
     """"Parse the guider number for a particular FGSExternalCalibration observation.
+
     """
     observation_number = int(observation_number)
     apt_namespace = '{http://www.stsci.edu/JWST/APT}'
@@ -2170,8 +2170,21 @@ def get_guider_number(xml_file, observation_number):
     observation_list = observation_data.findall('.//' + apt_namespace + 'Observation')
     for obs in observation_list:
         if int(obs.findtext(apt_namespace + 'Number')) == observation_number:
-            detector = obs.findtext('.//' + fgs_namespace + 'Detector')
-            number = detector[-1]
-            return number
+            try:
+                detector = obs.findtext('.//' + fgs_namespace + 'Detector')
+                number = detector[-1]
+                return number
+            except TypeError:
+                sr = [x for x in obs.iterchildren() if x.tag.split(apt_namespace)[1] == "SpecialRequirements"][0]
+                try:
+                    gs = [x for x in sr.iterchildren() if x.tag.split(apt_namespace)[1] == "GuideStarID"][0]
+                except IndexError:
+                    raise IndexError("This observation doesn't have a Guide Star Special Requirement")
+
+                # Pull out the guide star ID and the guider number
+                number = [x for x in gs.iterchildren() if x.tag.split(apt_namespace)[1] == "Guider"][0].text
+                if not isinstance(number, int):
+                    number = number.lower().replace(' ', '').split('guider')[1]
+                return number
 
     raise RuntimeError('Could not find guider number in observation {} in {}'.format(observation_number, xml_file))
