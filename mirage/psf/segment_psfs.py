@@ -401,7 +401,6 @@ def get_segment_offset(segment_number, detector, library_list):
     try:
         x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
         y_arcsec += header['BSOFF_V3']*60 #
-        print("Added a telescope boresight offset based on header information")
     except:
         pass
 
