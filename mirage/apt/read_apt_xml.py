@@ -990,8 +990,7 @@ class ReadAPTXML():
             fgs_grps = fgs_conf.find(ns + 'Groups').text
             fgs_ints = fgs_conf.find(ns + 'Integrations').text
 
-        # TODO read guider detector requirement from GuideStarID special requirement in this case
-        guider_det_num = 1  # PLACEHOLDER ONLY
+        guider_det_num = get_guider_number_from_special_requirements(self.apt, obs)
         fgs_subarr = "FGS{}_FULL".format(guider_det_num)
 
         # Repeat for the number of exposures
@@ -2156,8 +2155,8 @@ class ReadAPTXML():
 
 
 def get_guider_number(xml_file, observation_number):
-    """"Parse the guider number for a particular FGSExternalCalibration observation.
-
+    """"Parse the guider number for a particular FGSExternalCalibration or
+    WfscGlobalAlignment observation.
     """
     observation_number = int(observation_number)
     apt_namespace = '{http://www.stsci.edu/JWST/APT}'
@@ -2175,16 +2174,25 @@ def get_guider_number(xml_file, observation_number):
                 number = detector[-1]
                 return number
             except TypeError:
-                sr = [x for x in obs.iterchildren() if x.tag.split(apt_namespace)[1] == "SpecialRequirements"][0]
-                try:
-                    gs = [x for x in sr.iterchildren() if x.tag.split(apt_namespace)[1] == "GuideStarID"][0]
-                except IndexError:
-                    raise IndexError("This observation doesn't have a Guide Star Special Requirement")
-
-                # Pull out the guide star ID and the guider number
-                number = [x for x in gs.iterchildren() if x.tag.split(apt_namespace)[1] == "Guider"][0].text
-                if not isinstance(number, int):
-                    number = number.lower().replace(' ', '').split('guider')[1]
+                number = get_guider_number_from_special_requirements(apt_namespace, obs)
                 return number
 
     raise RuntimeError('Could not find guider number in observation {} in {}'.format(observation_number, xml_file))
+
+
+def get_guider_number_from_special_requirements(apt_namespace, obs):
+    """Parse the guider number from the SpecialRequirements for a particular WfscGlobalAlignment
+    observation.
+    """
+    sr = [x for x in obs.iterchildren() if x.tag.split(apt_namespace)[1] == "SpecialRequirements"][0]
+    try:
+        gs = [x for x in sr.iterchildren() if x.tag.split(apt_namespace)[1] == "GuideStarID"][0]
+    except IndexError:
+        raise IndexError('There is no Guide Star Special Requirement for this observation')
+
+    # Pull out the guide star ID and the guider number
+    guider = [x for x in gs.iterchildren() if x.tag.split(apt_namespace)[1] == "Guider"][0].text
+    if not isinstance(guider, int):
+        guider = guider.lower().replace(' ', '').split('guider')[1]
+
+    return guider
