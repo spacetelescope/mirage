@@ -938,16 +938,14 @@ class ReadAPTXML():
         # Determine the Global Alignment Iteration Type
         GA_iteration = obs.find('.//' + ns + 'GaIteration').text
 
-        if GA_iteration == 'ADJUST1':
-            n_exp = 3
-        elif GA_iteration == 'ADJUST2':
-            n_exp = 6  # technically 5, but 3 is repeated?
+        if GA_iteration == 'ADJUST1' or GA_iteration == 'CORRECT':
+            # 3 NIRCam and 1 FGS images
+            n_exp = 4
+        elif GA_iteration == 'ADJUST2' or GA_iteration == 'CORRECT+ADJUST':
+            # 5 NIRCam and 2 FGS
+            n_exp = 7
         elif GA_iteration == 'BSCORRECT':
-            # Technically has 2 dithers, but that doesn't seem to be incorporated...
-            n_exp = 2
-        elif GA_iteration == 'CORRECT+ADJUST':
-            n_exp = 6  # technically 5, but 3 is repeated?
-        elif GA_iteration == 'CORRECT':
+            # 2 NIRCam and 1 FGS
             n_exp = 3
 
         # Find observation-specific parameters
@@ -956,6 +954,7 @@ class ReadAPTXML():
 
         # Find filter parameters for all filter configurations within obs
         ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
+        ga_fgs_configs = template.findall('.//' + ns + 'FgsParameters')
 
         # Check the target type in order to decide whether the tracking should be
         # sidereal or non-sidereal
@@ -987,16 +986,38 @@ class ReadAPTXML():
             else:
                 long_pupil = 'CLEAR'
 
-        # Repeat for the number of exposures + 1
-        for j in range(n_exp + 1):
+        for fgs_conf in ga_fgs_configs:
+            fgs_grps = fgs_conf.find(ns + 'Groups').text
+            fgs_ints = fgs_conf.find(ns + 'Integrations').text
+
+        guider_det_num = get_guider_number_from_special_requirements(self.apt, obs)
+        fgs_subarr = "FGS{}_FULL".format(guider_det_num)
+
+        # Repeat for the number of exposures
+        for j in range(n_exp):
             # Add all parameters to dictionary
-            tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                          science_category, typeflag, mod, subarr, pdithtype,
-                          pdither, sdithtype, sdither, sfilt, lfilt,
-                          rpatt, grps, ints, short_pupil,
-                          long_pupil, grismval, coordparallel,
-                          i_obs, j + 1, template_name, 'NIRCAM', obs_label,
-                          target_name, tracking)
+
+            if j==2 or j==5:
+                # This is an FGS image as part of GA
+
+                # Add FGS exposure to the dictionary
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, 'N/A', fgs_subarr, pdithtype,
+                              pdither, sdithtype, sdither, 'N/A', 'N/A',
+                              'FGSRAPID', fgs_grps, fgs_ints, 'N/A',
+                              'N/A', 'N/A', coordparallel,
+                              i_obs, j + 1, template_name, 'FGS', obs_label,
+                              target_name, tracking)
+            else:
+                # This is a NIRCam image as part of GA
+
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, mod, subarr, pdithtype,
+                              pdither, sdithtype, sdither, sfilt, lfilt,
+                              rpatt, grps, ints, short_pupil,
+                              long_pupil, grismval, coordparallel,
+                              i_obs, j + 1, template_name, 'NIRCAM', obs_label,
+                              target_name, tracking)
 
             exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -2134,7 +2155,8 @@ class ReadAPTXML():
 
 
 def get_guider_number(xml_file, observation_number):
-    """"Parse the guider number for a particular FGSExternalCalibration observation.
+    """"Parse the guider number for a particular FGSExternalCalibration or
+    WfscGlobalAlignment observation.
     """
     observation_number = int(observation_number)
     apt_namespace = '{http://www.stsci.edu/JWST/APT}'
@@ -2147,8 +2169,30 @@ def get_guider_number(xml_file, observation_number):
     observation_list = observation_data.findall('.//' + apt_namespace + 'Observation')
     for obs in observation_list:
         if int(obs.findtext(apt_namespace + 'Number')) == observation_number:
-            detector = obs.findtext('.//' + fgs_namespace + 'Detector')
-            number = detector[-1]
-            return number
+            try:
+                detector = obs.findtext('.//' + fgs_namespace + 'Detector')
+                number = detector[-1]
+                return number
+            except TypeError:
+                number = get_guider_number_from_special_requirements(apt_namespace, obs)
+                return number
 
     raise RuntimeError('Could not find guider number in observation {} in {}'.format(observation_number, xml_file))
+
+
+def get_guider_number_from_special_requirements(apt_namespace, obs):
+    """Parse the guider number from the SpecialRequirements for a particular WfscGlobalAlignment
+    observation.
+    """
+    sr = [x for x in obs.iterchildren() if x.tag.split(apt_namespace)[1] == "SpecialRequirements"][0]
+    try:
+        gs = [x for x in sr.iterchildren() if x.tag.split(apt_namespace)[1] == "GuideStarID"][0]
+    except IndexError:
+        raise IndexError('There is no Guide Star Special Requirement for this observation')
+
+    # Pull out the guide star ID and the guider number
+    guider = [x for x in gs.iterchildren() if x.tag.split(apt_namespace)[1] == "Guider"][0].text
+    if not isinstance(guider, int):
+        guider = guider.lower().replace(' ', '').split('guider')[1]
+
+    return guider
