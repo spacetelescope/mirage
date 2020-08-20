@@ -44,6 +44,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  pixelflat_: None
 	  illumflat_: None           #Illumination flat field file
 	  astrometric_: crds         #Astrometric distortion file (asdf)
+	  photom_: crds              #Cal pipeline photom reference file
 	  ipc_: crds                 #File containing IPC kernel to apply
 	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
@@ -99,6 +100,8 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  pymethod_: True                                 #Use double Poisson simulation for photon yield
 	  expand_catalog_for_segments_: False             # Expand catalog for 18 segments and use distinct PSFs
 	  use_dateobs_for_background_: False              # Use date_obs value to determine background. If False, bkgdrate is used.
+	  signal_low_limit_for_segmap_: 0.031             # Lower signal limit for a pixel to be included in the segmentation map
+	  signal_low_limit_for_segmap_units_: ADU/sec     # Units of signal_low_limit_for_segmap_. Can be: ADU/sec, e/sec, MJy/sr, ergs/cm2/a, ergs/cm2/hz
 
 	Telescope_:
 	  ra_: 53.1                     #RA of simulated pointing
@@ -398,6 +401,19 @@ Name of the astrometric distortion reference file to use for including the effec
 
 .. hint::
 	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
+
+.. _photom:
+
+Photom Reference File
++++++++++++++++++++++
+
+*Reffiles:photom*
+
+Name of the JWST calibration pipeline photom reference file to use. This file is used to translate the minimum flux level for pixel inclusion in the segmentation map to ADU/sec in the case where the user provides that value in MJy/sr.
+
+.. hint::
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
+
 
 .. _ipc:
 
@@ -921,6 +937,25 @@ Use date_obs for background
 *simSignals:use_dateobs_for_background*
 
 This entry controls the way the background signal for the observation is calculated. If it is True, then the background value will be created by extracting the background spectrum assoicated with :ref:`date_obs <date_obs>` from the `jwst_backgrounds <https://github.com/spacetelescope/jwst_backgrounds>`_ package. If False, the background will be determined by calculating the background value at a certain percentile of the collection of backgrounds for the given pointing over 365 days. If :ref:`bkgdrate <bkgdrate>` is "low", "medium", "high", then the percentiles used are 10th, 50th, and 90th, respectively. If it is a float, that value (in ADU/sec/pixel) will be added to all pixels.
+
+.. _signal_low_limit_for_segmap:
+
+Lower Signal Limit for the Segmentation Map
++++++++++++++++++++++++++++++++++++++++++++
+
+*simSignals:signal_low_limit_for_segmap*
+
+When adding an astrophysical source to the seed image, this is the lower threshold value used to control which pixels in the source are added to the segmentation map. Pixels with signal rates below this threshold will not be included. Mirage uses the segmentation map for WFSS simulations. Only object pixels that are present in the segmentation map are dispersed. This is done, rather than dispersing all pixels, in order to save compute time. The value can be given in a number of units. See :ref:`signal_low_limit_for_segmap_units <signal_low_limit_for_segmap_units>` below for a list of valid units.
+
+.. _signal_low_limit_for_segmap_units:
+
+Units for the Lower Signal Limit for the Segmentation Map
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*simSignals:signal_low_limit_for_segmap_units*
+
+This field gives the units associated with the value in the :ref: `signal_low_limit_for_segmap <signal_low_limit_for_segmap>` value above. Supported units include: ADU/sec, ADU/s, e/sec, e/s, MJy/sr, ergs/cm2/a, ergs/cm2/hz. Note that this field is case insensitive. If the signal limit is given in units other than ADU/sec, Mirage will convert the value to ADU/sec before comparing source signal levels and adding pixels to the segmentation map.
+
 
 .. _Telescope:
 

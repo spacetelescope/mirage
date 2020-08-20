@@ -60,7 +60,7 @@ class ReadAPTXML():
                             'IntegrationsShort', 'GroupsShort', 'Dither',  # MIRI
                             'GroupsLong', 'ReadoutPatternShort', 'IntegrationsLong',
                             'Exposures', 'Wavelength', 'ReadoutPatternLong', 'Filter',
-                            'EtcIdLong', 'EtcIdShort', 'EtcId',
+                            'EtcIdLong', 'EtcIdShort', 'EtcId', 'Tracking'
                             ]
 
         self.APTObservationParams_keys = ProposalParams_keys + ObsParams_keys + \
@@ -70,6 +70,32 @@ class ReadAPTXML():
             self.APTObservationParams[key] = []
         self.empty_exposures_dictionary = copy.deepcopy(self.APTObservationParams)
         self.observation_info = OrderedDict()
+
+    def get_tracking_type(self, observation):
+        """Deetermine whether the observation uses sidereal or non-sidereal
+        tracking
+
+        Parameters
+        ----------
+        observation : etree xml element
+            xml content of observation
+
+        Returns
+        -------
+        tracking_type : str
+            "sidereal" or "non-sidereal" based on the target used in the
+            observation
+        """
+        target_id = observation.find(self.apt + 'TargetID').text
+        targname = target_id.split(' ')[1]
+        matched_key = [key for key in self.target_type if targname == key]
+        if len(matched_key) == 0:
+            raise ValueError('No matching target name for {} in self.target_type'.format(targname))
+        elif len(matched_key) > 1:
+            raise ValueError('Multiple matching target names for {} in self.target_type.'.format(targname))
+        else:
+            tracking_type = self.target_type[matched_key[0]]
+        return tracking_type
 
     def read_xml(self, infile, verbose=False):
         """Main function. Read in the .xml file from APT, and output dictionary of parameters.
@@ -145,13 +171,24 @@ class ReadAPTXML():
         targs = tree.find(self.apt + 'Targets')
         target_elements = targs.findall(self.apt + 'Target')
         self.target_info = {}
+        self.target_type = {}
         for target in target_elements:
             t_name = target.find(self.apt + 'TargetName').text
-            t_coords = target.find(self.apt + 'EquatorialCoordinates').items()[0][1]
+            try:
+                t_coords = target.find(self.apt + 'EquatorialCoordinates').items()[0][1]
+            except AttributeError:
+                # Non-sidereal targets do not have EquatorialCoordinates entries in the xml
+                t_coords = '00 00 00 00 00 00'
             ra_hour, ra_min, ra_sec, dec_deg, dec_arcmin, dec_arcsec = t_coords.split(' ')
             ra = '{}:{}:{}'.format(ra_hour, ra_min, ra_sec)
             dec = '{}:{}:{}'.format(dec_deg, dec_arcmin, dec_arcsec)
             self.target_info[t_name] = (ra, dec)
+
+            type_key = [key for key in target.attrib.keys() if 'type' in key]
+            if 'SolarSystem' in target.attrib[type_key[0]]:
+                self.target_type[t_name] = 'non-sidereal'
+            else:
+                self.target_type[t_name] = 'sidereal'
         print('target_info:')
         print(self.target_info)
 
@@ -437,6 +474,7 @@ class ReadAPTXML():
         dictionary['Instrument'].append(tup[24])
         dictionary['ObservationName'].append(tup[25])
         dictionary['TargetID'].append(tup[26])
+        dictionary['Tracking'].append(tup[27])
         return dictionary
 
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary,
@@ -505,6 +543,10 @@ class ReadAPTXML():
 
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
 
         if instrument.lower() == 'nircam':
             # NIRCam uses FilterConfig structure to specifiy exposure parameters
@@ -593,11 +635,14 @@ class ReadAPTXML():
                     if key == 'ShortFilter':
                         ShortPupil, ShortFilter = self.separate_pupil_and_filter(value)
                         filter_config_dict['ShortPupil'] = ShortPupil
+                        filter_config_dict['ShortFilter'] = ShortFilter
                     elif key == 'LongFilter':
                         LongPupil, LongFilter = self.separate_pupil_and_filter(value)
                         filter_config_dict['LongPupil'] = LongPupil
+                        filter_config_dict['LongFilter'] = LongFilter
 
-                    filter_config_dict[key] = value
+                    if key not in ['ShortFilter', 'ShortPupil', 'LongFilter', 'LongPupil']:
+                        filter_config_dict[key] = value
 
                 for key in self.APTObservationParams_keys:
                     if key in filter_config_dict.keys():
@@ -616,12 +661,12 @@ class ReadAPTXML():
                         value = str(FiducialPointOverride)
                     elif key == 'APTTemplate':
                         value = template_name
+                    elif key == 'Tracking':
+                        value = tracking
                     else:
                         value = str(None)
-
                     if (key == 'Mode'):
                         value = 'imaging'
-
                     exposures_dictionary[key].append(value)
 
             ##########################################################
@@ -735,6 +780,8 @@ class ReadAPTXML():
                                 value = str(FiducialPointOverride)
                             elif key == 'APTTemplate':
                                 value = template_name
+                            elif key == 'Tracking':
+                                value = tracking
                             else:
                                 value = str(None)
 
@@ -773,6 +820,11 @@ class ReadAPTXML():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
 
+
+        print(exposures_dictionary['ShortFilter'])
+        print(exposures_dictionary['LongFilter'])
+
+
         return exposures_dictionary
 
     def read_commissioning_template(self, template, template_name, obs, prop_params):
@@ -802,6 +854,10 @@ class ReadAPTXML():
 
         # Find filter parameters for all filter configurations within obs
         filter_configs = template.findall('.//' + ns + 'FilterConfig')
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
 
         for filt in filter_configs:
             sfilt = filt.find(ns + 'ShortFilter').text
@@ -838,7 +894,7 @@ class ReadAPTXML():
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
                               i_obs , j + 1, template_name, 'NIRCAM', obs_label,
-                              target_name)
+                              target_name, tracking)
 
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -882,16 +938,14 @@ class ReadAPTXML():
         # Determine the Global Alignment Iteration Type
         GA_iteration = obs.find('.//' + ns + 'GaIteration').text
 
-        if GA_iteration == 'ADJUST1':
-            n_exp = 3
-        elif GA_iteration == 'ADJUST2':
-            n_exp = 6  # technically 5, but 3 is repeated?
+        if GA_iteration == 'ADJUST1' or GA_iteration == 'CORRECT':
+            # 3 NIRCam and 1 FGS images
+            n_exp = 4
+        elif GA_iteration == 'ADJUST2' or GA_iteration == 'CORRECT+ADJUST':
+            # 5 NIRCam and 2 FGS
+            n_exp = 7
         elif GA_iteration == 'BSCORRECT':
-            # Technically has 2 dithers, but that doesn't seem to be incorporated...
-            n_exp = 2
-        elif GA_iteration == 'CORRECT+ADJUST':
-            n_exp = 6  # technically 5, but 3 is repeated?
-        elif GA_iteration == 'CORRECT':
+            # 2 NIRCam and 1 FGS
             n_exp = 3
 
         # Find observation-specific parameters
@@ -900,6 +954,11 @@ class ReadAPTXML():
 
         # Find filter parameters for all filter configurations within obs
         ga_nircam_configs = template.findall('.//' + ns + 'NircamParameters')
+        ga_fgs_configs = template.findall('.//' + ns + 'FgsParameters')
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
 
         for conf in ga_nircam_configs:
             sfilt = conf.find(ns + 'ShortFilter').text
@@ -927,16 +986,38 @@ class ReadAPTXML():
             else:
                 long_pupil = 'CLEAR'
 
-        # Repeat for the number of exposures + 1
-        for j in range(n_exp + 1):
+        for fgs_conf in ga_fgs_configs:
+            fgs_grps = fgs_conf.find(ns + 'Groups').text
+            fgs_ints = fgs_conf.find(ns + 'Integrations').text
+
+        guider_det_num = get_guider_number_from_special_requirements(self.apt, obs)
+        fgs_subarr = "FGS{}_FULL".format(guider_det_num)
+
+        # Repeat for the number of exposures
+        for j in range(n_exp):
             # Add all parameters to dictionary
-            tup_to_add = (pi_name, prop_id, prop_title, prop_category,
-                          science_category, typeflag, mod, subarr, pdithtype,
-                          pdither, sdithtype, sdither, sfilt, lfilt,
-                          rpatt, grps, ints, short_pupil,
-                          long_pupil, grismval, coordparallel,
-                          i_obs, j + 1, template_name, 'NIRCAM', obs_label,
-                          target_name)
+
+            if j==2 or j==5:
+                # This is an FGS image as part of GA
+
+                # Add FGS exposure to the dictionary
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, 'N/A', fgs_subarr, pdithtype,
+                              pdither, sdithtype, sdither, 'N/A', 'N/A',
+                              'FGSRAPID', fgs_grps, fgs_ints, 'N/A',
+                              'N/A', 'N/A', coordparallel,
+                              i_obs, j + 1, template_name, 'FGS', obs_label,
+                              target_name, tracking)
+            else:
+                # This is a NIRCam image as part of GA
+
+                tup_to_add = (pi_name, prop_id, prop_title, prop_category,
+                              science_category, typeflag, mod, subarr, pdithtype,
+                              pdither, sdithtype, sdither, sfilt, lfilt,
+                              rpatt, grps, ints, short_pupil,
+                              long_pupil, grismval, coordparallel,
+                              i_obs, j + 1, template_name, 'NIRCAM', obs_label,
+                              target_name, tracking)
 
             exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
             self.obs_tuple_list.append(tup_to_add)
@@ -1000,6 +1081,10 @@ class ReadAPTXML():
         lw_pupils = ['F405N'] * 7
         lw_filts = ['F444W'] * 7
 
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
+
         for i in range(7):
             mod = mods[i]
             subarr = subarrs[i]
@@ -1022,7 +1107,7 @@ class ReadAPTXML():
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
                               i_obs, j + 1, template_name, 'NIRCAM', obs_label,
-                              target_name)
+                              target_name, tracking)
 
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 self.obs_tuple_list.append(tup_to_add)
@@ -1067,6 +1152,10 @@ class ReadAPTXML():
         # Determine the sensing type, and list the pupils and filters
         # in the appropriate order
         sensing_type = obs.find('.//' + ns + 'SensingType').text
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
 
         n_configs = 0
         n_dithers = []
@@ -1181,7 +1270,7 @@ class ReadAPTXML():
                               rpatt, grps, ints, short_pupil,
                               long_pupil, grismval, coordparallel,
                               i_obs, 1, template_name, 'NIRCAM', obs_label,
-                              target_name)
+                              target_name, tracking)
 
                 exposures_dictionary = self.add_exposure(exposures_dictionary, tup_to_add)
                 exposures_dictionary['number_of_dithers'] += str(n_dith)
@@ -1262,6 +1351,10 @@ class ReadAPTXML():
         num_exps = template.find(ns + 'NumExps').text
         num_outputs = template.find(ns + 'NumOutputs').text  # Number of amplifiers used
 
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
+
         # Neither TA exposures nor Grism Time Series exposures allow dithering
         number_of_dithers = '1'
         number_of_subpixel_positions = '1'
@@ -1295,6 +1388,7 @@ class ReadAPTXML():
         exposures_dictionary['LongPupil'] = ['CLEAR', long_pupil]
         exposures_dictionary['FiducialPointOverride'] = [str(False)] * 2
         exposures_dictionary['ParallelInstrument'] = [False] * 2
+        exposures_dictionary['Tracking'] = [tracking] * 2
 
         # Populate other keywords with None
         for key in self.APTObservationParams_keys:
@@ -1345,6 +1439,10 @@ class ReadAPTXML():
 
         # Observation-wide info
         instrument = obs.find(self.apt + 'Instrument').text
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
 
         # Get target name
         try:
@@ -1408,6 +1506,7 @@ class ReadAPTXML():
         exposures_dictionary['LongPupil'] = ['CLEAR', long_pupil]
         exposures_dictionary['FiducialPointOverride'] = [str(False)] * 2
         exposures_dictionary['ParallelInstrument'] = [False] * 2
+        exposures_dictionary['Tracking'] = [tracking] * 2
 
         # Populate other keywords with None
         for key in self.APTObservationParams_keys:
@@ -1456,6 +1555,10 @@ class ReadAPTXML():
         instrument = obs.find(self.apt + 'Instrument').text
         module = template.find(ns + 'Module').text
         subarr = template.find(ns + 'Subarray').text
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
 
         # Determine if there is an aperture override
         override = obs.find('.//' + self.apt + 'FiducialPointOverride')
@@ -1568,6 +1671,7 @@ class ReadAPTXML():
                     exp_seq_dict['FilterWheel'] = ['none'] * 2  # used for NIRISS
                     exp_seq_dict['PupilWheel'] = ['none'] * 2  # used for NIRISS
                     exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * 2
+                    exp_seq_dict['Tracking'] = [tracking] * 2
                 else:
                     exp_seq_dict['Mode'] = [grism_typeflag]
                     exp_seq_dict['Module'] = [module]
@@ -1595,6 +1699,7 @@ class ReadAPTXML():
                     exp_seq_dict['FilterWheel'] = ['none']  # used for NIRISS
                     exp_seq_dict['PupilWheel'] = ['none']  # used for NIRISS
                     exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride]
+                    exp_seq_dict['Tracking'] = [tracking]
 
                 # Add exp_seq_dict to the exposures_dictionary
                 exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
@@ -1632,6 +1737,7 @@ class ReadAPTXML():
             out_of_field_dict['FilterWheel'] = ['none'] * 2  # used for NIRISS
             out_of_field_dict['PupilWheel'] = ['none'] * 2  # used for NIRISS
             out_of_field_dict['FiducialPointOverride'] = [FiducialPointOverride] * 2
+            out_of_field_dict['Tracking'] = [tracking] * 2
 
             # Add out_of_field_dict to the exposures_dictionary
             exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
@@ -1851,6 +1957,10 @@ class ReadAPTXML():
         explist = template.find(ns + 'ExposureList')
         expseqs = explist.findall(ns + 'ExposureSequences')
 
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
+
         # Determine if there is an aperture override
         override = obs.find('.//' + self.apt + 'FiducialPointOverride')
         FiducialPointOverride = True if override is not None else False
@@ -1860,7 +1970,7 @@ class ReadAPTXML():
             # Grism values are listed for each ExposureSequence
             grismval = expseq.find(ns + 'Sequence').text
             if grismval == 'BOTH':
-                grismval = ['GRISM150R', 'GRISM150C']
+                grismval = ['GR150R', 'GR150C']
                 both_grisms = True
                 entry_repeats = [2, 3]
             else:
@@ -1880,6 +1990,15 @@ class ReadAPTXML():
 
                 # Collect info on the direct exposure
                 directexp = expseq.find(ns + 'DiExposure')
+
+                # Check to see if the user requested extra direct dithers.
+                # Handle xml files from older versions of APT where ShouldDither
+                # is not present
+                try:
+                    extra_direct_dithers = directexp.find(ns + 'ShouldDither').text
+                except AttributeError:
+                    extra_direct_dithers = 'false'
+
                 typeflag = 'imaging'
                 if dither_direct == 'NO_DITHERING':
                     pdither = '1'  # direct image has no dithers
@@ -1923,14 +2042,25 @@ class ReadAPTXML():
                 exp_seq_dict['TileNumber'] = [tile] * repeats
                 exp_seq_dict['APTTemplate'] = [template_name] * repeats
                 exp_seq_dict['ObservationName'] = [proposal_param_dict['ObservationName']] * repeats
-                #exp_seq_dict['FilterWheel'] = [filter_name] * repeats
                 exp_seq_dict['PupilWheel'] = [filter_name] * repeats
                 exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * repeats
+                exp_seq_dict['Tracking'] = [tracking] * repeats
 
                 if not both_grisms:
+                    if extra_direct_dithers == 'true':
+                        primary_dither_list = [pdither, pdither_grism, str(int(pdither)+2)]
+                        num_of_dither_list = [str(int(pdither)*int(sdither)),
+                                              str(int(pdither_grism)*int(sdither_grism)),
+                                              str(int(pdither) * int(sdither) * 3)]
+                    else:
+                        primary_dither_list = [pdither, pdither_grism, pdither]
+                        num_of_dither_list = [str(int(pdither)*int(sdither)),
+                                              str(int(pdither_grism)*int(sdither_grism)),
+                                              str(int(pdither)*int(sdither))]
+
                     exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]
                     exp_seq_dict['PrimaryDitherType'] = [pdither_type, pdither_type_grism, pdither_type]
-                    exp_seq_dict['PrimaryDithers'] = [pdither, pdither_grism, pdither]
+                    exp_seq_dict['PrimaryDithers'] = primary_dither_list
                     exp_seq_dict['SubpixelPositions'] = [sdither, sdither_grism, sdither]
                     exp_seq_dict['SubpixelDitherType'] = [sdither_type, sdither_type_grism, sdither_type]
                     exp_seq_dict['ReadoutPattern'] = [rpatt, grism_rpatt, rpatt]
@@ -1938,10 +2068,7 @@ class ReadAPTXML():
                     exp_seq_dict['Integrations'] = [ints, grism_ints, ints]
                     exp_seq_dict['ShortPupil'] = [pupil, grism_pupil, pupil]
                     exp_seq_dict['Grism'] = [direct_grismvalue, grism, direct_grismvalue]
-                    exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
-                                                         str(int(pdither_grism)*int(sdither_grism)),
-                                                         str(int(pdither)*int(sdither))]
-                    #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                    exp_seq_dict['number_of_dithers'] = num_of_dither_list
                     exp_seq_dict['FilterWheel'] = [pupil, grism_pupil, pupil]
                 else:
                     if grism_number == 0:
@@ -1957,12 +2084,22 @@ class ReadAPTXML():
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism]
                         exp_seq_dict['number_of_dithers'] = [str(int(pdither)*int(sdither)),
                                                              str(int(pdither_grism)*int(sdither_grism))]
-                        #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil]
                         exp_seq_dict['FilterWheel'] = [pupil, grism_pupil]
                     elif grism_number == 1:
+                        if extra_direct_dithers == 'true':
+                            primary_dither_list = [str(int(pdither)+3), pdither_grism, str(int(pdither)+2)]
+                            num_of_dither_list = [str((int(pdither)*int(sdither))*4),
+                                                  str(int(pdither_grism)*int(sdither_grism)),
+                                                  str(int(pdither)*int(sdither)*3)]
+                        else:
+                            primary_dither_list = [str(int(pdither)+1), pdither_grism, pdither]
+                            num_of_dither_list = [str((int(pdither)*int(sdither))*2),
+                                                  str(int(pdither_grism)*int(sdither_grism)),
+                                                  str(int(pdither)*int(sdither))]
+
                         exp_seq_dict['Mode'] = [typeflag, grism_typeflag, typeflag]
                         exp_seq_dict['PrimaryDitherType'] = [pdither_type, pdither_type_grism, pdither_type]
-                        exp_seq_dict['PrimaryDithers'] = [str(int(pdither)+1), pdither_grism, pdither]
+                        exp_seq_dict['PrimaryDithers'] = primary_dither_list
                         exp_seq_dict['SubpixelPositions'] = [sdither, sdither_grism, sdither]
                         exp_seq_dict['SubpixelDitherType'] = [sdither_type, sdither_type_grism, sdither_type]
                         exp_seq_dict['ReadoutPattern'] = [rpatt, grism_rpatt, rpatt]
@@ -1970,10 +2107,7 @@ class ReadAPTXML():
                         exp_seq_dict['Integrations'] = [ints, grism_ints, ints]
                         exp_seq_dict['ShortPupil'] = [pupil, grism_pupil, pupil]
                         exp_seq_dict['Grism'] = [direct_grismvalue, grism, direct_grismvalue]
-                        exp_seq_dict['number_of_dithers'] = [str((int(pdither)*int(sdither))*2),
-                                                             str(int(pdither_grism)*int(sdither_grism)),
-                                                             str(int(pdither)*int(sdither))]
-                        #exp_seq_dict['PupilWheel'] = [pupil, grism_pupil, pupil]
+                        exp_seq_dict['number_of_dithers'] = num_of_dither_list
                         exp_seq_dict['FilterWheel'] = [pupil, grism_pupil, pupil]
                 #######################################################################
                 # Update exposure dictionary to return
@@ -2024,7 +2158,8 @@ class ReadAPTXML():
 
 
 def get_guider_number(xml_file, observation_number):
-    """"Parse the guider number for a particular FGSExternalCalibration observation.
+    """"Parse the guider number for a particular FGSExternalCalibration or
+    WfscGlobalAlignment observation.
     """
     observation_number = int(observation_number)
     apt_namespace = '{http://www.stsci.edu/JWST/APT}'
@@ -2037,8 +2172,30 @@ def get_guider_number(xml_file, observation_number):
     observation_list = observation_data.findall('.//' + apt_namespace + 'Observation')
     for obs in observation_list:
         if int(obs.findtext(apt_namespace + 'Number')) == observation_number:
-            detector = obs.findtext('.//' + fgs_namespace + 'Detector')
-            number = detector[-1]
-            return number
+            try:
+                detector = obs.findtext('.//' + fgs_namespace + 'Detector')
+                number = detector[-1]
+                return number
+            except TypeError:
+                number = get_guider_number_from_special_requirements(apt_namespace, obs)
+                return number
 
     raise RuntimeError('Could not find guider number in observation {} in {}'.format(observation_number, xml_file))
+
+
+def get_guider_number_from_special_requirements(apt_namespace, obs):
+    """Parse the guider number from the SpecialRequirements for a particular WfscGlobalAlignment
+    observation.
+    """
+    sr = [x for x in obs.iterchildren() if x.tag.split(apt_namespace)[1] == "SpecialRequirements"][0]
+    try:
+        gs = [x for x in sr.iterchildren() if x.tag.split(apt_namespace)[1] == "GuideStarID"][0]
+    except IndexError:
+        raise IndexError('There is no Guide Star Special Requirement for this observation')
+
+    # Pull out the guide star ID and the guider number
+    guider = [x for x in gs.iterchildren() if x.tag.split(apt_namespace)[1] == "Guider"][0].text
+    if not isinstance(guider, int):
+        guider = guider.lower().replace(' ', '').split('guider')[1]
+
+    return guider

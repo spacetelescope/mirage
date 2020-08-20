@@ -29,7 +29,10 @@ from astropy.io import ascii as asc
 import numpy as np
 from scipy.stats import sigmaclip
 
-from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS
+from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
+                                   NIRCAM_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
+                                   NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, NIRCAM_FILTERS, \
+                                   NIRISS_FILTERS, FGS_FILTERS
 
 
 def append_dictionary(base_dictionary, added_dictionary, braid=False):
@@ -168,10 +171,38 @@ def calc_frame_time(instrument, aperture, xdim, ydim, amps):
     return ((1.0 * xdim / amps + colpad) * (ydim + rowpad) + fullpad) * 1.e-5
 
 
-def check_niriss_filter(oldfilter, oldpupil):
+def check_nircam_filter(old_filter, old_pupil):
+    """This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRCam the filter and pupil names are correct, relieving the user of the need to remember which of the
+    filters are in the filter wheel and which are in the pupil wheel.
+
+    Parameters
+    ----------
+
+    old_filter :  str
+        Assumed to be the self.params['Readout']['filter'] value from the .yaml file
+
+    old_pupil :  str
+        Assumed to be the self.params['Readout']['pupil'] value from the .yaml file
+
+    Returns
+    -------
+
+    new_filter : str
+        The proper FILTER parameter for the requested NIRISS filter name
+
+    new_pupil : str
+        The proper PUPIL parameter for the requested NIRISS filter name
     """
-    This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
-    that for NIRISS the filter and pupil names are correct, releaving the user of the need to remember which of the 12
+    filter_combo = '{}/{}'.format(old_filter, old_pupil)
+    updated_combo = standardize_filters('nircam', [filter_combo])[0]
+    new_filter, new_pupil = updated_combo.split('/')
+    return new_filter, new_pupil
+
+
+def check_niriss_filter(oldfilter, oldpupil):
+    """This is a utility function that checks the FILTER and PUPIL parameters read in from the .yaml file and makes sure
+    that for NIRISS the filter and pupil names are correct, relieving the user of the need to remember which of the 12
     filters are in the filter wheel and which are in the pupil wheel.  If the user puts the correct values for filter and
     pupil nothing is done, but the user can just put the filter name in the filter parameter and CLEAR in the pupil
     parameter, in which case this routine sorts out which value actually goes where.  Hence for example one can have a
@@ -335,7 +366,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                              'crosstalk', 'occult', 'pixelAreaMap',
                              'subarray_defs', 'filtpupilcombo',
                              'flux_cal', 'readpattdefs', 'filter_throughput',
-                             'filter_wheel_positions'],
+                             'filter_wheel_positions', 'photom'],
                 'simSignals': ['pointsource', 'psfpath', 'galaxyListFile',
                                'extended', 'movingTargetList', 'movingTargetSersic',
                                'movingTargetExtended', 'movingTargetToTrack',
@@ -388,6 +419,14 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
 
     for key1 in pathdict:
         for key2 in pathdict[key1]:
+
+            # For those using an old or incomplete yaml file, if any of the
+            # CRDS keywords are missing, create them and set equal to 'crds'.
+            if key2 not in params[key1].keys():
+                if key2 in CRDS_FILE_TYPES.keys():
+                    print('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
+                    params[key1][key2] = 'crds'
+
             if params[key1][key2].lower() not in ['none', 'config', 'crds']:
                 params[key1][key2] = os.path.abspath(os.path.expandvars(params[key1][key2]))
             elif params[key1][key2].lower() == 'config':
@@ -524,7 +563,7 @@ def get_frame_count_info(numints, numgroups, numframes, numskips, numresets):
     return frames_per_group, frames_per_integration, total_frames
 
 
-def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_detector=None):
+def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_module=None, fgs_detector=None):
     """Locate the filter throughput file in the config directory that
     corresponds to the given instrument/module/filter
 
@@ -535,6 +574,10 @@ def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_
 
     filter_name : str
         Name of the filter. Ignored in the case of FGS.
+
+    pupil_name : str
+        Name of the optical element in the pupil wheel.
+        Only used for NIRCam cases.
 
     nircam_module : str
         Name of module. Ignored except in the case of NIRCam
@@ -553,10 +596,19 @@ def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_
 
     instrument = instrument.lower()
     if instrument == 'nircam':
-        tp_file = '{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
-                                                                          nircam_module.lower())
+
+        # WLP8 and WLM8 have idenitcal throughput curves, so Mirage carries
+        # only throughput files for WLP8
+        if pupil_name.upper() == 'WLM8':
+            pupil_name = 'WLP8'
+        tp_file = '{}_{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
+                                                                             pupil_name.upper(),
+                                                                             nircam_module.lower())
     elif instrument == 'niriss':
-        tp_file = '{}_niriss_throughput1.txt'.format(filter_name.lower())
+        element = filter_name
+        if filter_name in ['CLEAR', 'CLEARP', 'GR150R', 'GR150C']:
+            element = pupil_name
+        tp_file = '{}_niriss_throughput1.txt'.format(element.lower())
     elif instrument == 'fgs':
         det_number = fgs_detector[-1]
         tp_file = 'guider{}_throughput_py.txt'.format(det_number)
@@ -564,6 +616,8 @@ def get_filter_throughput_file(instrument, filter_name, nircam_module=None, fgs_
         raise ValueError('ERROR: invalid instrument: {}'.format(instrument))
 
     throughput_file = os.path.join(config_path, tp_file)
+    if not os.path.isfile(throughput_file):
+        raise FileNotFoundError('Throughput file {} does not exist.'.format(throughput_file))
     return throughput_file
 
 
@@ -615,14 +669,33 @@ def get_subarray_info(params, subarray_table):
     return params
 
 
-def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam=None,
+def normalize_filters(instrument, filter_name, pupil_name):
+    """Modify filter/pupil values to be consistent with the filter/pupil wheels
+    that they are in.
+    """
+    if instrument.lower() == 'niriss':
+        newfilter, newpupil = check_niriss_filter(filter_name, pupil_name)
+    elif instrument.lower() == 'nircam':
+        newfilter, newpupil = check_nircam_filter(filter_name, pupil_name)
+    elif instrument.lower() == 'fgs':
+        newfilter = filter_name
+        newpupil = pupil_name
+    return newfilter, newpupil
+
+
+def magnitude_to_countrate(instrument, filter_name, magsys, mag, photfnu=None, photflam=None,
                            vegamag_zeropoint=None):
     """Convert a given source magnitude into count rate
 
     Parameters
     ----------
-    observation_mode : str
-        e.g. 'imaging', 'wfss'
+    instrument : str
+        e.g. 'nircam'
+
+    filter_name : str
+        Filter used in the observation. Only used in the case of
+        NIRISS, where filters in the filter wheel have their
+        throughput modified.
 
     magsys : str
         Magnitude system of the input magnitudes. Allowed values are:
@@ -650,15 +723,17 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
         Count rate (e/s) corresponding to the input magnutude(s)
 
     """
-    # For NIRISS AMI mode, the count rate values calculated need to be
-    # scaled by a factor 0.15/0.84 = 0.17857.  The 0.15 value is the
-    # throughput of the NRM, while the 0.84 value is the throughput of the
-    # imaging CLEARP element that is in place in the pupil wheel for the
-    # normal imaging observations.
-    if observation_mode in ['ami', 'AMI']:
-        count_scale = 0.15 / 0.84
+    # For NIRISS filters in the filter wheel, we increase the count rate by a
+    # factor of 1/0.84. This is because the throughput of the CLEARP element
+    # in the pupil wheel (which will be used in combination with the filter)
+    # is 0.84, and is included in the PSFs produced by WebbPSF, but also in
+    # the throughput curves used by Mirage. So we need to remove one of these
+    # two factors of 0.84
+    if ((instrument.lower() == 'niriss') and (filter_name.upper() in NIRISS_FILTER_WHEEL_FILTERS)):
+        count_scale = 1. / 0.84
     else:
-        count_scale = 1.
+        count_scale = 1.0
+
     if magsys.lower() == 'abmag':
         try:
             return count_scale * (10**((mag + 48.599934378) / -2.5) / photfnu)
@@ -677,6 +752,72 @@ def magnitude_to_countrate(observation_mode, magsys, mag, photfnu=None, photflam
         except:
             raise ValueError(("ST mag to countrate conversion failed."
                               "magnitude = {}, photflam = {}".format(mag, photflam)))
+
+
+def make_mag_column_names(instrument, filters):
+    """
+    Given as input the instrument name and the list of filters needed, this
+    routine generates the list of output header values for the Mirage input
+    file.
+
+    Parameters
+    ----------
+    instrument : str
+        'NIRCam', 'NIRISS', or 'Guider"
+
+    filters : list
+        List of the filters needed (names such as F090W) or either None or
+        an empty list to select all filters)
+
+    Returns
+    -------
+    headerstrs : list
+        The header string list for the output Mirage magnitudes line;
+        if concatentated with spaces, it is the list of magnitudes header
+        values that needs to be written to the source list file.
+    """
+    instrument = instrument.lower()
+    if instrument == 'nircam':
+        possible_filters = NIRCAM_FILTERS
+        pupil_wheel_options = NIRCAM_PUPIL_WHEEL_FILTERS + ['WLP8', 'WLM8', 'CLEAR']
+    elif instrument == 'niriss':
+        possible_filters = NIRISS_FILTERS
+        pupil_wheel_options = NIRISS_PUPIL_WHEEL_FILTERS + ['CLEARP']
+    elif instrument == 'fgs':
+        possible_filters = FGS_FILTERS
+    else:
+        # Allow non-JWST instruments/filters to be used, in order
+        # to keep catalogs with non-JWST magnitude columns complete
+        headerstrs = []
+        for filter_val in filters:
+            headerstrs.append('{}_{}_magnitude'.format(instrument, filter_val.lower()))
+        return headerstrs
+
+    headerstrs = []
+    for filter_name in filters:
+
+        # Check to be sure the filter is supported
+        if filter_name.upper() not in possible_filters:
+            print(possible_filters)
+            raise ValueError("{} is not recognized or not supported for {}.".format(filter_name, instrument))
+
+        if instrument in ['niriss', 'fgs']:
+            column_name = '{}_{}_magnitude'.format(instrument, filter_name.lower())
+        else:
+            parts = filter_name.upper().split('/')
+            if len(parts) == 2:
+                if parts[0] in pupil_wheel_options:
+                    pup_val = parts[0]
+                    filt_val = parts[1]
+                elif parts[1] in pupil_wheel_options:
+                    pup_val = parts[1]
+                    filt_val = parts[0]
+                column_name = '{}_{}_{}_magnitude'.format(instrument, filt_val.lower(), pup_val.lower())
+            else:
+                raise ValueError('{} is an incomplete filter name. Filter and pupil must be present.'.format(filter_name))
+
+        headerstrs.append(column_name)
+    return headerstrs
 
 
 def sigma_clipped_mean_value_of_image(array, sigma_value):
@@ -774,12 +915,6 @@ def read_pattern_check(parameters):
                .format(parameters['Readout']['readpatt'],
                        parameters['Readout']['nframe'],
                        parameters['Readout']['nskip'])))
-
-        print('in read_pattern_check, nframe and nskip are:')
-        print(parameters['Readout']['nframe'], parameters['Readout']['nskip'])
-        print(type(parameters['Readout']['nframe']), type(parameters['Readout']['nskip']))
-        print('maxiter', parameters['nonlin']['maxiter'], type(parameters['nonlin']['maxiter']))
-
     else:
         # If the read pattern is not present in the definition file
         # then quit.
@@ -829,6 +964,97 @@ def read_yaml(filename):
     except FileNotFoundError as e:
             print(e)
     return data
+
+
+def standardize_filters(instrument, filter_values):
+    """Transform a list of filters into a list of full filter specifications
+    including filter and pupil value.
+    e.g. F090W -> F090/CLEAR, F323N -> F322W2/F323N
+    For NIRISS, since specifying the filter name alone is unambiguous,
+    change any e.g. "F090W/CLEARP" to "F090W"
+
+    Also reorder to be filter/pupil.
+
+    Paramters
+    ---------
+    instrument : str
+        Instrument name
+
+    filter_values : list
+        Input, possibly shorthand, filter values
+
+    Returns
+    -------
+    full_names : list
+        Full filter/pupil values for each input element
+    """
+    full_names = []
+
+    if instrument.lower() == 'fgs':
+        return filter_values
+    elif instrument.lower() == 'nircam':
+        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC']
+        reverse_nircam_2_filter_crosses = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in NIRCAM_2_FILTER_CROSSES]
+        wlp8_combinations = ['{}/WLP8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
+        wlm8_combinations = ['{}/WLM8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
+        wl8_combinations = wlp8_combinations + wlm8_combinations
+        reverse_wlp8 = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in wlp8_combinations]
+        reverse_wlm8 = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in wlm8_combinations]
+        reverse_wl8_combinations = reverse_wlp8 + reverse_wlm8
+
+        for filter_value in filter_values:
+            filter_value = filter_value.upper()
+            parts = filter_value.split('/')
+            if len(parts) == 2:
+                if filter_value in NIRCAM_2_FILTER_CROSSES + wl8_combinations:
+                    full_names.append(filter_value)
+                elif filter_value in reverse_nircam_2_filter_crosses + reverse_wl8_combinations:
+                    full_names.append('{}/{}'.format(parts[1], parts[0]))
+                elif parts[0] in pw_values:
+                    if parts[1] not in pw_values:
+                        full_names.append('{}/{}'.format(parts[1], parts[0]))
+                    else:
+                        raise ValueError("Both {} and {} are in the pupil wheel. This is not supported.".format(parts[0], parts[1]))
+                elif parts[0] not in pw_values:
+                    if parts[1] not in pw_values:
+                        raise ValueError("Both {} and {} are in the filter wheel. This is not supported.".format(parts[0], parts[1]))
+                    else:
+                        full_names.append('{}/{}'.format(parts[0], parts[1]))
+            elif len(parts) == 1:
+                if filter_value in NIRCAM_CLEAR_CROSSING_FILTERS:
+                    full_names.append('{}/CLEAR'.format(filter_value))
+                elif filter_value in NIRCAM_PUPIL_WHEEL_FILTERS:
+                    fw_value = NIRCAM_GO_PW_FILTER_PAIRINGS[filter_value]
+                    full_names.append('{}/{}'.format(fw_value, filter_value))
+                else:
+                    raise ValueError('Unsupported shorthand filter value: {}'.format(filter_value))
+    elif instrument.lower() == 'niriss':
+        for filter_value in filter_values:
+            filter_value = filter_value.upper()
+            parts = filter_value.split('/')
+            if len(parts) == 1:
+                if filter_value not in ['CLEAR', 'CLEARP']:
+                    full_names.append(filter_value)
+                else:
+                    raise ValueError('{} not supported for NIRISS'.format(filter_value))
+            elif len(parts) == 2:
+                if parts[0] in ['CLEAR', 'CLEARP']:
+                    if parts[1] in ['CLEAR', 'CLEARP']:
+                        raise ValueError("CLEAR/CLEARP not supported for NIRISS")
+                    else:
+                        full_names.append(parts[1])
+                else:
+                    if parts[1] not in ['CLEAR', 'CLEARP']:
+                        raise ValueError(("{} unsupported. For NIRISS, filter must be CLEAR or pupil must be CLEARP."
+                                          .format(filter_value)))
+                    else:
+                        full_names.append(parts[0])
+            else:
+                raise ValueError('{} is an unsupported filter value for NIRISS'.format(filter_value))
+    else:
+        # For instruments other than those on JWST (i.e. JHK), pass the filter name though unchanged
+        full_names.extend(filter_values)
+    return full_names
 
 
 def write_yaml(data, filename):

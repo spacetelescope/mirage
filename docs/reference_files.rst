@@ -22,8 +22,6 @@ The ``dark_type`` keyword controls which dark current exposures are downloaded. 
 
 If True, the ``skip_dark`` parameter will cause the script not to download the dark current files for the given instrument. Similarly, the ``skip_cosmic_rays`` and ``skip_psfs`` parameters, if True, will cause the script to skip downloading the cosmic ray library and PSF library, respectively, for the indicated instruments. The default for all three of these parameters is False.
 
-The ``skip_grism`` parameter controls whether the reference files associated with the grisms (needed for WFSS simulations) are downloaded. If False, the grism data will be downloaded.
-
 When called, the function will download the appropriate files from the `STScI Box repository <https://stsci.app.box.com/folder/69205492331>`_, unzip the files, and create the directory structure Mirage expects. It will then remind you to point your MIRAGE_DATA environment variable to the top-level location of these files, so that Mirage knows where to find them. You
 may wish to add this definition to your .bashrc or .cshrc file.
 
@@ -32,6 +30,12 @@ For example:
 ::
 
 	export MIRAGE_DATA="/my_files/jwst/simulations/mirage_data"
+
+Download Grism-related Reference Data
+-------------------------------------
+
+In order to create dispersed images, using WFSS or grism TSO modes, a set of reference files describing the performance of the grisms are necessary. These files include sensitivity curves and dispersion information. These files are currently stored on GitHub in two repositories: one for `NIRCam <https://github.com/npirzkal/GRISM_NIRCAM>`_ and one for `NIRISS <https://github.com/npirzkal/GRISM_NIRISS>`_. To retrieve these files, clone the repositories from GitHub, and then move the files into the appropriate directory within the reference file directory structure. For NIRCam this is $MIRAGE_DATA/nircam/GRISM_NIRCAM/, and for NIRISS, $MIRAGE_DATA/niriss/GRISM_NIRISS/
+
 
 CRDS Environment Variables
 --------------------------

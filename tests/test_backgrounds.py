@@ -59,13 +59,13 @@ def test_specific_day_of_year_background_spectrum():
     dec = -69.5225
     obs_date = '2021-10-04'
 
-    lw_filter_file = os.path.join(CONFIG_DIR, 'F444W_nircam_plus_ote_throughput_moda_sorted.txt')
+    lw_filter_file = os.path.join(CONFIG_DIR, 'F444W_CLEAR_nircam_plus_ote_throughput_moda_sorted.txt')
     #lw_photflam = 7.7190e-22  # FLAM in cgs
     #lw_pivot = 4.3849  # microns
     lw_siaf = pysiaf.Siaf('nircam')['NRCA5_FULL']
     # Here: etc is 1.03, mirage is 0.84. This may be due to a bug in the ETC.
 
-    sw_filter_file = os.path.join(CONFIG_DIR, 'F090W_nircam_plus_ote_throughput_moda_sorted.txt')
+    sw_filter_file = os.path.join(CONFIG_DIR, 'F090W_CLEAR_nircam_plus_ote_throughput_moda_sorted.txt')
     #sw_photflam = 3.3895e-20  # FLAM in cgs
     #sw_pivot = 0.9034  # microns
     sw_siaf = pysiaf.Siaf('nircam')['NRCA2_FULL']

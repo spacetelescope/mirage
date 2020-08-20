@@ -28,10 +28,6 @@ NIRCAM_GRIDDED_PSF_URLS = ['https://data.science.stsci.edu/redirect/JWST/jwst-si
 NIRISS_GRIDDED_PSF_URLS = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/niriss/psf_libraries/gridded_psf_libraries/niriss_gridded_psf_library.tar.gz']
 FGS_GRIDDED_PSF_URLS = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/fgs/psf_libraries/gridded_psf_libraries/fgs_gridded_psf_library.tar.gz']
 
-# Grism-related files
-NIRCAM_GRISM_FILES = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/nircam/grism/nircam_grism_library.tar.gz']
-NIRISS_GRISM_FILES = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/niriss/grism/niriss_grism_library.tar.gz']
-
 # Dark current files
 NIRCAM_RAW_DARK_URLS = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/nircam/darks/raw/A1/NRCNRCA1-DARK-60082202011_1_481_SE_2016-01-09T00h03m58_level1b_uncal.fits.gz',
                         'https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/nircam/darks/raw/A1/NRCNRCA1-DARK-60090213141_1_481_SE_2016-01-09T02h53m12_level1b_uncal.fits.gz',
@@ -194,8 +190,8 @@ FGS_LINEARIZED_DARK_URLS = ['https://data.science.stsci.edu/redirect/JWST/jwst-s
 
 TEMP_DISTORTION_REFERENCE_FILES = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/nircam/reference_files/nircam_distortion_files.tar.gz']
 
-DISK_USAGE = {'nircam': {'crs': 1.1, 'psfs': 23, 'raw_darks': 79, 'lin_darks': 319, 'grism': 0.005},
-              'niriss': {'crs': 0.26, 'psfs': 0.87, 'raw_darks': 31, 'lin_darks': 121, 'grism': 0.167},
+DISK_USAGE = {'nircam': {'crs': 1.1, 'psfs': 23, 'raw_darks': 79, 'lin_darks': 319},
+              'niriss': {'crs': 0.26, 'psfs': 0.87, 'raw_darks': 31, 'lin_darks': 121},
               'fgs': {'crs': 0.31, 'psfs': .04, 'raw_darks': 11, 'lin_darks': 39}}
 
 def download_file(url, file_name, output_directory='./'):
@@ -231,8 +227,7 @@ def download_file(url, file_name, output_directory='./'):
 
 
 def download_reffiles(directory, instrument='all', dark_type='linearized',
-                      skip_darks=False, skip_cosmic_rays=False, skip_psfs=False,
-                      skip_grism=False):
+                      skip_darks=False, skip_cosmic_rays=False, skip_psfs=False):
     """Download tarred and gzipped reference files. Expand, unzip and
     organize into the necessary directory structure such that Mirage
     can use them.
@@ -272,16 +267,12 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
     skip_psfs : bool
         If False (default), download the requested PSF libraries.
         If True, do not download the libraries.
-
-    skip_grism : bool
-        If False (default), download the grism-related reference files
-        If True, do not download the grism data.
     """
     # Be sure the input instrument is a list
     file_list = get_file_list(instrument.lower(), dark_type.lower(),
                               skip_darks=skip_darks,
                               skip_cosmic_rays=skip_cosmic_rays,
-                              skip_psfs=skip_psfs, skip_grism=skip_grism)
+                              skip_psfs=skip_psfs)
 
     # Download everything first
     for file_url in file_list:
@@ -350,7 +341,7 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
 
 
 def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=False,
-                  skip_psfs=False, skip_grism=False):
+                  skip_psfs=False):
     """Collect the list of URLs corresponding to the Mirage reference
     files to be downloaded
 
@@ -376,10 +367,6 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
     skip_psfs : bool
         If False (default), include the requested PSF libraries.
         If True, do not include the libraries.
-
-    skip_grism : bool
-        If False (default), include the grism-related reference files.
-        If True, do not include the grism files.
 
     Returns
     -------
@@ -422,13 +409,6 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                     total_download_size += added_size
                     print('Size of NIRCam raw dark files: {} Gb'.format(added_size))
 
-            if not skip_grism:
-                # Get grism-related files
-                urls.extend(NIRCAM_GRISM_FILES)
-                added_size = DISK_USAGE['nircam']['grism']
-                total_download_size += added_size
-                print('Size of NIRCam grism files: {} Gb'.format(added_size))
-
             # Get the temporary distortion reference files with the
             # correct coefficients
             urls.extend(TEMP_DISTORTION_REFERENCE_FILES)
@@ -458,13 +438,6 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                     added_size = DISK_USAGE['niriss']['raw_darks']
                     total_download_size += added_size
                     print('Size of NIRISS raw dark files: {} Gb'.format(added_size))
-
-            if not skip_grism:
-                # Get grism-related files
-                urls.extend(NIRISS_GRISM_FILES)
-                added_size = DISK_USAGE['niriss']['grism']
-                total_download_size += added_size
-                print('Size of NIRISS grism files: {} Gb'.format(added_size))
 
         # FGS
         elif instrument_name.lower() == 'fgs':

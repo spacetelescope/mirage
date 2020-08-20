@@ -25,7 +25,10 @@ from mirage.apt.apt_inputs import get_filters
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, \
     ExtendedCatalog, MovingPointSourceCatalog, MovingExtendedCatalog, \
     MovingSersicCatalog
-from mirage.utils.utils import ensure_dir_exists
+from mirage.utils.constants import FGS_FILTERS, NIRCAM_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
+    NIRISS_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
+    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS
+from mirage.utils.utils import ensure_dir_exists, make_mag_column_names, standardize_filters
 
 
 def create_basic_exposure_list(xml_file, pointing_file):
@@ -564,7 +567,11 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
     else:
         outra = ra
         outdec = dec
-    filter_names = make_filter_names(instrument, filters)
+
+    # Normalize filter names. Transform any shorthand into a full filter
+    # specification. (e.g. "F090W" -> "W090W/CLEAR")
+    filters = standardize_filters(instrument, filters)
+    filter_names = make_mag_column_names(instrument, filters)
 
     gaia_cat, gaia_mag_cols, gaia_2mass, gaia_2mass_crossref, gaia_wise, \
         gaia_wise_crossref = query_GAIA_ptsrc_catalog(outra, outdec, box_width)
@@ -695,7 +702,7 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     filters : dict
         Dictionary with keys equal to JWST instrument names, and values
         that are lists of filter names. Besancon sources will have magnitudes
-        transformed into thiese filters
+        transformed into these filters
 
     ra_column_name : str
         Name of the column in the input catalog that contains the Right Ascension
@@ -726,7 +733,7 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     # Create list of filter names from filters dictionary
     all_filters = []
     for instrument in filters:
-        filt_list = make_filter_names(instrument.lower(), filters[instrument])
+        filt_list = make_mag_column_names(instrument.lower(), filters[instrument])
         all_filters.extend(filt_list)
 
     # Read in the input catalog
@@ -764,8 +771,8 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
                                     dec=catalog[dec_column_name].data)
 
     for filt in all_filters:
-        instrument, filter_name, _ = filt.split('_')
-        mirage_cat.add_magnitude_column(catalog[filt], instrument=instrument, filter_name=filter_name)
+        #instrument, filter_name, _ = filt.split('_')
+        mirage_cat.add_magnitude_column(catalog[filt], column_name=filt)
 
     # Save to output file if requested
     if output_file is not None:
@@ -791,10 +798,16 @@ def crossmatch_filter_names(filter_names, standard_filters):
         List of matching filter names
     """
     inds = []
-    for loop in range(len(filter_names)):
-        for n1 in range(len(standard_filters)):
-            if filter_names[loop] in standard_filters[n1]:
-                inds.append(n1)
+    for filter_name in filter_names:
+        name_to_match = filter_name
+
+        # Weak lens inputs can be WLP8 or WLM8, but we want to match either
+        # with the WLP8 entries in the standard magnitude list
+        if 'wlm' in filter_name:
+            name_to_match = filter_name.replace('wlm', 'wlp')
+
+        index = standard_filters.index(name_to_match)
+        inds.append(index)
     return inds
 
 
@@ -888,7 +901,7 @@ def read_standard_magnitudes():
     standard_magnitudes = np.loadtxt(standard_mag_file, comments='#')
     # standard_values holds the wavelengths (microns), zero magnitude flux
     # density values (W/m^2/micron and Jy) and the relative ISM extinction
-    standard_values = np.zeros((4, 58), dtype=np.float32)
+    standard_values = np.zeros((4, 73), dtype=np.float32)
     # The following list is manually produced, but must match the order
     # of filters in the input file, where the names are a bit different.
     # Note that for the GAIA g filter the trailing space is needed to
@@ -904,21 +917,29 @@ def read_standard_magnitudes():
                         'niriss_f380m_magnitude', 'niriss_f430m_magnitude',
                         'niriss_f444w_magnitude', 'niriss_f480m_magnitude',
                         'fgs_guider1_magnitude', 'fgs_guider2_magnitude',
-                        'nircam_f070w_magnitude', 'nircam_f090w_magnitude',
-                        'nircam_f115w_magnitude', 'nircam_f140m_magnitude',
-                        'nircam_f150w_magnitude', 'nircam_f150w2_magnitude',
-                        'nircam_f162m_magnitude', 'nircam_f164n_magnitude',
-                        'nircam_f182m_magnitude', 'nircam_f187n_magnitude',
-                        'nircam_f200w_magnitude', 'nircam_f210m_magnitude',
-                        'nircam_f212n_magnitude', 'nircam_f250m_magnitude',
-                        'nircam_f277w_magnitude', 'nircam_f300m_magnitude',
-                        'nircam_f322w2_magnitude', 'nircam_f323n_magnitude',
-                        'nircam_f335m_magnitude', 'nircam_f356w_magnitude',
-                        'nircam_f360m_magnitude', 'nircam_f405n_magnitude',
-                        'nircam_f410m_magnitude', 'nircam_f430m_magnitude',
-                        'nircam_f444w_magnitude', 'nircam_f460m_magnitude',
-                        'nircam_f466n_magnitude', 'nircam_f470n_magnitude',
-                        'nircam_f480m_magnitude']
+                        'nircam_f070w_clear_magnitude', 'nircam_f090w_clear_magnitude',
+                        'nircam_f115w_clear_magnitude', 'nircam_f140m_clear_magnitude',
+                        'nircam_f150w_clear_magnitude', 'nircam_f150w2_clear_magnitude',
+                        'nircam_f150w2_f162m_magnitude', 'nircam_f150w2_f164n_magnitude',
+                        'nircam_f182m_clear_magnitude', 'nircam_f187n_clear_magnitude',
+                        'nircam_f200w_clear_magnitude', 'nircam_f210m_clear_magnitude',
+                        'nircam_f212n_clear_magnitude', 'nircam_f250m_clear_magnitude',
+                        'nircam_f277w_clear_magnitude', 'nircam_f300m_clear_magnitude',
+                        'nircam_f322w2_clear_magnitude', 'nircam_f322w2_f323n_magnitude',
+                        'nircam_f335m_clear_magnitude', 'nircam_f356w_clear_magnitude',
+                        'nircam_f360m_clear_magnitude', 'nircam_f444w_f405n_magnitude',
+                        'nircam_f410m_clear_magnitude', 'nircam_f430m_clear_magnitude',
+                        'nircam_f444w_clear_magnitude', 'nircam_f460m_clear_magnitude',
+                        'nircam_f444w_f466n_magnitude', 'nircam_f444w_f470n_magnitude',
+                        'nircam_f480m_clear_magnitude', 'nircam_wlp4_clear_magnitude',
+                        'nircam_f070w_wlp8_magnitude', 'nircam_f090w_wlp8_magnitude',
+                        'nircam_f115w_wlp8_magnitude', 'nircam_f140m_wlp8_magnitude',
+                        'nircam_f150w2_wlp8_magnitude', 'nircam_f150w_wlp8_magnitude',
+                        'nircam_f162m_wlp8_magnitude', 'nircam_f164n_wlp8_magnitude',
+                        'nircam_f182m_wlp8_magnitude', 'nircam_f187n_wlp8_magnitude',
+                        'nircam_f200w_wlp8_magnitude', 'nircam_f210m_wlp8_magnitude',
+                        'nircam_f212n_wlp8_magnitude', 'nircam_wlp4_wlp8_magnitude']
+
     standard_labels = []
     n1 = 0
     for line in lines:
@@ -1098,8 +1119,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     # Now, convert to JWST magnitudes either by transformation (for sources
     # with GAIA G/BP/RP magnitudes) or by interpolation (all other
     # cases).
-    out_filter_names = make_filter_names(instrument, filter_names)
-    inds = crossmatch_filter_names(in_filters, standard_filters)
+    out_filter_names = make_mag_column_names(instrument, filter_names)
     in_wavelengths = np.squeeze(np.copy(standard_values[0, inds]))
     inds = crossmatch_filter_names(out_filter_names, standard_filters)
     if len(inds) < 1:
@@ -1120,16 +1140,8 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     out_magnitudes = np.copy(out_magnitudes[0:nfinal, :])
     outcat = PointSourceCatalog(ra=raout, dec=decout)
     n1 = 0
-    for filter in out_filter_names:
-        values = filter.split('_')
-        if len(values) == 3:
-            inst = values[0].upper()
-            fil1 = values[1].upper()
-        else:
-            inst = values[0].upper()
-            fil1 = ''
-        outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), instrument=inst,
-                                    filter_name=fil1, magnitude_system='vegamag')
+    for column_value in out_filter_names:
+        outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value)
         n1 = n1+1
     return outcat
 
@@ -1378,49 +1390,6 @@ def interpolate_magnitudes(wl1, mag1, wl2, filternames):
     return outmags
 
 
-def make_filter_names(instrument, filters):
-    """
-    Given as input the instrument name and the list of filters needed, this
-    routine generates the list of output header values for the Mirage input
-    file.
-
-    Parameters
-    ----------
-    insrument : str
-        'NIRCam', 'NIRISS', or 'Guider"
-
-    filters : list
-        List of the filters needed (names such as F090W) or either None or
-        an empty list to select all filters)
-
-    Returns
-    -------
-    headerstrs : list
-        The header string list for the output Mirage magnitudes line;
-        if concatentated with spaces, it is the list of magnitudes header
-        values that needs to be written to the source list file.
-    """
-    instrument_names = ['FGS', 'NIRCam', 'NIRISS']
-    guider_filters = ['guider1', 'guider2']
-    guider_filter_names = ['fgs_guider1_magnitude', 'fgs_guider2_magnitude']
-    niriss_filters = ['F090W', 'F115W', 'F140M', 'F150W', 'F158M', 'F200W',
-                      'F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
-    niriss_filter_names = ['niriss_{}_magnitude'.format(filt.lower()) for filt in niriss_filters]
-    nircam_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F150W2',
-                      'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
-                      'F212N', 'WLP4',  'F250M', 'F277W', 'F300M', 'F322W2', 'F323N',
-                      'F335M', 'F356W', 'F360M', 'F405N', 'F410M', 'F430M',
-                      'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
-    nircam_filter_names = ['nircam_{}_magnitude'.format(filt.lower()) for filt in nircam_filters]
-    names1 = [guider_filters, nircam_filters, niriss_filters]
-    names2 = [guider_filter_names, nircam_filter_names, niriss_filter_names]
-    headerstrs = []
-    for loop in range(len(instrument_names)):
-        if (instrument_names[loop].lower() == instrument.lower()) or (instrument.lower() == 'all'):
-            headerstrs = add_filter_names(headerstrs, names1[loop], names2[loop], filters)
-    return headerstrs
-
-
 def add_filter_names(headerlist, filter_names, filter_labels, filters):
     """
     Add a set of filter header labels (i.e. niriss_f090w_magnitude for example)
@@ -1667,12 +1636,7 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
     # -------------Add magnitude columns-------------------------------
     mag_cols = [colname for colname in combined.colnames if 'magnitude' in colname]
     for col in mag_cols:
-        elements = col.split('_')
-        instrument = elements[0]
-        minus_inst = col.split('{}_'.format(instrument))[-1]
-        filter_name = minus_inst.split('_magnitude')[0]
-        new_cat.add_magnitude_column(combined[col].data, instrument=instrument,
-                                     filter_name=filter_name)
+        new_cat.add_magnitude_column(combined[col].data, column_name=col)
 
     return new_cat
 
@@ -2269,7 +2233,10 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             seedvalue = seed
     np.random.seed(seedvalue)
     threshold = outarea/goodss_area
-    filter_names = make_filter_names(instrument, filters)
+
+    # Standardize the input filter names
+    std_filters = standardize_filters(instrument, filters)
+    filter_names = make_mag_column_names(instrument, std_filters)
     nfilters = len(filter_names)
     if nfilters < 1:
         print('Error matching filters to standard list.  Inputs are:')
@@ -2284,21 +2251,21 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     filterinds = {'niriss_f090w_magnitude': 0, 'niriss_f115w_magnitude': 1,
                   'niriss_f150w_magnitude': 2, 'niriss_f200w_magnitude': 3,
                   'niriss_f140m_magnitude': 4, 'niriss_f158m_magnitude': 5,
-                  'nircam_f070w_magnitude': 6, 'nircam_f090w_magnitude': 7,
-                  'nircam_f115w_magnitude': 8, 'nircam_f150w_magnitude': 9,
-                  'nircam_f200w_magnitude': 10, 'nircam_f150w2_magnitude': 11,
-                  'nircam_f140m_magnitude': 12, 'nircam_f162m_magnitude': 13,
-                  'nircam_f182m_magnitude': 14, 'nircam_f210m_magnitude': 15,
-                  'nircam_f164n_magnitude': 16, 'nircam_f187n_magnitude': 17,
-                  'nircam_f212n_magnitude': 18, 'nircam_f277w_magnitude': 19,
-                  'nircam_f356w_magnitude': 20, 'nircam_f444w_magnitude': 21,
-                  'nircam_f322w2_magnitude': 22, 'nircam_f250m_magnitude': 23,
-                  'nircam_f300m_magnitude': 24, 'nircam_f335m_magnitude': 25,
-                  'nircam_f360m_magnitude': 26, 'nircam_f410m_magnitude': 27,
-                  'nircam_f430m_magnitude': 28, 'nircam_f460m_magnitude': 29,
-                  'nircam_f480m_magnitude': 30, 'nircam_f323n_magnitude': 31,
-                  'nircam_f405n_magnitude': 32, 'nircam_f466n_magnitude': 33,
-                  'nircam_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
+                  'nircam_f070w_clear_magnitude': 6, 'nircam_f090w_clear_magnitude': 7,
+                  'nircam_f115w_clear_magnitude': 8, 'nircam_f150w_clear_magnitude': 9,
+                  'nircam_f200w_clear_magnitude': 10, 'nircam_f150w2_clear_magnitude': 11,
+                  'nircam_f140m_clear_magnitude': 12, 'nircam_f150w2_f162m_magnitude': 13,
+                  'nircam_f182m_clear_magnitude': 14, 'nircam_f210m_clear_magnitude': 15,
+                  'nircam_f150w2_f164n_magnitude': 16, 'nircam_f187n_clear_magnitude': 17,
+                  'nircam_f212n_clear_magnitude': 18, 'nircam_f277w_clear_magnitude': 19,
+                  'nircam_f356w_clear_magnitude': 20, 'nircam_f444w_clear_magnitude': 21,
+                  'nircam_f322w2_clear_magnitude': 22, 'nircam_f250m_clear_magnitude': 23,
+                  'nircam_f300m_clear_magnitude': 24, 'nircam_f335m_clear_magnitude': 25,
+                  'nircam_f360m_clear_magnitude': 26, 'nircam_f410m_clear_magnitude': 27,
+                  'nircam_f430m_clear_magnitude': 28, 'nircam_f460m_clear_magnitude': 29,
+                  'nircam_f480m_clear_magnitude': 30, 'nircam_f322w2_f323n_magnitude': 31,
+                  'nircam_f444w_f405n_magnitude': 32, 'nircam_f444w_f466n_magnitude': 33,
+                  'nircam_f444w_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
                   'niriss_f356w_magnitude': 20, 'niriss_f380m_magnitude': 26,
                   'niriss_f430m_magnitude': 28, 'niriss_f444w_magnitude': 21,
                   'niriss_f480m_magnitude': 30, 'fgs_guider1_magnitude': 11,
@@ -2306,6 +2273,11 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     module_path = pkg_resources.resource_filename('mirage', '')
     catalog_file = os.path.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
     catalog_values = np.loadtxt(catalog_file, comments='#')
+
+    # Force positive values for radius, sersic index, and ellipticity
+    good = ((catalog_values[:, 59] >= 0.) & (catalog_values[:, 61] > 0.) & (catalog_values[:, 63] >= 0.))
+    catalog_values = catalog_values[good, :]
+
     outinds = np.zeros((nfilters), dtype=np.int16)
     try:
         loop = 0
@@ -2313,7 +2285,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             outinds[loop] = filterinds[filter] + 8
             loop = loop+1
     except:
-        print('Error matching filter %s to standard list.' % (filter))
+        print('Error matching filter %s to those available in 3D-HST catalog.' % (filter))
         return None, None
     # The following variables hold the Sersic profile index values
     # (radius [arc-seconds], sersic index, ellipticity, position angle)
@@ -2347,14 +2319,19 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     drout = np.copy(catalog_values[outputinds, sersicerrorinds[0]])
     rout = rout+2.*drout*np.random.normal(0., 1., nout)
     rout[rout < 0.01] = 0.01
+    max_rad = np.max(catalog_values[:, sersicinds[0]])
+    rout[rout > max_rad] = max_rad
     elout = np.copy(catalog_values[outputinds, sersicinds[2]])
     delout = np.copy(catalog_values[outputinds, sersicerrorinds[2]])
     elout = elout+delout*np.random.normal(0., 1., nout)
     elout[elout > 0.98] = 0.98
+    elout[elout < 0.] = 0.0
     sindout = np.copy(catalog_values[outputinds, sersicinds[1]])
     dsindout = np.copy(catalog_values[outputinds, sersicinds[1]])
     sindout = sindout+dsindout*np.random.normal(0., 1., nout)
     sindout[sindout < 0.1] = 0.1
+    max_sersic = np.max(catalog_values[:, sersicinds[1]])
+    sindout[sindout > max_sersic] = max_sersic
     paout = np.copy(catalog_values[outputinds, sersicinds[3]])
     dpaout = np.copy(catalog_values[outputinds, sersicinds[3]])
     paout = paout+dpaout*np.random.normal(0., 1., nout)
@@ -2370,16 +2347,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
         mag1 = catalog_values[outputinds, outinds[loop]]
         dmag1 = -0.2*np.random.random(nout)+0.1
         mag1 = mag1 + dmag1
-        if 'niriss' in filter_names[loop]:
-            inst1 = 'NIRISS'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        elif 'nircam' in filter_names[loop]:
-            inst1 = 'NIRCam'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        else:
-            inst1 = 'FGS'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        galaxy_cat.add_magnitude_column(mag1, instrument=inst1,
-                                        filter_name=filter_name,
+
+        galaxy_cat.add_magnitude_column(mag1, column_name=filter_names[loop],
                                         magnitude_system='abmag')
     return galaxy_cat, seedvalue
