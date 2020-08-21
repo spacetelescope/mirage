@@ -48,7 +48,7 @@ import pkg_resources
 from astropy.table import Table, vstack
 from astropy.io import ascii
 import numpy as np
-from pysiaf import rotations
+from pysiaf import rotations, Siaf
 import yaml
 
 from . import read_apt_xml
@@ -305,6 +305,18 @@ class AptInput:
         #     for key in observation_dictionary.keys():
         #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
+
+
+        print(observation_dictionary.keys())
+        print(observation_dictionary['Subarray'])
+        print(observation_dictionary['aperture'])
+
+        if 'WfscGlobalAlignment' in observation_dictionary['APTTemplate']:
+            #    if this is going to go before expand_for_detectors, then we will
+            #    need it to work on observation_dictionary rather than self.exposure_tab
+            observation_dictionary = self.global_alignment_pointing(observation_dictionary)
+
+
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
         # fix data for filename generation
@@ -326,11 +338,6 @@ class AptInput:
 
 
 
-
-
-
-        #if 'WfscGlobalAlignment' in self.exposure_tab['APTTemplate']:
-        #    self.global_alignment_pointing()
 
         # set exposure number (new sequence for every combination of seq id and act id and observation number and detector)
         temp_table = Table([self.exposure_tab['sequence_id'], self.exposure_tab['exposure'], self.exposure_tab['act_id'], self.exposure_tab['obs_num'], self.exposure_tab['detector']], names=('sequence_id', 'exposure', 'act_id', 'obs_num', 'detector'))
@@ -581,7 +588,7 @@ class AptInput:
 
                 elif instrument == 'fgs':
                     if input_dictionary['APTTemplate'][index] == 'WfscGlobalAlignment':
-                        guider_number = input_dictionary['FGS_Detector'][index]
+                        guider_number = input_dictionary['aperture'][index][3]
                     elif input_dictionary['APTTemplate'][index] == 'FgsExternalCalibration':
                         guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                     detectors = ['G{}'.format(guider_number)]
@@ -890,54 +897,185 @@ class AptInput:
                     'sequence_id': seq_id, 'observation_id': observation_id}
         return pointing
 
-    """
-    def global_alignment_pointing(self):
 
-        Adjust the pointing dictionary information for global alignment
+    def global_alignment_pointing(self, obs_dict):
+        """Adjust the pointing dictionary information for global alignment
         observations. Some of the entries need to be changed from NIRCam to
         FGS. Remember that not all observations in the dictionary will
         necessarily be WfscGlobalAlignment template. Be sure the leave all
         other templates unchanged.
 
+        Parameters
+        ----------
+        obs_dict : dict
+            Dictionary of observation parameters, as returned from add_observation_info()
+
+        Returns
+        -------
+        obs_dict : dict
+            Dictionary with modified values for FGS pointing in Global Alignment templates
+        """
+
         # We'll always be changing NIRCam to FGS, so set up the NIRCam siaf
         # instance outside of loop
-        nrc_siaf = pysiaf.Siaf('nircam')['NRCA3_FULL']
+        nrc_siaf = Siaf('nircam')['NRCA3_FULL']
 
-        ga_index = self.exposure_tab['APTTemplate'] == 'WfscGlobalAlignment'
-        observation_numbers = list(dict.fromkeys(self.exposure_tab['obs_num'][ga_index]))
+        ga_index = np.array(obs_dict['APTTemplate']) == 'WfscGlobalAlignment'
+
+        print('obs_num: ')
+        print(obs_dict['obs_num'])
+
+        print('ga_index: ', ga_index)
+
+        #observation_numbers = list(dict.fromkeys(self.exposure_tab['obs_num'][ga_index]))
+        observation_numbers = np.unique(np.array(obs_dict['obs_num'])[ga_index])
+
+
+        print('Observation_numbers:')
+        print(observation_numbers)
 
         for obs_num in observation_numbers:
-            indexes = np.where(self.exposure_tab['obs_num'] == obs_num)
+            obs_indexes = np.where(np.array(obs_dict['obs_num']) == obs_num)[0]
+
+
+            print(obs_num)
+            print(obs_dict['obs_num'])
+            print(obs_indexes)
+
 
             # Find which GA observation type (e.g. ADJUST2) is used,
             # as this dictates the number and order of NIRCam and FGS
             # exposures
-            ga_iteration = self.exposure_tab['ga_iteration'][indexes][0].upper()
+            # No GA_Iteration column in dictionary
+            #ga_iteration = np.array(self.exposure_tab['GA_Iteration'])[obs_indexes][0].upper()
+            #print('ga_iteration: ', ga_iteration)
+
+            # Get the subarray and aperture entries for the observation
+            aperture_values = np.array(obs_dict['aperture'])[obs_indexes]
+            subarr_values = np.array(obs_dict['Subarray'])[obs_indexes]
+
+
+            print('BEFORE: ', aperture_values)
+
+            # Subarray values, which come from the xml file, are correct. The aperture
+            # values, which come from the pointing file, are not correct. We need to
+            # copy over the FGS values from the Subarray column to the aperture column
+            to_fgs = [True if 'FGS' in subarr else False for subarr in subarr_values]
+            aperture_values[to_fgs] = subarr_values[to_fgs]
+            fgs_aperture = aperture_values[to_fgs][0]
+
+            print('AFTER: ', aperture_values)
+
 
             # Determine which exposures within the observation need to be changed
             # from NIRCam to FGS
-            inst_order = constants.GLOBAL_ALIGNMENT_INSTRUMENT_OREDER[ga_iteration]
-            to_fgs = np.where(inst_order == 'FGS')
+            #inst_order = constants.GLOBAL_ALIGNMENT_INSTRUMENT_ORDER[ga_iteration]
+            #to_fgs = np.where(np.array(inst_order) == 'fgs')[0]
 
             # Determine which FGS detector to be used
-            this needs to come from special requirements in xml
+            #fgs_detector_number = np.array(self.exposure_tab['FGS_Detector'])[obs_indexes][0]
 
+
+            """
+            # These are already done in read_apt_xml!!!!
             # Switch the instrument name to FGS in the FGS exposures
-            self.exposure_tab['instrument'][indexes][to_fgs] = 'FGS'
-            fgs_aperture = 'FGS{}_FULL'.format(det_number)
-            self.exposure_tab['aperture'][indexes][to_fgs] = fgs_aperture
+            instrument_col = np.array(self.exposure_tab['Instrument'])
+            instrument_col[obs_indexes][to_fgs] = 'FGS'
+            self.exposure_tab['Instrument'] = instrument_col
+
+            aperture_col = np.array(self.exposure_tab['aperture'])
+            fgs_aperture = 'FGS{}_FULL'.format(fgs_detector_number)
+            """
+
+            """
+            print('+++++++++++++++')
+            print('Types:')
+            print(type(self.exposure_tab['aperture']), type(aperture_col))
+            print(type(obs_indexes), type(to_fgs))
+            test = np.arange(20)
+            obs_indexes = np.array([5, 6, 7, 8, 9, 10, 11])
+            print(test)
+            test[obs_indexes][to_fgs] = 999
+            print(test)
+            test[obs_indexes[to_fgs]] = 888
+            print(test)
+            stop
+            """
+
+
+
+            #print(type(obs_indexes))
+            #print(type(to_fgs))
+
+            #print(len(aperture_col))
+            #print(obs_indexes)
+            #print(to_fgs)
+
+
+            ####TEST####
+            #aperture_col[obs_indexes] = 'GARBAGE'
+
+            # Not sure why I need to do it this way, but stringing
+            # together two index arrays doesn't seem to work
+            #temp = aperture_col[obs_indexes]
+            #temp[to_fgs] = fgs_aperture
+            #aperture_col[obs_indexes] = temp
+
+
+            # WHY DOESN'T THIS WORK!!!!
+            #aperture_col[obs_indexes[to_fgs]] = fgs_aperture
+            all_aperture_values = np.array(obs_dict['aperture'])
+            all_aperture_values[obs_indexes] = aperture_values
+            obs_dict['aperture'] = all_aperture_values
+
+            #print(fgs_aperture)
+            #print(aperture_col[obs_indexes])
+            #print('AFTER:', aperture_col[obs_indexes][to_fgs])
+            #print(aperture_col)
+
+
 
             # Update the pointing info for the FGS exposures
-            fgs = pysiaf.Siaf('fgs')[fgs_aperture]   # or FGS2_FULL
+            fgs = Siaf('fgs')[fgs_aperture]   # or FGS2_FULL
             basex, basey = fgs.tel_to_idl(nrc_siaf.V2Ref, nrc_siaf.V3Ref)
+            dithx = np.array(obs_dict['dithx'])[obs_indexes[to_fgs]]
+            dithy = np.array(obs_dict['dithy'])[obs_indexes[to_fgs]]
             idlx = basex + dithx
             idly = basey + dithy
-            self.exposure_tab['BaseX'][indexes][to_fgs] = basex
-            self.exposure_tab['BaseY'][indexes][to_fgs] = basey
-            self.exposure_tab['IdlX'][indexes][to_fgs] = idlx
-            self.exposure_tab['IdlY'][indexes][to_fgs] = idly
+
+            basex_col = np.array(obs_dict['basex'])
+            basey_col = np.array(obs_dict['basey'])
+            idlx_col = np.array(obs_dict['idlx'])
+            idly_col = np.array(obs_dict['idly'])
+
+            basex_col[obs_indexes[to_fgs]] = basex
+            basey_col[obs_indexes[to_fgs]] = basey
+            idlx_col[obs_indexes[to_fgs]] = idlx
+            idly_col[obs_indexes[to_fgs]] = idly
+
+            obs_dict['basex'] = basex_col
+            obs_dict['basey'] = basey_col
+            obs_dict['idlx'] = idlx_col
+            obs_dict['idly'] = idly_col
+
+            print('NEW', basex, basey, dithx, dithy, idlx, idly)
+
+            print(obs_dict['Instrument'])
+            print(obs_dict['aperture'])
+            print(obs_dict['basex'])
+            print(obs_dict['basey'])
 
 
+        print('\n\n')
+        print(obs_dict['Instrument'])
+        print(obs_dict['aperture'])
+        print(obs_dict['basex'])
+        print(obs_dict['basey'])
+
+        return obs_dict
+
+
+        """
             Quantities that need to be updated:
             aperture name
 

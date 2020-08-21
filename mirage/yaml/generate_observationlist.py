@@ -483,13 +483,14 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
 
 
-    from astropy.table import Table
-    from astropy.io import ascii
+    #from astropy.io import ascii
     #print('SAVING example_xml_table.txt FOR DEVELOPMENT')
     #temp = Table()
     #for key in xml_dict:
     #    temp[key] = xml_dict[key]
     #ascii.write(xml_dict, 'example_xml_table.txt', overwrite=True)
+
+    """
     print('\n\n\nREADING IN modified_xml_table.txt for DEVELOPMENT\n\n\n')
     temp = ascii.read('modified_xml_table.txt')
     xml_dict = {}
@@ -497,7 +498,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
         xml_dict[colname] = temp[colname]
         if colname == 'Subpixel_positions':
             xml_dict[colname] = [str(ele) for ele in temp[colname]]
-
+    """
 
 
 
