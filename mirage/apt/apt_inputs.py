@@ -318,20 +318,6 @@ class AptInput:
             if isparallel:
                 self.exposure_tab['sequence_id'][j] = '2'
 
-
-
-        # Write out the exposure tab as it currently is, so that I can modify it
-        # to simulate what the GA xml reader updates will give, and then read it
-        # in here for testing.
-        #import csv
-        #w = csv.writer(open("example_exposure_tab.csv", "w"))
-        #for key, val in self.exposure_tab.items():
-        #    w.writerow([key, val])
-
-
-
-
-
         # set exposure number (new sequence for every combination of seq id and act id and observation number and detector)
         temp_table = Table([self.exposure_tab['sequence_id'], self.exposure_tab['exposure'], self.exposure_tab['act_id'], self.exposure_tab['obs_num'], self.exposure_tab['detector']], names=('sequence_id', 'exposure', 'act_id', 'obs_num', 'detector'))
 
