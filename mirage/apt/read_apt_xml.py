@@ -820,11 +820,6 @@ class ReadAPTXML():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
 
-
-        print(exposures_dictionary['ShortFilter'])
-        print(exposures_dictionary['LongFilter'])
-
-
         return exposures_dictionary
 
     def read_commissioning_template(self, template, template_name, obs, prop_params):

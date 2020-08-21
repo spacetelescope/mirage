@@ -97,15 +97,6 @@ MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.19235
 # to when it is not in the beam
 NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 
-# Lists of the NIRCam/FGS exposure order associated with each type of
-# Global Alignment observation type
-GLOBAL_ALIGNMENT_INSTRUMENT_ORDER = {}
-GLOBAL_ALIGNMENT_INSTRUMENT_ORDER['ADJUST1'] = ['nircam', 'nircam', 'fgs', 'nircam']
-GLOBAL_ALIGNMENT_INSTRUMENT_ORDER['CORRECT'] = ['nircam', 'nircam', 'fgs', 'nircam']
-GLOBAL_ALIGNMENT_INSTRUMENT_ORDER['ADJUST2'] = ['nircam', 'nircam', 'fgs', 'nircam', 'nircam', 'fgs', 'nircam']
-GLOBAL_ALIGNMENT_INSTRUMENT_ORDER['CORRECT+ADJUST'] = ['nircam', 'nircam', 'fgs', 'nircam', 'nircam', 'fgs', 'nircam']
-GLOBAL_ALIGNMENT_INSTRUMENT_ORDER['BSCORRECT'] = ['nircam', 'nircam', 'fgs']
-
 # Minimum signal rate for a pixel to be included in the segmentation map.
 SEGMENTATION_MIN_SIGNAL_RATE = 0.031  # ADU/sec
 SUPPORTED_SEGMENTATION_THRESHOLD_UNITS = ['adu/s', 'adu/sec', 'e/s', 'e/sec', 'mjy/str', 'mjy/sr', 'erg/cm2/a', 'erg/cm2/hz']

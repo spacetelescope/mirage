@@ -305,17 +305,10 @@ class AptInput:
         #     for key in observation_dictionary.keys():
         #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
-
-
-        print(observation_dictionary.keys())
-        print(observation_dictionary['Subarray'])
-        print(observation_dictionary['aperture'])
-
+        # Global Alignment observations need to have the pointing information for the
+        # FGS exposures updated
         if 'WfscGlobalAlignment' in observation_dictionary['APTTemplate']:
-            #    if this is going to go before expand_for_detectors, then we will
-            #    need it to work on observation_dictionary rather than self.exposure_tab
             observation_dictionary = self.global_alignment_pointing(observation_dictionary)
-
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
@@ -922,40 +915,14 @@ class AptInput:
 
         ga_index = np.array(obs_dict['APTTemplate']) == 'WfscGlobalAlignment'
 
-        print('obs_num: ')
-        print(obs_dict['obs_num'])
-
-        print('ga_index: ', ga_index)
-
-        #observation_numbers = list(dict.fromkeys(self.exposure_tab['obs_num'][ga_index]))
         observation_numbers = np.unique(np.array(obs_dict['obs_num'])[ga_index])
-
-
-        print('Observation_numbers:')
-        print(observation_numbers)
 
         for obs_num in observation_numbers:
             obs_indexes = np.where(np.array(obs_dict['obs_num']) == obs_num)[0]
 
-
-            print(obs_num)
-            print(obs_dict['obs_num'])
-            print(obs_indexes)
-
-
-            # Find which GA observation type (e.g. ADJUST2) is used,
-            # as this dictates the number and order of NIRCam and FGS
-            # exposures
-            # No GA_Iteration column in dictionary
-            #ga_iteration = np.array(self.exposure_tab['GA_Iteration'])[obs_indexes][0].upper()
-            #print('ga_iteration: ', ga_iteration)
-
             # Get the subarray and aperture entries for the observation
             aperture_values = np.array(obs_dict['aperture'])[obs_indexes]
             subarr_values = np.array(obs_dict['Subarray'])[obs_indexes]
-
-
-            print('BEFORE: ', aperture_values)
 
             # Subarray values, which come from the xml file, are correct. The aperture
             # values, which come from the pointing file, are not correct. We need to
@@ -964,79 +931,12 @@ class AptInput:
             aperture_values[to_fgs] = subarr_values[to_fgs]
             fgs_aperture = aperture_values[to_fgs][0]
 
-            print('AFTER: ', aperture_values)
-
-
-            # Determine which exposures within the observation need to be changed
-            # from NIRCam to FGS
-            #inst_order = constants.GLOBAL_ALIGNMENT_INSTRUMENT_ORDER[ga_iteration]
-            #to_fgs = np.where(np.array(inst_order) == 'fgs')[0]
-
-            # Determine which FGS detector to be used
-            #fgs_detector_number = np.array(self.exposure_tab['FGS_Detector'])[obs_indexes][0]
-
-
-            """
-            # These are already done in read_apt_xml!!!!
-            # Switch the instrument name to FGS in the FGS exposures
-            instrument_col = np.array(self.exposure_tab['Instrument'])
-            instrument_col[obs_indexes][to_fgs] = 'FGS'
-            self.exposure_tab['Instrument'] = instrument_col
-
-            aperture_col = np.array(self.exposure_tab['aperture'])
-            fgs_aperture = 'FGS{}_FULL'.format(fgs_detector_number)
-            """
-
-            """
-            print('+++++++++++++++')
-            print('Types:')
-            print(type(self.exposure_tab['aperture']), type(aperture_col))
-            print(type(obs_indexes), type(to_fgs))
-            test = np.arange(20)
-            obs_indexes = np.array([5, 6, 7, 8, 9, 10, 11])
-            print(test)
-            test[obs_indexes][to_fgs] = 999
-            print(test)
-            test[obs_indexes[to_fgs]] = 888
-            print(test)
-            stop
-            """
-
-
-
-            #print(type(obs_indexes))
-            #print(type(to_fgs))
-
-            #print(len(aperture_col))
-            #print(obs_indexes)
-            #print(to_fgs)
-
-
-            ####TEST####
-            #aperture_col[obs_indexes] = 'GARBAGE'
-
-            # Not sure why I need to do it this way, but stringing
-            # together two index arrays doesn't seem to work
-            #temp = aperture_col[obs_indexes]
-            #temp[to_fgs] = fgs_aperture
-            #aperture_col[obs_indexes] = temp
-
-
-            # WHY DOESN'T THIS WORK!!!!
-            #aperture_col[obs_indexes[to_fgs]] = fgs_aperture
             all_aperture_values = np.array(obs_dict['aperture'])
             all_aperture_values[obs_indexes] = aperture_values
             obs_dict['aperture'] = all_aperture_values
 
-            #print(fgs_aperture)
-            #print(aperture_col[obs_indexes])
-            #print('AFTER:', aperture_col[obs_indexes][to_fgs])
-            #print(aperture_col)
-
-
-
             # Update the pointing info for the FGS exposures
-            fgs = Siaf('fgs')[fgs_aperture]   # or FGS2_FULL
+            fgs = Siaf('fgs')[fgs_aperture]
             basex, basey = fgs.tel_to_idl(nrc_siaf.V2Ref, nrc_siaf.V3Ref)
             dithx = np.array(obs_dict['dithx'])[obs_indexes[to_fgs]]
             dithy = np.array(obs_dict['dithy'])[obs_indexes[to_fgs]]
@@ -1058,83 +958,8 @@ class AptInput:
             obs_dict['idlx'] = idlx_col
             obs_dict['idly'] = idly_col
 
-            print('NEW', basex, basey, dithx, dithy, idlx, idly)
-
-            print(obs_dict['Instrument'])
-            print(obs_dict['aperture'])
-            print(obs_dict['basex'])
-            print(obs_dict['basey'])
-
-
-        print('\n\n')
-        print(obs_dict['Instrument'])
-        print(obs_dict['aperture'])
-        print(obs_dict['basex'])
-        print(obs_dict['basey'])
-
         return obs_dict
 
-
-        """
-            Quantities that need to be updated:
-            aperture name
-
-            seen in example: base + dither = idl
-
-            BaseX - same value for all dithers/pointings
-            BaseY
-            dithx - very small difference (~0.05) in nrc/nis example, except for the first pointing where nrc and nis are exactly 0.0
-            dithy
-            IdlX - large difference (~-200) in nrc/nis example. values = basex + dithx
-            IdlY
-
-            Quantities that stay the same:
-            RA
-            Dec
-            V2
-            V3
-
-
-
-
-
-
-            THIS SECTION ISN'T NEEDED....I THINK
-            # Loop over the exposures to be changed, and update pointing information
-            for change in to_fgs:
-                # Sanity check
-                siaf_instrument = self.exposure_tab['Instrument'][indexes][change]
-                if siaf_instrument.lower() != 'nircam':
-                    raise ValueError(('ERROR: expecting all GA entries to initially be set to NIRCam, '
-                                      'but this one, in observation number {}, is set to {}'.format(obs_num, siaf_instrument)))
-
-                aperture_name = self.exposure_tab['aperture'][indexes][change]
-                pointing_ra = np.float(self.exposure_tab['ra'][indexes][change])
-                pointing_dec = np.float(self.exposure_tab['dec'][indexes][change])
-                pointing_v2 = np.float(self.exposure_tab['v2'][indexes][change])
-                pointing_v3 = np.float(self.exposure_tab['v3'][indexes][change])
-
-                try:
-                    telescope_roll = np.float(self.exposure_tab['pav3'][indexes][change])
-                except KeyError:
-                    telescope_roll = np.float(self.exposure_tab['PAV3'][indexes][change])
-
-                local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                        siaf_interface.get_siaf_information(nrc_siaf, aperture_name,
-                                                            pointing_ra, pointing_dec, telescope_roll,
-                                                            v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
-
-                # Define which FGS aperture we are switching to
-                fgs_aperture = ??
-
-                # Calculate RA, Dec of reference location for the detector
-                ra, dec = rotations.pointing(attitude_matrix, fgs_aperture.V2Ref, fgs_aperture.V3Ref)
-
-
-
-
-        return
-    """
 
     def tight_dithers(self, input_dict):
         """
