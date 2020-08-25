@@ -370,7 +370,7 @@ class AptInput:
                         obs_num = self.exposure_tab['obs_num'][i]
 
                         if self.exposure_tab['APTTemplate'][i] == 'WfscGlobalAlignment':
-                            guider_number = self.exposure_tab['FGS_Detector'][i]
+                            guider_number = self.exposure_tab['aperture'][i][3]
                         elif self.exposure_tab['APTTemplate'][i] == 'FgsExternalCalibration':
                             guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
                         else:
