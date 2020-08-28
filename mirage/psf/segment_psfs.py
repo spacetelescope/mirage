@@ -70,6 +70,10 @@ def _generate_psfs_for_one_segment(inst, ote, segment_tilts, out_dir, boresight,
             ote.amplitude = pupil[0].data
             inst.pupil = ote
 
+            # Determine normalization factor - what fraction of total pupil is in this one segment?
+            full_pupil = fits.getdata(os.path.join(webbpsf.utils.get_webbpsf_data_path(), 'jwst_pupil_RevW_npix1024.fits.gz'))
+            pupil_fraction_for_this_segment = pupil[0].data.sum() / full_pupil.sum()
+
             # Generate the PSF grid
             # NOTE: we are choosing a polychromatic simulation here to better represent the
             # complexity of simulating unstacked PSFs. See the WebbPSF website for more details.
@@ -77,6 +81,10 @@ def _generate_psfs_for_one_segment(inst, ote, segment_tilts, out_dir, boresight,
                                  use_detsampled_psf=True, fov_pixels=fov_pixels,
                                  oversample=1, overwrite=overwrite, add_distortion=False,
                                  nlambda=nlambda, verbose=False)
+
+            # Apply correct normalization factor for the fraction of light in that segment.
+            # WebbPSF is outputting PSFs normalized to 1 by default even for the individual segments.
+            grid.data *= pupil_fraction_for_this_segment
 
             # Remove and add header keywords about segment
             del grid.meta["grid_xypos"]
@@ -86,6 +94,11 @@ def _generate_psfs_for_one_segment(inst, ote, segment_tilts, out_dir, boresight,
             grid.meta['XTILT'] = (round(segment_tilts[i, 0], 2), 'X tilt of the segment in micro radians')
             grid.meta['YTILT'] = (round(segment_tilts[i, 1], 2), 'Y tilt of the segment in micro radians')
             grid.meta['SMPISTON'] = (ote.segment_state[18][4], 'Secondary mirror piston (defocus) in microns')
+            grid.meta['SMXTILT'] = (ote.segment_state[18][0], 'Secondary mirror X Tilt in microradians')
+            grid.meta['SMYTILT'] = (ote.segment_state[18][1], 'Secondary mirror Y Tilt in microradians')
+            grid.meta['SMXTRANS'] = (ote.segment_state[18][2], 'Secondary mirror X Translation in microns')
+            grid.meta['SMYTRANS'] = (ote.segment_state[18][3], 'Secondary mirror Y Translation in microns')
+            grid.meta['FRACAREA'] = (pupil_fraction_for_this_segment, "Fractional area of OTE primary for this segment")
 
             if boresight is not None:
                 grid.meta['BSOFF_V2'] = (boresight[0], 'Telescope boresight offset in V2 in arcminutes')
@@ -379,6 +392,7 @@ def get_segment_offset(segment_number, detector, library_list):
     elif segment.startswith('C'):
         ytilt += sm_piston * 0.017761
 
+    # Next we work out the individual offsets from segment-level tilts
     control_xaxis_rotations = {
         'A1': 180, 'A2': 120, 'A3': 60, 'A4': 0, 'A5': -60,
         'A6': -120, 'B1': 0, 'C1': 60, 'B2': -60, 'C2': 0,
@@ -398,6 +412,26 @@ def get_segment_offset(segment_number, detector, library_list):
     x_arcsec = 2 * umrad_to_arcsec * tilt_onto_x
     y_arcsec = 2 * umrad_to_arcsec * tilt_onto_y
 
+    # Secondary mirror tilts and translations also shift the apparent location of each PSF,
+    # often referred to as "changing the boresight".
+    # Coefficients for this are worked out by Randal Telfer in
+    # "JWST Secondary Mirror Influence Functions", doc #JWST-PRES-043631
+    # Values here are taken from Rev C of that document. They are given in units of NIRCam SW pixels per micro-unit of SM pose.
+    # We include just the first order terms, neglecting the small higher order terms
+    sm_xtilt = header.get('SMXTILT', 0)
+    sm_ytilt = header.get('SMYTILT', 0)
+    sm_xtrans = header.get('SMXTRANS', 0)
+    sm_ytrans = header.get('SMYTRANS', 0)
+
+    nrc_pixelscale = 0.0311 # arcsec/pixel
+    x_boresight_offset = ( 1.27777*sm_ytilt - 0.71732*sm_xtrans) * nrc_pixelscale
+    y_boresight_offset = (-1.27363*sm_xtilt - 0.71571*sm_ytrans) * nrc_pixelscale
+
+    x_arcsec += x_boresight_offset
+    y_arcsec += y_boresight_offset
+
+    # Optionally, arbitrary boresight offset may also be present in the FITS header metadata.
+    # If so, include that in the PSF too. Be careful about coordinate sign for the V2 axis!
     try:
         x_arcsec -= header['BSOFF_V2']*60 # BS offset values in header are in arcminutes
         y_arcsec += header['BSOFF_V3']*60 #
