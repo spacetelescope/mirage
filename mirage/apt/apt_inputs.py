@@ -454,22 +454,17 @@ class AptInput:
                             # This block should catch full-frame observations
                             # in either imaging (including TS imaging) or
                             # wfss mode
-                            if template != 'WfscGlobalAlignment':
-                                matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
-                                matched_apertures = []
-                                detectors = []
-                                for ap in matched_aps:
-                                    detectors.append(ap[3:5])
-                                    split = ap.split('_')
-                                    if len(split) == 3:
-                                        ap_string = '{}_{}'.format(split[1], split[2])
-                                    elif len(split) == 2:
-                                        ap_string = split[1]
-                                    matched_apertures.append(ap_string)
-                            else:
-                                det_str, ap_str = input_dictionary['aperture'][index].split('_')
-                                matched_apertures = [ap_str]
-                                detectors = [det_str[3:5]]
+                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
+                            matched_apertures = []
+                            detectors = []
+                            for ap in matched_aps:
+                                detectors.append(ap[3:5])
+                                split = ap.split('_')
+                                if len(split) == 3:
+                                    ap_string = '{}_{}'.format(split[1], split[2])
+                                elif len(split) == 2:
+                                    ap_string = split[1]
+                                matched_apertures.append(ap_string)
 
                         elif mode == 'ts_grism':
                             # This block should get Grism Time Series
