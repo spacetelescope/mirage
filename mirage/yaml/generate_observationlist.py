@@ -488,6 +488,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # create an expanded dictionary that contains lists of parameters expanded for dithers
     xml_dict = expand_for_dithers(xml_dict, verbose=verbose)
+
     #print('Summary of observation dictionary after expanding for dithers:')
     #for key in xml_dict.keys():
     #    print('{:<25}: number of elements is {:>5}'.format(key, len(xml_dict[key])))

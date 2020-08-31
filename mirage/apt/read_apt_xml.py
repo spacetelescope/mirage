@@ -820,11 +820,6 @@ class ReadAPTXML():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
 
-
-        print(exposures_dictionary['ShortFilter'])
-        print(exposures_dictionary['LongFilter'])
-
-
         return exposures_dictionary
 
     def read_commissioning_template(self, template, template_name, obs, prop_params):
@@ -1034,6 +1029,13 @@ class ReadAPTXML():
 
             # self.APTObservationParams = self.add_exposure(self.APTObservationParams, tup_to_add)
             # self.obs_tuple_list.append(tup_to_add)
+
+        # All exposures are full frame 4 amp readouts
+        exposures_dictionary['NumOutputs'] = [4] * len(exposures_dictionary['NumOutputs'])
+
+        # Add the target RA and Dec to the exposure dictionary
+        exposures_dictionary['TargetRA'] = [self.target_info[target_name][0]] * len(exposures_dictionary['NumOutputs'])
+        exposures_dictionary['TargetDec'] = [self.target_info[target_name][1]] * len(exposures_dictionary['NumOutputs'])
 
         return exposures_dictionary, n_exp
 
