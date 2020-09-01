@@ -48,16 +48,25 @@ INST_LIST = ['nircam', 'niriss', 'fgs']
 
 
 class DarkPrep():
-    def __init__(self, offline=False):
+    def __init__(self, file_splitting=True, offline=False):
         """Instantiate DarkPrep object.
 
         Parameters
         ----------
+        file_splitting : bool
+            If True, the output dark current objects are split into
+            segment files, following the logic of the JWST calibration
+            pipeline. If False, no file-splitting is done. False should
+            only be used in very limited cases, such as when creating new
+            linearized dark current files to add to the collection of
+            Mirage reference files
+
         offline : bool
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
         self.offline = offline
+        self.file_splitting = file_splitting
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
@@ -694,9 +703,16 @@ class DarkPrep():
         # to be split into pieces to save memory
         xdim = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
         ydim = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
-        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
-                                                                                          self.params['Readout']['ngroup'],
-                                                                                          self.params['Readout']['nint'])
+        if self.file_splitting:
+            split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
+                                                                                              self.params['Readout']['ngroup'],
+                                                                                              self.params['Readout']['nint'])
+        else:
+            print('File-splitting disabled. Output will be forced into a single file.')
+            split_seed = False
+            group_segment_indexes = np.array([0, self.params['Readout']['ngroup']])
+            integration_segment_indexes = np.array([0, self.params['Readout']['nint']])
+
         # In order to avoid the case of having a single integration
         # in the final file, which leads to rate rather than rateints
         # files in the pipeline, check to be sure that the integration
