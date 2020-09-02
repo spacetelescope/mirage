@@ -495,6 +495,26 @@ class DarkPrep():
             # Don't worry about counting reset frames between integrations
             # We're not concerned with timing here.
 
+    def get_reffile_metadata(self, keyword):
+        """Reetrive the name of the reference file used to calibate
+        self.linDark
+
+        Parameters
+        ----------
+        keyword : str
+            Header keyword to be retrived (e.g. 'R_LINEAR')
+
+        Returns
+        -------
+        value : str
+            Header keyword value
+        """
+        try:
+            value = self.linDark.header[keyword]
+        except KeyError:
+            value = 'N/A'
+        return value
+
     def integration_copy(self, req, darkint):
         """Use copies of integrations in the dark current input to
         make up integrations in the case where the output has
@@ -541,7 +561,7 @@ class DarkPrep():
 
         self.dark.header['NINTS'] = req
 
-    def linearize_dark(self, darkobj):
+    def linearize_dark(self, darkobj, save_refs=True):
         """Beginning with the input dark current ramp, run the dq_init, saturation, superbias
         subtraction, refpix and nonlin pipeline steps in order to produce a linearized
         version of the ramp. This will be used when combining the dark ramp with the
@@ -551,6 +571,10 @@ class DarkPrep():
         -----------
         darkobj : obj
             Instance of read_fits class containing dark current data and info
+
+        save_refs : bool
+            Whether or not to save the names of the reference files used in the
+            pipeline run.
 
         Returns
         -------
@@ -617,20 +641,22 @@ class DarkPrep():
         if self.runStep['linearity']:
             linDark = LinearityStep.call(linDark,
                                          config_file=self.params['newRamp']['linear_configfile'],
-                                         override_linearity=self.params['Reffiles']['linearity'],
-                                         output_file=linearoutfile, save_results=True,
-                                         output_dir=self.params['Output']['directory'])
+                                         override_linearity=self.params['Reffiles']['linearity'])
         else:
             linDark = LinearityStep.call(linDark,
-                                         config_file=self.params['newRamp']['linear_configfile'],
-                                         output_file=linearoutfile, save_results=True,
-                                         output_dir=self.params['Output']['directory'])
-
-        print(("Linearized dark (output directly from pipeline saved as {}"
-               .format(os.path.join(self.params['Output']['directory'], linearoutfile))))
+                                         config_file=self.params['newRamp']['linear_configfile'])
 
         # Now we need to put the data back into a read_fits object
         linDarkobj = read_fits.Read_fits()
+
+        # Save the reference files used during the pipeline run
+        if save_refs:
+            self.linearity_reffile = linDark.meta.ref_file.linearity.name
+            self.mask_reffile = linDark.meta.ref_file.mask.name
+            self.saturation_reffile = linDark.meta.ref_file.saturation.name
+            self.superbias_reffile = linDark.meta.ref_file.superbias.name
+
+        # Populate the data
         linDarkobj.model = linDark
         linDarkobj.rampmodel_to_obj()
         linDarkobj.sbAndRefpix = sbAndRefpixEffects
@@ -850,7 +876,7 @@ class DarkPrep():
                         self.zeroModel.data = np.expand_dims(self.dark.zeroframe, axis=1)
                         self.zeroModel.header = self.linDark.header
                         self.zeroModel.header['NGROUPS'] = 1
-                        self.zeroModel = self.linearize_dark(self.zeroModel)
+                        self.zeroModel = self.linearize_dark(self.zeroModel, save_refs=False)
                         # Return the zeroModel data to 3 dimensions
                         # integrations, y, x
                         self.zeroModel.data = self.zeroModel.data[:, 0, :, :]
@@ -966,6 +992,10 @@ class DarkPrep():
             h0.header['INSTRUME'] = self.instrument
             h0.header['SLOWAXIS'] = self.slowaxis
             h0.header['FASTAXIS'] = self.fastaxis
+            h0.header['R_LINEAR'] = self.linearity_reffile
+            h0.header['R_MASK'] = self.mask_reffile
+            h0.header['R_SATURA'] = self.saturation_reffile
+            h0.header['R_SUPERB'] = self.superbias_reffile
 
             # Add some basic Mirage-centric info
             h0.header['MRGEVRSN'] = (mirage.__version__, 'Mirage version used')
@@ -1033,6 +1063,11 @@ class DarkPrep():
         self.instrument = self.linDark.header['INSTRUME']
         self.fastaxis = self.linDark.header['FASTAXIS']
         self.slowaxis = self.linDark.header['SLOWAXIS']
+
+        self.linearity_reffile = self.get_reffile_metadata('R_LINEAR')
+        self.mask_reffile = self.get_reffile_metadata('R_MASK')
+        self.saturation_reffile = self.get_reffile_metadata('R_SATURA')
+        self.superbias_reffile = self.get_reffile_metadata('R_SUPERB')
 
     def read_parameter_file(self):
         """Read in the yaml parameter file"""
