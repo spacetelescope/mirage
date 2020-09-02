@@ -920,10 +920,10 @@ class DarkPrep():
                 if file_index == 0:
                     #print('self.linDark shape is {}. Expecting it to be 4D'.format(self.linDark.data.shape))
                     junk, num_grps, ydim, xdim = self.linDark.data.shape
-                    final_dark = np.zeros((number_of_ints, num_grps, ydim, xdim))
-                    final_sbandrefpix = np.zeros((number_of_ints, num_grps, ydim, xdim))
-                    final_zerodata = np.zeros((number_of_ints, ydim, xdim))
-                    final_zero_sbandrefpix = np.zeros((number_of_ints, ydim, xdim))
+                    final_dark = np.zeros((number_of_ints, num_grps, ydim, xdim), dtype=np.float32)
+                    final_sbandrefpix = np.zeros((number_of_ints, num_grps, ydim, xdim), dtype=np.float32)
+                    final_zerodata = np.zeros((number_of_ints, ydim, xdim), dtype=np.float32)
+                    final_zero_sbandrefpix = np.zeros((number_of_ints, ydim, xdim), dtype=np.float32)
 
                 if not use_all_files:
                     print('Setting integration {} to use file {}\n'.format(file_index, os.path.split(filename)[1]))
