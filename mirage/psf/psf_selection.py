@@ -59,8 +59,11 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
 
     Returns
     -------
-    norm : bool
-        True if the normalization is as expected. False otherwise
+    result : tup
+        2-element tuple. The first is a boolean, which is
+        True if the normalization is as expected. False otherwise.
+        The second element is a short string describing the
+        result.
     """
     ndims = len(lib.data.shape)
     if ndims == 3:
