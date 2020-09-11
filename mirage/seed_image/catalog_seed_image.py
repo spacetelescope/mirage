@@ -39,7 +39,7 @@ from . import moving_targets
 from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
-from mirage.seed_image import tso
+from mirage.seed_image import tso, ephemeris_tools
 from ..reference_files import crds_tools
 from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
@@ -1327,24 +1327,25 @@ class Catalog_seed():
 
         if MT_tracking is True:
             # Here, we are tracking a non-sidereal target.
-            try:
-                # If there are moving targets on top of the non-
-                # sidereal tracking (e.g. tracking Io but Europa
-                # comes into the fov), then the velocity vector
-                # of the moving target needs to be adjusted.
-                # If the input catalog already contains
-                # 'x_or_RA_velocity' then we know we have a moving
-                # target. If it doesn't, then we have sidereal
-                # targets, and we can simply set their velocity
-                # as the inverse of that being tracked.
-                mtlist['x_or_RA_velocity'] -= tracking_ra_vel
-                mtlist['y_or_Dec_velocity'] -= tracking_dec_vel
-                pixvelflag = trackingPixVelFlag
-            except:
-                print('Setting velocity of targets equal to the non-sidereal tracking velocity')
-                mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel
-                mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel
-                pixvelflag = trackingPixVelFlag
+            if 'ephemeris_file' not in mtlist.colnames:
+                try:
+                    # If there are moving targets on top of the non-
+                    # sidereal tracking (e.g. tracking Io but Europa
+                    # comes into the fov), then the velocity vector
+                    # of the moving target needs to be adjusted.
+                    # If the input catalog already contains
+                    # 'x_or_RA_velocity' then we know we have a moving
+                    # target. If it doesn't, then we have sidereal
+                    # targets, and we can simply set their velocity
+                    # as the inverse of that being tracked.
+                    mtlist['x_or_RA_velocity'] -= tracking_ra_vel
+                    mtlist['y_or_Dec_velocity'] -= tracking_dec_vel
+                    pixvelflag = trackingPixVelFlag
+                except:
+                    print('Setting velocity of targets equal to the non-sidereal tracking velocity')
+                    mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel
+                    mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel
+                    pixvelflag = trackingPixVelFlag
 
         # Exposure times for all frames
         numints = self.params['Readout']['nint']
@@ -1397,18 +1398,27 @@ class Catalog_seed():
         time_reported = False
         for index, entry in zip(indexes, mtlist):
             start_time = time.time()
-            # For each object, calculate x,y or RA,Dec of initial position
-            pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
-                entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
 
-            # Now generate a list of x,y position in each frame
-            if pixvelflag is False:
-                # Calculate the RA,Dec in each frame
-                # input velocities are arcsec/hour. ra/dec are in units of degrees,
-                # so divide velocities by 3600^2.
-                ra_frames = ra + (entry['x_or_RA_velocity'] / 3600. / 3600.) * frameexptimes
-                dec_frames = dec + (entry['y_or_Dec_velocity'] / 3600. / 3600.) * frameexptimes
+            # If the ephemeris file is set to 'None', then strip that
+            # column from entry so that the manually-input velocities
+            # will be used
+            if 'ephemeris_file' in entry.colnames:
+                if entry['ephemeris_file'].lower() == 'none':
+                    entry.remove_column('ephemeris_file')
 
+            # If an ephemeris file is given read it in
+            eph = None
+            if 'ephemeris_file' in entry.colnames:
+                ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+                start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
+                all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
+                ra_eph, dec_eph = self.get_ephemeris(entry['ephemeris_file'])
+
+                # Create list of positions for all frames
+                ra_frames = ra_eph(all_times)
+                dec_frames = dec_eph(all_times)
+
+                # Translate into list of x, y positions
                 x_frames = []
                 y_frames = []
                 for in_ra, in_dec in zip(ra_frames, dec_frames):
@@ -1419,11 +1429,48 @@ class Catalog_seed():
                 x_frames = np.array(x_frames)
                 y_frames = np.array(y_frames)
 
+                # Use the initial location to determine the PSF to uses
+                pixelx = x_frames[1]
+                pixely = y_frames[1]
+                ra = ra_frames[1]
+                dec = dec_frames[1]
             else:
-                # If input velocities are pixels/hour, then generate the list of
-                # x,y in each frame directly
-                x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
-                y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
+                # If no ephemeris file is given, use the ra and dec velocity values
+                # from the source catalog.
+                # Calculate x,y or RA,Dec of initial position
+                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(
+                    entry['x_or_RA'], entry['y_or_Dec'], pixelFlag, 4096)
+
+                # Now generate a list of x,y position in each frame
+                if pixvelflag is False:
+                    # Calculate the RA,Dec in each frame
+                    # input velocities are arcsec/hour. ra/dec are in units of degrees,
+                    # so divide velocities by 3600^2.
+                    ra_frames = ra + (entry['x_or_RA_velocity'] / 3600. / 3600.) * frameexptimes
+                    dec_frames = dec + (entry['y_or_Dec_velocity'] / 3600. / 3600.) * frameexptimes
+
+                    x_frames = []
+                    y_frames = []
+                    for in_ra, in_dec in zip(ra_frames, dec_frames):
+                        # Calculate the x,y position at each frame
+                        px, py, pra, pdec, pra_str, pdec_str = self.get_positions(in_ra, in_dec, False, 4096)
+                        x_frames.append(px)
+                        y_frames.append(py)
+                    x_frames = np.array(x_frames)
+                    y_frames = np.array(y_frames)
+
+                else:
+                    # If input velocities are pixels/hour, then generate the list of
+                    # x,y in each frame directly
+                    x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
+                    y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
+
+
+
+
+
+
+
 
             # Get countrate and PSF size info
             if entry[mag_column] is not None:
@@ -1488,9 +1535,9 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(entry['x_or_RA'],
-                                                                              entry['y_or_Dec'],
-                                                                              pixelFlag, 4096)
+                #pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(entry['x_or_RA'],
+                #                                                              entry['y_or_Dec'],
+                #                                                              pixelFlag, 4096)
 
                 pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
 
@@ -1570,6 +1617,38 @@ class Catalog_seed():
                 time_reported = True
             obj_counter += 1
         return mt_integration, moving_segmap.segmap
+
+    def get_ephemeris(self, method):
+        """Wrapper function to simplify the creation of an ephemeris
+
+        Parameters
+        ----------
+        method : str
+            Method to use to create the ephemeris. Can be one of two
+            options:
+            1) Name of an ascii file containing an ephemeris.
+            2) 'create' - Horizons is queried in order to produce an ephemeris
+
+        Returns
+        -------
+        ephemeris : tup
+            Tuple of interpolation functions for (RA, Dec). Interpolation
+            functions are for RA (or Dec) in degrees as a function of
+            calendar timestamp
+        """
+        if method.lower() != 'create':
+            ephem = ephemeris_tools.read_ephemeris_file(method)
+        else:
+            start_date = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
+            earlier = start_date - datetime.timedelta(days=1)
+            later = start_date + datetime.timedelta(days=1)
+            step_size = 0.1  # days
+            ephem = ephemeris_tools.query_horizons(self.params['Output']['target_name'], earlier, later, step_size)
+            raise NotImplementedError('Horizons query not yet working')
+
+        ephemeris = ephemeris_tools.create_interpol_function(ephem)
+        return ephemeris
+
 
     def on_detector(self, xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
@@ -1749,6 +1828,30 @@ class Catalog_seed():
                      'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             ptsrc.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
 
+            # Get the correct RA, Dec if an ephemeris file is provided
+            # In this block we now assume a single target in the catalog.
+            if 'ephemeris_file' in ptsrc.colnames:
+                if ptsrc['ephemeris_file'][0].lower() == 'none':
+                    ptsrc.remove_column('ephemeris_file')
+
+            # If an ephemeris file is given read it in.
+            # In this block we now assume a single target in the catalog.
+            if 'ephemeris_file' in ptsrc.colnames:
+                ptsrc = self.ephemeris_radec_value_at_obstime(ptsrc)
+
+                #hour, minute, second = self.params['Output']['time_obs'].split(':')
+                #seconds = np.float(second)
+                #sec_int = np.int(np.floor(seconds))
+                #microsec = np.int((seconds - sec_int) * 1e6)
+                #time_string = '{}:{}:{}:{}'.format(hour, minute, str(sec_int), str(microsec))
+                #ob_time = '{}T{}'.format(self.params['Output']['date_obs'], time_string)
+                #start_date = ephemeris_tools.to_timestamp(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S:%f'))
+                #ra_eph, dec_eph = self.get_ephemeris(ptsrc['ephemeris_file'][0])
+                #print('\n\n\n*****If this works, add it to the galaxy and extended blocks below as well****\n\n\n')
+                ## Create list of positions for all frames
+                #ptsrc['x_or_RA'] = ra_eph(start_date)
+                #ptsrc['y_or_Dec'] = dec_eph(start_date)
+
             temp_ptsrc_filename = os.path.join(self.params['Output']['directory'],
                                                'temp_non_sidereal_point_sources.list')
             ptsrc.write(temp_ptsrc_filename, format='ascii', overwrite=True)
@@ -1780,6 +1883,18 @@ class Catalog_seed():
             meta4 = ('from run using non-sidereal moving target '
                      'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             galaxies.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
+
+            # Get the correct RA, Dec if an ephemeris file is provided
+            # In this block we now assume a single target in the catalog.
+            if 'ephemeris_file' in galaxies.colnames:
+                if galaxies['ephemeris_file'][0].lower() == 'none':
+                    galaxies.remove_column('ephemeris_file')
+
+            # If an ephemeris file is given read it in.
+            # In this block we now assume a single target in the catalog.
+            if 'ephemeris_file' in galaxies.colnames:
+                galaxies = self.ephemeris_radec_value_at_obstime(galaxies)
+
             galaxies.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_sersic_sources.list'), format='ascii', overwrite=True)
 
             galaxyCRImage, galaxySegmap = self.make_galaxy_image('temp_non_sidereal_sersic_sources.list')
@@ -1807,6 +1922,18 @@ class Catalog_seed():
             meta3 = 'Extended sources with non-sidereal tracking. File produced by ramp_simulator.py'
             meta4 = 'from run using non-sidereal moving target list {}.'.format(self.params['simSignals']['movingTargetToTrack'])
             extended.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
+
+            # Get the correct RA, Dec if an ephemeris file is provided
+            # In this block we now assume a single target in the catalog.
+            if 'ephemeris_file' in extended.colnames:
+                if extended['ephemeris_file'][0].lower() == 'none':
+                    extended.remove_column('ephemeris_file')
+
+            # If an ephemeris file is given read it in.
+            # In this block we now assume a single target in the catalog.
+            if 'ephemeris_file' in extended.colnames:
+                extended = self.ephemeris_radec_value_at_obstime(extended)
+
             extended.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_extended_sources.list'), format='ascii', overwrite=True)
 
             extlist, extstamps = self.getExtendedSourceList('temp_non_sidereal_extended_sources.list')
@@ -1835,6 +1962,23 @@ class Catalog_seed():
             raise ValueError(("No non-sidereal countrate targets produced."
                               "You shouldn't be here."))
         return totalCRImage, totalSegmap, track_ra_vel, track_dec_vel, velFlag
+
+    def ephemeris_radec_value_at_obstime(self, src_catalog):
+        """Calculate the RA, Dec of the target at the observation time
+        from the yaml file
+        """
+        # In this block we now assume a single target in the catalog.
+        hour, minute, second = self.params['Output']['time_obs'].split(':')
+        seconds = np.float(second)
+        sec_int = np.int(np.floor(seconds))
+        microsec = np.int((seconds - sec_int) * 1e6)
+        time_string = '{}:{}:{}:{}'.format(hour, minute, str(sec_int), str(microsec))
+        ob_time = '{}T{}'.format(self.params['Output']['date_obs'], time_string)
+        start_date = ephemeris_tools.to_timestamp(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S:%f'))
+        ra_eph, dec_eph = self.get_ephemeris(src_catalog['ephemeris_file'][0])
+        src_catalog['x_or_RA'] = ra_eph(start_date)
+        src_catalog['y_or_Dec'] = dec_eph(start_date)
+        return src_catalog
 
     def create_sidereal_image(self):
         # Generate a signal rate image from input sources
