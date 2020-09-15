@@ -136,9 +136,6 @@ class MovingTarget():
 
         for i in range(1,numframes+1):
             # Find the velocity of the source during this frame
-            xvelocity = (xframes[i] - xframes[i-1]) / frametime
-            yvelocity = (yframes[i] - yframes[i-1]) / frametime
-            secPerPix = 1. / np.sqrt(xvelocity*xvelocity + yvelocity*yvelocity)
             outputframe1 = np.copy(outputframe0)
 
             if xframessub[i-1] < xframessub[i]:
@@ -166,7 +163,7 @@ class MovingTarget():
             else:
                 outputframe1 = self.inputMotion(outputframe1, substamp, xframessub[i-1:i+1],
                                                 yframessub[i-1:i+1],xssub[good],yssub[good],
-                                                secPerPix)
+                                                frametime)
 
             outputframe0 = np.copy(outputframe1)
 
@@ -293,23 +290,41 @@ class MovingTarget():
             # If values are NaN then we can't change them to integers
             return outxmin, outxmax, stampxmin, stampxmax
 
-    def inputMotion(self, inframe, source, xbounds, ybounds, xs, ys, secperpix):
+    def inputMotion(self, inframe, source, xbounds, ybounds, xs, ys, frame_time):
         """
         Smear out the source to create an output frame image
         given the necessary info about the source location and velocity
 
-        Arguments:
+        Parameters
         ----------
-        inframe -- 2D array representing the image
-        source -- 2D stamp image containing the source
-        xbounds -- 2-element list containing the starting and ending x-dimension
-                   coordinates of the source (i.e. location corresponding to the
-                   beginning and ending of the frame)
-        ybounds -- 2-element list containing the starting and ending y-dimension
-                   coordinates of the source
-        xs -- list of x-coordinate positions of the source
-        ys -- list of y-coordinate positions of the source
-        secperpix -- Inverse velocity of the source, in seconds per pixel
+        inframe : numpy.ndarray
+            2D array representing the image
+
+        source : numpy.ndarray
+            2D stamp image containing the source
+
+        xbounds : list
+            2-element list containing the starting and ending x-dimension
+            coordinates of the source (i.e. location corresponding to the
+            beginning and ending of the frame)
+
+        ybounds : list
+            2-element list containing the starting and ending y-dimension
+            coordinates of the source
+
+        xs : list
+            x-coordinate positions of the source
+
+        ys : list
+            y-coordinate positions of the source
+
+        frame_time : float
+            exposure time of a single frame
+
+        Returns
+        -------
+        inframe : numpy.ndarray
+            With streaked source added
         """
         frameylen,framexlen = inframe.shape
         srcylen,srcxlen = source.shape
@@ -320,6 +335,9 @@ class MovingTarget():
         xlist = np.round(xlist)
         ylist = np.round(ylist)
 
+        # exposure time between two of these equidistant points
+        pt_exptime = frame_time / len(xlist)
+
         for i in range(1,len(xlist)):
             outxmin, outxmax, stampxmin, stampxmax = self.coordCheck(xlist[i], srcxlen, framexlen)
             outymin, outymax, stampymin, stampymax = self.coordCheck(ylist[i], srcylen, frameylen)
@@ -329,7 +347,7 @@ class MovingTarget():
             # the output frame and it shouldn't be added
             if np.all(np.isfinite(outcoords)):
                 dist = np.sqrt((xlist[i]-xlist[i-1])**2 + (ylist[i]-ylist[i-1])**2)
-                inframe[outymin:outymax, outxmin:outxmax] += (source[stampymin:stampymax, stampxmin:stampxmax]*secperpix*dist)
+                inframe[outymin:outymax, outxmin:outxmax] += (source[stampymin:stampymax, stampxmin:stampxmax] * pt_exptime)
         return inframe
 
     def subsample(self, image, factorx, factory):

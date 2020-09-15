@@ -1179,8 +1179,8 @@ class Catalog_seed():
                 non_sidereal_ramp += mtt_data_list[i]
                 # non_sidereal_zero += mtt_zero_list[i]
         if mtt_data_segmap is not None:
-            nonsidereal_segmap.segmap += mtt_data_segmap
-        return non_sidereal_ramp, nonsidereal_segmap.segmap
+            nonsidereal_segmap += mtt_data_segmap
+        return non_sidereal_ramp, nonsidereal_segmap
 
     def readMTFile(self, filename):
         """
@@ -1762,7 +1762,7 @@ class Catalog_seed():
                 ptsrcCRImage *= self.flatfield
 
             totalCRList.append(ptsrcCRImage)
-            totalSegList.append(ptsrcCRSegmap)
+            totalSegList.append(ptsrcCRSegmap.segmap)
 
         if len(galaxy_rows) > 0:
             galaxies = targs[galaxy_rows]
@@ -1780,9 +1780,11 @@ class Catalog_seed():
             meta4 = ('from run using non-sidereal moving target '
                      'list {}.'.format(self.params['simSignals']['movingTargetToTrack']))
             galaxies.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
-            galaxies.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_sersic_sources.list'), format='ascii', overwrite=True)
 
-            galaxyCRImage, galaxySegmap = self.make_galaxy_image('temp_non_sidereal_sersic_sources.list')
+            temp_gal_filename = os.path.join(self.params['Output']['directory'],
+                                               'temp_non_sidereal_sersic_sources.list')
+            galaxies.write(temp_gal_filename, format='ascii', overwrite=True)
+            galaxyCRImage, galaxySegmap = self.make_galaxy_image(temp_gal_filename)
 
             if self.instrument == 'nircam' and self.params['Inst']['mode'] in ['wfss', 'ts_grism']:
                 pass
@@ -1807,9 +1809,11 @@ class Catalog_seed():
             meta3 = 'Extended sources with non-sidereal tracking. File produced by ramp_simulator.py'
             meta4 = 'from run using non-sidereal moving target list {}.'.format(self.params['simSignals']['movingTargetToTrack'])
             extended.meta['comments'] = [meta0, meta1, meta2, meta3, meta4]
-            extended.write(os.path.join(self.params['Output']['directory'], 'temp_non_sidereal_extended_sources.list'), format='ascii', overwrite=True)
 
-            extlist, extstamps = self.getExtendedSourceList('temp_non_sidereal_extended_sources.list')
+            temp_ext_filename = os.path.join(self.params['Output']['directory'],
+                                               'temp_non_sidereal_extended_sources.list')
+            extended.write(temp_ext_filename, format='ascii', overwrite=True)
+            extlist, extstamps = self.getExtendedSourceList(temp_ext_filename)
 
             # translate the extended source list into an image
             extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps)
@@ -3769,6 +3773,10 @@ class Catalog_seed():
                 print("Extended list input positions assumed to be in units of RA and Dec.")
         except:
             raise FileNotFoundError("WARNING: Unable to open the extended source list file {}".format(filename))
+
+        # Create table of point source countrate versus psf size
+        if self.add_psf_wings is True:
+            self.translate_psf_table(magsys)
 
         # File to save adjusted point source locations
         eoutcat = self.params['Output']['file'][0:-5] + '_extendedsources.list'
