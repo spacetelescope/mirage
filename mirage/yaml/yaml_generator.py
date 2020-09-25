@@ -1602,14 +1602,12 @@ class SimInput:
             else:  # niriss and fgs
                 for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                                                            '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
-                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw', FGS1_DARK_SEARCH_STRING))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', FGS1_DARK_SEARCH_STRING))
 
                     elif det == 'G2':
-                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                                                            '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
-                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw', FGS2_DARK_SEARCH_STRING))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', FGS2_DARK_SEARCH_STRING))
 
                     elif det == 'NIS':
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',

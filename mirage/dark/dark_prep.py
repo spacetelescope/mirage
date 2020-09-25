@@ -38,6 +38,7 @@ import astropy.units as u
 
 import mirage
 from mirage.utils import read_fits, utils, siaf_interface
+from mirage.utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING
 from mirage.utils.file_splitting import find_file_splits
 from mirage.utils.timer import Timer
 from mirage.reference_files import crds_tools
@@ -703,7 +704,12 @@ class DarkPrep():
                 dark_dir = os.path.split(self.params['Reffiles']['linearized_darkfile'])[0]
             else:
                 dark_dir = os.path.split(self.params['Reffiles']['dark'])[0]
-            dark_list = glob(os.path.join(dark_dir, '*.fits'))
+            search_string = '*.fits'
+            if 'FGS1' in self.params['Readout']['array_name']:
+                search_string = FGS1_DARK_SEARCH_STRING
+            elif 'FGS2' in self.params['Readout']['array_name']:
+                search_string = FGS2_DARK_SEARCH_STRING
+            dark_list = glob(os.path.join(dark_dir, search_string))
         else:
             if self.runStep['linearized_darkfile']:
                 dark_list = [self.params['Reffiles']['linearized_darkfile']]
