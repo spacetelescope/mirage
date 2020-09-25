@@ -21,6 +21,11 @@ EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NIS_WFSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
 
+# SEARCH STRINGS TO USE FOR FGS DARKS (needed because darks for the two
+# detectors are mixed in a single directory)
+FGS1_DARK_SEARCH_STRING = '*_497_*fits'
+FGS2_DARK_SEARCH_STRING = '*_498_*fits'
+
 # Supported NIRISS filters
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
 NIRISS_PUPIL_WHEEL_FILTERS = ['F090W', 'F115W', 'F158M', 'F140M', 'F150W', 'F200W']
