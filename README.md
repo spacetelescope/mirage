@@ -40,18 +40,7 @@ Please find additional citation instructions in [CITATION](CITATION).
 
 Prior to contributing to the `mirage` development, please review our [style guide](https://github.com/spacetelescope/mirage/blob/master/style_guide/style_guide.md).
 
-The following is a bare bones example of a best work flow for contributing to the project:
-
-1. Create a fork off of the `spacetelescope` `mirage` repository.
-2. Make a local clone of your fork.
-3. Ensure your personal fork is pointing `upstream` properly.
-4. Create a branch on that personal fork.
-5. Make your software changes.
-6. Push that branch to your personal GitHub repository (i.e. `origin`).
-7. On the `spacetelescope` `mirage` repository, create a pull request that merges the branch into `spacetelescope:master`.
-8. Assign a reviewer from the team for the pull request.
-9. Iterate with the reviewer over any needed changes until the reviewer accepts and merges your branch.
-10. Delete your local copy of your branch.
+Contibutors should use a ["forking workflow"](https://github.com/spacetelescope/style-guides/blob/master/guides/git-workflow.md#the-forking-workflow-) when making contributions to the project.
 
 
 ## Code of Conduct
