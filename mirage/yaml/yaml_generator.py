@@ -107,6 +107,7 @@ import pysiaf
 
 from ..apt import apt_inputs
 from ..reference_files import crds_tools
+from ..utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
