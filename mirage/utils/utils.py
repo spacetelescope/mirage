@@ -720,7 +720,7 @@ def magnitude_to_countrate(instrument, filter_name, magsys, mag, photfnu=None, p
     Returns
     -------
     count_rate : float or list
-        Count rate (e/s) corresponding to the input magnutude(s)
+        Count rate (ADU/s) corresponding to the input magnutude(s)
 
     """
     # For NIRISS filters in the filter wheel, we increase the count rate by a
