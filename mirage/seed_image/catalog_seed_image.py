@@ -11,6 +11,7 @@ import argparse
 import datetime
 import sys
 import glob
+import logging
 import os
 import copy
 import re
@@ -40,6 +41,7 @@ from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
 from mirage.seed_image import tso
+from ..logging import logging_functions
 from ..reference_files import crds_tools
 from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
@@ -125,11 +127,22 @@ class Catalog_seed():
 
     def make_seed(self):
         """MAIN FUNCTION"""
-        print('\n\nRunning catalog_seed_image..\n')
 
         # Read in input parameters and quality check
         self.seed_files = []
         self.readParameterFile()
+
+        # Initialize the log using dictionary from the yaml file
+        log_config_file = os.path.join(self.modpath, 'config', 'logging_config.yam')
+        log_output_dir = os.path.abspath(os.path.join(self.params['Output']['directory'], 'logs'))
+        utils.ensure_dir_exists(log_output_dir)
+        logfile_name = self.paramfile.replace('.yaml', '.log')
+        logging_functions.via_config_file(log_config_file, os.path.join(log_output_dir, logfile_name))
+        self.logger = logging.getLogger('mirage.catalog_seed_image')
+
+        # Get the log caught up on what's already happened
+        self.logger.info('\n\nRunning catalog_seed_image..\n')
+        self.logger.info('Reading parameter file: {}'.format(self.paramfile))
 
         # Make filter/pupil values respect the filter/pupil wheel they are in
         self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
@@ -164,9 +177,9 @@ class Catalog_seed():
         self.output_dims = (self.nominal_dims * np.array([self.coord_adjust['y'],
                                                           self.coord_adjust['x']])).astype(np.int)
 
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
-        print('output dimensions are: {}'.format(self.output_dims))
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+        self.logger.info('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+        self.logger.info('output dimensions are: {}'.format(self.output_dims))
+        self.logger.info('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
 
         # Read in the flat field file so it can be used later
         self.prepare_flat()
@@ -176,7 +189,7 @@ class Catalog_seed():
                                                self.params['Readout']['array_name'],
                                                self.nominal_dims[1], self.nominal_dims[0],
                                                self.params['Readout']['namp'])
-        print("Frametime is {}".format(self.frametime))
+        self.logger.info("Frametime is {}".format(self.frametime))
 
         # Get information on the number of frames
         self.get_frame_count_info()
@@ -218,7 +231,7 @@ class Catalog_seed():
                     delta_int = self.file_segment_indexes[1:] - self.file_segment_indexes[0: -1]
                     if delta_int[-1] == 1 and delta_int[0] != 1:
                         self.file_segment_indexes[-2] -= 1
-                        print('Adjusted to avoid single integration: ', self.file_segment_indexes)
+                        self.logger.debug('Adjusted final seed to avoid single integration: {}'.format(self.file_segment_indexes))
 
                 # More adjustments related to segment numbers. We need to compare
                 # the integration indexes for the seed images vs those for the final
@@ -303,9 +316,9 @@ class Catalog_seed():
             max_wing_size = self.psf_wings.shape[0]
             too_large = np.where(np.array(self.psf_wing_sizes['number_of_pixels']) > max_wing_size)[0]
             if len(too_large) > 0:
-                print(('Some PSF sizes in {} are larger than the PSF library file dimensions. '
-                       'Resetting these values in the table to be equal to the PSF dimensions'
-                       .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
+                self.logger.info(('Some PSF sizes in {} are larger than the PSF library file dimensions. '
+                                  'Resetting these values in the table to be equal to the PSF dimensions'
+                                  .format(os.path.basename(self.params['simSignals']['psf_wing_threshold_file']))))
                 self.psf_wing_sizes['number_of_pixels'][too_large] = max_wing_size
 
         # Prepare for saving seed images. Set default values for the
@@ -327,7 +340,7 @@ class Catalog_seed():
 
         # For imaging mode, generate the countrate image using the catalogs
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
-            print('Creating signal rate image of synthetic inputs.')
+            self.logger.info('Creating signal rate image of sidereal synthetic inputs.')
             self.seedimage, self.seed_segmap = self.create_sidereal_image()
             outapp = ''
 
@@ -335,7 +348,7 @@ class Catalog_seed():
         # everything in the catalogs needs to be streaked across
         # the detector
         if self.params['Telescope']['tracking'].lower() == 'non-sidereal':
-            print('Creating signal ramp of synthetic inputs')
+            self.logger.info('Creating signal ramp of non-sidereal synthetic inputs')
             self.seedimage, self.seed_segmap = self.non_sidereal_seed()
             outapp = '_nonsidereal_target'
 
@@ -344,14 +357,14 @@ class Catalog_seed():
         mov_targs_ramps = []
         if (self.runStep['movingTargets'] | self.runStep['movingTargetsSersic']
                 | self.runStep['movingTargetsExtended']):
-            print(("Creating signal ramp of sources that are moving with "
-                   "respect to telescope tracking."))
+            self.logger.info(("Creating signal ramp of sources that are moving with "
+                              "respect to telescope tracking."))
             trailed_ramp, trailed_segmap = self.make_trailed_ramp()
             outapp += '_trailed_sources'
 
             # Now we need to expand frameimage into a ramp
             # so we can add the trailed objects
-            print('Combining trailed object ramp with that containing tracked targets')
+            self.logger.info('Combining trailed object ramp with that containing tracked targets')
             if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
                 self.seedimage = self.combineSimulatedDataSources('countrate', self.seedimage, trailed_ramp)
             else:
@@ -396,7 +409,7 @@ class Catalog_seed():
                 # Save the full-sized pom seed image to a file
                 self.pom_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_pom_seed_image.fits')
                 self.saveSeedImage(self.pom_seed, self.pom_segmap, self.pom_file)
-                print('Full POM seed image saved as: {}'.format(self.pom_file))
+                self.logger.info('Full POM seed image saved as: {}'.format(self.pom_file))
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
             if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
@@ -419,9 +432,9 @@ class Catalog_seed():
                 self.seed_files = [self.seed_file]
 
             self.saveSeedImage(self.seedimage, self.seed_segmap, self.seed_file)
-            print("Final seed image and segmentation map saved as {}".format(self.seed_file))
-            print("Seed image, segmentation map, and metadata available as:")
-            print("self.seedimage, self.seed_segmap, self.seedinfo.")
+            self.logger.info("Final seed image and segmentation map saved as {}".format(self.seed_file))
+            self.logger.info("Seed image, segmentation map, and metadata available as:")
+            self.logger.info("self.seedimage, self.seed_segmap, self.seedinfo.\n\n")
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
@@ -574,7 +587,7 @@ class Catalog_seed():
                         counter += 1
 
                         # Save the seed image segment to a file
-                        print('\n\n\ntotal_seed_segments-and_parts: ', self.total_seed_segments_and_parts)
+                        self.logger.debug('\n\n\ntotal_seed_segments_and_parts: ', self.total_seed_segments_and_parts)
                         seg_string = str(self.segment_number).zfill(3)
                         part_string = str(self.segment_part_number).zfill(3)
                         self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],
@@ -582,7 +595,7 @@ class Catalog_seed():
 
                         self.saveSeedImage(seed, segmap, self.seed_file)
                         self.seed_files.append(self.seed_file)
-                        print('Adding file {} to self.seed_files\n'.format(self.seed_file))
+                        self.logger.info('Adding file {} to self.seed_files\n'.format(self.seed_file))
                         j += 1
 
                     i += 1
@@ -828,18 +841,18 @@ class Catalog_seed():
             tgroup = 0.
             arraygroup = 0
             arrayint = 0
-            print('Seed image is 2D.')
+            self.logger.info('Seed image is 2D.')
         elif len(arrayshape) == 3:
             units = 'ADU'
             grps, yd, xd = arrayshape
             integ = 0
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
-            print('Seed image is 3D.')
+            self.logger.info('Seed image is 3D.')
         elif len(arrayshape) == 4:
             units = 'ADU'
             integ, grps, yd, xd = arrayshape
             tgroup = self.frametime * (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
-            print('Seed image is 4D.')
+            self.logger.info('Seed image is 4D.')
 
         xcent_fov = xd / 2
         ycent_fov = yd / 2
@@ -955,8 +968,8 @@ class Catalog_seed():
             numints = self.params['Readout']['nint']
             num_frames = self.params['Readout']['ngroup'] * \
                 (self.params['Readout']['nframe'] + self.params['Readout']['nskip'])
-            print("Countrate image of synthetic signals being converted to "
-                  "RAPID/NISRAPID integration with {} frames.".format(num_frames))
+            self.logger.info("Countrate image of synthetic signals being converted to "
+                             "RAPID/NISRAPID integration with {} frames.".format(num_frames))
             input1_ramp = np.zeros((numints, num_frames, yd, xd))
             for i in range(num_frames):
                 input1_ramp[0, i, :, :] = input1 * self.frametime * (i + 1)
@@ -991,7 +1004,7 @@ class Catalog_seed():
             # print("RA velocity of {} and dec_val of {}".format(ra_vel, dec_vel))
 
         if self.runStep['movingTargets']:
-            print("Adding moving point sources to seed image.")
+            self.logger.info("Adding moving point sources to seed image.")
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],
                                                                        'pointSource',
                                                                        MT_tracking=tracking,
@@ -1007,7 +1020,7 @@ class Catalog_seed():
 
         # moving target using a sersic object
         if self.runStep['movingTargetsSersic']:
-            print("Adding moving galaxies to seed image.")
+            self.logger.info("Adding moving galaxies to seed image.")
             mov_targs_sersic, mt_galaxy_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetSersic'],
                                                                          'galaxies',
                                                                          MT_tracking=tracking,
@@ -1026,7 +1039,7 @@ class Catalog_seed():
 
         # moving target using an extended object
         if self.runStep['movingTargetsExtended']:
-            print("Adding moving extended sources to seed image.")
+            self.logger.info("Adding moving extended sources to seed image.")
             mov_targs_ext, mt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetExtended'],
                                                                    'extended',
                                                                    MT_tracking=tracking,
@@ -1107,7 +1120,7 @@ class Catalog_seed():
         if self.runStep['pointsource']:
             # Now ptsrc is a list, which we need to provide to
             # movingTargetInputs
-            print("Adding moving background point sources to seed image.")
+            self.logger.info("Adding moving background point sources to seed image.")
             mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],
                                                                   'pointSource',
                                                                   MT_tracking=True,
@@ -1125,11 +1138,11 @@ class Catalog_seed():
                 mtt_data_segmap = np.copy(mtt_ptsrc_segmap)
             else:
                 mtt_data_segmap += mtt_ptsrc_segmap
-            print(("Done with creating moving targets from {}"
-                   .format(self.params['simSignals']['pointsource'])))
+            self.logger.info(("Done with creating moving targets from {}"
+                              .format(self.params['simSignals']['pointsource'])))
 
         if self.runStep['galaxies']:
-            print("Adding moving background galaxies to seed image.")
+            self.logger.info("Adding moving background galaxies to seed image.")
             mtt_galaxies, mtt_galaxies_segmap = self.movingTargetInputs(self.params['simSignals']['galaxyListFile'],
                                                                         'galaxies',
                                                                         MT_tracking=True,
@@ -1147,11 +1160,11 @@ class Catalog_seed():
             else:
                 mtt_data_segmap += mtt_galaxies_segmap
 
-            print(("Done with creating moving targets from {}".
-                   format(self.params['simSignals']['galaxyListFile'])))
+            self.logger.info(("Done with creating moving targets from {}".
+                              format(self.params['simSignals']['galaxyListFile'])))
 
         if self.runStep['extendedsource']:
-            print("Adding moving background extended sources to seed image.")
+            self.logger.info("Adding moving background extended sources to seed image.")
             mtt_ext, mtt_ext_segmap = self.movingTargetInputs(self.params['simSignals']['extended'],
                                                               'extended',
                                                               MT_tracking=True,
@@ -1169,8 +1182,8 @@ class Catalog_seed():
             else:
                 mtt_data_segmap += mtt_ext_segmap
 
-            print(("Done with creating moving targets from {}".
-                   format(self.params['simSignals']['extended'])))
+            self.logger.info(("Done with creating moving targets from {}".
+                              format(self.params['simSignals']['extended'])))
 
         # Add in the other objects which are not being tracked on
         # (i.e. the sidereal targets)
@@ -1341,7 +1354,7 @@ class Catalog_seed():
                 mtlist['y_or_Dec_velocity'] -= tracking_dec_vel
                 pixvelflag = trackingPixVelFlag
             except:
-                print('Setting velocity of targets equal to the non-sidereal tracking velocity')
+                self.logger.info('Setting velocity of targets equal to the non-sidereal tracking velocity')
                 mtlist['x_or_RA_velocity'] = 0. - tracking_ra_vel
                 mtlist['y_or_Dec_velocity'] = 0. - tracking_dec_vel
                 pixvelflag = trackingPixVelFlag
@@ -1565,8 +1578,8 @@ class Catalog_seed():
             if obj_counter > 3 and not time_reported:
                 avg_time = np.mean(times)
                 total_time = len(indexes) * avg_time
-                print(("Expected time to process {} sources: {:.2f} seconds "
-                       "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
+                self.logger.info(("Expected time to process {} sources: {:.2f} seconds "
+                                  "({:.2f} minutes)".format(len(indexes), total_time, total_time/60)))
                 time_reported = True
             obj_counter += 1
         return mt_integration, moving_segmap.segmap
@@ -1863,14 +1876,14 @@ class Catalog_seed():
             if not self.expand_catalog_for_segments:
 
                 # Translate the point source list into an image
-                print('Calculating point source lists')
+                self.logger.info('Creating point source lists')
                 pslist = self.get_point_source_list(self.params['simSignals']['pointsource'])
                 psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
 
             elif self.expand_catalog_for_segments:
                 # Expand the point source list for each mirror segment, and add together
                 # the 18 point source images that used different PSFs.
-                print('Expanding the source catalog for 18 mirror segments')
+                self.logger.info('Expanding the source catalog for 18 mirror segments')
 
                 # Create empty image and segmentation map
                 ptsrc_segmap = segmap.SegMap()
@@ -1883,7 +1896,7 @@ class Catalog_seed():
                     self.params['simSignals']['psfpath'], pupil=self.psf_pupil
                 )
                 for i_segment in np.arange(1, 19):
-                    print('\nCalculating point source lists for segment {}'.format(i_segment))
+                    self.logger.info('\nCalculating point source lists for segment {}'.format(i_segment))
                     # Get the RA/Dec offset that matches the given segment
                     offset_vector = get_segment_offset(i_segment, self.detector, library_list)
 
@@ -1900,8 +1913,8 @@ class Catalog_seed():
                         seg_psfImageName = self.basename + '_pointSourceRateImage_seg{:02d}.fits'.format(i_segment)
                         h0 = fits.PrimaryHDU(seg_psfimage)
                         h0.writeto(seg_psfImageName, overwrite=True)
-                        print("    Segment {} point source image and segmap saved as {}".format(i_segment,
-                                                                                                seg_psfImageName))
+                        self.logger.info("    Segment {} point source image and segmap saved as {}".format(i_segment,
+                                                                                                           seg_psfImageName))
 
                     psfimage += seg_psfimage
 
@@ -1940,7 +1953,7 @@ class Catalog_seed():
             else:
                 self.ptsrc_seed_filename = '{}_ptsrc_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.point_source_seed, self.point_source_seg_map, self.ptsrc_seed_filename)
-            print("Point source image and segmap saved as {}".format(self.ptsrc_seed_filename))
+            self.logger.info("Point source image and segmap saved as {}".format(self.ptsrc_seed_filename))
 
         else:
             self.point_source_seed = None
@@ -1982,7 +1995,7 @@ class Catalog_seed():
             else:
                 self.galaxy_seed_filename = '{}_galaxy_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.galaxy_source_seed, self.galaxy_source_seg_map, self.galaxy_seed_filename)
-            print("Simulated galaxy image and segmap saved as {}".format(self.galaxy_seed_filename))
+            self.logger.info("Simulated galaxy image and segmap saved as {}".format(self.galaxy_seed_filename))
 
             # Add galaxy segmentation map to the master copy
             segmentation_map = self.add_segmentation_maps(segmentation_map, galaxy_segmap)
@@ -2031,7 +2044,7 @@ class Catalog_seed():
             else:
                 self.extended_seed_filename = '{}_extended_seed_image.fits'.format(self.basename)
             self.saveSeedImage(self.extended_source_seed, self.extended_source_seg_map, self.extended_seed_filename)
-            print("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
+            self.logger.info("Extended object image and segmap saved as {}".format(self.extended_seed_filename))
 
             # Add galaxy segmentation map to the master copy
             segmentation_map = self.add_segmentation_maps(segmentation_map, ext_segmap)
@@ -2046,7 +2059,7 @@ class Catalog_seed():
 
         # ZODIACAL LIGHT
         if self.runStep['zodiacal'] is True:
-            print(("\n\nWARNING: A file has been provided for a zodiacal light contribution "
+            self.logger.warning(("\n\nWARNING: A file has been provided for a zodiacal light contribution "
                    "but zodi is included in the background addition in imaging/imaging TSO modes "
                    "if bkgdrate is set to low/medium/high, or for any WFSS/Grism TSO observations.\n\n"))
             # zodiangle = self.eclipticangle() - self.params['Telescope']['rotation']
@@ -2083,7 +2096,7 @@ class Catalog_seed():
         if self.params['Output']['save_intermediates'] is True:
             rateImageName = self.basename + '_AddedSources_adu_per_sec.fits'
             self.saveSingleFits(signalimage, rateImageName)
-            print("Signal rate image of all added sources saved as {}".format(rateImageName))
+            self.logger.info("Signal rate image of all added sources saved as {}".format(rateImageName))
 
         return signalimage, segmentation_map
 
@@ -2146,9 +2159,9 @@ class Catalog_seed():
         try:
             lines, pixelflag, magsys = self.read_point_source_file(filename)
             if pixelflag:
-                print("Point source list input positions assumed to be in units of pixels.")
+                self.logger.info("Point source list input positions assumed to be in units of pixels.")
             else:
-                print("Point list input positions assumed to be in units of RA and Dec.")
+                self.logger.info("Point list input positions assumed to be in units of RA and Dec.")
         except:
             raise NameError("WARNING: Unable to open the point source list file {}".format(filename))
 
@@ -2212,7 +2225,7 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(lines, filename)
 
-        print('Filtering point sources to keep only those on the detector')
+        self.logger.info('Filtering point sources to keep only those on the detector')
         for index, values in zip(indexes, lines):
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
@@ -2256,16 +2269,16 @@ class Catalog_seed():
 
         self.n_pointsources = len(pointSourceList)
         if self.n_pointsources > 0:
-            print("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
+            self.logger.info("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
         else:
-            print("\nINFO: No point sources present on the detector.")
+            self.logger.info("\nNo point sources present on the detector.")
 
         # close the output file
         pslist.close()
 
         # If no good point sources were found in the requested array, alert the user
-        if len(pointSourceList) < 1:
-            print("INFO: No point sources within the requested aperture.")
+        #if len(pointSourceList) < 1:
+        #    self.logger.info("No point sources within the requested aperture.")
             # print("The point source image option is being turned off")
             # self.runStep['pointsource']=False
             # if self.runStep['extendedsource'] == False and self.runStep['cosmicray'] == False:
@@ -2329,7 +2342,7 @@ class Catalog_seed():
         return dimension
 
     def shift_sources_by_offset(self, lines, segment_offset, pixelflag):
-        print('    Shifting point source locations by arcsecond offset {}'.format(segment_offset))
+        self.logger.info('    Shifting point source locations by arcsecond offset {}'.format(segment_offset))
 
         shifted_lines = lines.copy()
         shifted_lines.remove_rows(np.arange(0, len(shifted_lines)))
@@ -2337,7 +2350,7 @@ class Catalog_seed():
         V2ref_arcsec = self.siaf.V2Ref
         V3ref_arcsec = self.siaf.V3Ref
         position_angle = self.params['Telescope']['rotation']
-        print('    Position angle = ', position_angle)
+        self.logger.info('    Position angle = ', position_angle)
         attitude_ref = pysiaf.utils.rotations.attitude(V2ref_arcsec, V3ref_arcsec, self.ra, self.dec, position_angle)
 
         # Shift every source by the appropriate offset
@@ -2540,8 +2553,8 @@ class Catalog_seed():
                     estimated_remaining_time = time_per_ptsrc * (len(pointSources) - (i+1)) * u.second
                     time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
-                    print(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
-                           'Projected finish time: {}'.format(i, time_remaining, finish_time)))
+                    self.logger.info(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
+                                      'Projected finish time: {}'.format(i, time_remaining, finish_time)))
 
         return psfimage, ptsrc_segmap
 
@@ -3119,14 +3132,14 @@ class Catalog_seed():
 
         # Search catalog column names.
         if specific_mag_col in catalog.colnames:
-            print("Using {} column in {} for magnitudes".format(specific_mag_col,
-                                                                os.path.split(catalog_file_name)[1]))
+            self.logger.info("Using {} column in {} for magnitudes".format(specific_mag_col,
+                                                                           os.path.split(catalog_file_name)[1]))
             return specific_mag_col
 
         elif 'magnitude' in catalog.colnames:
-            print(("WARNING: Catalog {} does not have a magnitude column called {}, "
-                   "but does have a generic 'magnitude' column. Continuing simulation using that."
-                   .format(os.path.split(catalog_file_name)[1], specific_mag_col)))
+            self.logger.warning(("WARNING: Catalog {} does not have a magnitude column called {}, "
+                                 "but does have a generic 'magnitude' column. Continuing simulation using that."
+                                 .format(os.path.split(catalog_file_name)[1], specific_mag_col)))
             return "magnitude"
         else:
             raise ValueError(("WARNING: Catalog {} has no magnitude column for {} specifically called {}, "
@@ -3189,7 +3202,7 @@ class Catalog_seed():
             pixelx -= self.subarray_bounds[0]
             pixely -= self.subarray_bounds[1]
         else:
-            # print('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
+            self.logger.debug('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
@@ -3405,9 +3418,9 @@ class Catalog_seed():
         # Write the results to a file
         self.n_galaxies = len(filteredList)
         if self.n_galaxies > 0:
-            print(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
+            self.logger.info(("Number of galaxies found within or close to the requested aperture: {}".format(self.n_galaxies)))
         else:
-            print("\nINFO: No galaxies present within the aperture.")
+            self.logger.info("\nINFO: No galaxies present within the aperture.")
 
         filteredList.meta['comments'] = [("Field center (degrees): %13.8f %14.8f y axis rotation angle "
                                           "(degrees): %f  image size: %4.4d %4.4d\n" %
@@ -3594,14 +3607,14 @@ class Catalog_seed():
         # Read in the list of galaxies (positions and magnitides)
         glist, pixflag, radflag, magsys = self.readGalaxyFile(file)
         if pixflag:
-            print("Galaxy list input positions assumed to be in units of pixels.")
+            self.logger.info("Galaxy list input positions assumed to be in units of pixels.")
         else:
-            print("Galaxy list input positions assumed to be in units of RA and Dec.")
+            self.logger.info("Galaxy list input positions assumed to be in units of RA and Dec.")
 
         if radflag:
-            print("Galaxy list input radii assumed to be in units of pixels.")
+            self.logger.info("Galaxy list input radii assumed to be in units of pixels.")
         else:
-            print("Galaxy list input radii assumed to be in units of arcsec.")
+            self.logger.info("Galaxy list input radii assumed to be in units of arcsec.")
 
         # Extract and save only the entries which will land (fully or partially) on the
         # aperture of the output
@@ -3724,8 +3737,8 @@ class Catalog_seed():
                     estimated_remaining_time = time_per_galaxy * (len(galaxylist) - (entry_index+1)) * u.second
                     time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
-                    print(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
-                           'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
+                    self.logger.info(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
+                                      'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
 
         return galimage, segmentation.segmap
 
@@ -3768,9 +3781,9 @@ class Catalog_seed():
         try:
             lines, pixelflag, magsys = self.read_point_source_file(filename)
             if pixelflag:
-                print("Extended source list input positions assumed to be in units of pixels.")
+                self.logger.info("Extended source list input positions assumed to be in units of pixels.")
             else:
-                print("Extended list input positions assumed to be in units of RA and Dec.")
+                self.logger.info("Extended list input positions assumed to be in units of RA and Dec.")
         except:
             raise FileNotFoundError("WARNING: Unable to open the extended source list file {}".format(filename))
 
@@ -3804,8 +3817,6 @@ class Catalog_seed():
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
         indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
-
-        print("After extended sources, max index is {}".format(self.maxindex))
 
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(lines, filename)
@@ -3894,9 +3905,9 @@ class Catalog_seed():
                 else:
                     # In this case, no magnitude is given in the extended input list
                     # Assume the input stamp image is in units of e/sec then.
-                    print("No magnitude given for extended source in {}.".format(values['filename']))
-                    print("Assuming the original file is in units of counts per sec.")
-                    print("Multiplying original file values by 'extendedscale'.")
+                    self.logger.warning("No magnitude given for extended source in {}.".format(values['filename']))
+                    self.logger.warning("Assuming the original file is in units of counts per sec.")
+                    self.logger.warning("Multiplying original file values by 'extendedscale'.")
                     countrate = norm_factor * self.params['simSignals']['extendedscale']
                     framecounts = countrate * self.frametime
                     magwrite = 99.99999
@@ -3916,14 +3927,14 @@ class Catalog_seed():
                              (indexnum, ra_str, dec_str, ra, dec, pixelx, pixely, magwrite, countrate,
                               framecounts)))
 
-        print("Number of extended sources found within or close to the requested aperture: {}".format(len(extSourceList)))
+        self.logger.info("Number of extended sources found within or close to the requested aperture: {}".format(len(extSourceList)))
         # close the output file
         eslist.close()
 
         # If no good point sources were found in the requested array, alert the user
         if len(extSourceList) < 1:
-            print("Warning: no non-sidereal extended sources within the requested array.")
-            print("The extended source image option is being turned off")
+            self.logger.info("Warning: no non-sidereal extended sources within the requested array.")
+            self.logger.info("The extended source image option is being turned off")
 
         return extSourceList, all_stamps
 
@@ -4053,9 +4064,9 @@ class Catalog_seed():
                 self.n_extend += 1
 
         if self.n_extend == 0:
-            print("No extended sources present within the aperture.")
+            self.logger.info("No extended sources present within the aperture.")
         else:
-            print('Number of extended sources present within the aperture: {}'.format(self.n_extend))
+            self.logger.info('Number of extended sources present within the aperture: {}'.format(self.n_extend))
         return extimage, segmentation.segmap
 
     def enlarge_stamp(self, image, dims):
@@ -4174,7 +4185,7 @@ class Catalog_seed():
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.safe_load(infile)
         except (ScannerError, FileNotFoundError, IOError) as e:
-            print(e)
+            self.logger.info(e)
 
     def check_params(self):
         """Check input parameters for expected datatypes, values"""
@@ -4250,10 +4261,10 @@ class Catalog_seed():
 
         # Notify user if no catalogs are provided
         if self.params['simSignals']['pointsource'] == 'None':
-            print('No point source catalog provided in yaml file.')
+            self.logger.info('No point source catalog provided in yaml file.')
 
         if self.params['simSignals']['galaxyListFile'] == 'None':
-            print('No galaxy catalog provided in yaml file.')
+            self.logger.info('No galaxy catalog provided in yaml file.')
 
         # Determine the instrument module and detector from the aperture name
         aper_name = self.params['Readout']['array_name']
@@ -4311,8 +4322,8 @@ class Catalog_seed():
         try:
             self.params['Telescope']["rotation"] = float(self.params['Telescope']["rotation"])
         except ValueError:
-            print(("ERROR: bad rotation value {}, setting to zero."
-                   .format(self.params['Telescope']["rotation"])))
+            self.logger.error(("ERROR: bad rotation value {}, setting to zero."
+                               .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
 
         siaf_inst = self.params['Inst']['instrument']
@@ -4326,7 +4337,7 @@ class Catalog_seed():
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])
 
-        print('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
+        self.logger.info('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']
@@ -4341,8 +4352,8 @@ class Catalog_seed():
             self.params['simSignals']['bkgdrate'] = float(self.params['simSignals']['bkgdrate'])
         else:
             if self.params['simSignals']['bkgdrate'].lower() in bkgdrate_options:
-                print(("Calculating background rate using jwst_background "
-                       "based on {} level".format(self.params['simSignals']['bkgdrate'])))
+                self.logger.info(("Calculating background rate using jwst_background "
+                                  "based on {} level".format(self.params['simSignals']['bkgdrate'])))
 
                 # Find the appropriate filter throughput file
                 if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt':
@@ -4353,8 +4364,8 @@ class Catalog_seed():
                 else:
                     filter_file = self.params['Reffiles']['filter_throughput']
 
-                print(("Using {} filter throughput file for background calculation."
-                       .format(filter_file)))
+                self.logger.info(("Using {} filter throughput file for background calculation."
+                                  .format(filter_file)))
 
                 # To translate background signals from MJy/sr to e-/sec to
                 # ADU/sec, we need a mean gain value
@@ -4378,7 +4389,7 @@ class Catalog_seed():
                                                                                              self.gain_value, self.siaf,
                                                                                              back_wave=bkgd_wave,
                                                                                              back_sig=bkgd_spec)
-                    print("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
+                    self.logger.info("Background rate determined using date_obs: {}".format(self.params['Output']['date_obs']))
                 else:
                     # Here the background level is based on high/medium/low rather than date
                     orig_level = copy.deepcopy(self.params['simSignals']['bkgdrate'])
@@ -4386,7 +4397,7 @@ class Catalog_seed():
                                                                                              filter_file, False,
                                                                                              self.gain_value, self.siaf,
                                                                                              level=self.params['simSignals']['bkgdrate'].lower())
-                    print("Background rate determined using {} level: {}".format(orig_level, self.params['simSignals']['bkgdrate']))
+                    self.logger.info("Background rate determined using {} level: {}".format(orig_level, self.params['simSignals']['bkgdrate']))
             else:
                 raise ValueError(("WARNING: unrecognized background rate value. "
                                   "Must be either a number or one of: {}"
@@ -4450,11 +4461,11 @@ class Catalog_seed():
             mtch = self.params['Readout']['readpatt'] == self.readpatterns['name']
             self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
             self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
-            print(('Requested readout pattern {} is valid. '
-                  'Using the nframe = {} and nskip = {}'
-                   .format(self.params['Readout']['readpatt'],
-                           self.params['Readout']['nframe'],
-                           self.params['Readout']['nskip'])))
+            self.logger.info(('Requested readout pattern {} is valid. '
+                              'Using the nframe = {} and nskip = {}'
+                              .format(self.params['Readout']['readpatt'],
+                                      self.params['Readout']['nframe'],
+                                      self.params['Readout']['nskip'])))
         else:
             # If the read pattern is not present in the definition file
             # then quit.
@@ -4567,8 +4578,8 @@ class Catalog_seed():
             self.segmentation_threshold = self.params['simSignals']['signal_low_limit_for_segmap']
             segmentation_threshold_units = self.params['simSignals']['signal_low_limit_for_segmap_units'].lower()
         except KeyError:
-            print(('simSignals:signal_low_limit_for_segmap and/or simSignals:signal_low_limit_for_segmap_units '
-                   'not present in input yaml file. Using the default value of: {} ADU/sec'.format(self.segmentation_threshold)))
+            self.logger.info(('simSignals:signal_low_limit_for_segmap and/or simSignals:signal_low_limit_for_segmap_units '
+                              'not present in input yaml file. Using the default value of: {} ADU/sec'.format(self.segmentation_threshold)))
 
         if segmentation_threshold_units not in SUPPORTED_SEGMENTATION_THRESHOLD_UNITS:
             raise ValueError(('Unsupported unit for the segmentation map lower signal limit: {}.\n'
@@ -4609,8 +4620,8 @@ class Catalog_seed():
         if ((value >= vmin) & (value <= vmax)):
             return value
         else:
-            print(("ERROR: {} for {} is not within reasonable bounds. "
-                   "Setting to {}".format(value, typ, default)))
+            self.logger.warning(("ERROR: {} for {} is not within reasonable bounds. "
+                                 "Setting to {}".format(value, typ, default)))
             return default
 
     def read_distortion_reffile(self):
