@@ -113,6 +113,9 @@ PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
 # Fraction of the total Sersic
 SERSIC_FRACTIONAL_SIGNAL = 0.9995
 
+# Configuration file for defining the logs
+LOG_CONFIG_FILENAME = 'logging_config.yaml'
+
 
 def grism_factor(instrument_name):
     """Return the factor by which the field of view is expanded when

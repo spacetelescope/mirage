@@ -48,7 +48,8 @@ from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
-                              SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS
+                              SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
+                              LOG_CONFIG_FILENAME
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -133,7 +134,7 @@ class Catalog_seed():
         self.readParameterFile()
 
         # Initialize the log using dictionary from the yaml file
-        log_config_file = os.path.join(self.modpath, 'config', 'logging_config.yam')
+        log_config_file = os.path.join(self.modpath, 'config', LOG_CONFIG_FILENAME)
         log_output_dir = os.path.abspath(os.path.join(self.params['Output']['directory'], 'logs'))
         utils.ensure_dir_exists(log_output_dir)
         logfile_name = self.paramfile.replace('.yaml', '.log')
