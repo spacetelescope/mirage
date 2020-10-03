@@ -115,6 +115,7 @@ SERSIC_FRACTIONAL_SIGNAL = 0.9995
 
 # Configuration file for defining the logs
 LOG_CONFIG_FILENAME = 'logging_config.yaml'
+STANDARD_LOGFILE_NAME = 'temp.log'
 
 
 def grism_factor(instrument_name):

@@ -13,12 +13,22 @@ HISTORY:
 
 import os
 import argparse
+import logging
+import yaml
+import shutil
 
 from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .ramp_generator import obs_generator
+from .logging import logging_functions
 from .utils import read_fits
-from .utils.utils import expand_environment_variable
+from .utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from .utils.utils import ensure_dir_exists, expand_environment_variable
+
+
+classpath = os.path.dirname(__file__)
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class ImgSim():
@@ -48,6 +58,11 @@ class ImgSim():
         self.offline = offline
 
     def create(self):
+        # Initialize the log using dictionary from the yaml file
+        self.logger = logging.getLogger('mirage.imaging_simulator')
+        self.logger.info('\n\nRunning imaging_simulator....\n')
+        self.logger.info('using parameter file: {}'.format(self.paramfile))
+
         # Create seed image
         cat = catalog_seed_image.Catalog_seed(offline=self.offline)
         cat.paramfile = self.paramfile
@@ -59,7 +74,7 @@ class ImgSim():
         # Prepare dark current exposure if
         # needed.
         if self.override_dark is None:
-            print('Perform dark preparation:')
+            self.logger.info('Perform dark preparation:')
             d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfile
             d.prepare()
@@ -69,7 +84,7 @@ class ImgSim():
             else:
                 obs.linDark = d.dark_files
         else:
-            print('\n\noverride_dark has been set. Skipping dark_prep.')
+            self.logger.info('\n\noverride_dark has been set. Skipping dark_prep.')
             if isinstance(self.override_dark, str):
                 self.read_dark_product(self.override_dark)
                 obs.linDark = self.prepDark
@@ -84,8 +99,8 @@ class ImgSim():
             obs.seedheader = cat.seedinfo
         else:
             obs.seed = cat.seed_files
-            print('USING SEED_FILES')
-            print(cat.seed_files)
+            self.logger.info('USING SEED_FILES')
+            self.logger.info('{}'.format(cat.seed_files))
         obs.create()
 
         # Make useful information class attributes
@@ -93,6 +108,22 @@ class ImgSim():
         self.seed_segmap = cat.seed_segmap
         self.seedinfo = cat.seedinfo
         self.linDark = obs.linDark
+
+        self.logger.info('\nImaging simulator complete')
+
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME)
+
+    def get_output_dir(self):
+        """Get the output directory name from self.paramfile
+
+        Returns
+        -------
+        outdir : str
+            Output directory specified in self.paramfile
+        """
+        self.read_param_file()
+        outdir = self.params['Output']['directory']
+        return outdir
 
     def read_dark_product(self, file):
         # Read in dark product that was produced

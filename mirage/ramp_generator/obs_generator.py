@@ -33,8 +33,10 @@ import random
 import copy
 from math import radians
 import datetime
+import logging
 import warnings
 import argparse
+import shutil
 
 import yaml
 import pkg_resources
@@ -46,11 +48,12 @@ import astropy.units as u
 import pysiaf
 
 import mirage
+from mirage.logging import logging_functions
 from mirage.ramp_generator import unlinearize
 from mirage.reference_files import crds_tools
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
-from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES
+from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.timer import Timer
 
 
@@ -58,6 +61,10 @@ INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_grism"],
          "niriss": ["imaging", "ami", "pom", "wfss"],
          "fgs": ["imaging"]}
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class Observation():
@@ -139,9 +146,9 @@ class Observation():
                     # Now add the crosstalk image to the signalimage
                     exposure[integ, group, ys:ye, xs:xe] += xtimage
         else:
-            print("Crosstalk calculation requested, but the chosen subarray")
-            print("is read out using only 1 amplifier.")
-            print("Therefore there will be no crosstalk. Skipping this step.")
+            self.logger.info(("Crosstalk calculation requested, but the chosen subarray "
+                              "is read out using only 1 amplifier. "
+                              "Therefore there will be no crosstalk. Skipping this step."))
         return exposure
 
     def add_crs_and_noise(self, seed, num_integrations=None):
@@ -197,7 +204,7 @@ class Observation():
         # because each needs its own collection
         # of cosmic rays and poisson noise realization
         for integ in range(nint):
-            print("Integration {}:".format(integ))
+            self.logger.info("Integration {}:".format(integ))
             if seeddim == 2:
                 inseed = seed
             elif seeddim == 4:
@@ -308,7 +315,7 @@ class Observation():
             # designed to remove IPC effects to one designed to
             # add IPC effects
             if self.params['Reffiles']['invertIPC']:
-                print("Inverting IPC kernel prior to convolving with image")
+                self.logger.info("Inverting IPC kernel prior to convolving with image")
                 kernel = self.invert_ipc_kernel(kernel)
             self.kernel = np.copy(kernel)
         kshape = kernel.shape
@@ -592,8 +599,8 @@ class Observation():
                 for i in range(self.params['Readout']['ngroup']):
                     # average together the appropriate frames,
                     # skip the appropriate frames
-                    print(('Averaging dark current ramp in add_synthetic_to_dark.'
-                           'Frames {}, to become group {}'.format(frames, i)))
+                    self.logger.info(('Averaging dark current ramp in add_synthetic_to_dark.'
+                                      'Frames {}, to become group {}'.format(frames, i)))
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:
@@ -677,13 +684,13 @@ class Observation():
         try:
             value = float(value)
         except ValueError:
-            print("WARNING: {} for {} is not a float.".format(value, typ))
+            self.logger.error("{} for {} is not a float.".format(value, typ))
 
         if ((value >= vmin) & (value <= vmax)):
             return value
         else:
-            print(("ERROR: {} for {} is not within reasonable bounds. "
-                   "Setting to {}".format(value, typ, default)))
+            self.logger.error(("ERROR: {} for {} is not within reasonable bounds. "
+                               "Setting to {}".format(value, typ, default)))
             return default
 
     def check_params(self):
@@ -745,9 +752,9 @@ class Observation():
                 maxgroups = 999
 
         if (self.params['Readout']['ngroup'] > maxgroups):
-            print(("WARNING: {} is limited to a maximum of {} groups. "
-                   "Proceeding with ngroup = {}."
-                   .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
+            self.logger.warning(("WARNING: {} is limited to a maximum of {} groups. "
+                                 "Proceeding with ngroup = {}."
+                                 .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
             self.params['Readout']['readpatt'] = maxgroups
 
         # Check for entries in the parameter file that are None or blank,
@@ -795,18 +802,18 @@ class Observation():
             self.params['cosmicRay']['seed'] = int(self.params['cosmicRay']['seed'])
         except:
             self.params['cosmicRay']['seed'] = 66231289
-            print(("ERROR: cosmic ray random number generator seed is bad. "
-                   "Using the default value of {}."
-                   .format(self.params['cosmicRay']['seed'])))
+            self.logger.warning(("ERROR: cosmic ray random number generator seed is bad. "
+                                 "Using the default value of {}."
+                                 .format(self.params['cosmicRay']['seed'])))
 
         # Also make sure the poisson random number seed is an integer
         try:
             self.params['simSignals']['poissonseed'] = int(self.params['simSignals']['poissonseed'])
         except:
             self.params['simSignals']['poissonseed'] = 815813492
-            print(("ERROR: cosmic ray random number generator seed is bad. "
-                   "Using the default value of {}."
-                   .format(self.params['simSignals']['poissonseed'])))
+            self.logger.warning(("ERROR: cosmic ray random number generator seed is bad. "
+                                 "Using the default value of {}."
+                                 .format(self.params['simSignals']['poissonseed'])))
 
         # COSMIC RAYS:
         # Generate the name of the actual CR file to use
@@ -844,8 +851,8 @@ class Observation():
         try:
             self.params['Telescope']["rotation"] = float(self.params['Telescope']["rotation"])
         except:
-            print(("ERROR: bad rotation value {}, setting to zero."
-                   .format(self.params['Telescope']["rotation"])))
+            self.logger.warning(("ERROR: bad rotation value {}, setting to zero."
+                                 .format(self.params['Telescope']["rotation"])))
             self.params['Telescope']["rotation"] = 0.
 
         # Get SIAF-related information and subarray bounds
@@ -888,8 +895,8 @@ class Observation():
             try:
                 self.params['Output'][quality] = str(self.params['Output'][quality])
             except ValueError:
-                print(("WARNING: unable to convert {} to string. "
-                       "This is required.".format(self.params['Output'][quality])))
+                self.logger.error(("Unable to convert {} to string. "
+                                   "This is required.".format(self.params['Output'][quality])))
 
         # Get the filter wheel and pupil wheel resolver positions for the
         # filter and pupil to use. This information will be placed in the
@@ -947,10 +954,10 @@ class Observation():
 
         header : dict
         """
-        print("Reconstructing seed image from multiple files")
+        self.logger.info("Reconstructing seed image from multiple files")
         for i, filename in enumerate(filenames):
 
-            print('File: ', filename)
+            self.logger.info('File: ', filename)
 
             # Read in the data from one file
             seed_data, seg_data, header_data = self.read_seed(filename)
@@ -960,7 +967,7 @@ class Observation():
                 nints = header_data['SEGINT']
                 ngroups = header_data['SEGGROUP']
 
-                print('Final seed image shape: ({}, {}, {}, {})'.format(nints, ngroups, ydim, xdim))
+                self.logger.info('Final seed image shape: ({}, {}, {}, {})'.format(nints, ngroups, ydim, xdim))
                 seed = np.zeros((nints, ngroups, ydim, xdim))
                 segmap = seg_data
 
@@ -1010,8 +1017,8 @@ class Observation():
                 try:
                     standard_bitvalue = dqflags.pixel[dqname]
                 except KeyError:
-                    print(('Keyword {} does not correspond to an existing DQ '
-                           'mnemonic, so will be ignored'.format(dqname)))
+                    self.logger.info(('Keyword {} does not correspond to an existing DQ '
+                                      'mnemonic, so will be ignored'.format(dqname)))
                     continue
                 just_this_bit = np.bitwise_and(inmask, bitplane)
                 pixels = np.where(just_this_bit != 0)
@@ -1055,10 +1062,15 @@ class Observation():
 
     def create(self):
         """MAIN FUNCTION"""
-        print("\nRunning observation generator....\n")
-
         # Read in the parameter file
         self.read_parameter_file()
+
+        # Initialize the log using dictionary from the yaml file
+        self.logger = logging.getLogger(__name__)
+
+        # Get the log caught up on what's already happened
+        self.logger.info('\n\nRunning observation generator....\n')
+        self.logger.info('Reading parameter file: {}'.format(self.paramfile))
 
         # Make filter/pupil values respect the filter/pupil wheel they are in
         self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
@@ -1123,7 +1135,7 @@ class Observation():
         tmpy, tmpx = self.linear_dark.data.shape[-2:]
         self.frametime = utils.calc_frame_time(self.instrument, self.params['Readout']['array_name'],
                                                tmpx, tmpy, self.params['Readout']['namp'])
-        print("Frametime is {}".format(self.frametime))
+        self.logger.info("Frametime is {}".format(self.frametime))
 
         # Calculate the rate of cosmic ray hits expected per frame
         self.get_cr_rate()
@@ -1132,8 +1144,8 @@ class Observation():
         if self.params['Reffiles']['saturation'] is not None:
             self.read_saturation_file()
         else:
-            print('CAUTION: no saturation map provided. Using')
-            print('{} for all pixels.'.format(self.params['nonlin']['limit']))
+            self.logger.warning(('No saturation map provided. Using '
+                                 '{} for all pixels.'.format(self.params['nonlin']['limit'])))
             dy, dx = self.linear_dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
 
@@ -1147,8 +1159,8 @@ class Observation():
         self.read_superbias_file()
 
         if len(self.linDark) > 1:
-            print(('An estimate of the remaining processing time will be provided after the first '
-                   'segment file has been created.\n\n'))
+            self.logger.info(('An estimate of the remaining processing time will be provided after the first '
+                              'segment file has been created.\n\n'))
         for i, linDark in enumerate(self.linDark):
             # Run the timer over each segment in order to come up with
             # a rough estimate of computation time
@@ -1175,7 +1187,7 @@ class Observation():
             if seg_str != '':
                 # Assume standard JWST filename format
                 try:
-                    print("Creating output file name with segment number.")
+                    self.logger.info("Creating output file name with segment number.")
                     parts = basename.split('_')
 
                     if len(parts) == 5:
@@ -1203,8 +1215,9 @@ class Observation():
 
             seed_files = seed_dict[linDark]
             if isinstance(seed_files[0], str):
-                print('\nSeed files:')
-                print(seed_files)
+                self.logger.info('\nSeed files:')
+                for e in seed_files:
+                    self.logger.info(e)
             # Get the corresponding input seed image(s)
             if isinstance(seed_files, str):
                 # If a single filename is supplied
@@ -1225,8 +1238,8 @@ class Observation():
             # by the gain to put in ADU/sec
             if 'UNITS' in self.seedheader.keys():
                 if self.seedheader['UNITS'] in ["e-/sec", "e-"]:
-                    print(("Seed image is in units of {}. Dividing by gain."
-                           .format(self.seedheader['units'])))
+                    self.logger.info(("Seed image is in units of {}. Dividing by gain."
+                                      .format(self.seedheader['units'])))
                     self.seed_image /= self.gain
             else:
                 raise ValueError(("'UNITS' keyword not present in header of "
@@ -1259,7 +1272,7 @@ class Observation():
                                                                                      syn_zeroframe=simzero)
 
             # Add other detector effects (Crosstalk/PAM)
-            print('Adding crosstalk')
+            self.logger.info('Adding crosstalk')
             lin_outramp = self.add_detector_effects(lin_outramp)
             lin_zeroframe = self.add_detector_effects(np.expand_dims(lin_zeroframe, axis=1))[:, 0, :, :]
 
@@ -1323,8 +1336,8 @@ class Observation():
                                    err_ext=err, group_dq=groupdq, pixel_dq=pixeldq)
 
                 stp.add_wcs(linearrampfile, roll=self.params['Telescope']['rotation'])
-                print("Final linearized exposure saved to:")
-                print("{}".format(linearrampfile))
+                self.logger.info("Final linearized exposure saved to:")
+                self.logger.info("{}".format(linearrampfile))
                 self.linear_output = linearrampfile
 
             # If the raw version is requested, we need to unlinearize
@@ -1341,7 +1354,7 @@ class Observation():
                         ofile = None
                         savefile = False
 
-                    print('Unlinearizing exposure.')
+                    self.logger.info('Unlinearizing exposure.')
                     raw_outramp = unlinearize.unlinearize(lin_outramp, nonlincoeffs, self.satmap,
                                                           lin_satmap,
                                                           maxiter=self.params['nonlin']['maxiter'],
@@ -1355,7 +1368,7 @@ class Observation():
                                                             save_accuracy_map=False)
 
                     # Add the superbias and reference pixel signal back in
-                    print('Adding superbias and reference pixel signals.')
+                    self.logger.info('Adding superbias and reference pixel signals.')
                     raw_outramp = self.add_superbias_and_refpix(raw_outramp, lin_sbAndRefpix)
                     raw_zeroframe = self.add_superbias_and_refpix(raw_zeroframe, self.linear_dark.zero_sbAndRefpix)
 
@@ -1371,8 +1384,8 @@ class Observation():
                     else:
                         self.save_fits(raw_outramp, raw_zeroframe, rawrampfile, mod='1b')
                     stp.add_wcs(rawrampfile, roll=self.params['Telescope']['rotation'])
-                    print("Final raw exposure saved to: ")
-                    print("{}".format(rawrampfile))
+                    self.logger.info("Final raw exposure saved to: ")
+                    self.logger.info("{}".format(rawrampfile))
                     self.raw_output = rawrampfile
                 else:
                     raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
@@ -1383,16 +1396,19 @@ class Observation():
             self.timer.stop(name='seg_{}'.format(str(i+1).zfill(4)))
 
             # If there is more than one segment, provide an estimate of processing time
-            print('\n\nSegment {} out of {} complete.'.format(i+1, len(self.linDark)))
+            self.logger.info('\n\nSegment {} out of {} complete.'.format(i+1, len(self.linDark)))
             if len(self.linDark) > 1:
                 time_per_segment = self.timer.sum(key_str='seg_') / (i+1)
                 estimated_remaining_time = time_per_segment * (len(self.linDark) - (i+1)) * u.second
                 time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
                 finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
-                print(('Estimated time remaining in obs_generator: {} minutes. '
-                       'Projected finish time: {}'.format(time_remaining, finish_time)))
+                self.logger.info(('Estimated time remaining in obs_generator: {} minutes. '
+                                  'Projected finish time: {}'.format(time_remaining, finish_time)))
 
-        print("Observation generation complete.")
+        self.logger.info("Observation generation complete.")
+
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=self.params['Output']['directory'])
 
     def create_group_entry(self, integration, groupnum, endday, endmilli, endsubmilli, endgroup,
                            xd, yd, gap, comp_code, comp_text, barycentric, heliocentric):
@@ -1527,9 +1543,9 @@ class Observation():
                 # expects, and keep the mask as read in.
                 pixeldq = mask
         else:
-            print("No bad pixel mask provided. Setting all pixels in")
-            print("pixel data quality extension to 0, indicating they")
-            print("are good.")
+            self.logger.info(("No bad pixel mask provided. Setting all pixels in "
+                              "pixel data quality extension to 0, indicating they "
+                              "are good."))
             pixeldq = np.zeros(data.shape[2:]).astype(np.uint32)
 
         return err, pixeldq
@@ -1620,7 +1636,7 @@ class Observation():
         # Get the input dark if a filename is supplied
         if isinstance(self.linDark, mirage.utils.read_fits.Read_fits):
             # Case where user has provided a Read_fits object
-            print('Dark object provided')
+            self.logger.info('Dark object provided')
             self.linear_dark = copy.deepcopy(self.linDark)
             self.linDark = ['none']
         else:
@@ -1631,10 +1647,12 @@ class Observation():
             elif isinstance(self.linDark, list):
                 # Case where dark is split amongst multiple files due to high
                 # data volume
-                print('Dark file list: {}'.format(self.linDark))
+                self.logger.info('Dark file list: ')
+                for e in self.linDark:
+                    self.logger.info('{}'.format(self.linDark))
             elif isinstance(self.linDark, str):
                 # If a single filename is given, read in the file
-                print('Reading in dark file: {}'.format(self.linDark))
+                self.logger.info('Reading in dark file: {}'.format(self.linDark))
                 self.linDark = [self.linDark]
             else:
                 raise TypeError('Unsupported type for self.linDark: {}'.format(type(self.linDark)))
@@ -1937,10 +1955,10 @@ class Observation():
 
                 # Add the frame to the group signal image
                 if j >= self.params['Readout']['nskip']:
-                    print('    Averaging frame {} into group {}'.format(frameindex, i))
+                    self.logger.info('    Averaging frame {} into group {}'.format(frameindex, i))
                     accumimage += framesignal
                 elif j < self.params['Readout']['nskip']:
-                    print('    Skipping frame {}'.format(frameindex))
+                    self.logger.info('    Skipping frame {}'.format(frameindex))
 
             # divide by nframes if > 1
             if self.params['Readout']['nframe'] > 1:
@@ -2025,10 +2043,10 @@ class Observation():
 
                 # Add the frame to the group signal image
                 if ((self.params['Readout']['nskip'] > 0) & (j >= self.params['Readout']['nskip'])):
-                    print('    Averaging frame {} into group {}'.format(frameindex, i))
+                    self.logger.info('    Averaging frame {} into group {}'.format(frameindex, i))
                     accumimage += framesignal
                 elif ((self.params['Readout']['nskip'] > 0) & (j < self.params['Readout']['nskip'])):
-                    print('    Skipping frame {}'.format(frameindex))
+                    self.logger.info('    Skipping frame {}'.format(frameindex))
 
             # divide by nframes if > 1
             if self.params['Readout']['nframe'] > 1:
@@ -2062,7 +2080,7 @@ class Observation():
             self.crrate = 0.0098729
 
         if self.crrate > 0.:
-            print("Base cosmic ray probability per pixel per second: {}".format(self.crrate))
+            self.logger.info("Base cosmic ray probability per pixel per second: {}".format(self.crrate))
 
     def get_nonlin_coeffs(self, linfile):
         """Read in non-linearity coefficients from given file
@@ -2082,9 +2100,9 @@ class Observation():
         nans = np.isnan(nonlin[1, :, :])
         numnan = np.sum(nans)
         if numnan > 0:
-            print(("The linearity coefficients of {} pixels are NaNs. "
-                   "Setting these coefficients such that no linearity "
-                   "correction is made.".format(numnan)))
+            self.logger.info(("The linearity coefficients of {} pixels are NaNs. "
+                              "Setting these coefficients such that no linearity "
+                              "correction is made.".format(numnan)))
 
         for i, cof in enumerate(range(nonlin.shape[0])):
             tmp = nonlin[cof, :, :]
@@ -2109,14 +2127,14 @@ class Observation():
             try:
                 nonlin = self.get_nonlin_coeffs(self.params['Reffiles']['linearity'])
             except:
-                print("Unable to read in non-linearity correction coefficients")
-                print("from {}.".format(self.params['Reffiles']['linearity']))
-                print("Using a set of mean coefficients.")
+                self.logger.warning(("Unable to read in non-linearity correction coefficients "
+                                     "from {}.".format(self.params['Reffiles']['linearity'])))
+                self.logger.info("Using a set of mean coefficients.")
                 nonlin = np.array([0., 1.0, 9.69903112e-07, 3.85263835e-11,
                                    1.09267058e-16, -5.30613939e-20, 9.27963411e-25])
         else:
-            print("No linearity coefficient file provided. Proceeding using a")
-            print("set of mean coefficients derived from CV3 data.")
+            self.logger.info(("No linearity coefficient file provided. Proceeding using a "
+                              "set of mean coefficients derived from CV3 data."))
             nonlin = np.array([0., 1.0, 9.69903112e-07, 3.85263835e-11,
                                1.09267058e-16, -5.30613939e-20, 9.27963411e-25])
         # print('Nonlinearity coefficients: ', nonlin)
@@ -2192,8 +2210,8 @@ class Observation():
         indir, infile = os.path.split(self.params["Reffiles"]["ipc"])
         outname = os.path.join(indir, "Kernel_to_add_IPC_effects_from_" + infile)
         hlist.writeto(outname, overwrite=True)
-        print(("Inverted IPC kernel saved to {} for future simulator "
-                "runs.".format(outname)))
+        self.logger.info(("Inverted IPC kernel saved to {} for future simulator "
+                          "runs.".format(outname)))
         return newkernel
 
     def map_seeds_to_dark(self):
@@ -2416,7 +2434,7 @@ class Observation():
                 image = h[1].data
                 header = h[0].header
         except FileNotFoundError:
-            print("WARNING: Unable to open {}".format(filename))
+            self.logger.error("ERROR: Unable to open {}".format(filename))
 
         # extract the appropriate subarray if necessary
         if ((self.subarray_bounds[0] != 0) or
@@ -2516,7 +2534,7 @@ class Observation():
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.safe_load(infile)
         except FileNotFoundError as e:
-            print("WARNING: unable to open {}".format(self.paramfile))
+            self.logger.warning("Unable to open {}".format(self.paramfile))
         if self.params['Inst']['instrument'].lower() == 'niriss':
             newfilter,newpupil = utils.check_niriss_filter(self.params['Readout']['filter'],self.params['Readout']['pupil'])
             self.params['Readout']['filter'] = newfilter
@@ -2530,15 +2548,15 @@ class Observation():
                 bad = ~np.isfinite(self.satmap)
                 self.satmap[bad] = 1.e6
             except Exception:
-                print(('WARNING: unable to open saturation file {}.'
-                       .format(self.params['Reffiles']['saturation'])))
-                print(("Please provide a valid file, or place 'none' "
-                       "in the saturation entry in the parameter file, "))
-                print(("in which case the nonlin limit value in the "
-                       "parameter file ({}) will be used for all pixels."
-                       .format(self.params['nonlin']['limit'])))
+                self.logger.warning(('WARNING: unable to open saturation file {}.'
+                                     .format(self.params['Reffiles']['saturation'])))
+                self.logger.warning(("Please provide a valid file, or place 'none' "
+                                     "in the saturation entry in the parameter file, "
+                                     "in which case the nonlin limit value in the "
+                                     "parameter file ({}) will be used for all pixels."
+                                     .format(self.params['nonlin']['limit'])))
         else:
-            print(('CAUTION: no saturation map provided. Using '
+            self.logger.warning(('No saturation map provided. Using '
                    '{} for all pixels.'.format(self.params['nonlin']['limit'])))
             dy, dx = self.linear_dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
@@ -2601,11 +2619,11 @@ class Observation():
             mtch = self.params['Readout']['readpatt'] == self.readpatterns['name']
             self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
             self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
-            print(('Requested readout pattern {} is valid. '
-                  'Using nframe = {} and nskip = {}'
-                   .format(self.params['Readout']['readpatt'],
-                           self.params['Readout']['nframe'],
-                           self.params['Readout']['nskip'])))
+            self.logger.info(('Requested readout pattern {} is valid. '
+                              'Using nframe = {} and nskip = {}'
+                              .format(self.params['Readout']['readpatt'],
+                                      self.params['Readout']['nframe'],
+                                      self.params['Readout']['nskip'])))
         else:
             # If the read pattern is not present in the definition file
             # then quit.
@@ -2781,7 +2799,7 @@ class Observation():
                 zeroframe = np.expand_dims(zeroframe, 0)
             outModel.zeroframe = zeroframe
         else:
-            print("Zeroframe not present. Setting to all zeros")
+            self.logger.info("Zeroframe not present. Setting to all zeros")
             numint, numgroup, ys, xs = ramp.shape
             outModel.zeroframe = np.zeros((numint, ys, xs))
 
@@ -2868,14 +2886,14 @@ class Observation():
 
         # Grism TSO data have the XREF_SCI and YREF_SCI keywords populated.
         # These are used to describe the location of the source on the detector.
-        print('\n\nPopulating xref_sci in output file:')
-        print(self.seedheader['XREF_SCI'])
+        self.logger.info('\n\nPopulating xref_sci in output file:')
+        self.logger.info('{}'.format(self.seedheader['XREF_SCI']))
 
         try:
             outModel.meta.wcsinfo.siaf_xref_sci = self.seedheader['XREF_SCI']
             outModel.meta.wcsinfo.siaf_yref_sci = self.seedheader['YREF_SCI']
         except KeyError:
-            print('Unable to propagate XREF_SCI, YREF_SCI from seed image to simualted data file.')
+            self.logger.warning('Unable to propagate XREF_SCI, YREF_SCI from seed image to simualted data file.')
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         # compute pointing of V1 axis
@@ -3050,7 +3068,7 @@ class Observation():
             if len(zeroframe.shape) == 2:
                 zeroframe = np.expand_dims(zeroframe, 0)
         else:
-            print("Zeroframe not present. Setting to all zeros")
+            self.logger.info("Zeroframe not present. Setting to all zeros")
             numint, numgroup, ys, xs = ramp.shape
 
         # Place the arrays in the correct extensions of the HDUList

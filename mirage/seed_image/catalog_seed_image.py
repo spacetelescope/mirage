@@ -49,7 +49,7 @@ from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
-                              LOG_CONFIG_FILENAME
+                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -72,6 +72,11 @@ inst_abbrev = {'nircam': 'NRC',
 ALLOWEDOUTPUTFORMATS = ['DMS']
 WFE_OPTIONS = ['predicted', 'requirements']
 WFEGROUP_OPTIONS = np.arange(5)
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class Catalog_seed():
@@ -134,12 +139,7 @@ class Catalog_seed():
         self.readParameterFile()
 
         # Initialize the log using dictionary from the yaml file
-        log_config_file = os.path.join(self.modpath, 'config', LOG_CONFIG_FILENAME)
-        log_output_dir = os.path.abspath(os.path.join(self.params['Output']['directory'], 'logs'))
-        utils.ensure_dir_exists(log_output_dir)
-        logfile_name = self.paramfile.replace('.yaml', '.log')
-        logging_functions.via_config_file(log_config_file, os.path.join(log_output_dir, logfile_name))
-        self.logger = logging.getLogger('mirage.catalog_seed_image')
+        self.logger = logging.getLogger(__name__)
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning catalog_seed_image..\n')
@@ -439,6 +439,17 @@ class Catalog_seed():
 
         # Return info in a tuple
         # return (self.seedimage, self.seed_segmap, self.seedinfo)
+
+        # In the case where the user is running only catalog_seed_image,
+        # we want to make a copy of the log file, rename
+        # it to something unique and move it to a logical location.
+        #
+        # If the user has called (e.g. imaging_simulator), in which case
+        # dark_prep will be run next, dark_prep will re-initialize the
+        # logger with the same handler and file destination, so it will
+        # append to the original log file created here.
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=self.params['Output']['directory'])
 
     def create_tso_seed(self, split_seed=False, integration_splits=-1, frame_splits=-1):
         """Create a seed image for time series sources. Just like for moving

@@ -21,6 +21,7 @@ Dependencies
 import copy
 import json
 import os
+import logging
 import pkg_resources
 import re
 import yaml
@@ -29,10 +30,16 @@ from astropy.io import ascii as asc
 import numpy as np
 from scipy.stats import sigmaclip
 
+from mirage.logging import logging_functions
 from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
                                    NIRCAM_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
                                    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, NIRCAM_FILTERS, \
-                                   NIRISS_FILTERS, FGS_FILTERS
+                                   NIRISS_FILTERS, FGS_FILTERS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def append_dictionary(base_dictionary, added_dictionary, braid=False):
@@ -360,6 +367,9 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
     # Place import statement here in order to avoid circular import
     # with crd_tools
     from mirage.reference_files import crds_tools
+
+    logger = logging.getLogger('mirage.utils.utils.full_paths')
+
     pathdict = {'Reffiles': ['dark', 'linearized_darkfile', 'badpixmask',
                              'superbias', 'linearity', 'saturation', 'gain',
                              'pixelflat', 'illumflat', 'ipc', 'astrometric',
@@ -424,7 +434,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
             # CRDS keywords are missing, create them and set equal to 'crds'.
             if key2 not in params[key1].keys():
                 if key2 in CRDS_FILE_TYPES.keys():
-                    print('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
+                    logger.info('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
                     params[key1][key2] = 'crds'
 
             if params[key1][key2].lower() not in ['none', 'config', 'crds']:
@@ -433,7 +443,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                 cfile = config_files['{}-{}'.format(key1, key2)]
                 fpath = os.path.join(module_path, 'config', cfile)
                 params[key1][key2] = fpath
-                print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
+                logger.info("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
             elif key2 in CRDS_FILE_TYPES.keys() and params[key1][key2].lower() == 'crds':
                 # 'crds' set for one of the reference files means to
                 # search for the best reference file currently in CRDS
@@ -441,7 +451,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                 # self.crds_datadir
                 mapping = crds_tools.get_reffiles(crds_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
                 params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
-                print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                logger.info("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
 
                 # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
                 if key2 == 'ipc':
@@ -450,11 +460,11 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                     # Check to see if the version of the IPC file with an
                     # inverted kernel already exists.
                     if os.path.isfile(inverted_kernel_file):
-                        print("Found an existing inverted kernel for this IPC file: {}".format(inverted_kernel_file))
+                        logger.info("Found an existing inverted kernel for this IPC file: {}".format(inverted_kernel_file))
                         params[key1][key2] = inverted_kernel_file
                         params['Reffiles']['invertIPC'] = False
                     else:
-                        print("No inverted IPC kernel file found. Kernel will be inverted prior to use.")
+                        logger.info("No inverted IPC kernel file found. Kernel will be inverted prior to use.")
                         params['Reffiles']['invertIPC'] = True
     return params
 
@@ -638,6 +648,8 @@ def get_subarray_info(params, subarray_table):
     params : dict
         Updated nested dictionary
     """
+    logger = logging.getLogger('mirage.utils.utils.get_subarray_info')
+
     if params['Readout']['array_name'] in subarray_table['AperName']:
         mtch = params['Readout']['array_name'] == subarray_table['AperName']
         namps = subarray_table['num_amps'].data[mtch][0]
@@ -647,11 +659,10 @@ def get_subarray_info(params, subarray_table):
             try:
                 if ((params['Readout']['namp'] == 1) or
                    (params['Readout']['namp'] == 4)):
-                    print(("CAUTION: Aperture {} can be used with either "
-                           "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
-                    print("or a 4-amp readout. The difference is a factor of 4 in")
-                    print(("readout time. You have requested {} amps."
-                           .format(params['Readout']['namp'])))
+                    logger.info(("CAUTION: Aperture {} can be used with either "
+                                 "a 1-amp or a 4-amp readout. The difference is a factor of 4 in "
+                                 "readout time. You have requested {} amps.".format(subarray_table['AperName'].data[mtch][0],
+                                                                                    params['Readout']['namp'])))
                 else:
                     raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
                                       "'Readout':'namp' in the input yaml file to one of these values."
@@ -798,7 +809,6 @@ def make_mag_column_names(instrument, filters):
 
         # Check to be sure the filter is supported
         if filter_name.upper() not in possible_filters:
-            print(possible_filters)
             raise ValueError("{} is not recognized or not supported for {}.".format(filter_name, instrument))
 
         if instrument in ['niriss', 'fgs']:
@@ -897,6 +907,7 @@ def parse_RA_Dec(ra_string, dec_string):
 def read_pattern_check(parameters):
     # Check the readout pattern that's entered and set nframe and nskip
     # accordingly
+    logger = logging.getLogger('mirage.utils.utils.read_pattern_check')
     parameters['Readout']['readpatt'] = parameters['Readout']['readpatt'].upper()
 
     # Read in readout pattern definition file
@@ -910,11 +921,11 @@ def read_pattern_check(parameters):
         mtch = parameters['Readout']['readpatt'] == readpatterns['name']
         parameters['Readout']['nframe'] = int(readpatterns['nframe'][mtch].data[0])
         parameters['Readout']['nskip'] = int(readpatterns['nskip'][mtch].data[0])
-        print(('Requested readout pattern {} is valid. '
-               'Using the nframe = {} and nskip = {}'
-               .format(parameters['Readout']['readpatt'],
-                       parameters['Readout']['nframe'],
-                       parameters['Readout']['nskip'])))
+        logger.info(('Requested readout pattern {} is valid. '
+                     'Using the nframe = {} and nskip = {}'
+                     .format(parameters['Readout']['readpatt'],
+                             parameters['Readout']['nframe'],
+                             parameters['Readout']['nskip'])))
     else:
         # If the read pattern is not present in the definition file
         # then quit.

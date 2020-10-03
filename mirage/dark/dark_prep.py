@@ -30,6 +30,7 @@ import datetime
 import logging
 from math import floor
 from glob import glob
+import shutil
 
 import yaml
 import pkg_resources
@@ -41,7 +42,7 @@ import mirage
 from mirage.logging import logging_functions
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING, \
-                                   LOG_CONFIG_FILENAME
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.file_splitting import find_file_splits
 from mirage.utils.timer import Timer
 from mirage.reference_files import crds_tools
@@ -49,6 +50,10 @@ from mirage.reference_files import crds_tools
 
 # Allowed instruments
 INST_LIST = ['nircam', 'niriss', 'fgs']
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class DarkPrep():
@@ -673,12 +678,7 @@ class DarkPrep():
         self.read_parameter_file()
 
         # Initialize the log using dictionary from the yaml file
-        log_config_file = os.path.join(self.modpath, 'config', LOG_CONFIG_FILENAME)
-        log_output_dir = os.path.abspath(os.path.join(self.params['Output']['directory'], 'logs'))
-        utils.ensure_dir_exists(log_output_dir)
-        logfile_name = self.paramfile.replace('.yaml', '.log')
-        logging_functions.via_config_file(log_config_file, os.path.join(log_output_dir, logfile_name))
-        self.logger = logging.getLogger('mirage.dark_prep')
+        self.logger = logging.getLogger(__name__)
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning dark_prep..\n')
@@ -1065,6 +1065,9 @@ class DarkPrep():
         self.prepDark.sbAndRefpix = final_sbandrefpix
         self.prepDark.zero_sbAndRefpix = final_zero_sbandrefpix
         self.prepDark.header = self.linDark.header
+
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=self.params['Output']['directory'])
 
     def read_linear_dark(self, input_file):
         """Read in the linearized version of the dark current ramp
