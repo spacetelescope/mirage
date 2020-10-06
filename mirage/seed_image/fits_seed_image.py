@@ -154,7 +154,7 @@ config_files = {'nircam': {'flux_cal': 'NIRCam_zeropoints.list'},
 
 KNOWN_PSF_TELESCOPES = {"JWST", "HST", "SPITZER"}
 
-classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
 logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
@@ -305,7 +305,8 @@ class ImgSeed:
         # Initialize log
         self.logger = logging.getLogger('mirage.seed_image.fits_seed_image')
         self.logger.info('\n\nRunning fits_seed_image....\n')
-        self.logger.info('using parameter file: {}'.format(self.paramfile))
+        self.logger.info('using parameter file: {}\n'.format(self.paramfile))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         self.detector_channel_value()
         self.distortion_file_value()

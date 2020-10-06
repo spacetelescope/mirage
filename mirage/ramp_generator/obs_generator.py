@@ -957,7 +957,7 @@ class Observation():
         self.logger.info("Reconstructing seed image from multiple files")
         for i, filename in enumerate(filenames):
 
-            self.logger.info('File: ', filename)
+            self.logger.info('{}'.format(filename))
 
             # Read in the data from one file
             seed_data, seg_data, header_data = self.read_seed(filename)
@@ -1070,7 +1070,8 @@ class Observation():
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
-        self.logger.info('Reading parameter file: {}'.format(self.paramfile))
+        self.logger.info('Reading parameter file: {}\n'.format(self.paramfile))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         # Make filter/pupil values respect the filter/pupil wheel they are in
         self.params['Readout']['filter'], self.params['Readout']['pupil'] = \

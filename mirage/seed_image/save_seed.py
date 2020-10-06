@@ -4,6 +4,7 @@
 Utility for saving seed images
 """
 import logging
+import os
 
 from astropy.io import fits
 import numpy as np

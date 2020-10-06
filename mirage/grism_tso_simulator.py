@@ -220,7 +220,7 @@ class GrismTSO():
 
         self.logger.info('Splitting background and TSO source into multiple yaml files.')
         self.logger.info('Running background sources through catalog_seed_image.')
-        self.logger.info('background param file is:', self.background_paramfile)
+        self.logger.info('background param file is: {}'.format(self.background_paramfile))
 
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
@@ -236,6 +236,7 @@ class GrismTSO():
         # Run the catalog_seed_generator on the non-TSO (background) sources. Even if
         # no source catalogs are given, we run using the dummy catalog created earlier,
         # because we need to add the 2D dispersed background at this point.
+        self.logger.info('Running catalog_seed_generator on background sources')
         background_direct = catalog_seed_image.Catalog_seed()
         background_direct.paramfile = self.background_paramfile
         background_direct.make_seed()
@@ -251,7 +252,7 @@ class GrismTSO():
                                  background_direct.extended_seed_filename]
         for seed_file in background_seed_files:
             if seed_file is not None:
-                self.logger.info("Dispersing seed image:", seed_file)
+                self.logger.info("Dispersing seed image: {}".format(seed_file))
                 disp = self.run_disperser(seed_file, orders=self.orders,
                                           add_background=not background_done,
                                           background_waves=bkgd_waves,
@@ -267,6 +268,7 @@ class GrismTSO():
                     background_dispersed += disp.final
 
         # Run the catalog_seed_generator on the TSO source
+        self.logger.info('Running catalog_seed_generator on TSO source')
         tso_direct = catalog_seed_image.Catalog_seed()
         tso_direct.paramfile = self.tso_paramfile
         tso_direct.make_seed()
@@ -446,7 +448,7 @@ class GrismTSO():
                 self.part_frame_start_number = split_meta.part_frame_start_number[counter]
                 counter += 1
 
-                self.logger.info('Overall integration number: ', overall_integration_number)
+                self.logger.info('Overall integration number: {}'.format(overall_integration_number))
                 segment_file_name = '{}seg{}_part{}_seed_image.fits'.format(segment_file_base,
                                                                             str(self.segment_number).zfill(3),
                                                                             str(self.segment_part_number).zfill(3))

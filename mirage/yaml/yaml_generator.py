@@ -251,7 +251,8 @@ class SimInput:
         # Initialize log
         self.logger = logging.getLogger('mirage.yaml.yaml_generator')
         self.logger.info('Running yaml_generator....\n')
-        self.logger.info('using APT xml file: {}'.format(input_xml))
+        self.logger.info('using APT xml file: {}\n'.format(input_xml))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
                                'dates': dates}

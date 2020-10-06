@@ -143,7 +143,8 @@ class Catalog_seed():
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning catalog_seed_image..\n')
-        self.logger.info('Reading parameter file: {}'.format(self.paramfile))
+        self.logger.info('Reading parameter file: {}\n'.format(self.paramfile))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         # Make filter/pupil values respect the filter/pupil wheel they are in
         self.params['Readout']['filter'], self.params['Readout']['pupil'] = \

@@ -8,6 +8,7 @@ and then used as an input to the ramp simulator.
 
 import argparse
 import logging
+import os
 
 from astropy import wcs
 from astropy.io import fits

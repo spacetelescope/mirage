@@ -129,10 +129,6 @@ def move_logfile_to_standard_location(base_file, input_log_file, yaml_outdir=Non
     if not os.path.exists(final_logfile_dir):
         os.makedirs(final_logfile_dir)
 
-
-    print('FINAL:', final_logfile_dir, final_logfile_name)
-
-
     # Copy the log into the directory
     shutil.copy2(input_log_file, os.path.join(final_logfile_dir, final_logfile_name))
 
