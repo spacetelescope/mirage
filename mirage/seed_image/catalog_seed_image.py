@@ -134,6 +134,7 @@ class Catalog_seed():
         # Initialize timer
         self.timer = Timer()
 
+    @logging_functions.log_fail
     def make_seed(self):
         """MAIN FUNCTION"""
 

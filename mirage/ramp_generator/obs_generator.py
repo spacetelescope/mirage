@@ -1063,6 +1063,7 @@ class Observation():
                                          (self.params['Readout']['nframe']+self.params['Readout']['nskip']))
         return crhits, crs_perframe
 
+    @logging_functions.log_fail
     def create(self):
         """MAIN FUNCTION"""
         # Read in the parameter file

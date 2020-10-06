@@ -670,6 +670,7 @@ class DarkPrep():
 
         return linDarkobj
 
+    @logging_functions.log_fail
     def prepare(self):
         """MAIN FUNCTION"""
         # Read in the yaml parameter file

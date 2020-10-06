@@ -108,6 +108,7 @@ class ReadAPTXML():
             tracking_type = self.target_type[matched_key[0]]
         return tracking_type
 
+    @logging_functions.log_fail
     def read_xml(self, infile, verbose=False):
         """Main function. Read in the .xml file from APT, and output dictionary of parameters.
 
@@ -438,6 +439,10 @@ class ReadAPTXML():
         #filebase = os.path.split(infile)[1]
         #tmpoutfile = '{}{}'.format(filebase.split('.xml')[0], '.txt')
         #ascii.write(final_table, os.path.join(tmpoutdir, tmpoutfile), overwrite=True)
+
+
+        print('CCCC', len(self.observation_info))
+
 
         return self.APTObservationParams
 

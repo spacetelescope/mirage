@@ -4,10 +4,12 @@
 """
 
 import datetime
+from functools import wraps
 import logging
 from logging.config import dictConfig
 import os
 import shutil
+import traceback
 import yaml
 
 
@@ -85,6 +87,36 @@ def get_output_dir(yaml_file):
     params = read_yaml(yaml_file)
     outdir = params['Output']['directory']
     return outdir
+
+
+def log_fail(func):
+    """Decorator to log crashes in the decorated code.
+
+    Parameters
+    ----------
+    func : func
+        The function to decorate.
+
+    Returns
+    -------
+    wrapped : func
+        The wrapped function.
+    """
+
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+
+        try:
+            # Run the function
+            func(*args, **kwargs)
+            logging.info('Completed Successfully')
+
+        except Exception:
+            logging.critical(traceback.format_exc())
+            logging.critical('CRASHED')
+            raise
+
+    return wrapped
 
 
 def move_logfile_to_standard_location(base_file, input_log_file, yaml_outdir=None, log_type='catalog_seed'):

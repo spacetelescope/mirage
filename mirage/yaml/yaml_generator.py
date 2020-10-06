@@ -599,6 +599,7 @@ class SimInput:
                 self.multiple_catalog_match(filter, cattype, match)
             return match[0]
 
+    @logging_functions.log_fail
     def create_inputs(self):
         """Create observation table """
         self.path_defs()
@@ -623,6 +624,9 @@ class SimInput:
 
             apt.output_dir = self.output_dir
             apt.create_input_table()
+
+
+            stop
 
             self.info = apt.exposure_tab
 
