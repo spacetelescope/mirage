@@ -118,6 +118,7 @@ in the examples directory
 """
 import argparse
 import copy
+import logging
 import os
 import pkg_resources
 import sys
@@ -137,11 +138,12 @@ from scipy.signal import fftconvolve
 import yaml
 
 from . import crop_mosaic, blot_image
+from mirage.logging import logging_functions
 from mirage.psf.psf_selection import get_psf_wings
 from mirage.psf import tools
 from mirage.seed_image.save_seed import save
 from mirage.reference_files import crds_tools
-from mirage.utils.constants import EXPTYPES
+from mirage.utils.constants import EXPTYPES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.flux_cal import fluxcal_info
 from mirage.utils.siaf_interface import get_siaf_information
 
@@ -151,6 +153,10 @@ config_files = {'nircam': {'flux_cal': 'NIRCam_zeropoints.list'},
                 }
 
 KNOWN_PSF_TELESCOPES = {"JWST", "HST", "SPITZER"}
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class ImgSeed:
@@ -296,6 +302,11 @@ class ImgSeed:
         resample) to resample this to the correct pixel scale and introduce the
         proper distortion for the requested detector
         """
+        # Initialize log
+        self.logger = logging.getLogger('mirage.seed_image.fits_seed_image')
+        self.logger.info('\n\nRunning fits_seed_image....\n')
+        self.logger.info('using parameter file: {}'.format(self.paramfile))
+
         self.detector_channel_value()
         self.distortion_file_value()
         module = self.module_value()
@@ -343,8 +354,8 @@ class ImgSeed:
         box = self.jwst_psf[mid_y-10:mid_y+11, mid_x-10:mid_x+11]
         jwst_x_fwhm, jwst_y_fwhm = tools.measure_fwhm(box)
         jwst_y_fwhm_arcsec = jwst_y_fwhm * self.outscale2
-        print('JWST FWHM in pix: ', jwst_y_fwhm)
-        print('JWST FWHM in arcsec: ', jwst_y_fwhm_arcsec)
+        self.logger.info('JWST FWHM in pix: {}'.format(jwst_y_fwhm))
+        self.logger.info('JWST FWHM in arcsec: {}'.format(jwst_y_fwhm_arcsec))
 
         # If the FWHM of the mosaic image is larger than that of the JWST
         # PSF, then we cannot continue because we cannot create a matching
@@ -366,7 +377,7 @@ class ImgSeed:
         self.prepare_psf()
 
         # Crop
-        print("Cropping subarray from mosaic")
+        self.logger.info("Cropping subarray from mosaic")
         pixel_scale = self.siaf[self.aperture].XSciScale
         crop = crop_mosaic.Extraction(mosaicfile=self.mosaic_file,
                                       data_extension_number=self.data_extension_number,
@@ -379,11 +390,11 @@ class ImgSeed:
         crop.extract()
 
         # Convolve the cropped image with the appropriate PSF
-        print("Convolving with PSF kernel")
+        self.logger.info("Convolving with PSF kernel")
         crop.cropped = self.psf_convolution(crop.cropped)
 
         # Blot
-        print("Resampling subarray onto JWST pixel grid")
+        self.logger.info("Resampling subarray onto JWST pixel grid")
         blot = blot_image.Blot(instrument=self.instrument, aperture=self.aperture,
                                ra=[self.blot_center_ra], dec=[self.blot_center_dec],
                                pav3=[self.blot_pav3], blotfile=crop.cropped,
@@ -412,7 +423,12 @@ class ImgSeed:
                                                  self.coords, self.grism_direct_factor,
                                                  segmentation_map=self.seed_segmap,
                                                  filename=self.blotted_file, base_unit='e-')
-            print('Blotted image saved to: {}'.format(self.seed_file))
+            self.logger.info('Blotted image saved to: {}'.format(self.seed_file))
+
+        self.logger.info('\nfits_seed_image complete')
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=self.params['Output']['directory'],
+                                                            log_type='fits_seed')
 
     def detector_channel_value(self):
         """Get the detector and optional channel value based on the aperture
@@ -539,7 +555,7 @@ class ImgSeed:
         noise = np.median(model.data)
         seg_map = detect_sources(model.data, noise*5., 8)
         if seg_map is None:
-            print('No segmentation map created. Returning empty segmap')
+            self.logger.info('No segmentation map created. Returning empty segmap')
             map_image = np.zeros_like(model.data)
         else:
             map_image = seg_map.data
@@ -628,7 +644,7 @@ class ImgSeed:
             # If no psf file is given, and the user requests a 2D Gaussian,
             # then make a 2D Gaussian
             if self.gaussian_psf:
-                print("Creating 2D Gaussian for mosiac PSF")
+                self.logger.info("Creating 2D Gaussian for mosiac PSF")
 
                 # If a Gaussian FWHM value is given, then construct the
                 # PSF using astropy's Gaussian2D kernel
@@ -645,17 +661,17 @@ class ImgSeed:
                 if gauss_ydim % 2 == 0:
                     gauss_ydim += 1
 
-                print('Mosaic pixel scale:', self.mosaic_metadata['pix_scale1'], self.mosaic_metadata['pix_scale2'])
-                print('JWST pixel scale:', self.outscale1, self.outscale2)
-                print('scale ratios:', scale_ratio1, scale_ratio2)
-                print('JWST PSF dims:', jwst_xdim, jwst_ydim)
-                print('Gaussian PSF dimensions: ', gauss_xdim, gauss_ydim)
+                self.logger.info('Mosaic pixel scale: {} x {}'.format(self.mosaic_metadata['pix_scale1'], self.mosaic_metadata['pix_scale2']))
+                self.logger.info('JWST pixel scale: {} x {}'.format(self.outscale1, self.outscale2))
+                self.logger.info('scale ratios: {}, {}'.format(scale_ratio1, scale_ratio2))
+                self.logger.info('JWST PSF dims: {} x {}'.format(jwst_xdim, jwst_ydim))
+                self.logger.info('Gaussian PSF dimensions: {} x {}'.format(gauss_xdim, gauss_ydim))
 
 
                 # Create 2D Gaussian
                 self.mosaic_psf = tools.gaussian_psf(self.mosaic_fwhm, gauss_xdim, gauss_ydim)
 
-                print('Temporarily saving psf for development')
+                self.logger.debug('Temporarily saving psf for development')
                 h0 = fits.PrimaryHDU(self.mosaic_psf)
                 hlist = fits.HDUList([h0])
                 hlist.writeto('gaussian_2d_psf.fits', overwrite=True)
@@ -666,14 +682,14 @@ class ImgSeed:
                 # with a known PSF. If so, use the appropriate function to
                 # construct a PSF
                 if self.mosaic_metadata['telescope'] == 'HST':
-                    print('Creating HST PSF, using 2D Gaussian')
-                    print('HST FWHM in arcsec: {}'.format(self.mosaic_fwhm * self.mosaic_metadata['pix_scale2']))
+                    self.logger.info('Creating HST PSF, using 2D Gaussian')
+                    self.logger.info('HST FWHM in arcsec: {}'.format(self.mosaic_fwhm * self.mosaic_metadata['pix_scale2']))
                     self.mosaic_psf = tools.get_HST_PSF(self.mosaic_metadata, self.mosaic_fwhm)
                 elif self.mosaic_psf_metadata['telescope'] == 'JWST':
-                    print("Retrieving JWST PSF")
+                    self.logger.info("Retrieving JWST PSF")
                     self.mosaic_psf = tools.get_JWST_PSF(self.mosaic_metadata)
                 elif self.mosaic_psf_metadata['instrument'] == 'IRAC':
-                    print("Retrieving IRAC PSF")
+                    self.logger.info("Retrieving IRAC PSF")
                     self.mosaic_psf = tools.get_IRAC_PSF(self.mosaic_metadata)
             else:
                 raise ValueError(("For telescopes other than {}, you must either provide a "
@@ -763,18 +779,18 @@ class ImgSeed:
 
         # Now crop either the resized JWST PSF or the mosaic PSF in
         # order to get them both to the same array size
-        print("Crop PSFs to have the same array size")
+        self.logger.info("Crop PSFs to have the same array size")
         self.jwst_psf, self.mosaic_psf = tools.same_array_size(self.jwst_psf, self.mosaic_psf)
 
         # Now we make a matching kernel. The mosaic can then be
         # convolved with this kernel in order to adjust the PSFs to match
         # those from JWST.
-        print("Create matching kernel")
+        self.logger.info("Create matching kernel")
         kernel = self.matching_kernel(self.mosaic_psf, self.jwst_psf, window_type='TukeyWindow',
                                       alpha=1.5, beta=1.5)
 
         if self.save_intermediates:
-            print('Save JWST psf and matching psf in outgoing_and_matching_kernel.fits')
+            self.logger.info('Save JWST psf and matching psf in outgoing_and_matching_kernel.fits')
             ha = fits.PrimaryHDU(orig_jwst)
             h0 = fits.ImageHDU(self.jwst_psf)
             h1 = fits.ImageHDU(self.mosaic_psf)
@@ -784,16 +800,16 @@ class ImgSeed:
                                    '{}_outgoing_and_matching_kernel.fits'.format(self.output_base))
             hlist.writeto(outfile, overwrite=True)
 
-        print('Convolve image cropped from mosaic with the matching PSF kernel')
+        self.logger.info('Convolve image cropped from mosaic with the matching PSF kernel')
         start_time = datetime.datetime.now()
         convolved_mosaic = fftconvolve(model.data, kernel, mode='same')
         end_time = datetime.datetime.now()
         delta_time = end_time - start_time
-        print("Convolution took {} seconds".format(delta_time.seconds))
+        self.logger.info("Convolution took {} seconds".format(delta_time.seconds))
         model.data = convolved_mosaic
 
         if self.save_intermediates:
-            print('Saving convolved mosaic as convolved_mosaic.fits')
+            self.logger.info('Saving convolved mosaic as convolved_mosaic.fits')
             h0 = fits.PrimaryHDU(convolved_mosaic)
             hlist = fits.HDUList([h0])
             outfile = os.path.join(self.outdir,

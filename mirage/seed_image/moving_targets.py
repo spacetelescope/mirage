@@ -28,14 +28,26 @@ Author:
 Bryan Hilbert
 '''
 
+import logging
+import os
 import sys
 
 import numpy as np
 from astropy.io import fits
 
+from ..logging import logging_functions
+from ..utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
+
 class MovingTarget():
 
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self.verbose = False
         self.subsampx = 3
         self.subsampy = 3
@@ -283,8 +295,8 @@ class MovingTarget():
                 else:
                     ioutxmax += 1
             else:
-                print("WARNING: bad stamp/output match. Quitting.")
-                sys.exit()
+                self.logger.error("WARNING: bad stamp/output match. Quitting.")
+                raise ValueError('Bad stamp/output match.')
             return ioutxmin, ioutxmax, istampxmin, istampxmax
         else:
             # If values are NaN then we can't change them to integers

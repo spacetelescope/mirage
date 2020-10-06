@@ -969,11 +969,13 @@ def read_yaml(filename):
     data : dict
         Nested dictionary of file contents
     """
+    logger = logging.getLogger('mirage.utils.utils.read_yaml')
+
     try:
         with open(filename, 'r') as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
     except FileNotFoundError as e:
-            print(e)
+            logging.error(e)
     return data
 
 

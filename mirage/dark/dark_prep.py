@@ -121,22 +121,22 @@ class DarkPrep():
         try:
             self.params['Readout']['nframe'] = int(self.params['Readout']['nframe'])
         except ValueError:
-            print("WARNING: Input value of nframe is not an integer.")
+            self.logger.error("WARNING: Input value of nframe is not an integer.")
 
         try:
             self.params['Readout']['nskip'] = int(self.params['Readout']['nskip'])
         except ValueError:
-            print("WARNING: Input value of nskip is not an integer.")
+            self.logger.error("WARNING: Input value of nskip is not an integer.")
 
         try:
             self.params['Readout']['ngroup'] = int(self.params['Readout']['ngroup'])
         except ValueError:
-            print("WARNING: Input value of ngroup is not an integer.")
+            self.logger.error("WARNING: Input value of ngroup is not an integer.")
 
         try:
             self.params['Readout']['nint'] = int(self.params['Readout']['nint'])
         except ValueError:
-            print("WARNING: Input value of nint is not an integer.")
+            self.logger.error("WARNING: Input value of nint is not an integer.")
 
         # Make sure that the requested number of groups is
         # less than or equal to the maximum allowed. If you're
@@ -150,12 +150,12 @@ class DarkPrep():
         if sum(match) == 1:
             maxgroups = self.readpatterns['maxgroups'].data[match][0]
         if sum(match) == 0:
-            print(("Unrecognized readout pattern {}. Assuming a maximum allowed number of groups of 10."
+            logger.error(("Unrecognized readout pattern {}. Assuming a maximum allowed number of groups of 10."
                    .format(self.params['Readout']['readpatt'])))
             maxgroups = 10
 
         if (self.params['Readout']['ngroup'] > maxgroups):
-            print(("WARNING: {} is limited to a maximum of {} groups. Proceeding with ngroup = {}."
+            logger.error(("WARNING: {} is limited to a maximum of {} groups. Proceeding with ngroup = {}."
                    .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
             self.params['Readout']['ngroup'] = maxgroups
 
@@ -323,7 +323,7 @@ class DarkPrep():
         if reqints <= ndarkints:
             # Fewer requested integrations than are in the
             # input dark.
-            print("{} output integrations requested.".format(reqints))
+            self.logger.info("{} output integrations requested.".format(reqints))
             self.dark.data = self.dark.data[0:reqints, :, :, :]
             if self.dark.sbAndRefpix is not None:
                 self.dark.sbAndRefpix = self.dark.sbAndRefpix[0:reqints, :, :, :]
@@ -332,9 +332,9 @@ class DarkPrep():
 
         elif reqints > ndarkints:
             # More requested integrations than are in input dark.
-            print(('Requested output has {} integrations, while input dark has only {}.'
-                   .format(reqints, ndarkints)))
-            print('Adding integrations to input dark by making copies of the input.')
+            logger.info(('Requested output has {} integrations, while input dark has only {}. '
+                         'Adding integrations to input dark by making copies of the input.'
+                         .format(reqints, ndarkints)))
             self.integration_copy(reqints, ndarkints)
 
     def data_volume_check(self, obj):
@@ -357,13 +357,13 @@ class DarkPrep():
 
         inputframes = obj.data.shape[1]
         if ngroup * (nskip + nframe) > inputframes:
-            print(("WARNING: Not enough frames in the input integration to "
+            self.logger.warning(("Not enough frames in the input integration to "
                    "create the requested number of output groups. Input has "
                    "{} frames. Requested output is {} groups each created from "
                    "{} frames plus skipping {} frames between groups for a total "
                    "of {} frames."
                    .format(inputframes, ngroup, nframe, nskip, ngroup * (nframe + nskip))))
-            print(("Making copies of {} dark current frames and adding them to "
+            self.logger.warning(("Making copies of {} dark current frames and adding them to "
                    "the end of the dark current integration."
                    .format(ngroup * (nskip + nframe) - inputframes)))
 
@@ -424,16 +424,12 @@ class DarkPrep():
         # Future improvement: download a missing dark file
         if not local:
             try:
-                print("Local copy of dark current file")
-                print("{} not found.".format(input_file))
-                print("Downloading.")
+                self.logger.info("Local copy of dark current file {} not found. Attempting to download".format(input_file))
                 darkfile = os.path.split(input_file)[1]
                 hh = fits.open(os.path.join(self.dark_url, darkfile))
                 hh.writeto(input_file)
             except Exception:
-                print("Local copy of dark current file")
-                print("{} not found.".format(input_file))
-                print("And unable to download. Quitting.")
+                self.logger.error("Local copy of dark current file {} not found, and unable to download. Quitting.".format(input_file))
 
         self.dark = read_fits.Read_fits()
         self.dark.file = input_file
@@ -470,9 +466,9 @@ class DarkPrep():
         # can be averaged and transformed into another readout pattern
         if self.dark.header['READPATT'] not in ['RAPID', 'NISRAPID', 'FGSRAPID']:
             if self.params['Readout']['readpatt'].upper() != self.dark.header['READPATT']:
-                print(("WARNING: cannot transform input {} integration into "
-                       "output {} integration.".format(self.dark.header['READPATT'],
-                                                       self.params['Readout']['readpatt'])))
+                self.logger.error(("WARNING: cannot transform input {} integration into "
+                                   "output {} integration.".format(self.dark.header['READPATT'],
+                                                                   self.params['Readout']['readpatt'])))
                 raise ValueError(("Only RAPID, NISRAPID, or FGSRAPID inputs can be translated to a "
                                   "different readout pattern"))
         else:
@@ -603,8 +599,7 @@ class DarkPrep():
             subfile = self.params['Reffiles']['dark']
         dark = darkobj.insert_into_datamodel(subfile)
 
-        print('Creating a linearized version of the dark current input ramp')
-        print('using JWST calibration pipeline.')
+        self.logger.info('Creating a linearized version of the dark current input ramp using JWST calibration pipeline.')
 
         # Run the DQ_Init step
         if self.runStep['badpixmask']:

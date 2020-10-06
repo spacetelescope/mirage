@@ -110,7 +110,6 @@ class ImgSim():
         self.linDark = obs.linDark
 
         self.logger.info('\nImaging simulator complete')
-
         logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME)
 
     def get_output_dir(self):

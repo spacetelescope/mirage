@@ -3,10 +3,20 @@
 """
 Utility for saving seed images
 """
+import logging
+
 from astropy.io import fits
 import numpy as np
 
 import mirage
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
 
 
 def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength,
@@ -14,22 +24,24 @@ def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength
          filename=None, segmentation_map=None, frametime=None, base_unit='ADU'):
     """Save a seed image
     """
+    logger = logging.getLogger('mirage.seed_image.save_seed.save')
+
     arrayshape = seed_image.shape
     if len(arrayshape) == 2:
         units = '{}/sec'.format(base_unit)
         yd, xd = arrayshape
         tgroup = 0.
-        print('Seed image is 2D.')
+        logger.info('Seed image is 2D.')
     elif len(arrayshape) == 3:
         units = base_unit
         g, yd, xd = arrayshape
         tgroup = frametime * (parameters['Readout']['nframe'] + parameters['Readout']['nskip'])
-        print('Seed image is 3D.')
+        logger.info('Seed image is 3D.')
     elif len(arrayshape) == 4:
         units = base_unit
         integ, g, yd, xd = arrayshape
         tgroup = frametime * (parameters['Readout']['nframe'] + parameters['Readout']['nskip'])
-        print('Seed image is 4D.')
+        logger.info('Seed image is 4D.')
 
     xcent_fov = xd / 2
     ycent_fov = yd / 2

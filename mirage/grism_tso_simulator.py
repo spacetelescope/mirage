@@ -50,6 +50,7 @@ import os
 import sys
 import argparse
 import datetime
+import logging
 import yaml
 
 from astropy.io import ascii, fits
@@ -65,14 +66,21 @@ from mirage import wfss_simulator
 from mirage.catalogs import catalog_generator, spectra_from_catalog
 from mirage.seed_image import catalog_seed_image
 from mirage.dark import dark_prep
+from mirage.logging import logging_functions
 from mirage.ramp_generator import obs_generator
 from mirage.reference_files import crds_tools
 from mirage.utils import read_fits
-from mirage.utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES
+from mirage.utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from mirage.utils import utils, file_io, backgrounds
 from mirage.utils.timer import Timer
 from mirage.yaml import yaml_update
+
+
+classpath = os.path.dirname(__file__)
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class GrismTSO():
@@ -174,6 +182,10 @@ class GrismTSO():
 
     def create(self):
         """MAIN FUNCTION"""
+        # Initialize the log using dictionary from the yaml file
+        self.logger = logging.getLogger('mirage.grism_tso_simulator')
+        self.logger.info('\n\nRunning grism_tso_simulator....\n')
+        self.logger.info('using parameter file: {}'.format(self.paramfile))
 
         # Get parameters necessary to create the TSO data
         orig_parameters = self.get_param_info()
@@ -206,9 +218,9 @@ class GrismTSO():
         # source from the other sources
         self.split_param_file(orig_parameters)
 
-        print('Splitting background and TSO source into multiple yaml files')
-        print('Running background sources through catalog_seed_image')
-        print('background param file is:', self.background_paramfile)
+        self.logger.info('Splitting background and TSO source into multiple yaml files.')
+        self.logger.info('Running background sources through catalog_seed_image.')
+        self.logger.info('background param file is:', self.background_paramfile)
 
         # Stellar spectrum hdf5 file will be required, so no need to create one here.
         # Create hdf5 file with spectra of all sources if requested
@@ -231,7 +243,7 @@ class GrismTSO():
 
         # Run the disperser on the background sources. Add the background
         # signal here as well
-        print('\n\nDispersing background sources\n\n')
+        self.logger.info('\n\nDispersing background sources\n\n')
 
         background_done = False
         background_seed_files = [background_direct.ptsrc_seed_filename,
@@ -239,7 +251,7 @@ class GrismTSO():
                                  background_direct.extended_seed_filename]
         for seed_file in background_seed_files:
             if seed_file is not None:
-                print("Dispersing seed image:", seed_file)
+                self.logger.info("Dispersing seed image:", seed_file)
                 disp = self.run_disperser(seed_file, orders=self.orders,
                                           add_background=not background_done,
                                           background_waves=bkgd_waves,
@@ -290,10 +302,10 @@ class GrismTSO():
         # Determine which frames of the exposure will take place with the unaltered stellar
         # spectrum. This will be all frames where the associated lightcurve is 1.0 everywhere.
         transit_frames, unaltered_frames = self.find_transit_frames(lightcurves)
-        print('Frame numbers containing the transit: {} - {}'.format(np.min(transit_frames), np.max(transit_frames)))
+        self.logger.info('Frame numbers containing the transit: {} - {}'.format(np.min(transit_frames), np.max(transit_frames)))
 
         # Run the disperser using the original, unaltered stellar spectrum. Set 'cache=True'
-        print('\n\nDispersing TSO source\n\n')
+        self.logger.info('\n\nDispersing TSO source\n\n')
         grism_seed_object = self.run_disperser(tso_direct.seed_file, orders=self.orders,
                                                add_background=False, cache=True, finalize=True)
 
@@ -324,8 +336,8 @@ class GrismTSO():
             hlist = fits.HDUList([h_back, h_tso])
             disp_filename = '{}_dispersed_seed_images.fits'.format(self.basename)
             hlist.writeto(disp_filename, overwrite=True)
-            print('\nDispersed seed images (background sources and TSO source) saved to {}.\n\n'
-                  .format(disp_filename))
+            self.logger.info('\nDispersed seed images (background sources and TSO source) saved to {}.\n\n'
+                             .format(disp_filename))
 
         # Calculate file splitting info
         self.file_splitting()
@@ -378,8 +390,8 @@ class GrismTSO():
                 initial_frame = self.grp_segment_indexes[j]
                 # int_dim and grp_dim are the number of integrations and
                 # groups in the current segment PART
-                print("\n\nCurrent segment part contains: {} integrations and {} groups.".format(int_dim, grp_dim))
-                print("Creating frame by frame dispersed signal")
+                self.logger.info("\n\nCurrent segment part contains: {} integrations and {} groups.".format(int_dim, grp_dim))
+                self.logger.info("Creating frame by frame dispersed signal")
                 segment_seed = np.zeros((int_dim, grp_dim, self.seed_dimensions[0], self.seed_dimensions[1]))
 
                 for integ in np.arange(int_dim):
@@ -434,25 +446,25 @@ class GrismTSO():
                 self.part_frame_start_number = split_meta.part_frame_start_number[counter]
                 counter += 1
 
-                print('Overall integration number: ', overall_integration_number)
+                self.logger.info('Overall integration number: ', overall_integration_number)
                 segment_file_name = '{}seg{}_part{}_seed_image.fits'.format(segment_file_base,
                                                                             str(self.segment_number).zfill(3),
                                                                             str(self.segment_part_number).zfill(3))
 
 
-                print('Segment int and frame start numbers: {} {}'.format(self.segment_int_start_number, self.segment_frame_start_number))
+                self.logger.info('Segment int and frame start numbers: {} {}'.format(self.segment_int_start_number, self.segment_frame_start_number))
                 #print('Part int and frame start numbers (ints and frames within the segment): {} {}'.format(self.part_int_start_number, self.part_frame_start_number))
 
                 # Disperser output is always full frame. Crop to the
                 # requested subarray if necessary
                 if orig_parameters['Readout']['array_name'] not in self.fullframe_apertures:
-                    print("Dispersed seed image size: {}".format(segment_seed.shape))
+                    self.logger.info("Dispersed seed image size: {}".format(segment_seed.shape))
                     segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
                     #gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
 
                 # Segmentation map will be centered in a frame that is larger
                 # than full frame by a factor of sqrt(2), so crop appropriately
-                print('Cropping segmentation map to appropriate aperture')
+                self.logger.info('Cropping segmentation map to appropriate aperture')
                 segy, segx = tso_segmentation_map.shape
                 dx = int((segx - tso_direct.nominal_dims[1]) / 2)
                 dy = int((segy - tso_direct.nominal_dims[0]) / 2)
@@ -470,7 +482,7 @@ class GrismTSO():
                 tso_direct.seedinfo['units'] = 'ADU/sec'
 
                 # Save the seed image. Save in units of ADU/sec
-                print('Saving seed image')
+                self.logger.info('Saving seed image')
                 tso_seed_header = fits.getheader(tso_direct.seed_file)
                 self.save_seed(segment_seed, tso_segmentation_map, tso_seed_header, orig_parameters) #,
                                #segment_number, segment_part_number)
@@ -479,29 +491,29 @@ class GrismTSO():
             self.timer.stop(name='seg_{}'.format(str(i+1).zfill(4)))
 
             # If there is more than one segment, provide an estimate of processing time
-            print('\n\nSegment {} out of {} complete.'.format(i+1, len(ints_per_segment)))
+            self.logger.info('\n\nSegment {} out of {} complete.'.format(i+1, len(ints_per_segment)))
             if len(ints_per_segment) > 1:
                 time_per_segment = self.timer.sum(key_str='seg_') / (i+1)
                 estimated_remaining_time = time_per_segment * (len(ints_per_segment) - (i+1)) * u.second
                 time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
                 finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
-                print(('\nEstimated time remaining in this exposure: {} minutes. '
-                       'Projected finish time: {}\n'.format(time_remaining, finish_time)))
+                self.logger.info(('\nEstimated time remaining in this exposure: {} minutes. '
+                                  'Projected finish time: {}\n'.format(time_remaining, finish_time)))
 
         # Prepare dark current exposure if
         # needed.
         if not self.override_dark:
-            print('Running dark prep')
+            self.logger.info('Running dark prep')
             d = dark_prep.DarkPrep()
             d.paramfile = self.paramfile
             d.prepare()
             use_darks = d.dark_files
         else:
-            print('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
+            self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
             use_darks = self.override_dark
 
         # Combine into final observation
-        print('Running observation generator')
+        self.logger.info('Running observation generator')
         obs = obs_generator.Observation()
         obs.linDark = use_darks
         obs.seed = self.seed_files
@@ -509,6 +521,9 @@ class GrismTSO():
         obs.seedheader = tso_direct.seedinfo
         obs.paramfile = self.paramfile
         obs.create()
+
+        self.logger.info('\nGrism TSO simulator complete')
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME)
 
     def file_splitting(self):
         """Determine file splitting details based on calculated data
@@ -540,7 +555,7 @@ class GrismTSO():
                 delta_int = self.file_segment_indexes[1:] - self.file_segment_indexes[0: -1]
                 if delta_int[-1] == 1 and delta_int[0] != 1:
                     self.file_segment_indexes[-2] -= 1
-                    print('Adjusted to avoid single integration: ', self.file_segment_indexes)
+                    self.logger.info('Adjusted to avoid single integration: ', self.file_segment_indexes)
 
             # More adjustments related to segment numbers. We need to compare
             # the integration indexes for the seed images vs those for the final
@@ -621,7 +636,7 @@ class GrismTSO():
                     cats.append(parameters['simSignals'][cattype])
             else:
                 if parameters['simSignals'][cattype].lower() != 'none':
-                    print(parameters['simSignals'][cattype].lower(), type(parameters['simSignals'][cattype]))
+                    self.logger.info(parameters['simSignals'][cattype].lower(), type(parameters['simSignals'][cattype]))
                     raise ValueError('{} catalog: {} is unsupported in grism TSO mode.'.format(cattype, parameters['simSignals'][cattype]))
 
         self.catalog_files.extend(cats)
@@ -734,7 +749,7 @@ class GrismTSO():
         hdulist = fits.HDUList([h0])
         outfile = '{}{}'.format(self.basename, '_normalized_lightcurves_vs_time.fits')
         hdulist.writeto(outfile, overwrite=True)
-        print('2D array of lightcurves vs time saved to: {}'.format(outfile))
+        self.logger.info('2D array of lightcurves vs time saved to: {}'.format(outfile))
 
         return lightcurves, time
 
@@ -869,7 +884,7 @@ class GrismTSO():
             units = 'ADU'
             integ, grps, yd, xd = arrayshape
             tgroup = self.frametime * (params['Readout']['nframe'] + params['Readout']['nskip'])
-            print('Seed image is 4D.')
+            self.logger.info('Seed image is 4D.')
         else:
             raise ValueError('Only 4D seed images supported. This seed image is {}D'.format(len(arrayshape)))
 
@@ -957,9 +972,9 @@ class GrismTSO():
         hdulist = fits.HDUList([h0, h1, h2])
         hdulist.writeto(self.seed_file, overwrite=True)
 
-        print("Seed image and segmentation map saved as {}".format(self.seed_file))
-        print("Seed image, segmentation map, and metadata available as:")
-        print("self.seedimage, self.seed_segmap, self.seedinfo.\n\n")
+        self.logger.info("Seed image and segmentation map saved as {}".format(self.seed_file))
+        self.logger.info("Seed image, segmentation map, and metadata available as:")
+        self.logger.info("self.seedimage, self.seed_segmap, self.seedinfo.\n\n")
 
     def split_param_file(self, params):
         """Create 2 copies of the input parameter file. One will contain
@@ -1049,9 +1064,9 @@ class GrismTSO():
         # Make sure the lightcurve time is at least as long as the exposure
         # time
         if exp_time > catalog_total_time:
-            print(('WARNING: Lightcurve duration specified in TSO catalog file is less than '
-                   'the total duration of the exposure. Adding extra time to the end of the '
-                   'lightcurve to match.'))
+            self.logger.info(('WARNING: Lightcurve duration specified in TSO catalog file is less than '
+                              'the total duration of the exposure. Adding extra time to the end of the '
+                              'lightcurve to match.'))
             catalog['End_time'][0] = catalog['Start_time'][0] + catalog_total_time.value
 
         # Make sure the time of inferior conjunction is betwen

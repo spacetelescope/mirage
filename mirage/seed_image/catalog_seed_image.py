@@ -449,7 +449,8 @@ class Catalog_seed():
         # logger with the same handler and file destination, so it will
         # append to the original log file created here.
         logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME,
-                                                            yaml_outdir=self.params['Output']['directory'])
+                                                            yaml_outdir=self.params['Output']['directory'],
+                                                            log_type='catalog_seed')
 
     def create_tso_seed(self, split_seed=False, integration_splits=-1, frame_splits=-1):
         """Create a seed image for time series sources. Just like for moving

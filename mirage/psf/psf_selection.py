@@ -30,6 +30,7 @@ Use
 
 from copy import copy
 from glob import glob
+import logging
 import os
 import warnings
 
@@ -37,9 +38,14 @@ from astropy.io import fits
 import numpy as np
 from webbpsf.utils import to_griddedpsfmodel
 
-from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS
+from mirage.logging import logging_functions
+from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.utils import expand_environment_variable, standardize_filters
 
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
@@ -200,6 +206,8 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         Object containing PSF library
 
     """
+    logger = logging.getLogger('mirage.psf.psf_selection.get_gridded_psf_library')
+
     # First, as a way to save time, let's assume a file naming convention
     # and search for the appropriate file that way. If we find a match,
     # confirm the properties of the file via the header. This way we don't
@@ -250,7 +258,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         library_file = get_library_file(instrument, detector, filtername, pupilname,
                                         wavefront_error, wavefront_error_group, library_path)
 
-    print("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
+    logger.info("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
 
     lib_head = fits.getheader(library_file)
     itm_sim = lib_head.get('ORIGIN', '') == 'ITM'
@@ -259,7 +267,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         try:
             library = to_griddedpsfmodel(library_file)
         except OSError:
-            print("OSError: Unable to open {}.".format(library_file))
+            logger.error("OSError: Unable to open {}.".format(library_file))
     else:
         # Handle input ITM images
         library = _load_itm_library(library_file)
@@ -308,6 +316,8 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     matches : str
         Name of the PSF library file for the instrument and filter name
     """
+    logger = logging.getLogger('mirage.psf.psf_selection.get_library_file')
+
     psf_files = glob(os.path.join(library_path, '*.fits'))
 
     # Determine if the PSF path is default or not
@@ -441,7 +451,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     if len(matches) == 1:
         return matches[0]
     elif len(matches) == 0:
-        print('Requested parameters:\ninstrument {}\ndetector {}\nfilt {}\npupil {}\nwfe {}\n'
+        logger.info('Requested parameters:\ninstrument {}\ndetector {}\nfilt {}\npupil {}\nwfe {}\n'
               'wfe_group {}\nlibrary_path {}\n'.format(instrument, detector, filt, pupil, wfe,
                                                        wfe_group, library_path))
         raise ValueError("No PSF library file found matching requested parameters.")
@@ -489,6 +499,8 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
         and column are not returned, in order to avoid edge effects
 
     """
+    logger = logging.getLogger('mirage.psf.psf_selection.get_psf_wings')
+
     # First, as a way to save time, let's assume a file naming convention
     # and search for the appropriate file that way. If we find a match,
     # confirm the properties of the file via the header. This way we don't
@@ -517,7 +529,7 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
         wings_file = get_library_file(instrument, detector, filtername, pupilname,
                                       wavefront_error, wavefront_error_group, library_path, wings=True)
 
-    print("PSF wings will be from: {}".format(os.path.basename(wings_file)))
+    logger.info("PSF wings will be from: {}".format(os.path.basename(wings_file)))
     with fits.open(wings_file) as hdulist:
         psf_wing = hdulist['DET_DIST'].data
     # Crop the outer row and column in order to remove any potential edge
@@ -526,7 +538,7 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
 
     for shape in psf_wing.shape:
         if shape % 2 == 0:
-            print(("WARNING: PSF wing file contains an even number of rows or columns. "
+            logger.error(("WARNING: PSF wing file contains an even number of rows or columns. "
                    "These must be even."))
             raise ValueError
     return psf_wing

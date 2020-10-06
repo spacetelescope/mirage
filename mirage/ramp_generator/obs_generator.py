@@ -3339,7 +3339,7 @@ class Observation():
         # assume that the input is 2D, since we are using it to build a signal rate frame
         imageshape = image.shape
         if len(imageshape) != 2:
-            self.printfunc("Error: image %s is not two-dimensional" % (name))
+            self.logger.error("Error: image {} is not two-dimensional".format(name))
             return None, None
 
         imageshape = image.shape

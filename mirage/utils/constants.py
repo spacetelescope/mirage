@@ -115,7 +115,16 @@ SERSIC_FRACTIONAL_SIGNAL = 0.9995
 
 # Configuration file for defining the logs
 LOG_CONFIG_FILENAME = 'logging_config.yaml'
+
+# Standard log file names. These are needed because we need to have a
+# log file name before we know the yaml/xml filename
+#These need to be unique for each call in order to support multiprocessing
+#But we cant use difft standard log filenames, because the utilities need
+#to be able to reference the correct log file regardless of where they are
+#being called from
 STANDARD_LOGFILE_NAME = 'temp.log'
+#STANDARD_FITSSEED_LOGFILE_NAME = 'temp_fits_seed.log'
+#STANDARD_YAML_GEN_LOGFILE_NAME = 'temp_yaml_gen.log'
 
 
 def grism_factor(instrument_name):
