@@ -74,6 +74,9 @@ class DarkPrep():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        # Initialize the log using dictionary from the yaml file
+        self.logger = logging.getLogger(__name__)
+
         self.offline = offline
         self.file_splitting = file_splitting
 
@@ -671,9 +674,6 @@ class DarkPrep():
         """MAIN FUNCTION"""
         # Read in the yaml parameter file
         self.read_parameter_file()
-
-        # Initialize the log using dictionary from the yaml file
-        self.logger = logging.getLogger(__name__)
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning dark_prep..\n')

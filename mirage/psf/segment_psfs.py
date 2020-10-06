@@ -259,7 +259,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     pool_start_time = time.time()
     results = pool.map(calc_psfs_for_one_segment, segments)
     pool_stop_time = time.time()
-    logger.info('\n=========== Elapsed time (all segments):', pool_stop_time - pool_start_time, '============\n')
+    logger.info('\n=========== Elapsed time (all segments): {} ============\n'.format(pool_stop_time - pool_start_time))
     pool.close()
 
 

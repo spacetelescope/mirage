@@ -89,6 +89,9 @@ class Catalog_seed():
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        # Initialize the log using dictionary from the yaml file
+        self.logger = logging.getLogger(__name__)
+
         self.offline = offline
 
         # Locate the module files, so that we know where to look
@@ -137,9 +140,6 @@ class Catalog_seed():
         # Read in input parameters and quality check
         self.seed_files = []
         self.readParameterFile()
-
-        # Initialize the log using dictionary from the yaml file
-        self.logger = logging.getLogger(__name__)
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning catalog_seed_image..\n')
