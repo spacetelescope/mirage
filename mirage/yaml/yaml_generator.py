@@ -624,10 +624,6 @@ class SimInput:
 
             apt.output_dir = self.output_dir
             apt.create_input_table()
-
-
-            stop
-
             self.info = apt.exposure_tab
 
             # Add start time info to each element.

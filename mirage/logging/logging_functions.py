@@ -109,7 +109,7 @@ def log_fail(func):
         try:
             # Run the function
             func(*args, **kwargs)
-            logging.info('Completed Successfully')
+            #logging.info('Completed Successfully')
 
         except Exception:
             logging.critical(traceback.format_exc())

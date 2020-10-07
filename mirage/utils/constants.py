@@ -118,7 +118,7 @@ LOG_CONFIG_FILENAME = 'logging_config.yaml'
 
 # Standard log file names. These are needed because we need to have a
 # log file name before we know the yaml/xml filename
-STANDARD_LOGFILE_NAME = 'temp.log'
+STANDARD_LOGFILE_NAME = 'mirage_latest.log'
 
 
 def grism_factor(instrument_name):
