@@ -20,12 +20,20 @@ TODO
 """
 import collections
 import copy
+import logging
 import os
 
 from astropy.table import Table, vstack
 import numpy as np
 
 from ..apt import read_apt_xml
+from ..logging import logging_functions
+from ..utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 # Get the mapping between the user-input catalog dictionary keys and
@@ -364,6 +372,9 @@ def expand_for_dithers(indict, verbose=True):
         Dictionary, expanded to include a separate entry for
         each dither
     """
+    # Initialize logger
+    logger = logging.getLogger('mirage.yaml.generate_observationlist.expand_for_dithers')
+
     expanded = {}
     for key in indict:
         expanded[key] = []
@@ -438,12 +449,12 @@ def expand_for_dithers(indict, verbose=True):
         expanded[key] = np.array(expanded_table[key]).tolist()
 
     if verbose:
-        print('Number of entries before expanding dithers: {}'.format(len(table)))
-        print('Number of entries after expanding dithers:  {}'.format(len(expanded_table)))
+        logger.info('Number of entries before expanding dithers: {}'.format(len(table)))
+        logger.info('Number of entries after expanding dithers:  {}'.format(len(expanded_table)))
 
     if verbose:
         for obs_id in list(dict.fromkeys(expanded_table['ObservationID'])):
-            print('Expanded table for Observation {} has {} entries'.format(obs_id, len(np.where(expanded_table['ObservationID']==obs_id)[0])))
+            logger.info('Expanded table for Observation {} has {} entries'.format(obs_id, len(np.where(expanded_table['ObservationID']==obs_id)[0])))
     return expanded
 
 
@@ -476,6 +487,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
         Read default values from configuration file
 
     """
+    # Initialize logger
+    logger = logging.getLogger('mirage.yaml.generate_observationlist.get_observation_dict')
+
     # Read in filters from APT .xml file
     readxml_obj = read_apt_xml.ReadAPTXML()
 
@@ -676,8 +690,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     try:
                         date_value = dates[observation_number]
                     except KeyError:
-                        print(("\n\nERROR: No date value specified for Observation {} in date dictionary. "
-                               "Quitting.\n\n".format(observation_number)))
+                        logger.error(("\n\nERROR: No date value specified for Observation {} in date dictionary. "
+                                      "Quitting.\n\n".format(observation_number)))
                         raise KeyError
 
                 # Get the proper PAV3 value
@@ -687,8 +701,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     try:
                         pav3_value = pav3[observation_number]
                     except KeyError:
-                        print(("\n\nERROR: No roll angle value specified for Observation {} in roll_angle "
-                               "dictionary. Quitting.\n\n".format(observation_number)))
+                        logger.error(("\n\nERROR: No roll angle value specified for Observation {} in roll_angle "
+                                      "dictionary. Quitting.\n\n".format(observation_number)))
                         raise KeyError
 
                 # Get the proper catalog values
@@ -706,9 +720,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     try:
                         catalogs_to_use = catalogs_per_observation[observation_number][instrument.lower()]
                     except KeyError:
-                        print(("\n\nERROR: Missing observation number or instrument entry in catalog "
-                               "dictionary. Failed to find catalogs[{}][{}]\n\n".format(observation_number,
-                                                                                        instrument.lower())))
+                        logger.error(("\n\nERROR: Missing observation number or instrument entry in catalog "
+                                      "dictionary. Failed to find catalogs[{}][{}]\n\n".format(observation_number,
+                                                                                               instrument.lower())))
                         raise KeyError
                     ptsrc_catalog_value = catalogs_to_use['PointsourceCatalog']
                     galaxy_catalog_value = catalogs_to_use['GalaxyCatalog']
@@ -729,9 +743,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                         cr_library_value = cosmic_rays[observation_number]['library']
                         cr_scale_value = cosmic_rays[observation_number]['scale']
                     except KeyError:
-                        print(("\n\nERROR: No cosmic ray library and/or scale value specified for "
-                               "Observation {} in cosmic_ray dictionary. Quitting.\n\n"
-                               .format(observation_number)))
+                        logger.error(("\n\nERROR: No cosmic ray library and/or scale value specified for "
+                                      "Observation {} in cosmic_ray dictionary. Quitting.\n\n"
+                                      .format(observation_number)))
                         raise KeyError
 
                 text += [
@@ -761,8 +775,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                             background_sw_value = background[observation_number]['nircam']['sw']
                             background_lw_value = background[observation_number]['nircam']['lw']
                         except KeyError:
-                            print(("\n\nERROR: Missing entry in the background dictionary for NIRCam SW and/or "
-                                   "LW channels, observation number: {}\n\n".format(observation_number)))
+                            logger.error(("\n\nERROR: Missing entry in the background dictionary for NIRCam SW and/or "
+                                          "LW channels, observation number: {}\n\n".format(observation_number)))
                             raise KeyError
 
                     text += [
@@ -824,8 +838,8 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                         try:
                             background_value = background[observation_number][instrument.lower()]
                         except KeyError:
-                            print(("\n\nERROR: Missing entry in the background dictionary for observation "
-                                   "number: {}, instrument: {}\n\n".format(observation_number, instrument)))
+                            logger.error(("\n\nERROR: Missing entry in the background dictionary for observation "
+                                          "number: {}, instrument: {}\n\n".format(observation_number, instrument)))
                             raise KeyError
 
                     text += [
@@ -862,14 +876,14 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
         try:
             os.mkdir(obs_dir)
         except OSError:
-            print("Creation of the directory {} failed".format(obs_dir))
+            logger.error("Creation of the directory {} failed".format(obs_dir))
         else:
-            print("Successfully created the directory {} to hold the observation list file.".format(obs_dir))
+            logger.info("Successfully created the directory {} to hold the observation list file.".format(obs_dir))
 
     f = open(yaml_file, 'w')
     for line in text_out:
         f.write(line)
     f.close()
-    print('\nWrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number, yaml_file))
+    logger.info('Wrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number, yaml_file))
 
     return return_dict

@@ -3,6 +3,7 @@
 
 import copy
 import os
+import logging
 import re
 from collections import OrderedDict
 
@@ -11,10 +12,16 @@ from astropy.io import ascii
 from astropy.table import Table, Column
 import numpy as np
 
+from ..logging import logging_functions
+from ..utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from ..utils.utils import append_dictionary
 
 APT_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 PACKAGE_DIR = os.path.dirname(APT_DIR)
+
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class ReadAPTXML():
@@ -36,6 +43,10 @@ class ReadAPTXML():
     """
 
     def __init__(self):
+        # Initialize log
+        self.logger = logging.getLogger('mirage.apt.read_apt_xml')
+        self.logger.info('Running read_apt_xml....\n')
+
         # Define the APT namespace
         self.apt = '{http://www.stsci.edu/JWST/APT}'
 
@@ -189,8 +200,8 @@ class ReadAPTXML():
                 self.target_type[t_name] = 'non-sidereal'
             else:
                 self.target_type[t_name] = 'sidereal'
-        print('target_info:')
-        print(self.target_info)
+        self.logger.info('target_info:')
+        self.logger.info('{}'.format(self.target_info))
 
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
@@ -238,14 +249,14 @@ class ReadAPTXML():
             coordparallel = obs.find(self.apt + 'CoordinatedParallel').text
 
             if verbose:
-                print('+'*100)
-                print('Observation `{}` labelled `{}` uses template `{}`'.format(observation_number, label,
+                self.logger.info('+'*100)
+                self.logger.info('Observation `{}` labelled `{}` uses template `{}`'.format(observation_number, label,
                                                                                  template_name))
                 number_of_entries = len(self.APTObservationParams['Instrument'])
-                print('APTObservationParams Dictionary holds {} entries before reading template'
-                      .format(number_of_entries))
+                self.logger.info('APTObservationParams Dictionary holds {} entries before reading template'
+                                 .format(number_of_entries))
                 if coordparallel == 'true':
-                    print('Coordinated parallel observation')
+                    self.logger.info('Coordinated parallel observation')
 
             CoordinatedParallelSet = None
             if coordparallel == 'true':
@@ -264,7 +275,7 @@ class ReadAPTXML():
             try:
                 targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
             except IndexError as e:
-                print("No target ID for observation: {}".format(obs))
+                self.logger.info("No target ID for observation: {}".format(obs))
                 targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
 
             # For NIRSpec Internal Lamp
@@ -361,13 +372,13 @@ class ReadAPTXML():
                         raise ValueError('Parallel template {} (with primary template {}) not supported.'
                                          .format(parallel_template_name, template_name))
             else:
-                print('SKIPPED: Observation `{}` labelled `{}` uses template `{}`'.format(observation_number,
-                                                                                          label,
-                                                                                          template_name))
+                self.logger.info('SKIPPED: Observation `{}` labelled `{}` uses template `{}`'.format(observation_number,
+                                                                                                     label,
+                                                                                                     template_name))
                 continue
 
             if verbose:
-                print('Dictionary read from template has {} entries.'.format(len(exposures_dictionary['Instrument'])))
+                self.logger.info('Dictionary read from template has {} entries.'.format(len(exposures_dictionary['Instrument'])))
 
             # # set default number of dithers, for downstream processing
             # for i, n_dither in enumerate(exposures_dictionary['number_of_dithers']):
@@ -391,9 +402,9 @@ class ReadAPTXML():
             label = obs_label
 
             if verbose:
-                print("Found {} tile(s) for observation {} {}".format(n_tiles, observation_number, label))
+                self.logger.info("Found {} tile(s) for observation {} {}".format(n_tiles, observation_number, label))
                 if len(visit_numbers) > 0:
-                    print('Found {} visits with numbers: {}'.format(len(visit_numbers), visit_numbers))
+                    self.logger.info('Found {} visits with numbers: {}'.format(len(visit_numbers), visit_numbers))
 
             if n_tiles > 1:
                 for i in range(n_tiles - 1):
@@ -404,12 +415,12 @@ class ReadAPTXML():
 
             if verbose:
                 number_of_entries_after = len(self.APTObservationParams['Instrument'])
-                print('APTObservationParams Dictionary holds {} entries after reading template ({:+d} entries)'
-                      .format(number_of_entries_after, number_of_entries_after-number_of_entries))
+                self.logger.info('APTObservationParams Dictionary holds {} entries after reading template ({:+d} entries)'
+                                 .format(number_of_entries_after, number_of_entries_after-number_of_entries))
 
         if verbose:
-            print('Finished reading APT xml file.')
-            print('+'*100)
+            self.logger.info('Finished reading APT xml file.')
+            self.logger.info('+'*100)
         # Temporary for creating truth tables to use in tests
         #bool_cols = ['ParallelInstrument']
         #int_cols = ['Groups', 'Integrations']
@@ -513,12 +524,12 @@ class ReadAPTXML():
                 instrument = 'NIRCAM'
             prime_instrument = obs.find(self.apt + 'Instrument').text
             if verbose:
-                print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
+                self.logger.info('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
             prime_template = obs.find(self.apt + 'Template')[0]
             prime_template_name = etree.QName(prime_template).localname
             prime_ns = "{{{}/Template/{}}}".format(self.apt.replace('{', '').replace('}', ''), prime_template_name)
             if verbose:
-                print('PRIME TEMPLATE NAME IS: {}'.format(prime_template_name))
+                self.logger.info('PRIME TEMPLATE NAME IS: {}'.format(prime_template_name))
         else:
             instrument = obs.find(self.apt + 'Instrument').text
             parallel_instrument = False
@@ -579,7 +590,7 @@ class ReadAPTXML():
                     number_of_primary_dithers = '8'
 
             else:
-                print('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
+                self.logger.info('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
 
             # Find the number of subpixel dithers
             if not parallel:
@@ -619,9 +630,9 @@ class ReadAPTXML():
 
             # Combine primary and subpixel dithers
             number_of_dithers = str(np.int(number_of_primary_dithers) * number_of_subpixel_dithers)
-            print('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
-                                                                            number_of_subpixel_dithers,
-                                                                            number_of_dithers))
+            self.logger.info('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
+                                                                                       number_of_subpixel_dithers,
+                                                                                       number_of_dithers))
 
             # Find filter parameters for all filter configurations within obs
             filter_configs = template.findall('.//' + ns + 'FilterConfig')
@@ -687,8 +698,8 @@ class ReadAPTXML():
                 dither_direct = observation_dict['DitherNirissWfssDirectImages']
                 if dither_direct == 'NO_DITHERING':
                     if verbose:
-                        print(('NIRISS WFSS parallel and NO_DITHERING set for direct imgages. Adjusting '
-                               'number_of_dithers to 1 for the matching NIRCam exposures.'))
+                        self.logger.info(('NIRISS WFSS parallel and NO_DITHERING set for direct imgages. Adjusting '
+                                          'number_of_dithers to 1 for the matching NIRCam exposures.'))
                     num_dithers = exposures_dictionary['number_of_dithers']
                     for counter in range(0, len(num_dithers), 3):
                         num_dithers[counter: counter+3] = ['1', num_dithers[counter+1], '1']
@@ -807,9 +818,9 @@ class ReadAPTXML():
                                     exposures_dictionary[key].append(str(exposure_dict[key]))
 
             if not parallel:
-                print('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
-                                                                                number_of_subpixel_dithers,
-                                                                                number_of_dithers))
+                self.logger.info('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
+                                                                                           number_of_subpixel_dithers,
+                                                                                           number_of_dithers))
 
         for key in exposures_dictionary.keys():
             if type(exposures_dictionary[key]) is not list:
@@ -1329,7 +1340,7 @@ class ReadAPTXML():
         try:
             targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
         except IndexError as e:
-            print("No target ID for observation: {}".format(obs))
+            self.logger.info("No target ID for observation: {}".format(obs))
             targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
 
         # Mode specific info, including target acq
@@ -1447,7 +1458,7 @@ class ReadAPTXML():
         try:
             targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[1]
         except IndexError as e:
-            print("No target ID for observation: {}".format(obs))
+            self.logger.info("No target ID for observation: {}".format(obs))
             targ_name = obs.find(self.apt + 'TargetID').text.split(' ')[0]
 
         # Mode specific info, including target acq
@@ -1842,10 +1853,10 @@ class ReadAPTXML():
             if key not in self.APTObservationParams_keys:
                 # if key not yet present, create entry
                 if key not in exp_dictionary.keys():
-                    print('Key {} not present in APTObservationParams nor exposures_dictionary'.format(key))
+                    self.logger.info('Key {} not present in APTObservationParams nor exposures_dictionary'.format(key))
                     exp_dictionary[key] = [str(exposure_seq_dict[key])]
                 else:
-                    print('Key {} not present in APTObservationParams'.format(key))
+                    self.logger.info('Key {} not present in APTObservationParams'.format(key))
                     exp_dictionary[key].append(str(exposure_seq_dict[key]))
         return exp_dictionary
 
@@ -1902,7 +1913,7 @@ class ReadAPTXML():
         # In that case we need to look into the nircam observation to see if the niriss direct images are
         # to be dithered
         if verbose:
-            print("Reading NIRISS WFSS template")
+            self.logger.info("Reading NIRISS WFSS template")
         if parallel:
             prime_template = obs.find(self.apt + 'Template')[0]
             prime_template_name = etree.QName(prime_template).localname
@@ -1912,7 +1923,7 @@ class ReadAPTXML():
             parallel_instrument = True
             prime_instrument = obs.find(self.apt + 'Instrument').text
             if verbose:
-                print('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
+                self.logger.info('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
             pdither_grism = prime_template.find(prime_ns + 'PrimaryDithers').text
             pdither_type_grism = prime_template.find(prime_ns + 'PrimaryDitherType').text
             dither_direct = prime_template.find(prime_ns + 'DitherNirissWfssDirectImages').text

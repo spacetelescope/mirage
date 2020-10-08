@@ -40,6 +40,7 @@ import copy
 import os
 import sys
 import argparse
+import logging
 import yaml
 
 import numpy as np
@@ -51,10 +52,12 @@ from scipy.stats import sigmaclip
 from .catalogs import spectra_from_catalog
 from .seed_image import catalog_seed_image
 from .dark import dark_prep
+from .logging import logging_functions
 from .ramp_generator import obs_generator
 from .utils import backgrounds, read_fits
 from .utils.flux_cal import fluxcal_info
-from .utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, NIRISS_GRISM_THROUGHPUT_FACTOR
+from .utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, NIRISS_GRISM_THROUGHPUT_FACTOR, \
+                             LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from .utils.utils import expand_environment_variable, get_filter_throughput_file
 
 from .yaml import yaml_update
@@ -63,6 +66,10 @@ NIRCAM_GRISM_CROSSING_FILTERS = ['F322W2', 'F277W', 'F356W', 'F444W', 'F250M', '
                                  'F335M', 'F360M', 'F410M', 'F430M', 'F323N', 'F405N',
                                  'F466N', 'F470N']
 NIRISS_GRISM_CROSSING_FILTERS = ['F200W', 'F150W', 'F140M', 'F158M', 'F115W', 'F090W']
+
+classpath = os.path.dirname(__file__)
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class WFSSSim():
@@ -132,6 +139,11 @@ class WFSSSim():
 
     def create(self):
         """MAIN FUNCTION"""
+        self.logger = logging.getLogger('mirage.wfss_simulator')
+        self.logger.info('\n\nRunning wfss_simulator....\n')
+        self.logger.info('using parameter files: ')
+        for pfile in self.paramfiles:
+            self.logger.info('{}'.format(pfile))
 
         # Loop over the yaml files and create
         # a direct seed image for each
@@ -140,7 +152,7 @@ class WFSSSim():
         galaxy_seeds = []
         extended_seeds = []
         for pfile in self.paramfiles:
-            print('Running catalog_seed_image for {}'.format(pfile))
+            self.logger.info('Running catalog_seed_image for {}'.format(pfile))
             cat = catalog_seed_image.Catalog_seed(offline=self.offline)
             cat.paramfile = pfile
             cat.make_seed()
@@ -180,14 +192,14 @@ class WFSSSim():
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
             if self.params['simSignals']['use_dateobs_for_background']:
-                print("Generating background spectrum for observation date: {}".format(self.params['Output']['date_obs']))
+                self.logger.info("Generating background spectrum for observation date: {}".format(self.params['Output']['date_obs']))
                 back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
                                                                                   self.params['Telescope']['dec'],
                                                                                   self.params['Output']['date_obs'])
             else:
                 if isinstance(self.params['simSignals']['bkgdrate'], str):
                     if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                        print("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
+                        self.logger.info("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
                         back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
                                                                                            self.module)
                     else:
@@ -301,13 +313,12 @@ class WFSSSim():
 
         # Crop to the requested subarray if necessary
         if cat.params['Readout']['array_name'] not in self.fullframe_apertures:
-            print("Subarray bounds: {}".format(cat.subarray_bounds))
-            print("Dispersed seed image size: {}".format(disp_seed.shape))
+            self.logger.info("Subarray bounds: {}".format(cat.subarray_bounds))
+            self.logger.info("Dispersed seed image size: {}".format(disp_seed.shape))
             disp_seed = self.crop_to_subarray(disp_seed, cat.subarray_bounds)
 
             # Segmentation map will be centered in a frame that is larger
             # than full frame by a factor of sqrt(2), so crop appropriately
-            print("Need to make this work for subarrays...")
             segy, segx = cat.seed_segmap.shape
             dx = int((segx - 2048) / 2)
             dy = int((segy - 2048) / 2)
@@ -354,7 +365,7 @@ class WFSSSim():
             else:
                 obslindark = d.dark_files
         else:
-            print('\n\noverride_dark has been set. Skipping dark_prep.')
+            self.logger.info('\n\noverride_dark has been set. Skipping dark_prep.')
             if isinstance(self.override_dark, str):
                 self.read_dark_product()
                 obslindark = self.prepDark
@@ -570,7 +581,7 @@ class WFSSSim():
             with open(file, 'r') as infile:
                 data = yaml.load(infile)
         except (FileNotFoundError, IOError) as e:
-            print(e)
+            self.logger.info(e)
 
     def read_gain_file(self, file):
         """
@@ -589,7 +600,7 @@ class WFSSSim():
                 image = h[1].data
                 header = h[0].header
         except (FileNotFoundError, IOError) as e:
-            print(e)
+            self.logger.info(e)
 
         mngain = np.nanmedian(image)
 
@@ -635,7 +646,7 @@ class WFSSSim():
             subdict = ascii.read(subfile, data_start=1, header_start=0)
             return subdict
         except (FileNotFoundError, IOError) as e:
-            print(e)
+            self.logger.info(e)
 
     def get_subarr_bounds(self, subname, sdict):
         # find the bounds of the requested subarray
@@ -662,7 +673,7 @@ class WFSSSim():
         if self.disp_seed_filename is None:
             self.disp_seed_filename = self.default_dispersed_filename
         hdu_list.writeto(self.disp_seed_filename, overwrite=True)
-        print(("Dispersed seed image saved to {}".format(self.disp_seed_filename)))
+        self.logger.info(("Dispersed seed image saved to {}".format(self.disp_seed_filename)))
 
     def add_options(self, parser=None, usage=None):
         if parser is None:

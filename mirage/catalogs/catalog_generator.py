@@ -22,15 +22,23 @@ tab.save()
 """
 
 import copy
+import logging
 import os
 
 from astropy.io import ascii
 from astropy.table import Table, Column
 import numpy as np
 
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.utils import standardize_filters, make_mag_column_names
 
 TSO_GRISM_INDEX = 99999
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
 
 class PointSourceCatalog():
     def __init__(self, ra=[], dec=[], x=[], y=[]):
@@ -73,6 +81,8 @@ class PointSourceCatalog():
         """Add a catalog to the current catalog instance"""
         # If the the source positions in the two catalogs have different units, then the catalogs
         # can't be combined.
+        logger = logging.getLogger('mirage.catalogs.catalog_generator.add_catalog')
+
         if self._location_units != catalog_to_add.location_units:
             raise ValueError("WARNING: Sources in the catalogs do not have matching units (RA/Dec or x/y)")
 
@@ -81,7 +91,7 @@ class PointSourceCatalog():
         new_mag_labels = list(catalog_to_add.magnitudes.keys())
         mag_sys = self.magnitudes[current_mag_labels[0]][0]
         if mag_sys != catalog_to_add.magnitudes[new_mag_labels[0]][0]:
-            print("WARNING: Magnitude systems of the two catalogs do not match. Cannot combine.")
+            logger.error("Magnitude systems of the two catalogs do not match. Cannot combine.")
 
         # Get the length of the two catalogs
         current_length = len(self._ra)
@@ -211,12 +221,15 @@ class PointSourceCatalog():
 
         Parameters
         ----------
-        justone
+        key : str
+            Column name in the catalog (e.g. 'nircam_f090w_magnitudes')
         """
+        logger = logging.getLogger('mirage.catalogs.catalog_generator.get_magnitudes')
+
         try:
             return self.magnitudes[key][1]
         except KeyError:
-            print("WARNING: No {} magnitude column present.".format(key))
+            logger.error("WARNING: No {} magnitude column present.".format(key))
 
     @property
     def location_units(self):
