@@ -19,10 +19,20 @@ Use
         from mirage.utils import file_io
         gain, gain_head = file_io.read_gain_file(filename)
 """
+import logging
 import os
 
 from astropy.io import ascii, fits
 import numpy as np
+
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
 
 
 def read_filter_throughput(filename):
@@ -60,12 +70,14 @@ def read_gain_file(filename):
     header : dict
         Information contained in the header of the file
     """
+    logger = logging.getLogger('mirage.utils.file_io.read_gain_file')
+
     try:
         with fits.open(filename) as h:
             image = h[1].data
             header = h[0].header
     except (FileNotFoundError, IOError) as e:
-        print(e)
+        logger.error(e)
 
     mngain = np.nanmedian(image)
 

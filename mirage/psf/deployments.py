@@ -13,6 +13,7 @@ Use
         ote = remove_piston_tip_tilt(ote, out_dir=out_dir)
 """
 
+import logging
 import os
 import time
 import yaml
@@ -20,6 +21,13 @@ import yaml
 from astropy.io import fits
 import numpy as np
 import webbpsf
+
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def load_ote_from_deployment_yaml(deployments_file, out_dir, save=True):
@@ -132,6 +140,7 @@ def generate_deployment_errors(save=True, out_dir=None):
     Deployment tolerances taken from JWST WFS&C Commissioning and Operations Plan (OTE-24):
     D36168 / 2299462 Rev C Page 10
     """
+    logger = logging.getLogger('mirage.psf.deployments.generate_deployment_errors')
 
     deployment_errors = {
         'sm_piston': np.random.normal(loc=0, scale=2500/5),  # microns
@@ -153,7 +162,7 @@ def generate_deployment_errors(save=True, out_dir=None):
         save_file = os.path.join(out_dir, 'deployment_errors_{}.yaml'.format(time.strftime("%Y%m%d_%H%M%S")))
         with open(save_file, 'w') as f:
             yaml.dump(deployment_errors, f, default_flow_style=False)
-        print('Saved deployment errors to {}'.format(save_file))
+        logger.info('Saved deployment errors to {}'.format(save_file))
     elif save:
         raise IOError('Cannot save deployment errors to yaml; no out_dir provided')
 
@@ -178,6 +187,8 @@ def reduce_deployment_errors(deployment_errors, reduction_factor=0.2, save=True,
     deployment_errors : dict
         Dictionary containing lists of reduced deployment errors
     """
+    logger = logging.getLogger('mirage.psf.deployments.reduce_deployment_errors')
+
     for key, value in deployment_errors.items():
         deployment_errors[key] = value * reduction_factor
 
@@ -186,7 +197,7 @@ def reduce_deployment_errors(deployment_errors, reduction_factor=0.2, save=True,
         save_file = os.path.join(out_dir, 'deployment_errors_reduced_{}.yaml'.format(time.strftime("%Y%m%d_%H%M%S")))
         with open(save_file, 'w') as f:
             yaml.dump(deployment_errors, f, default_flow_style=False)
-        print('Saved reduced ({}%) deployment errors to {}'.format(reduction_factor * 100, save_file))
+        logger.info('Saved reduced ({}%) deployment errors to {}'.format(reduction_factor * 100, save_file))
     elif save:
         raise IOError('Cannot save deployment errors to yaml; no out_dir provided')
 
@@ -215,6 +226,8 @@ def apply_deployment_errors(ote, deployment_errors, save=True, out_dir=None):
         List of X & Y tilts for each segment, in microns, to be used later to
         calculate the segment PSF displacement in pixels
     """
+    logger = logging.getLogger('mirage.psf.deployments.apply_deployment_errors')
+
     ote.reset()
     ote.remove_piston_tip_tilt = False  # Reset the piston/tip/tilt
 
@@ -244,7 +257,7 @@ def apply_deployment_errors(ote, deployment_errors, save=True, out_dir=None):
         save_file = os.path.join(out_dir, 'OPD_withtilt_{}.fits'.format(time.strftime("%Y%m%d_%H%M%S")))
         hdu = fits.PrimaryHDU(ote.opd, header=ote.opd_header)
         hdu.writeto(save_file)
-        print('Saved OPD to {}'.format(save_file))
+        logger.info('Saved OPD to {}'.format(save_file))
     elif save:
         raise IOError('Cannot save deployment errors to yaml; no out_dir provided')
 
@@ -268,6 +281,8 @@ def remove_piston_tip_tilt(ote, save=True, out_dir=None):
     ote : webbpsf.opds.OTE_Linear_Model_WSS object
         Adjustable OTE object without piston/tip/tilt
     """
+    logger = logging.getLogger('mirage.psf.deployments.remove_piston_tip_tilt')
+
     ote.remove_piston_tip_tilt = True
 
     # Also manually zero out the piston/tip/tilt
@@ -279,7 +294,7 @@ def remove_piston_tip_tilt(ote, save=True, out_dir=None):
         save_file = os.path.join(out_dir, 'OPD_notilt_{}.fits'.format(time.strftime("%Y%m%d_%H%M%S")))
         hdu = fits.PrimaryHDU(ote.opd, header=ote.opd_header)
         hdu.writeto(save_file)
-        print('Saved OPD with piston/tip/tilt removed to {}'.format(save_file))
+        logger.info('Saved OPD with piston/tip/tilt removed to {}'.format(save_file))
     elif save:
         raise IOError('Cannot save deployment errors to yaml; no out_dir provided')
 

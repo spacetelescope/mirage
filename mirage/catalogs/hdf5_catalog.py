@@ -24,8 +24,16 @@ Use
 
 import astropy.units as u
 import h5py
+import logging
+import os
 
-from mirage.utils.constants import FLAMBDA_CGS_UNITS, FLAMBDA_MKS_UNITS, FNU_CGS_UNITS, FNU_MKS_UNITS
+from mirage.logging import logging_functions
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FLAMBDA_MKS_UNITS, FNU_CGS_UNITS, FNU_MKS_UNITS, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def open(filename):
@@ -47,6 +55,7 @@ def open(filename):
         and a wavelength unit
         'fluxes' is an astropy.units Quantity composed of a list of flux values with flux unit
     """
+    logger = logging.getLogger('mirage.catalogs.hdf5_catalog.open')
     contents = {}
     with h5py.File(filename, 'r') as file_obj:
         no_wave_units = False
@@ -98,9 +107,9 @@ def open(filename):
 
             contents[int(key)] = {'wavelengths': waves, 'fluxes': fluxes}
     if no_wave_units:
-        print("{}: No wavelength units provided. Assuming MIRCONS.".format(filename))
+        logger.info("{}: No wavelength units provided. Assuming MIRCONS.".format(filename))
     if no_flux_units:
-        print("{}: No flux density units provided. Assuming F_lambda in CGS (erg/sec/cm^2/A)".format(filename))
+        logger.info("{}: No flux density units provided. Assuming F_lambda in CGS (erg/sec/cm^2/A)".format(filename))
     return contents
 
 
@@ -123,6 +132,7 @@ def open_tso(filename):
         and a time unit
         'fluxes' is an astropy.units Quantity composed of a list of flux values with flux unit
     """
+    logger = logging.getLogger('mirage.catalogs.hdf5_catalog.open_tso')
     contents = {}
     with h5py.File(filename, 'r') as file_obj:
         no_time_units = False
@@ -165,9 +175,9 @@ def open_tso(filename):
 
             contents[int(key)] = {'times': times, 'fluxes': fluxes}
     if no_time_units:
-        print("{}: No time units provided. Assuming SECONDS.".format(filename))
+        logger.info("{}: No time units provided. Assuming SECONDS.".format(filename))
     if no_flux_units:
-        print("{}: No flux density units provided. Assuming light curve is normalized.".format(filename))
+        logger.info("{}: No flux density units provided. Assuming light curve is normalized.".format(filename))
     return contents
 
 
@@ -287,6 +297,7 @@ def string_to_units(unit_string):
     -------
     units : astropy.units Quantity
     """
+    logger = logging.getLogger('mirage.catalogs.hdf5_catalog.string_to_units')
     if unit_string.lower() in ['flam', "flam_cgs"]:
         return FLAMBDA_CGS_UNITS
     elif unit_string.lower() == 'flam_mks':
@@ -301,7 +312,7 @@ def string_to_units(unit_string):
         try:
             return u.Unit(unit_string)
         except ValueError as e:
-            print(e)
+            logger.error(e)
 
 
 def units_to_string(unit):

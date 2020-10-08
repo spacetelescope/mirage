@@ -17,9 +17,14 @@ instrument_abbreviations = {'nircam': 'NRC',
 
 EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NRC_WFSS", "ts_grism": "NRC_TSGRISM"},
-            "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_IMAGE", "pom": "NIS_IMAGE",
+            "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_AMI", "pom": "NIS_IMAGE",
                        "wfss": "NIS_WFSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
+
+# SEARCH STRINGS TO USE FOR FGS DARKS (needed because darks for the two
+# detectors are mixed in a single directory)
+FGS1_DARK_SEARCH_STRING = '*_497_*fits'
+FGS2_DARK_SEARCH_STRING = '*_498_*fits'
 
 # Supported NIRISS filters
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
@@ -105,3 +110,13 @@ SUPPORTED_SEGMENTATION_THRESHOLD_UNITS = ['adu/s', 'adu/sec', 'e/s', 'e/sec', 'm
 # For use in converting background MJy/sr to e-/sec
 PRIMARY_MIRROR_AREA = 25.326 * u.meter * u.meter
 PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
+
+# Fraction of the total Sersic
+SERSIC_FRACTIONAL_SIGNAL = 0.9995
+
+# Configuration file for defining the logs
+LOG_CONFIG_FILENAME = 'logging_config.yaml'
+
+# Standard log file names. These are needed because we need to have a
+# log file name before we know the yaml/xml filename
+STANDARD_LOGFILE_NAME = 'mirage_latest.log'

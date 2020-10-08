@@ -46,7 +46,11 @@ def test_niriss_imaging():
     value1 = numpy.loadtxt('V88888024002P000000000112o_NIS_F480M_uncal_pointsources.list',usecols=[8,])
     value2 = numpy.loadtxt('V88888024002P000000000112o_NIS_NRM_F480M_uncal_pointsources.list',usecols=[8,])
     fluxratio = value2 / value1
-    targetratio = 0.15 / 0.84
+
+    # The 0.15 factor for the NRM and the 0.84 factor from the CLEARP element
+    # are now baked into the PSF from WebbPSF.
+    #targetratio = 0.15 / 0.84
+    targetratio = 1.0
     deviation = abs(fluxratio/targetratio - 1.)
     assert deviation < 1.e-06
     # clean up the output files in the test directory from this test.

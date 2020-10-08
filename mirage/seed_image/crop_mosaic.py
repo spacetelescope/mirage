@@ -7,11 +7,22 @@ and then used as an input to the ramp simulator.
 """
 
 import argparse
+import logging
+import os
 
 from astropy import wcs
 from astropy.io import fits
 import numpy as np
 from jwst import datamodels
+
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
 
 class Extraction():
     def __init__(self, mosaicfile=None, data_extension_number=0, wcs_extension_number=0,
@@ -50,6 +61,8 @@ class Extraction():
             image will be used for later. This is needed to transform the
             ``dimensions`` from JWST pixels to mosaic pixels.
         """
+        self.logger = logging.getLogger(__name__)
+
         self.mosaicfile = mosaicfile
         self.data_extension_number = data_extension_number
         self.wcs_extension_number = wcs_extension_number
@@ -81,9 +94,9 @@ class Extraction():
 
         # Assume the input mosaic has been drizzled, so remove
         # any SIP coefficients that may be present
-        print('\n\n******************************************************************')
-        print('Assuming input files have been drizzled. Removing SIP coefficients')
-        print('******************************************************************\n\n')
+        self.logger.info('\n\n******************************************************************')
+        self.logger.info('Assuming input files have been drizzled. Removing SIP coefficients')
+        self.logger.info('******************************************************************\n\n')
         mosaic_wcs.sip = None
 
         radec = np.array([[self.center_ra, self.center_dec]])
@@ -142,9 +155,9 @@ class Extraction():
         if maxx > mosaic_shape[1]:
             maxx = mosaic_shape[1]
 
-        print("Coords of center of cropped area", mosaic_center_x, mosaic_center_y)
-        print("X-min, X-max coords: ", minx, maxx)
-        print("Y-min, Y-max coords: ", miny, maxy)
+        self.logger.info("Coords of center of cropped area", mosaic_center_x, mosaic_center_y)
+        self.logger.info("X-min, X-max coords: ", minx, maxx)
+        self.logger.info("Y-min, Y-max coords: ", miny, maxy)
 
         crop = mosaic[self.data_extension_number].data[miny: maxy, minx: maxx]
 
@@ -154,7 +167,7 @@ class Extraction():
         # Save only if outfile is not None
         if self.outfile is not None:
             self.savefits(crop, self.outfile)
-            print("Extracted image saved to {}".format(self.outfile))
+            self.logger.info("Extracted image saved to {}".format(self.outfile))
 
     def populate_datamodel(self, array):
         """Place the image and accopanying WCS information in an

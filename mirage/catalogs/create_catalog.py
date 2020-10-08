@@ -8,6 +8,7 @@ in catalog_generator.py that can combine catalogs
 
 from collections import OrderedDict
 import copy
+import logging
 import math
 import numpy as np
 import os
@@ -25,10 +26,15 @@ from mirage.apt.apt_inputs import get_filters
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, \
     ExtendedCatalog, MovingPointSourceCatalog, MovingExtendedCatalog, \
     MovingSersicCatalog
+from mirage.logging import logging_functions
 from mirage.utils.constants import FGS_FILTERS, NIRCAM_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
     NIRISS_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
-    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS
+    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.utils import ensure_dir_exists, make_mag_column_names, standardize_filters
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def create_basic_exposure_list(xml_file, pointing_file):
@@ -132,6 +138,8 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     galaxy_catalog_names : list
         List of filenames of the saved galaxy catalogs
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.for_proposal')
+
     pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
     instrument_filter_dict = get_filters(pointing_dictionary)
 
@@ -240,7 +248,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
         if point_source:
             for i, instrument in enumerate(instrument_filter_dict):
-                print('\n--- Creating {} point source catalog ---'.format(instrument))
+                logger.info('\n--- Creating {} point source catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
                                                         besancon_catalog_file=besancon_catalog_file,
@@ -263,7 +271,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 ensure_dir_exists(out_dir)
                 full_catalog_path = os.path.join(out_dir, ptsrc_catalog_name)
                 ptsrc_cat.save(full_catalog_path)
-                print('\nPOINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
+                logger.info('\nPOINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
                 ptsrc_catalog_names.append(full_catalog_path)
 
             ptsrc_catalog_list.append(ptsrc_cat)
@@ -272,7 +280,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
         if extragalactic:
             for i, instrument in enumerate(instrument_filter_dict):
-                print('\n--- Creating {} extragalactic catalog ---'.format(instrument))
+                logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
                                                       filter_list, boxflag=False, brightlimit=14.0,
@@ -295,7 +303,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
                 full_catalog_path = os.path.join(out_dir, gal_catalog_name)
                 galaxy_cat.save(full_catalog_path)
-                print('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
+                logger.info('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
                 galaxy_catalog_names.append(full_catalog_path)
 
             galaxy_catalog_list.append(galaxy_cat)
@@ -560,6 +568,8 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
             A list of the filter name header strings for writing to
             an output file.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.get_all_catalogs')
+
     if isinstance(ra, str):
         pos = SkyCoord(ra, dec, frame='icrs')
         outra = pos.ra.deg
@@ -588,7 +598,7 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
                                             gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters)
 
     if besancon_catalog_file is not None:
-        print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_jwst.ra),
+        logger.info('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_jwst.ra),
                                                                                       len(observed_jwst.ra)))
         source_list = combine_catalogs(observed_jwst, besancon_jwst)
     else:
@@ -848,10 +858,11 @@ def match_model_magnitudes(in_magnitudes, in_filters, standard_magnitudes,
         1D array of the full set of estimated magnitudes from the model
         matching, or None if a problem occurs.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.match_model_magnitudes')
     inds = crossmatch_filter_names(in_filters, standard_filters)
     nmatch = float(len(inds))
     if nmatch != len(in_filters):
-        print('Error in matching the requested filters for model matching.')
+        logger.warning('Error in matching the requested filters for model matching.')
         return None
 
     subset = np.copy(standard_magnitudes[:, inds])
@@ -1011,6 +1022,8 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     outcat : mirage.catalogs.create_catalog.PointSourceCatalog
         This is the catalog of positions/magnitudes.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.combine_and_interpolate')
+
     standard_magnitudes, standard_values, standard_filters, standard_labels = read_standard_magnitudes()
     nfilters = len(filter_names)
     ngaia = len(gaia_cat['ra'])
@@ -1027,7 +1040,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
                   '2MASS Ks', 'WISE W1', 'WISE W2', 'WISE W3', 'WISE W4']
     inds = crossmatch_filter_names(in_filters, standard_filters)
     if len(inds) != len(in_filters):
-        print('Error matching the filters to the standard set.')
+        logger.warning('Error matching the filters to the standard set.')
         return None
     # first populate the gaia sources, with cross-references
     in_magnitudes[0:ngaia, 1] = gaia_cat['phot_g_mean_mag']
@@ -1656,6 +1669,8 @@ def combine_catalogs_v0(observed_jwst, besancon_jwst):
     outcat:           (mirage.catalogs.catalog_generator.PointSourceCatalog)
                       A new catalog object combining the two input catalogs
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.combine_catalogs_v0')
+
     keys1 = list(observed_jwst.magnitudes.keys())
     keys2 = list(besancon_jwst.magnitudes.keys())
     besanconinds = []
@@ -1664,10 +1679,10 @@ def combine_catalogs_v0(observed_jwst, besancon_jwst):
             if key == keys2[loop]:
                 besanconinds.append(loop)
     if len(keys1) != len(besanconinds):
-        print('Magnitude mismatch in catalogs to combine.  Will return None.')
+        logger.warning('Magnitude mismatch in catalogs to combine.  Will return None.')
         return None
     if observed_jwst.location_units != besancon_jwst.location_units:
-        print('Coordinate mismatch in catalogs to combine.  Will return None.')
+        logger.warning('Coordinate mismatch in catalogs to combine.  Will return None.')
         return None
     ra1 = observed_jwst.ra
     dec1 = observed_jwst.dec
@@ -1742,6 +1757,8 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     gaia_wise_crossref : astropy.table.Table
         The cross-reference list with WISE sources
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.query_GAIA_ptsrc_catalog')
+
     data = OrderedDict()
     data['gaia'] = OrderedDict()
     data['tmass'] = OrderedDict()
@@ -1785,12 +1802,12 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
         """.format(ra, dec, boxwidth, boxwidth)
 
     outvalues = {}
-    print('Searching the GAIA DR2 catalog')
+    logger.info('Searching the GAIA DR2 catalog')
     for key in data.keys():
         job = Gaia.launch_job_async(data[key]['query'], dump_to_file=False)
         table = job.get_results()
         outvalues[key] = table
-        print('Retrieved {} sources for catalog {}'.format(len(table), key))
+        logger.info('Retrieved {} sources for catalog {}'.format(len(table), key))
     gaia_mag_cols = ['phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag']
     return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
 
@@ -1842,6 +1859,8 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
     """
     from astropy import units as u
 
+    logger = logging.getLogger('mirage.catalogs.create_catalog.besancon')
+
     # Specified coordinates. Will need to convert to galactic long and lat
     # when calling model
     ra = ra * u.deg
@@ -1870,7 +1889,7 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
                '-p ref_filter K -p acol {} -p band_min {} -p band_max {} --run')
                .format(client, username, min_ra.value, min_dec.value, max_ra.value, max_dec.value,
                        colors, band_min, band_max))
-    print('Running command: ', command)
+    logger.info('Running command: ', command)
     os.system(command)
 
 
@@ -2214,6 +2233,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     seedvalue : integer
         The seed value used with numpy.random to generate the values.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.galaxy_background')
+
     # The following is the area of the GOODS-S field catalogue from Gabe Brammer
     # in square arc-seconds
     goodss_area = 606909.
@@ -2222,7 +2243,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     else:
         outarea = math.pi*box_width*box_width
     if outarea >= goodss_area:
-        print('Error: requested sky area is too large.  Values will not be produced.')
+        logger.error('Error: requested sky area is too large.  Values will not be produced.')
         return None, None
     if seed is None:
         seedvalue = int(950397468.*np.random.random())
@@ -2239,9 +2260,9 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     filter_names = make_mag_column_names(instrument, std_filters)
     nfilters = len(filter_names)
     if nfilters < 1:
-        print('Error matching filters to standard list.  Inputs are:')
-        print('Instrument: ', instrument)
-        print('Filter names: ', filters)
+        logger.error('Error matching filters to standard list.  Inputs are:')
+        logger.error('Instrument: ', instrument)
+        logger.error('Filter names: ', filters)
         return None, None
     # add 8 to these indexes to get the columns in the GODDS-S catalogue file
     #
@@ -2285,7 +2306,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             outinds[loop] = filterinds[filter] + 8
             loop = loop+1
     except:
-        print('Error matching filter %s to those available in 3D-HST catalog.' % (filter))
+        logger.error('Error matching filter %s to those available in 3D-HST catalog.' % (filter))
         return None, None
     # The following variables hold the Sersic profile index values
     # (radius [arc-seconds], sersic index, ellipticity, position angle)
