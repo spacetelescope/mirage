@@ -27,7 +27,7 @@ These are: **jwst**, which is the JWST calibration pipeline software, and two pa
     pip install mirage
     pip install git+https://github.com/npirzkal/GRISMCONF#egg=grismconf
     pip install git+https://github.com/npirzkal/NIRCAM_Gsim#egg=nircam_gsim
-    pip install git+https://github.com/spacetelescope/jwst#0.16.2
+    pip install git+https://github.com/spacetelescope/jwst@0.16.2
 
 .. tip::
     Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5

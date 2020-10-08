@@ -27,8 +27,10 @@ import sys
 import os
 import argparse
 import datetime
+import logging
 from math import floor
 from glob import glob
+import shutil
 
 import yaml
 import pkg_resources
@@ -37,7 +39,10 @@ from astropy.io import fits, ascii
 import astropy.units as u
 
 import mirage
+from mirage.logging import logging_functions
 from mirage.utils import read_fits, utils, siaf_interface
+from mirage.utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.file_splitting import find_file_splits
 from mirage.utils.timer import Timer
 from mirage.reference_files import crds_tools
@@ -46,18 +51,34 @@ from mirage.reference_files import crds_tools
 # Allowed instruments
 INST_LIST = ['nircam', 'niriss', 'fgs']
 
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
 
 class DarkPrep():
-    def __init__(self, offline=False):
+    def __init__(self, file_splitting=True, offline=False):
         """Instantiate DarkPrep object.
 
         Parameters
         ----------
+        file_splitting : bool
+            If True, the output dark current objects are split into
+            segment files, following the logic of the JWST calibration
+            pipeline. If False, no file-splitting is done. False should
+            only be used in very limited cases, such as when creating new
+            linearized dark current files to add to the collection of
+            Mirage reference files
+
         offline : bool
             If True, the check for the existence of the MIRAGE_DATA
             directory is skipped. This is primarily for Travis testing
         """
+        # Initialize the log using dictionary from the yaml file
+        self.logger = logging.getLogger(__name__)
+
         self.offline = offline
+        self.file_splitting = file_splitting
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
@@ -103,22 +124,22 @@ class DarkPrep():
         try:
             self.params['Readout']['nframe'] = int(self.params['Readout']['nframe'])
         except ValueError:
-            print("WARNING: Input value of nframe is not an integer.")
+            self.logger.error("WARNING: Input value of nframe is not an integer.")
 
         try:
             self.params['Readout']['nskip'] = int(self.params['Readout']['nskip'])
         except ValueError:
-            print("WARNING: Input value of nskip is not an integer.")
+            self.logger.error("WARNING: Input value of nskip is not an integer.")
 
         try:
             self.params['Readout']['ngroup'] = int(self.params['Readout']['ngroup'])
         except ValueError:
-            print("WARNING: Input value of ngroup is not an integer.")
+            self.logger.error("WARNING: Input value of ngroup is not an integer.")
 
         try:
             self.params['Readout']['nint'] = int(self.params['Readout']['nint'])
         except ValueError:
-            print("WARNING: Input value of nint is not an integer.")
+            self.logger.error("WARNING: Input value of nint is not an integer.")
 
         # Make sure that the requested number of groups is
         # less than or equal to the maximum allowed. If you're
@@ -132,12 +153,12 @@ class DarkPrep():
         if sum(match) == 1:
             maxgroups = self.readpatterns['maxgroups'].data[match][0]
         if sum(match) == 0:
-            print(("Unrecognized readout pattern {}. Assuming a maximum allowed number of groups of 10."
+            logger.error(("Unrecognized readout pattern {}. Assuming a maximum allowed number of groups of 10."
                    .format(self.params['Readout']['readpatt'])))
             maxgroups = 10
 
         if (self.params['Readout']['ngroup'] > maxgroups):
-            print(("WARNING: {} is limited to a maximum of {} groups. Proceeding with ngroup = {}."
+            logger.error(("WARNING: {} is limited to a maximum of {} groups. Proceeding with ngroup = {}."
                    .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
             self.params['Readout']['ngroup'] = maxgroups
 
@@ -305,7 +326,7 @@ class DarkPrep():
         if reqints <= ndarkints:
             # Fewer requested integrations than are in the
             # input dark.
-            print("{} output integrations requested.".format(reqints))
+            self.logger.info("{} output integrations requested.".format(reqints))
             self.dark.data = self.dark.data[0:reqints, :, :, :]
             if self.dark.sbAndRefpix is not None:
                 self.dark.sbAndRefpix = self.dark.sbAndRefpix[0:reqints, :, :, :]
@@ -314,9 +335,9 @@ class DarkPrep():
 
         elif reqints > ndarkints:
             # More requested integrations than are in input dark.
-            print(('Requested output has {} integrations, while input dark has only {}.'
-                   .format(reqints, ndarkints)))
-            print('Adding integrations to input dark by making copies of the input.')
+            logger.info(('Requested output has {} integrations, while input dark has only {}. '
+                         'Adding integrations to input dark by making copies of the input.'
+                         .format(reqints, ndarkints)))
             self.integration_copy(reqints, ndarkints)
 
     def data_volume_check(self, obj):
@@ -339,13 +360,13 @@ class DarkPrep():
 
         inputframes = obj.data.shape[1]
         if ngroup * (nskip + nframe) > inputframes:
-            print(("WARNING: Not enough frames in the input integration to "
+            self.logger.warning(("Not enough frames in the input integration to "
                    "create the requested number of output groups. Input has "
                    "{} frames. Requested output is {} groups each created from "
                    "{} frames plus skipping {} frames between groups for a total "
                    "of {} frames."
                    .format(inputframes, ngroup, nframe, nskip, ngroup * (nframe + nskip))))
-            print(("Making copies of {} dark current frames and adding them to "
+            self.logger.warning(("Making copies of {} dark current frames and adding them to "
                    "the end of the dark current integration."
                    .format(ngroup * (nskip + nframe) - inputframes)))
 
@@ -406,16 +427,12 @@ class DarkPrep():
         # Future improvement: download a missing dark file
         if not local:
             try:
-                print("Local copy of dark current file")
-                print("{} not found.".format(input_file))
-                print("Downloading.")
+                self.logger.info("Local copy of dark current file {} not found. Attempting to download".format(input_file))
                 darkfile = os.path.split(input_file)[1]
                 hh = fits.open(os.path.join(self.dark_url, darkfile))
                 hh.writeto(input_file)
             except Exception:
-                print("Local copy of dark current file")
-                print("{} not found.".format(input_file))
-                print("And unable to download. Quitting.")
+                self.logger.error("Local copy of dark current file {} not found, and unable to download. Quitting.".format(input_file))
 
         self.dark = read_fits.Read_fits()
         self.dark.file = input_file
@@ -452,9 +469,9 @@ class DarkPrep():
         # can be averaged and transformed into another readout pattern
         if self.dark.header['READPATT'] not in ['RAPID', 'NISRAPID', 'FGSRAPID']:
             if self.params['Readout']['readpatt'].upper() != self.dark.header['READPATT']:
-                print(("WARNING: cannot transform input {} integration into "
-                       "output {} integration.".format(self.dark.header['READPATT'],
-                                                       self.params['Readout']['readpatt'])))
+                self.logger.error(("WARNING: cannot transform input {} integration into "
+                                   "output {} integration.".format(self.dark.header['READPATT'],
+                                                                   self.params['Readout']['readpatt'])))
                 raise ValueError(("Only RAPID, NISRAPID, or FGSRAPID inputs can be translated to a "
                                   "different readout pattern"))
         else:
@@ -485,6 +502,26 @@ class DarkPrep():
             self.total_frames *= self.numints
             # Don't worry about counting reset frames between integrations
             # We're not concerned with timing here.
+
+    def get_reffile_metadata(self, keyword):
+        """Reetrive the name of the reference file used to calibate
+        self.linDark
+
+        Parameters
+        ----------
+        keyword : str
+            Header keyword to be retrived (e.g. 'R_LINEAR')
+
+        Returns
+        -------
+        value : str
+            Header keyword value
+        """
+        try:
+            value = self.linDark.header[keyword]
+        except KeyError:
+            value = 'N/A'
+        return value
 
     def integration_copy(self, req, darkint):
         """Use copies of integrations in the dark current input to
@@ -532,7 +569,7 @@ class DarkPrep():
 
         self.dark.header['NINTS'] = req
 
-    def linearize_dark(self, darkobj):
+    def linearize_dark(self, darkobj, save_refs=True):
         """Beginning with the input dark current ramp, run the dq_init, saturation, superbias
         subtraction, refpix and nonlin pipeline steps in order to produce a linearized
         version of the ramp. This will be used when combining the dark ramp with the
@@ -542,6 +579,10 @@ class DarkPrep():
         -----------
         darkobj : obj
             Instance of read_fits class containing dark current data and info
+
+        save_refs : bool
+            Whether or not to save the names of the reference files used in the
+            pipeline run.
 
         Returns
         -------
@@ -561,8 +602,7 @@ class DarkPrep():
             subfile = self.params['Reffiles']['dark']
         dark = darkobj.insert_into_datamodel(subfile)
 
-        print('Creating a linearized version of the dark current input ramp')
-        print('using JWST calibration pipeline.')
+        self.logger.info('Creating a linearized version of the dark current input ramp using JWST calibration pipeline.')
 
         # Run the DQ_Init step
         if self.runStep['badpixmask']:
@@ -608,32 +648,38 @@ class DarkPrep():
         if self.runStep['linearity']:
             linDark = LinearityStep.call(linDark,
                                          config_file=self.params['newRamp']['linear_configfile'],
-                                         override_linearity=self.params['Reffiles']['linearity'],
-                                         output_file=linearoutfile, save_results=True,
-                                         output_dir=self.params['Output']['directory'])
+                                         override_linearity=self.params['Reffiles']['linearity'])
         else:
             linDark = LinearityStep.call(linDark,
-                                         config_file=self.params['newRamp']['linear_configfile'],
-                                         output_file=linearoutfile, save_results=True,
-                                         output_dir=self.params['Output']['directory'])
-
-        print(("Linearized dark (output directly from pipeline saved as {}"
-               .format(os.path.join(self.params['Output']['directory'], linearoutfile))))
+                                         config_file=self.params['newRamp']['linear_configfile'])
 
         # Now we need to put the data back into a read_fits object
         linDarkobj = read_fits.Read_fits()
+
+        # Save the reference files used during the pipeline run
+        if save_refs:
+            self.linearity_reffile = linDark.meta.ref_file.linearity.name
+            self.mask_reffile = linDark.meta.ref_file.mask.name
+            self.saturation_reffile = linDark.meta.ref_file.saturation.name
+            self.superbias_reffile = linDark.meta.ref_file.superbias.name
+
+        # Populate the data
         linDarkobj.model = linDark
         linDarkobj.rampmodel_to_obj()
         linDarkobj.sbAndRefpix = sbAndRefpixEffects
 
         return linDarkobj
 
+    @logging_functions.log_fail
     def prepare(self):
         """MAIN FUNCTION"""
-        print("\nRunning dark_prep....\n")
-
         # Read in the yaml parameter file
         self.read_parameter_file()
+
+        # Get the log caught up on what's already happened
+        self.logger.info('\n\nRunning dark_prep..\n')
+        self.logger.info('Reading parameter file: {}\n'.format(self.paramfile))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         # Make filter/pupil values respect the filter/pupil wheel they are in
         self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
@@ -668,7 +714,12 @@ class DarkPrep():
                 dark_dir = os.path.split(self.params['Reffiles']['linearized_darkfile'])[0]
             else:
                 dark_dir = os.path.split(self.params['Reffiles']['dark'])[0]
-            dark_list = glob(os.path.join(dark_dir, '*.fits'))
+            search_string = '*.fits'
+            if 'FGS1' in self.params['Readout']['array_name']:
+                search_string = FGS1_DARK_SEARCH_STRING
+            elif 'FGS2' in self.params['Readout']['array_name']:
+                search_string = FGS2_DARK_SEARCH_STRING
+            dark_list = glob(os.path.join(dark_dir, search_string))
         else:
             if self.runStep['linearized_darkfile']:
                 dark_list = [self.params['Reffiles']['linearized_darkfile']]
@@ -694,9 +745,16 @@ class DarkPrep():
         # to be split into pieces to save memory
         xdim = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
         ydim = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
-        split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
-                                                                                          self.params['Readout']['ngroup'],
-                                                                                          self.params['Readout']['nint'])
+        if self.file_splitting:
+            split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
+                                                                                              self.params['Readout']['ngroup'],
+                                                                                              self.params['Readout']['nint'])
+        else:
+            self.logger.info('File-splitting disabled. Output will be forced into a single file.')
+            split_seed = False
+            group_segment_indexes = np.array([0, self.params['Readout']['ngroup']])
+            integration_segment_indexes = np.array([0, self.params['Readout']['nint']])
+
         # In order to avoid the case of having a single integration
         # in the final file, which leads to rate rather than rateints
         # files in the pipeline, check to be sure that the integration
@@ -706,7 +764,7 @@ class DarkPrep():
             delta_int = integration_segment_indexes[1:] - integration_segment_indexes[0: -1]
             if delta_int[-1] == 1 and delta_int[0] != 1:
                 integration_segment_indexes[-2] -= 1
-                print('Adjusted to avoid single integration: ', integration_segment_indexes)
+                self.logger.info('Adjusted final segment file to avoid single integration: {}'.format(integration_segment_indexes))
 
         # This currently pays attention only to splitting the file on integrations, and not
         # within an integration. It seems like we can keep it this way as the dark data is
@@ -717,8 +775,8 @@ class DarkPrep():
         # will have 400 frames open. This is also an unlikely situation, but it could
         # be a problem.
         if len(integration_segment_indexes[:-1]) > 1:
-            print(('An estimate of processing time remaining will be provided after the first segment '
-                   'has been completed.\n\n'))
+            self.logging.info(('An estimate of processing time remaining will be provided after the first segment '
+                               'has been completed.\n\n'))
 
         self.dark_files = []
         for seg_index, segment in enumerate(integration_segment_indexes[:-1]):
@@ -731,8 +789,8 @@ class DarkPrep():
             else:
                 number_of_ints = self.numints
 
-            print('Segment number: ', seg_index)
-            print('Number of integrations:', number_of_ints)
+            self.logger.info('Segment number: {}'.format(seg_index))
+            self.logger.info('Number of integrations: {}'.format(number_of_ints))
 
             # Generate the list of dark current files to use
             if number_of_ints == 1:
@@ -744,18 +802,20 @@ class DarkPrep():
                     random_indices = np.random.choice(len(dark_list), number_of_ints, replace=False)
                     files_to_use = dark_list[random_indices]
                 except TypeError:
-                    print(dark_list)
-                    print(number_of_ints)
-                    print(random_indices)
-                    print(type(random_indices))
-                    print(type(random_indices[0]))
+                    self.logger.debug("Error in random choice")
+                    self.logger.debug(dark_list)
+                    self.logger.debug(number_of_ints)
+                    self.logger.debug(random_indices)
+                    self.logger.debug(type(random_indices))
+                    self.logger.debug(type(random_indices[0]))
                     raise ValueError("Error in random choice.")
             else:
                 use_all_files = True
                 files_to_use = dark_list
 
-            print('Dark files to use:')
-            print(files_to_use)
+            self.logger.info('Dark files to use:')
+            for dummy in files_to_use:
+                self.logger.info(dummy)
 
             # Create a list describing which dark current file goes with
             # which integration. Force the 0th element to be the first
@@ -767,7 +827,7 @@ class DarkPrep():
             # Loop over dark current files
             for file_index, filename in enumerate(files_to_use):
 
-                print('Working on dark file: {}'.format(filename))
+                self.logger.info('Working on dark file: {}'.format(filename))
                 if not use_all_files:
                     frames = np.arange(len(files_to_use))
                 else:
@@ -797,8 +857,8 @@ class DarkPrep():
                 # Put the input dark (or linearized dark) into the
                 # requested readout pattern
                 self.dark, sbzeroframe = self.reorder_dark(self.dark)
-                print(('DARK has been reordered to {} to match the input readpattern of {}'
-                       .format(self.dark.data.shape, self.dark.header['READPATT'])))
+                self.logger.info(('DARK has been reordered to {} to match the input readpattern of {}'
+                                  .format(self.dark.data.shape, self.dark.header['READPATT'])))
 
                 # If a raw dark was read in, create linearized version
                 # here using the SSB pipeline. Better to do this
@@ -815,18 +875,18 @@ class DarkPrep():
                     # into a RampModel instance
                     # print('Working on {}'.format(self.dark))
                     self.linDark = self.linearize_dark(self.dark)
-                    print("Linearized dark shape: {}".format(self.linDark.data.shape))
+                    self.logger.info("Linearized dark shape: {}".format(self.linDark.data.shape))
 
                     if self.params['Readout']['readpatt'].upper() in ['RAPID', 'NISRAPID', 'FGSRAPID']:
-                        print(("Output is {}, grabbing zero frame from linearized dark"
-                               .format(self.params['Readout']['readpatt'].upper())))
+                        self.logger.info(("Output is {}, grabbing zero frame from linearized dark"
+                                          .format(self.params['Readout']['readpatt'].upper())))
                         self.zeroModel = read_fits.Read_fits()
                         self.zeroModel.data = self.linDark.data[:, 0, :, :]
                         self.zeroModel.sbAndRefpix = self.linDark.sbAndRefpix[:, 0, :, :]
                     elif ((self.params['Readout']['readpatt'].upper() not in ['RAPID', 'NISRAPID', 'FGSRAPID']) &
                           (self.dark.zeroframe is not None)):
-                        print("Now we need to linearize the zeroframe because the")
-                        print("output readpattern is not RAPID, NISRAPID, or FGSRAPID")
+                        self.logger.info(("Now we need to linearize the zeroframe because the "
+                                          "output readpattern is not RAPID, NISRAPID, or FGSRAPID"))
                         # Now we need to linearize the zeroframe. Place it
                         # into a RampModel instance before running the
                         # pipeline steps
@@ -834,7 +894,7 @@ class DarkPrep():
                         self.zeroModel.data = np.expand_dims(self.dark.zeroframe, axis=1)
                         self.zeroModel.header = self.linDark.header
                         self.zeroModel.header['NGROUPS'] = 1
-                        self.zeroModel = self.linearize_dark(self.zeroModel)
+                        self.zeroModel = self.linearize_dark(self.zeroModel, save_refs=False)
                         # Return the zeroModel data to 3 dimensions
                         # integrations, y, x
                         self.zeroModel.data = self.zeroModel.data[:, 0, :, :]
@@ -855,8 +915,8 @@ class DarkPrep():
                         # to the exposure time of a single frame. This block of the
                         # code should only be run if the input dark is a non-RAPID
                         # dark from ground testing (i.e. a converted FITSWriter file)
-                        print(('Non-RAPID input dark with no zeroframe extension.'
-                               ' Creating an approximation.'))
+                        self.logger.info(('Non-RAPID input dark with no zeroframe extension.'
+                                          ' Creating an approximation.'))
                         self.zeroModel = read_fits.Read_fits()
                         nint, ng, ny, nx = self.dark.data.shape
                         frametime = self.linDark.header['TFRAME']
@@ -904,13 +964,13 @@ class DarkPrep():
                 if file_index == 0:
                     #print('self.linDark shape is {}. Expecting it to be 4D'.format(self.linDark.data.shape))
                     junk, num_grps, ydim, xdim = self.linDark.data.shape
-                    final_dark = np.zeros((number_of_ints, num_grps, ydim, xdim))
-                    final_sbandrefpix = np.zeros((number_of_ints, num_grps, ydim, xdim))
-                    final_zerodata = np.zeros((number_of_ints, ydim, xdim))
-                    final_zero_sbandrefpix = np.zeros((number_of_ints, ydim, xdim))
+                    final_dark = np.zeros((number_of_ints, num_grps, ydim, xdim), dtype=np.float32)
+                    final_sbandrefpix = np.zeros((number_of_ints, num_grps, ydim, xdim), dtype=np.float32)
+                    final_zerodata = np.zeros((number_of_ints, ydim, xdim), dtype=np.float32)
+                    final_zero_sbandrefpix = np.zeros((number_of_ints, ydim, xdim), dtype=np.float32)
 
                 if not use_all_files:
-                    print('Setting integration {} to use file {}\n'.format(file_index, os.path.split(filename)[1]))
+                    self.logger.info('Setting integration {} to use file {}\n'.format(file_index, os.path.split(filename)[1]))
                     final_dark[file_index, :, :, :] = self.linDark.data
                     final_sbandrefpix[file_index, :, :, :] = self.linDark.sbAndRefpix
                     final_zerodata[file_index, :, :] = self.zeroModel.data
@@ -920,7 +980,7 @@ class DarkPrep():
                     # the dark ramps because the number of integrations
                     # is larger than the number of dark current files
                     #frames = np.where(mapping == file_index)[0]
-                    print('File number {} will be used for integrations {}'.format(file_index, frames))
+                    self.logger.info('File number {} will be used for integrations {}'.format(file_index, frames))
                     final_dark[frames, :, :, :] = self.linDark.data
 
                     #final_sbandrefpix[frames, :, :, :] = self.linDark.sbAndRefpix
@@ -950,6 +1010,10 @@ class DarkPrep():
             h0.header['INSTRUME'] = self.instrument
             h0.header['SLOWAXIS'] = self.slowaxis
             h0.header['FASTAXIS'] = self.fastaxis
+            h0.header['R_LINEAR'] = self.linearity_reffile
+            h0.header['R_MASK'] = self.mask_reffile
+            h0.header['R_SATURA'] = self.saturation_reffile
+            h0.header['R_SUPERB'] = self.superbias_reffile
 
             # Add some basic Mirage-centric info
             h0.header['MRGEVRSN'] = (mirage.__version__, 'Mirage version used')
@@ -962,24 +1026,24 @@ class DarkPrep():
                 objname = self.basename + '_linear_dark_prep_object.fits'
             objname = os.path.join(self.params['Output']['directory'], objname)
             hl.writeto(objname, overwrite=True)
-            print(("Linearized dark frame plus superbias and reference"
-                   "pixel signals, as well as zeroframe, saved to {}. "
-                   "This can be used as input to the observation "
-                   "generator.".format(objname)))
+            self.logger.info(("Linearized dark frame plus superbias and reference"
+                              "pixel signals, as well as zeroframe, saved to {}. "
+                              "This can be used as input to the observation "
+                              "generator.".format(objname)))
             self.dark_files.append(objname)
 
             # Timing information
             self.timer.stop(name='seg_{}'.format(str(seg_index+1).zfill(4)))
 
             # If there is more than one segment, provide an estimate of processing time
-            print('\n\nSegment {} out of {} complete.'.format(seg_index+1, len(integration_segment_indexes[:-1])))
+            self.logger.info('\n\nSegment {} out of {} complete.'.format(seg_index+1, len(integration_segment_indexes[:-1])))
             if len(integration_segment_indexes[:-1]) > 1:
                 time_per_segment = self.timer.sum(key_str='seg_') / (seg_index+1)
                 estimated_remaining_time = time_per_segment * (len(integration_segment_indexes[:-1]) - (seg_index+1)) * u.second
                 time_remaining = np.around(estimated_remaining_time.to(u.minute).value, decimals=2)
                 finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
-                print(('Estimated time remaining in dark_prep: {} minutes. '
-                       'Projected finish time: {}'.format(time_remaining, finish_time)))
+                self.logger.info(('Estimated time remaining in dark_prep: {} minutes. '
+                                  'Projected finish time: {}'.format(time_remaining, finish_time)))
 
         # If only one dark current file is needed, return just the file
         # name rather than a list.
@@ -999,12 +1063,15 @@ class DarkPrep():
         self.prepDark.zero_sbAndRefpix = final_zero_sbandrefpix
         self.prepDark.header = self.linDark.header
 
+        logging_functions.move_logfile_to_standard_location(self.paramfile, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=self.params['Output']['directory'])
+
     def read_linear_dark(self, input_file):
         """Read in the linearized version of the dark current ramp
         using the read_fits class"""
         try:
-            print(('Reading in linearized dark current ramp from {}'
-                   .format(input_file)))
+            self.logger.info(('Reading in linearized dark current ramp from {}'
+                              .format(input_file)))
             self.linDark = read_fits.Read_fits()
             #self.linDark.file = self.params['Reffiles']['linearized_darkfile']
             self.linDark.file = input_file
@@ -1018,13 +1085,18 @@ class DarkPrep():
         self.fastaxis = self.linDark.header['FASTAXIS']
         self.slowaxis = self.linDark.header['SLOWAXIS']
 
+        self.linearity_reffile = self.get_reffile_metadata('R_LINEAR')
+        self.mask_reffile = self.get_reffile_metadata('R_MASK')
+        self.saturation_reffile = self.get_reffile_metadata('R_SATURA')
+        self.superbias_reffile = self.get_reffile_metadata('R_SUPERB')
+
     def read_parameter_file(self):
         """Read in the yaml parameter file"""
         try:
             with open(self.paramfile, 'r') as infile:
                 self.params = yaml.safe_load(infile)
         except FileNotFoundError:
-            print("WARNING: unable to open {}".format(self.paramfile))
+            self.logger.error("Unable to open {}".format(self.paramfile))
 
     def readpattern_check(self):
         """Check the readout pattern that's entered and set the number of averaged frames
@@ -1042,11 +1114,11 @@ class DarkPrep():
             mtch = self.params['Readout']['readpatt'] == self.readpatterns['name']
             self.params['Readout']['nframe'] = self.readpatterns['nframe'][mtch].data[0]
             self.params['Readout']['nskip'] = self.readpatterns['nskip'][mtch].data[0]
-            print(('Requested readout pattern {} is valid. '
-                  'Using the nframe = {} and nskip = {}'
-                   .format(self.params['Readout']['readpatt'],
-                           self.params['Readout']['nframe'],
-                           self.params['Readout']['nskip'])))
+            self.logger.info(('Requested readout pattern {} is valid. '
+                              'Using the nframe = {} and nskip = {}'
+                              .format(self.params['Readout']['readpatt'],
+                                      self.params['Readout']['nframe'],
+                                      self.params['Readout']['nskip'])))
         else:
             # If the read pattern is not present in the definition file
             # then quit.
@@ -1124,11 +1196,11 @@ class DarkPrep():
         rapids = ['RAPID', 'NISRAPID', 'FGSRAPID']
         if ((darkpatt in rapids) & (dark.zeroframe is None)):
             dark.zeroframe = dark.data[:, 0, :, :]
-            print("Saving 0th frame from data to the zeroframe extension")
+            self.logger.info("Saving 0th frame from data to the zeroframe extension")
             if dark.sbAndRefpix is not None:
                 sbzero = dark.sbAndRefpix[:, 0, :, :]
         elif ((darkpatt not in rapids) & (dark.zeroframe is None)):
-            print("Unable to save the zeroth frame because the input dark current ramp is not RAPID.")
+            self.logger.info("Unable to save the zeroth frame because the input dark current ramp is not RAPID.")
             sbzero = None
         elif ((darkpatt in rapids) & (dark.zeroframe is not None)):
             # In this case we already have the zeroframe
@@ -1161,8 +1233,8 @@ class DarkPrep():
                 for i in range(self.params['Readout']['ngroup']):
                     # Average together the appropriate frames,
                     # skip the appropriate frames
-                    print(("Averaging dark current ramp. Frames {}, to become "
-                           "group {}".format(frames, i)))
+                    self.logger.info(("Averaging dark current ramp. Frames {}, to become "
+                                      "group {}".format(frames, i)))
 
                     # If averaging needs to be done
                     if self.params['Readout']['nframe'] > 1:

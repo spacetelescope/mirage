@@ -41,6 +41,7 @@ October 2018 - Major modifications to read programs of all science instruments a
 '''
 import copy
 import os
+import logging
 import re
 import argparse
 import pkg_resources
@@ -48,12 +49,18 @@ import pkg_resources
 from astropy.table import Table, vstack
 from astropy.io import ascii
 import numpy as np
-from pysiaf import rotations
+from pysiaf import rotations, Siaf
 import yaml
 
 from . import read_apt_xml
+from ..logging import logging_functions
 from ..utils import siaf_interface, constants, utils
-from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES
+from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class AptInput:
@@ -70,6 +77,8 @@ class AptInput:
 
     def __init__(self, input_xml=None, pointing_file=None, output_dir=None, output_csv=None,
                  observation_list_file=None):
+        self.logger = logging.getLogger('mirage.apt.apt_inputs')
+
         self.input_xml = input_xml
         self.pointing_file = pointing_file
         self.output_dir = output_dir
@@ -100,8 +109,8 @@ class AptInput:
         for obs in intab['obs_label']:
             match = obs == epochs['observation'].data
             if np.sum(match) == 0:
-                print("No valid epoch line found for observation {}".format(obs))
-                print(epochs['observation'].data)
+                self.logger.error("No valid epoch line found for observation {}".format(obs))
+                self.logger.error('{}'.format(epochs['observation'].data))
                 epoch_start.append(default_date)
                 epoch_pav3.append(0.)
             else:
@@ -305,6 +314,11 @@ class AptInput:
         #     for key in observation_dictionary.keys():
         #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
+        # Global Alignment observations need to have the pointing information for the
+        # FGS exposures updated
+        if 'WfscGlobalAlignment' in observation_dictionary['APTTemplate']:
+            observation_dictionary = self.global_alignment_pointing(observation_dictionary)
+
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
         # fix data for filename generation
@@ -332,7 +346,7 @@ class AptInput:
 
         if verbose:
             for key in self.exposure_tab.keys():
-                print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
+                self.logger.info('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
@@ -347,7 +361,7 @@ class AptInput:
             indir, infile = os.path.split(self.input_xml)
             self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
-        print('csv exposure list written to {}'.format(self.output_csv))
+        self.logger.info('csv exposure list written to {}'.format(self.output_csv))
 
     def check_aperture_override(self):
         if bool(self.exposure_tab['FiducialPointOverride']) is True:
@@ -363,11 +377,17 @@ class AptInput:
                     # Handle the one case we understand, for now
                     if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
                         obs_num = self.exposure_tab['obs_num'][i]
-                        guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+
+                        if self.exposure_tab['APTTemplate'][i] == 'WfscGlobalAlignment':
+                            guider_number = self.exposure_tab['aperture'][i][3]
+                        elif self.exposure_tab['APTTemplate'][i] == 'FgsExternalCalibration':
+                            guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                        else:
+                            raise ValueError("WARNING: unsupported APT template with Fiducial Override.")
                         guider_aperture = 'FGS{}_FULL'.format(guider_number)
                         fixed_apertures.append(guider_aperture)
                     else:
-                        print(instrument, aperture, inst_match_ap, aperture_key[instrument.lower()])
+                        self.logger.error('{} {} {} {}'.format(instrument, aperture, inst_match_ap, aperture_key[instrument.lower()]))
                         raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
                 else:
                     fixed_apertures.append(aperture)
@@ -436,6 +456,7 @@ class AptInput:
 
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
                     mode = input_dictionary['Mode'][index]
+                    template = input_dictionary['APTTemplate'][index]
                     if (sub == 'FULL'):
 
                         if mode in ['imaging', 'ts_imaging', 'wfss']:
@@ -549,7 +570,10 @@ class AptInput:
                     detectors = ['NRS']
 
                 elif instrument == 'fgs':
-                    guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                    if input_dictionary['APTTemplate'][index] == 'WfscGlobalAlignment':
+                        guider_number = input_dictionary['aperture'][index][3]
+                    elif input_dictionary['APTTemplate'][index] == 'FgsExternalCalibration':
+                        guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                     detectors = ['G{}'.format(guider_number)]
 
                 elif instrument == 'miri':
@@ -608,18 +632,18 @@ class AptInput:
         """
         filter_match = [True if filter_name in mtch else False for mtch in apertures]
         if any(filter_match):
-            print('EXACT FILTER MATCH')
-            print(filter_match)
+            self.logger.debug('EXACT FILTER MATCH')
+            self.logger.debud('{}'.format(filter_match))
             apertures = list(np.array(apertures)[filter_match])
         else:
-            print('NO EXACT FILTER MATCH')
+            self.logger.debug('NO EXACT FILTER MATCH')
             filter_int = int(filter_name[1:4])
             aperture_int = np.array([int(ap.split('_')[-1][1:4]) for ap in apertures])
             wave_diffs = np.abs(aperture_int - filter_int)
             min_diff_index = np.where(wave_diffs == np.min(wave_diffs))[0]
             apertures = list(apertures[min_diff_index])
 
-            print(filter_int, aperture_int, min_diff_index, apertures)
+            self.logger.debug('{} {} {} {}'.format(filter_int, aperture_int, min_diff_index, apertures))
 
         return apertures
 
@@ -731,7 +755,7 @@ class AptInput:
                         # adopt value passed to function
                         pass
                     if verbose:
-                        print('Extracted proposal ID {}'.format(propid))
+                        self.logger.info('Extracted proposal ID {}'.format(propid))
                     continue
 
                 elif (len(line) > 1):
@@ -757,7 +781,7 @@ class AptInput:
                         obsnum = str(obsnum).zfill(3)
                         visitnum = str(visitnum).zfill(3)
                         if (skip is True) and (verbose):
-                            print('Skipping observation {} ({})'.format(obsnum, obslabel))
+                            self.logger.info('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
                         # Skip the line at the beginning of each
@@ -843,7 +867,7 @@ class AptInput:
 
                     except ValueError as e:
                         if verbose:
-                            print('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
+                            self.logger.info('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
                         pass
 
         pointing = {'exposure': exp, 'dither': dith, 'aperture': aperture,
@@ -855,6 +879,77 @@ class AptInput:
                     'act_id': activity_id, 'visit_id': visit_id, 'visit_group': visit_grp,
                     'sequence_id': seq_id, 'observation_id': observation_id}
         return pointing
+
+
+    def global_alignment_pointing(self, obs_dict):
+        """Adjust the pointing dictionary information for global alignment
+        observations. Some of the entries need to be changed from NIRCam to
+        FGS. Remember that not all observations in the dictionary will
+        necessarily be WfscGlobalAlignment template. Be sure the leave all
+        other templates unchanged.
+
+        Parameters
+        ----------
+        obs_dict : dict
+            Dictionary of observation parameters, as returned from add_observation_info()
+
+        Returns
+        -------
+        obs_dict : dict
+            Dictionary with modified values for FGS pointing in Global Alignment templates
+        """
+
+        # We'll always be changing NIRCam to FGS, so set up the NIRCam siaf
+        # instance outside of loop
+        nrc_siaf = Siaf('nircam')['NRCA3_FULL']
+
+        ga_index = np.array(obs_dict['APTTemplate']) == 'WfscGlobalAlignment'
+
+        observation_numbers = np.unique(np.array(obs_dict['obs_num'])[ga_index])
+
+        for obs_num in observation_numbers:
+            obs_indexes = np.where(np.array(obs_dict['obs_num']) == obs_num)[0]
+
+            # Get the subarray and aperture entries for the observation
+            aperture_values = np.array(obs_dict['aperture'])[obs_indexes]
+            subarr_values = np.array(obs_dict['Subarray'])[obs_indexes]
+
+            # Subarray values, which come from the xml file, are correct. The aperture
+            # values, which come from the pointing file, are not correct. We need to
+            # copy over the FGS values from the Subarray column to the aperture column
+            to_fgs = [True if 'FGS' in subarr else False for subarr in subarr_values]
+            aperture_values[to_fgs] = subarr_values[to_fgs]
+            fgs_aperture = aperture_values[to_fgs][0]
+
+            all_aperture_values = np.array(obs_dict['aperture'])
+            all_aperture_values[obs_indexes] = aperture_values
+            obs_dict['aperture'] = all_aperture_values
+
+            # Update the pointing info for the FGS exposures
+            fgs = Siaf('fgs')[fgs_aperture]
+            basex, basey = fgs.tel_to_idl(nrc_siaf.V2Ref, nrc_siaf.V3Ref)
+            dithx = np.array(obs_dict['dithx'])[obs_indexes[to_fgs]]
+            dithy = np.array(obs_dict['dithy'])[obs_indexes[to_fgs]]
+            idlx = basex + dithx
+            idly = basey + dithy
+
+            basex_col = np.array(obs_dict['basex'])
+            basey_col = np.array(obs_dict['basey'])
+            idlx_col = np.array(obs_dict['idlx'])
+            idly_col = np.array(obs_dict['idly'])
+
+            basex_col[obs_indexes[to_fgs]] = basex
+            basey_col[obs_indexes[to_fgs]] = basey
+            idlx_col[obs_indexes[to_fgs]] = idlx
+            idly_col[obs_indexes[to_fgs]] = idly
+
+            obs_dict['basex'] = basex_col
+            obs_dict['basey'] = basey_col
+            obs_dict['idlx'] = idlx_col
+            obs_dict['idly'] = idly_col
+
+        return obs_dict
+
 
     def tight_dithers(self, input_dict):
         """

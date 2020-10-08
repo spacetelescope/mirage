@@ -23,6 +23,7 @@ Use
 """
 from collections import OrderedDict
 import copy
+import logging
 import os
 import pkg_resources
 
@@ -36,7 +37,9 @@ from synphot.spectrum import SpectralElement
 from synphot.models import Empirical1D
 
 from . import hdf5_catalog
-from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES
+from mirage.logging import logging_functions
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.flux_cal import mag_col_name_to_filter_pupil
 from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file, standardize_filters
 
@@ -45,6 +48,10 @@ CONFIG_PATH = os.path.join(MODULE_PATH, 'config')
 ZEROPOINT_FILES = {'niriss': os.path.join(CONFIG_PATH, 'niriss_zeropoints.list'),
                    'nircam': os.path.join(CONFIG_PATH, 'NIRCam_zeropoints.list'),
                    'fgs': os.path.join(CONFIG_PATH, 'guider_zeropoints.list')}
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def add_flam_columns(cat, mag_sys):
@@ -211,6 +218,7 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
         are numpy arrays of values. These can optionally have astropy units
         attached to them.
     """
+    logger = logging.getLogger('mirage.catalogs.spectra_from_catalog.create_spectra')
     flambda_cols = [col for col in catalog_with_flambda.colnames if 'flam' in col]
     filter_name = [colname.split('_')[1] for colname in flambda_cols]
     instrument = np.array([colname.split('_')[0] for colname in flambda_cols])
@@ -227,8 +235,8 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
     pivots = np.array(pivots)
 
     if (len(pivots) == 1):
-        print(("INFO: single filter magnitude input. Extrapolating to produce "
-               "a flat continuum."))
+        logger.info(("Single filter magnitude input. Extrapolating to produce "
+                     "a flat continuum."))
         extrapolate_SED = True
         pivots = np.append(pivots, pivots[0] + 0.01)
 
@@ -383,6 +391,8 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     output_filename : str
         Name of the saved HDF5 file containing all object spectra.
     """
+    logger = logging.getLogger('mirage.catalogs.spectra_from_catalog.make_all_spectra')
+
     # Create the output filename if needed
     if output_filename is None:
         output_filename = create_output_sed_filename(catalog_files[0], input_spectra_file)
@@ -444,7 +454,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
 
         catalog, filter_info = add_flam_columns(ascii_catalog, mag_sys)
         catalog.write(flambda_output_catalog, format='ascii', overwrite=True)
-        print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
+        logger.info('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
 
         # Renormalize
         if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
@@ -478,7 +488,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
 
     # Save the source spectra in an hdf5 file
     hdf5_catalog.save(spectra, output_filename, wavelength_unit='micron', flux_unit='flam')
-    print('Spectra catalog file saved to {}'.format(output_filename))
+    logger.info('Spectra catalog file saved to {}'.format(output_filename))
     return output_filename
 
 
@@ -559,6 +569,8 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         requested magnitude, only for spectra where the flux units are
         astropy.units.pct
     """
+    logger = logging.getLogger('mirage.catalogs.spectra_from_catalog.rescale_normalized_spectra')
+
     # Get the Vega spectrum from synphot. Use the version that was used
     # to create the photom reference files and filter zeropoints
     with syn_conf.set_temp('vega_file', 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_008.fits'):
@@ -576,7 +588,7 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
-            print('SED for source {} is normalized. Rescaling.'.format(dataset))
+            logger.info('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
 
             if not any(match):
@@ -634,6 +646,6 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
 
             spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
         else:
-            print('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
+            logger.info('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
 
     return spec

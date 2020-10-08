@@ -8,6 +8,7 @@ Use in conjunction with crop_mosaic.py
 import sys
 import os
 import glob
+import logging
 from copy import copy
 import argparse
 
@@ -20,8 +21,15 @@ from jwst.assign_wcs import AssignWcsStep
 from jwst.datamodels import container
 import pysiaf
 
-from ..utils import set_telescope_pointing_separated as stp
-from ..utils.siaf_interface import get_instance
+from mirage.logging import logging_functions
+from mirage.utils import set_telescope_pointing_separated as stp
+from mirage.utils.siaf_interface import get_instance
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class Blot():
@@ -58,6 +66,8 @@ class Blot():
             Name of a CRDS distortion reference file to be used when running
             the assign_wcs pipeline step on the blotted data
         """
+        self.logger = logging.getLogger(__name__)
+
         if isinstance(ra, float):
             self.center_ra = [ra]
         else:
