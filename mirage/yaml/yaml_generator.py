@@ -109,6 +109,7 @@ import pysiaf
 from ..apt import apt_inputs
 from ..logging import logging_functions
 from ..reference_files import crds_tools
+from ..reference_files.utils import get_transmission_file
 from ..utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
@@ -401,6 +402,7 @@ class SimInput:
         ipc_arr = deepcopy(empty_col)
         ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
+        transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
 
@@ -434,7 +436,10 @@ class SimInput:
                     updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # Query CRDS
-            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
+            # Exclude transmission file for now
+            files_no_transmission = list(CRDS_FILE_TYPES.values())
+            files_no_transmission.remove('transmission')
+            reffiles = crds_tools.get_reffiles(status_dict, files_no_transmission,
                                                download=not self.offline)
 
             # If the user entered reference files in self.reffile_defaults
@@ -455,6 +460,13 @@ class SimInput:
                         else:
                             crds_key = key
                         reffiles[crds_key] = manual_reffiles[key]
+
+            # Transmission image file
+            # For the moment, this file is retrieved from NIRCAM_GRISM or NIRISS_GRISM
+            # Down the road it will become part of CRDS, at which point
+            if 'transmission' not in reffiles.keys():
+                reffiles['transmission'] = get_transmission_file(status_dict)
+                self.logger.info('Using transmission file: {}'.format(reffiles['transmission']))
 
             # Check to see if a version of the inverted IPC kernel file
             # exists already in the same directory. If so, use that and
@@ -477,6 +489,7 @@ class SimInput:
             ipc_arr[match] = reffiles['ipc']
             ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
+            transmission_arr[match] = reffiles['transmission']
             badpixmask_arr[match] = reffiles['mask']
             pixelflat_arr[match] = reffiles['flat']
 
@@ -489,6 +502,7 @@ class SimInput:
         self.info['ipc'] = list(ipc_arr)
         self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
 
@@ -512,6 +526,7 @@ class SimInput:
         photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
+        transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
 
@@ -545,6 +560,7 @@ class SimInput:
             photom_arr[match] = manual_reffiles['photom']
             ipc_arr[match] = manual_reffiles['ipc']
             pixelAreaMap_arr[match] = manual_reffiles['area']
+            transmission_arr[match] = manual_reffiles['transmission']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
             pixelflat_arr[match] = manual_reffiles['pixelflat']
 
@@ -556,6 +572,7 @@ class SimInput:
         self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
 
@@ -665,6 +682,7 @@ class SimInput:
             self.info['ipc'] = column_data
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
+            self.info['transmission'] = column_data
             self.info['badpixmask'] = column_data
             self.info['pixelflat'] = column_data
 
@@ -1826,6 +1844,17 @@ class SimInput:
         except KeyError:
             files['area'] = 'none'
 
+        # transmission image
+        try:
+            if instrument == 'nircam':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][detector][filtername][pupilname]
+            elif instrument == 'niriss':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][filtername][pupilname]
+            elif instrument == 'fgs':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][detector]
+        except KeyError:
+            files['transmission'] = 'none'
+
         # bad pixel map
         try:
             if instrument == 'nircam':
@@ -1987,6 +2016,8 @@ class SimInput:
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
                      .format(input['pixelAreaMap'])))
+            f.write(('  transmission: {}      # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov\n'
+                     .format(input['transmission'])))
             f.write(('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'
                      .format(input['subarray_def_file'])))
             f.write(('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated '

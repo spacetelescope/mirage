@@ -316,10 +316,6 @@ class GrismTSO():
         no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
         background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
-        # Mulitply the dispersed seed images by the flat field
-        no_transit_signal *= tso_direct.flatfield
-        background_dispersed *= tso_direct.flatfield
-
         # Create a reference pixel mask, and crop to the requeted aperture
         full_maskimage = np.zeros((tso_direct.ffsize, tso_direct.ffsize), dtype=np.int)
         full_maskimage[4:tso_direct.ffsize-4, 4:tso_direct.ffsize-4] = 1.

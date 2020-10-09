@@ -85,6 +85,7 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'ipc': 'ipc',
                    'linearity': 'linearity',
                    'pixelAreaMap': 'area',
+                   'transmission': 'transmission',
                    'saturation': 'saturation',
                    'superbias': 'superbias',
                    'pixelflat': 'flat',
@@ -119,23 +120,3 @@ LOG_CONFIG_FILENAME = 'logging_config.yaml'
 # Standard log file names. These are needed because we need to have a
 # log file name before we know the yaml/xml filename
 STANDARD_LOGFILE_NAME = 'mirage_latest.log'
-
-
-def grism_factor(instrument_name):
-    """Return the factor by which the field of view is expanded when
-    creating grism simulations compared to direct image simulations
-
-    Parameters
-    ----------
-    instrument_name : str
-        JWST instrument name
-
-    Returns
-    -------
-    factor : float
-        Multiplicative factor by which the fov is enlarged
-    """
-    if instrument_name.lower() == 'nircam':
-        return np.sqrt(2.)
-    elif instrument_name.lower() == 'niriss':
-        return 2322./2048.

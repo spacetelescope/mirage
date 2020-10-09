@@ -30,6 +30,7 @@ from astropy.io import ascii as asc
 import numpy as np
 from scipy.stats import sigmaclip
 
+from mirage.reference_files.utils import get_transmission_file
 from mirage.logging import logging_functions
 from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
                                    NIRCAM_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
@@ -373,7 +374,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
     pathdict = {'Reffiles': ['dark', 'linearized_darkfile', 'badpixmask',
                              'superbias', 'linearity', 'saturation', 'gain',
                              'pixelflat', 'illumflat', 'ipc', 'astrometric',
-                             'crosstalk', 'occult', 'pixelAreaMap',
+                             'crosstalk', 'occult', 'pixelAreaMap', 'transmission',
                              'subarray_defs', 'filtpupilcombo',
                              'flux_cal', 'readpattdefs', 'filter_throughput',
                              'filter_wheel_positions', 'photom'],
@@ -449,9 +450,33 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                 # search for the best reference file currently in CRDS
                 # and download if it is not already present in
                 # self.crds_datadir
-                mapping = crds_tools.get_reffiles(crds_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
-                params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
-                logger.info("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                query_dictionary = crds_dictionary
+
+                # For NIRCam WFSS and grism time series simluations we need to get the
+                # imaging mode flat for the crossing filter. This is because the grism-
+                # specific flat in CRDS is all 1.0's, because most people apply a wavelength-
+                # dependent flat to the data after they have a 1D sepctrum (according to Pirzkal).
+                # So when introducing flat field effects into the data, we use the imaging mode
+                # flat. This assumes no wavelength-dependence to the flat field
+                if ((params['Inst']['instrument'].lower() == 'nircam') and (params['Inst']['mode'] in ['wfss', 'ts_grism'])
+                   and (key2 == 'pixelflat')):
+                    img_dict = copy.deepcopy(crds_dictionary)
+                    if img_dict['PUPIL'] in ['GRISMR', 'GRISMC']:
+                        img_dict['PUPIL'] = 'CLEAR'
+                    else:
+                        raise ValueError('WFSS or GrismTSO sim, but Pupil is not set to one of the grisms.')
+                    query_dictionary = img_dict
+
+                if key2 != 'transmission':
+                    mapping = crds_tools.get_reffiles(query_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
+                    params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
+                    logger.info("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                else:
+                    # For the moment, the transmission files are stored in the GRISM_NIRCAM and
+                    # GRISM_NIRISS repos. Longer-term they will become CRDS files and this else
+                    # statement can be deleted.
+                    params[key1][key2] = get_transmission_file(query_dictionary)
+                    logger.info("From grism library, found {} as the POM transmission file.".format(params[key1][key2]))
 
                 # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
                 if key2 == 'ipc':
