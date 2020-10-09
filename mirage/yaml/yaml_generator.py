@@ -466,6 +466,7 @@ class SimInput:
             # Down the road it will become part of CRDS, at which point
             if 'transmission' not in reffiles.keys():
                 reffiles['transmission'] = get_transmission_file(status_dict)
+                self.logger.info('Using transmission file: {}'.format(reffiles['transmission']))
 
             # Check to see if a version of the inverted IPC kernel file
             # exists already in the same directory. If so, use that and

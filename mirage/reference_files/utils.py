@@ -41,14 +41,14 @@ def get_transmission_file(parameter_dict):
     datadir = os.environ.get('MIRAGE_DATA')
 
     if parameter_dict['INSTRUME'].lower() == 'nircam':
-        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRCAM')
+        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRCAM/V2')
 
         module = parameter_dict['DETECTOR'][3]
 
         # Assume that detector names in the transmission file names will
         # use 'NRCA5' rather than 'NRCALONG'
-        if 'LONG' in parameter_dict['DETECTOR']:
-            parameter_dict['DETECTOR'] = parameter_dict['DETECTOR'].replace('LONG', '5')
+        #if 'LONG' in parameter_dict['DETECTOR']:
+        #    parameter_dict['DETECTOR'] = parameter_dict['DETECTOR'].replace('LONG', '5')
 
         if parameter_dict['DETECTOR'] not in ['NRCA5', 'NRCB5', 'NRCALONG', 'NRCBLONG']:
             # For NIRCam SW, we use the same file for all detectors/filters/pupils
@@ -64,51 +64,15 @@ def get_transmission_file(parameter_dict):
 
     # For NIRISS we search for a detector/filter/pupil-dependent file
     elif parameter_dict['INSTRUME'].lower() == 'niriss':
-        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRISS')
-        transmission_filename = search_transmission_files(dirname, parameter_dict)
+        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRISS/V2')
+        filt = parameter_dict['FILTER'].upper()
+        if filt not in ['GR150R', 'GR150C']:
+            transmission_filename = None
+        else:
+            transmission_filename = os.path.join(dirname, 'jwst_niriss_cv3_pomtransmission_{}_{}.fits'.format(filt, parameter_dict['PUPIL']))
 
+    # For FGS we don't need to worry about a transmission file
     elif parameter_dict['INSTRUME'].lower() == 'fgs':
-        dirname = os.path.join(datadir, 'niriss', 'GRISM_NIRISS')
-        transmission_filename = os.path.join(dirname, 'FGS_transmission_image.fits')
+        transmission_filename = None
 
-    return transmission_file
-
-
-def search_transmission_files(directory, parameters):
-    """Find the transmission file within the collection of transmission files
-    that matches the provided detector, filter and pupil values
-
-    Parameters
-    ----------
-    directory : str
-        Name of directory containing the transmission file collection
-
-    parameter_dict : dict
-        Dictionary of basic metadata from the file to be processed by the
-        returned reference files (e.g. INSTRUME, DETECTOR, etc)
-
-    Returns
-    -------
-    match[0] : str
-        Full path to the transmission file
-    """
-    files = glob(os.path.join(directory, '*transmission*fits'))
-
-    filt = parameters['FILTER']
-    pupil = parameters['PUPIL']
-    detector = parameters['DETECTOR']
-
-    # Search using filenames
-    if parameters['INSTRUME'].lower() == 'nircam':
-        match = [file for file in files if ((filt in file) and (pupil in file) and (detector in file))]
-    elif parameters['INSTRUME'].lower() == 'niriss':
-        match = [file for file in files if ((filt in file) and (pupil in file))]
-    else:
-        raise ValueError('Only NIRCam and NIRISS are supported in search_transmission_files()')
-
-    if len(match) == 1:
-        return match[0]
-    elif len(match) == 0:
-        raise ValueError("No matching transmission image files found: {}".format(parameters))
-    elif len(match) > 1:
-        raise ValueError("More than one matching transmission image file found: {}".format(match))
+    return transmission_filename

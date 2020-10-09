@@ -406,6 +406,7 @@ class Catalog_seed():
             # For NIRISS POM data, extract the central 2048x2048
             if self.params['Inst']['mode'] in ["pom"]:
                 # Expose the full-sized pom seed image
+                self.logger.info('Multiplying seed by POM transmission image.')
                 self.seedimage *= self.transmission_image
                 self.pom_seed = copy.deepcopy(self.seedimage)
                 self.pom_segmap = copy.deepcopy(self.seed_segmap)
@@ -427,6 +428,7 @@ class Catalog_seed():
             # For data that will not be dispersed, multiply by the transmission image
             # pom data have already been multiplied by the transmission image above
             if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
+                self.logger.info('Multiplying seed by POM transmission image.')
                 self.seedimage *= self.transmission_image
 
             # Save the combined static + moving targets ramp
@@ -546,6 +548,7 @@ class Catalog_seed():
                 segmap *= self.maskimage
 
                 # Multiply by the transmission image
+                self.logger.info('Multiplying seed by POM transmission image.')
                 seed *= self.transmission_image
 
                 # Save the seed image segment to a file
@@ -597,6 +600,7 @@ class Catalog_seed():
                         segmap *= self.maskimage
 
                         # Multiply by the transmission image
+                        self.logger.info('Multiplying seed by POM transmission image.')
                         seed *= self.transmission_image
 
                         # Get metadata values to save in seed image header
@@ -754,7 +758,8 @@ class Catalog_seed():
             except:
                 raise IOError('WARNING: unable to read in {}'.format(filename))
         else:
-            print('No transmission file for this mode. Assuming full transmission for all pixels. (no e.g. occulters blocking any pixels.')
+            self.logger.info(('No transmission file given. Assuming full transmission for all pixels, '
+                              'not including flat field effects. (no e.g. occulters blocking any pixels).'))
             transmission = np.ones((2048, 2048))
             header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
 
