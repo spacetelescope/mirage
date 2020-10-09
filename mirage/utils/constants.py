@@ -21,6 +21,11 @@ EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NIS_WFSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
 
+# SEARCH STRINGS TO USE FOR FGS DARKS (needed because darks for the two
+# detectors are mixed in a single directory)
+FGS1_DARK_SEARCH_STRING = '*_497_*fits'
+FGS2_DARK_SEARCH_STRING = '*_498_*fits'
+
 # Supported NIRISS filters
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
 NIRISS_PUPIL_WHEEL_FILTERS = ['F090W', 'F115W', 'F158M', 'F140M', 'F150W', 'F200W']
@@ -80,6 +85,7 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'ipc': 'ipc',
                    'linearity': 'linearity',
                    'pixelAreaMap': 'area',
+                   'transmission': 'transmission',
                    'saturation': 'saturation',
                    'superbias': 'superbias',
                    'pixelflat': 'flat',
@@ -108,22 +114,9 @@ PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
 # Fraction of the total Sersic
 SERSIC_FRACTIONAL_SIGNAL = 0.9995
 
+# Configuration file for defining the logs
+LOG_CONFIG_FILENAME = 'logging_config.yaml'
 
-def grism_factor(instrument_name):
-    """Return the factor by which the field of view is expanded when
-    creating grism simulations compared to direct image simulations
-
-    Parameters
-    ----------
-    instrument_name : str
-        JWST instrument name
-
-    Returns
-    -------
-    factor : float
-        Multiplicative factor by which the fov is enlarged
-    """
-    if instrument_name.lower() == 'nircam':
-        return np.sqrt(2.)
-    elif instrument_name.lower() == 'niriss':
-        return 2322./2048.
+# Standard log file names. These are needed because we need to have a
+# log file name before we know the yaml/xml filename
+STANDARD_LOGFILE_NAME = 'mirage_latest.log'

@@ -24,6 +24,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    seed_images.rst
    dark_preparation.rst
    observation_generator.rst
+   logging.rst
 ..   api.rst
 
 

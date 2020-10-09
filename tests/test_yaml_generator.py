@@ -406,6 +406,27 @@ def test_reffile_crds_full_name():
                                                    'nrcb4': {'f150w': {'NRC_IMAGE': 'my_reffiles/my_distortion_for_b4.asdf'}}},
                                     'area': {'nrcb5': {'f322w2': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b5.fits'}}},
                                              'nrcb4': {'f150w': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.fits'}}}},
+                                    'transmission': {'nrcb5': {'f322w2': {'clear': 'my_reffiles/my_transmission_for_b5.fits'},
+                                                               'f444w': {'clear': 'my_reffiles/my_transmission_for_b5.fits'},
+                                                               'f335m': {'clear': 'my_reffiles/my_transmission_for_b5.fits'},
+                                                               'f300m': {'clear': 'my_reffiles/my_transmission_for_b5.fits'}},
+                                                     'nrcb1': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b1.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b1.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b1.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b1.fits'}},
+                                                     'nrcb2': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b2.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b2.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b2.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b2.fits'}},
+                                                     'nrcb3': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b3.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b3.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b3.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b3.fits'}},
+                                                     'nrcb4': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b4.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b4.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b4.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b4.fits'}},
+                                                    },
                                     'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                                    'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
                                     'pixelflat': {'nrcb5': {'f322w2': {'clear': 'my_reffiles/my_flatfield_for_b5.fits'}}}
@@ -416,6 +437,9 @@ def test_reffile_crds_full_name():
                                     'gain': 'my_niriss_gain.fits',
                                     'distortion': {'F115W': {'nis_image': 'my_niriss_disotrtion.asdf'}},
                                     'area': {'clear': {'f115w': {'nis_image': 'my_niriss_area.fits'}}},
+                                    'transmission': {'clear': {'f115w': 'my_niriss_transmission.fits'},
+                                                     'gr150c': {'f115w': 'my_niriss_gr_transmission.fits'}
+                                                     },
                                     'badpixmask': 'my_niriss_badpixmask.fits',
                                     'pixelflat': {'clear': {'f115w': 'my_niriss_flatfield.fits'}}
                                     }
@@ -479,9 +503,11 @@ def test_reffile_crds_full_name():
     for index in match_nrc_sw_distortion_area:
         assert yam.info['astrometric'][index] == 'my_reffiles/my_distortion_for_b4.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_reffiles/my_pam_for_b4.fits'
+        assert yam.info['transmission'][index] == 'my_reffiles/my_transmission_for_b4.fits'
     for index in match_nrc_lw_distortion_area:
         assert yam.info['astrometric'][index] == 'my_reffiles/my_distortion_for_b5.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_reffiles/my_pam_for_b5.fits'
+        assert yam.info['transmission'][index] == 'my_reffiles/my_transmission_for_b5.fits'
     for index in match_nrc_lw_flat:
         assert yam.info['pixelflat'][index] == 'my_reffiles/my_flatfield_for_b5.fits'
 
@@ -495,6 +521,7 @@ def test_reffile_crds_full_name():
     for info in match_nis_distortion_area:
         assert yam.info['astrometric'][index] == 'my_niriss_disotrtion.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_niriss_area.fits'
+        assert yam.info['transmission'][index] == 'my_niriss_transmission.fits'
     for info in match_nis_flat:
         assert yam.info['pixelflat'][index] == 'my_niriss_flatfield.fits'
 

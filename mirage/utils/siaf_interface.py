@@ -19,12 +19,21 @@ Use
 
 """
 import os
+import logging
 import numpy as np
 
 import pysiaf
 from pysiaf import iando
+
+from mirage.logging import logging_functions
 from ..utils import rotations
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def aperture_ra_dec(siaf_instance, aperture_name, ra, dec, telescope_roll, output_apertures):
@@ -134,6 +143,8 @@ def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, 
         List of full-frame coordinates corresponding to the minimum and maximum
         values of x and y in the given aperture
     """
+    logger = logging.getLogger('mirage.utils.siaf_interface.get_siaf_information')
+
     # Select the correct aperture
     siaf = siaf_instance[aperture_name]
 
@@ -157,7 +168,7 @@ def get_siaf_information(siaf_instance, aperture_name, ra, dec, telescope_roll, 
         subarray_boundaries = [xcorner[0], ycorner[0], xcorner[1], ycorner[1]]
     except (RuntimeError, TypeError) as e:  # e.g. NIRSpec NRS_FULL_MSA aperture
         if verbose:
-            print('get_siaf_information raised error:\n{}\nIgnoring it.'.format(e))
+            logger.info('get_siaf_information raised error:\n{}\nIgnoring it.'.format(e))
         subarray_boundaries = [0, 0, 0, 0]
     return local_roll, att_matrix, fullframesize, subarray_boundaries
 
@@ -185,6 +196,8 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
         Subarray corner coordinates
 
     """
+    logger = logging.getLogger('mirage.utils.get_siaf_information.sci_subarray_corners')
+
     # get SIAF
     if siaf is None:
         siaf = get_instance(instrument)
@@ -208,7 +221,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
 
     # If multiuple apertures are listed as parents keep only the first
     if ';' in aperture._parent_apertures:
-        print('Multiple parent apertures: {}'.format(aperture._parent_apertures))
+        logger.info('Multiple parent apertures: {}'.format(aperture._parent_apertures))
         aperture._parent_apertures = aperture._parent_apertures.split(';')[0]
 
     if aperture_name in master_aperture_names:
@@ -217,7 +230,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     elif aperture._parent_apertures is not None:
         # use parent aperture for transformation
         if verbose:
-            print('Using parent {} for {}'.format(aperture._parent_apertures, aperture_name))
+            logger.info('Using parent {} for {}'.format(aperture._parent_apertures, aperture_name))
         x_sci, y_sci = siaf[aperture._parent_apertures].det_to_sci(x_det, y_det)
         aperture = siaf[aperture._parent_apertures]
 

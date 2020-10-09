@@ -93,6 +93,7 @@ History
 import sys
 import os
 import argparse
+import logging
 from copy import deepcopy
 from glob import glob
 import datetime
@@ -106,14 +107,22 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
+from ..logging import logging_functions
 from ..reference_files import crds_tools
+from ..reference_files.utils import get_transmission_file
+from ..utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
-from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE
+from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE, \
+                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from ..utils import utils
 
 ENV_VAR = 'MIRAGE_DATA'
+
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class SimInput:
@@ -240,6 +249,12 @@ class SimInput:
             Whether the class is being called with or without access to
             Mirage reference data. Used primarily for testing.
         """
+        # Initialize log
+        self.logger = logging.getLogger('mirage.yaml.yaml_generator')
+        self.logger.info('Running yaml_generator....\n')
+        self.logger.info('using APT xml file: {}\n'.format(input_xml))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
+
         parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
                                'dates': dates}
 
@@ -297,7 +312,7 @@ class SimInput:
                                                      verbose=self.verbose,
                                                      parameter_overrides=parameter_overrides)
         else:
-            print('No input xml file provided. Observation dictionary not constructed.')
+            self.logger.error('No input xml file provided. Observation dictionary not constructed.')
 
         self.reffile_setup()
 
@@ -387,6 +402,7 @@ class SimInput:
         ipc_arr = deepcopy(empty_col)
         ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
+        transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
 
@@ -420,7 +436,10 @@ class SimInput:
                     updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # Query CRDS
-            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
+            # Exclude transmission file for now
+            files_no_transmission = list(CRDS_FILE_TYPES.values())
+            files_no_transmission.remove('transmission')
+            reffiles = crds_tools.get_reffiles(status_dict, files_no_transmission,
                                                download=not self.offline)
 
             # If the user entered reference files in self.reffile_defaults
@@ -441,6 +460,13 @@ class SimInput:
                         else:
                             crds_key = key
                         reffiles[crds_key] = manual_reffiles[key]
+
+            # Transmission image file
+            # For the moment, this file is retrieved from NIRCAM_GRISM or NIRISS_GRISM
+            # Down the road it will become part of CRDS, at which point
+            if 'transmission' not in reffiles.keys():
+                reffiles['transmission'] = get_transmission_file(status_dict)
+                self.logger.info('Using transmission file: {}'.format(reffiles['transmission']))
 
             # Check to see if a version of the inverted IPC kernel file
             # exists already in the same directory. If so, use that and
@@ -463,6 +489,7 @@ class SimInput:
             ipc_arr[match] = reffiles['ipc']
             ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
+            transmission_arr[match] = reffiles['transmission']
             badpixmask_arr[match] = reffiles['mask']
             pixelflat_arr[match] = reffiles['flat']
 
@@ -475,6 +502,7 @@ class SimInput:
         self.info['ipc'] = list(ipc_arr)
         self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
 
@@ -498,6 +526,7 @@ class SimInput:
         photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
+        transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
 
@@ -531,6 +560,7 @@ class SimInput:
             photom_arr[match] = manual_reffiles['photom']
             ipc_arr[match] = manual_reffiles['ipc']
             pixelAreaMap_arr[match] = manual_reffiles['area']
+            transmission_arr[match] = manual_reffiles['transmission']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
             pixelflat_arr[match] = manual_reffiles['pixelflat']
 
@@ -542,6 +572,7 @@ class SimInput:
         self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
 
@@ -585,6 +616,7 @@ class SimInput:
                 self.multiple_catalog_match(filter, cattype, match)
             return match[0]
 
+    @logging_functions.log_fail
     def create_inputs(self):
         """Create observation table """
         self.path_defs()
@@ -609,7 +641,6 @@ class SimInput:
 
             apt.output_dir = self.output_dir
             apt.create_input_table()
-
             self.info = apt.exposure_tab
 
             # Add start time info to each element.
@@ -624,7 +655,7 @@ class SimInput:
             self.make_output_names()
 
         elif self.table_file is not None:
-            print('Reading table file: {}'.format(self.table_file))
+            self.logger.info('Reading table file: {}'.format(self.table_file))
             info = ascii.read(self.table_file)
             self.info = self.table_to_dict(info)
             final_file = self.table_file + '_with_yaml_parameters.csv'
@@ -651,6 +682,7 @@ class SimInput:
             self.info['ipc'] = column_data
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
+            self.info['transmission'] = column_data
             self.info['badpixmask'] = column_data
             self.info['pixelflat'] = column_data
 
@@ -741,7 +773,7 @@ class SimInput:
 
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
-        print('Updated observation table file saved to {}'.format(final_file))
+        self.logger.info('Updated observation table file saved to {}'.format(final_file))
 
         # Now go through the lists one element at a time
         # and create a yaml file for each.
@@ -789,7 +821,7 @@ class SimInput:
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
         obs_ids = sorted(list(set([m[7:10] for m in mosaic_numbers])))
 
-        print('\n')
+        self.logger.info('\n')
 
         total_exposures = 0
         for obs in obs_ids:
@@ -842,17 +874,21 @@ class SimInput:
             else:
                 instrument_string = '    Prime: {}'.format(prime_instrument)
 
-            print('\nObservation {}:'.format(obs))
-            print(instrument_string)
-            print('    {} visit(s)'.format(n_visits))
-            print('    {} activity(ies)'.format(n_activities))
-            #print('    {} exposure(s)'.format(n_exposures))
+            self.logger.info('Observation {}:'.format(obs))
+            self.logger.info(instrument_string)
+            self.logger.info('    {} visit(s)'.format(n_visits))
+            self.logger.info('    {} activity(ies)'.format(n_activities))
+            #self.logger.info('    {} exposure(s)'.format(n_exposures))
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
-                print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
-            print('    {} file(s)'.format(total_files))
+                self.logger.info('    {} NIRCam detector(s) in module {}'.format(n_det, module))
+            self.logger.info('    {} file(s)'.format(total_files))
 
-        # print('\n{} exposures total.'.format(total_exposures))
-        print('{} output files written to: {}'.format(len(yamls), self.output_dir))
+        # self.logger.info('\n{} exposures total.'.format(total_exposures))
+        self.logger.info('{} output files written to: {}'.format(len(yamls), self.output_dir))
+        self.logger.info('Yaml generator complete')
+        log_outdir = os.path.dirname(self.input_xml)
+        logging_functions.move_logfile_to_standard_location(self.input_xml, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=log_outdir, log_type='yaml_generator')
 
     def create_output_name(self, input_obj, index=0):
         """Put together the JWST formatted fits file name based on observation parameters
@@ -997,7 +1033,7 @@ class SimInput:
         for key in refs:
             if detector in key:
                 return refs[key]
-        print("WARNING: no file found for detector {} in {}"
+        self.logger.error("WARNING: no file found for detector {} in {}"
               .format(detector, refs))
 
     def get_subarray_defs(self, filename=None):
@@ -1355,8 +1391,8 @@ class SimInput:
                 # should never enter this code block given the lines above.
                 if amp == 0:
                     amp = 4
-                    print(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
-                           'In the future this information should be made a user input.'.format(aperture)))
+                    self.logger.info(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
+                                      'In the future this information should be made a user input.'.format(aperture)))
                 namp.append(amp)
 
                 # same activity ID
@@ -1458,9 +1494,9 @@ class SimInput:
         matchlist : list
           Matching catalog names
         """
-        print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
-        print("Observation filter: {}".format(filter))
-        print("Matched point source catalogs: {}".format(matchlist))
+        self.logger.warning("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
+        self.logger.warning("Observation filter: {}".format(filter))
+        self.logger.warning("Matched point source catalogs: {}".format(matchlist))
 
     def no_catalog_match(self, filter, cattype):
         """
@@ -1474,10 +1510,10 @@ class SimInput:
           Type of catalog (e.g. pointsource)
 
         """
-        print("WARNING: unable to find filter ({}) name".format(filter))
-        print("in any of the given {} inputs".format(cattype))
-        print("Using the first input for now. Make sure input catalog names have")
-        print("the appropriate filter name in the filename to get matching to work.")
+        self.logger.warning("WARNING: unable to find filter ({}) name".format(filter))
+        self.logger.warning("in any of the given {} inputs".format(cattype))
+        self.logger.warning("Using the first input for now. Make sure input catalog names have")
+        self.logger.warning("the appropriate filter name in the filename to get matching to work.")
 
     def path_defs(self):
         """Expand input files to have full paths"""
@@ -1602,14 +1638,12 @@ class SimInput:
             else:  # niriss and fgs
                 for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                                                            '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
-                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw', FGS1_DARK_SEARCH_STRING))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', FGS1_DARK_SEARCH_STRING))
 
                     elif det == 'G2':
-                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                                                            '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
-                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw', FGS2_DARK_SEARCH_STRING))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', FGS2_DARK_SEARCH_STRING))
 
                     elif det == 'NIS':
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
@@ -1670,7 +1704,7 @@ class SimInput:
 
         # If no path explicitly provided, use the default path.
         if self.psf_paths is None:
-            print('No PSF path provided. Using default path as PSF path for all yamls.')
+            self.logger.info('No PSF path provided. Using default path as PSF path for all yamls.')
             paths_out = []
             for instrument in self.info['Instrument']:
                 default_path = self.global_psfpath[instrument.lower()]
@@ -1678,7 +1712,7 @@ class SimInput:
             return paths_out
 
         elif isinstance(self.psf_paths, str):
-            print('Using provided PSF path.')
+            self.logger.info('Using provided PSF path.')
             paths_out = [self.psf_paths] * len(self.info['act_id'])
             return paths_out
 
@@ -1690,7 +1724,7 @@ class SimInput:
                              .format(n_activities, len(self.psf_paths)))
 
         elif isinstance(self.psf_paths, list):
-            print('Using provided PSF paths.')
+            self.logger.info('Using provided PSF paths.')
             paths_out = [self.psf_paths[i] for i in exp_id_indices]
             return paths_out
 
@@ -1809,6 +1843,17 @@ class SimInput:
                 files['area'] = self.reffile_overrides[instrument]['area'][detector]
         except KeyError:
             files['area'] = 'none'
+
+        # transmission image
+        try:
+            if instrument == 'nircam':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][detector][filtername][pupilname]
+            elif instrument == 'niriss':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][filtername][pupilname]
+            elif instrument == 'fgs':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][detector]
+        except KeyError:
+            files['transmission'] = 'none'
 
         # bad pixel map
         try:
@@ -1971,6 +2016,8 @@ class SimInput:
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
                      .format(input['pixelAreaMap'])))
+            f.write(('  transmission: {}      # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov\n'
+                     .format(input['transmission'])))
             f.write(('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'
                      .format(input['subarray_def_file'])))
             f.write(('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated '
@@ -2293,8 +2340,8 @@ def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=Fals
         if pointing_table['obs_num'][i] == f"{obs_num:03d}":
             ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
             if verbose:
-                print(f"Pointing table row {i} is for obs {obs_num}")
-                print(f" Coords from APT pointing file: {ra_deg} {dec_deg} deg")
+                self.logger.info(f"Pointing table row {i} is for obs {obs_num}")
+                self.logger.info(f" Coords from APT pointing file: {ra_deg} {dec_deg} deg")
             break
     else:
         raise RuntimeError(f"Could not find any info for an observation number {obs_num} in the pointing table.")
