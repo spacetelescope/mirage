@@ -741,25 +741,6 @@ class Observation():
             self.params['Readout']['filter'] = 'NA'
             self.params['Readout']['pupil'] = 'NA'
 
-        # Make sure that the requested number of groups is less than or
-        # equal to the maximum allowed.
-        # For full frame science operations, ngroup is going to be limited
-        # to 10 for all readout patterns
-        # except for the DEEP patterns, which can go to 20.
-        match = self.readpatterns['name'] == self.params['Readout']['readpatt'].upper()
-        if sum(match) == 1:
-            if 'FULL' in self.params['Readout']['array_name']:
-                maxgroups = self.readpatterns['maxgroups'].data[match][0]
-            else:
-                # I'm not sure what the limit is for subarrays, if any
-                maxgroups = 999
-
-        if (self.params['Readout']['ngroup'] > maxgroups):
-            self.logger.warning(("WARNING: {} is limited to a maximum of {} groups. "
-                                 "Proceeding with ngroup = {}."
-                                 .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
-            self.params['Readout']['readpatt'] = maxgroups
-
         # Check for entries in the parameter file that are None or blank,
         # indicating the step should be skipped. Create a dictionary of steps
         # and populate with True or False
