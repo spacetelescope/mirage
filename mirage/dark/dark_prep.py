@@ -141,27 +141,6 @@ class DarkPrep():
         except ValueError:
             self.logger.error("WARNING: Input value of nint is not an integer.")
 
-        # Make sure that the requested number of groups is
-        # less than or equal to the maximum allowed. If you're
-        # continuing on with an unknown readout pattern (not
-        # recommended) then assume a max of 10 groups.
-        # For science operations, ngroup is going to be limited
-        # to 10 for all readout patterns except for the DEEP
-        # patterns, which can go to 20. (FOR FULL FRAME!!)
-        # Subarray exposures can use more!!
-        match = self.readpatterns['name'] == self.params['Readout']['readpatt'].upper()
-        if sum(match) == 1:
-            maxgroups = self.readpatterns['maxgroups'].data[match][0]
-        if sum(match) == 0:
-            logger.error(("Unrecognized readout pattern {}. Assuming a maximum allowed number of groups of 10."
-                   .format(self.params['Readout']['readpatt'])))
-            maxgroups = 10
-
-        if (self.params['Readout']['ngroup'] > maxgroups):
-            logger.error(("WARNING: {} is limited to a maximum of {} groups. Proceeding with ngroup = {}."
-                   .format(self.params['Readout']['readpatt'], maxgroups, maxgroups)))
-            self.params['Readout']['ngroup'] = maxgroups
-
         # Check for entries in the parameter file that are None or blank,
         # indicating the step should be skipped. Create a dictionary of steps
         # and populate with True or False
