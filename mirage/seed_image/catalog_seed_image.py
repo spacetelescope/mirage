@@ -1087,12 +1087,6 @@ class Catalog_seed():
            (instrument.lower() == 'niriss' and (self.params['Inst']['mode'] in ["pom", "wfss"] or self.params['Output']['grism_source_image'])):
             self.coord_adjust['x'] = self.grism_direct_factor_x
             self.coord_adjust['y'] = self.grism_direct_factor_y
-            #self.coord_adjust['xoffset'] = np.int((self.grism_direct_factor_x - 1.) *
-            #                                      (self.subarray_bounds[2] -
-            #                                       self.subarray_bounds[0] + 1) / 2.)
-            #self.coord_adjust['yoffset'] = np.int((self.grism_direct_factor_y - 1.) *
-            #                                      (self.subarray_bounds[3] -
-            #                                       self.subarray_bounds[1] + 1) / 2.)
             self.coord_adjust['xoffset'] = self.trans_ff_xmin + self.subarray_bounds[0]
             self.coord_adjust['yoffset'] = self.trans_ff_ymin + self.subarray_bounds[1]
 
@@ -1838,10 +1832,6 @@ class Catalog_seed():
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
-            #xd = np.int(self.nominal_dims[1] * self.coord_adjust['x'])
-            #yd = np.int(self.nominal_dims[0] * self.coord_adjust['y'])
-            #signalimage = np.zeros((yd, xd), dtype=np.float)
-            #segmentation_map = np.zeros((yd, xd))
             signalimage = np.zeros(self.output_dims, dtype=np.float)
             segmentation_map = np.zeros(self.output_dims)
 
