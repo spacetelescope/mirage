@@ -754,7 +754,7 @@ class DarkPrep():
         # will have 400 frames open. This is also an unlikely situation, but it could
         # be a problem.
         if len(integration_segment_indexes[:-1]) > 1:
-            self.logging.info(('An estimate of processing time remaining will be provided after the first segment '
+            self.logger.info(('An estimate of processing time remaining will be provided after the first segment '
                                'has been completed.\n\n'))
 
         self.dark_files = []
