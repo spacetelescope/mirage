@@ -24,6 +24,8 @@ mirage/catalogs/*.list
 
 # exceptions
 !tests/test_data/*/*.yaml
+!tests/test_data/*/mirage_logs/
+!tests/test_data/*/*/mirage_logs/
 
 # Other #
 #########
