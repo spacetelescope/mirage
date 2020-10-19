@@ -3295,9 +3295,6 @@ class Observation():
                     mapping[dark_element] = self.seed
             else:
                 mapping = self.map_seeds_to_dark()
-            #else:
-            #    raise ValueError("Unsupported length of self.linDark ({}) and self.seed ({})."
-            #                     .format(len(self.linDark), len(self.seed)))
         elif isinstance(self.seed, np.ndarray):
             for dark_element in self.linDark:
                 mapping[dark_element] = self.seed
