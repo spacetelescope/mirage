@@ -227,7 +227,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
                 filename_pupil = 'mask_nrm'
         elif instrument.lower() == 'nircam':
             filename_filter = filtername
-            filename_pupil = pupilname
+            filename_pupil = pupilname if 'GDHS' not in pupilname else 'clear'  # for WFSC team practice purposes we don't produce DHS "PSFs"
 
         default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
                                                                                             detector.lower(),
@@ -332,6 +332,12 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     # handle the NIRISS NRM case
     if pupil == 'NRM':
         pupil = 'MASK_NRM'
+
+    # Handle the DHS for Coarse Phasing - this is a workaround for webbpsf not
+    # implementing this. We're going to load an ITM image in any case in this mode
+    # so the PSF is entirely unused, but we need to load something or else MIRAGE errors.
+    if pupil == 'GDHS0' or pupil == 'GDHS60':
+        pupil = 'CLEAR'
 
     for filename in psf_files:
         try:
