@@ -3826,8 +3826,9 @@ class Catalog_seed():
             # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
             # print('extended source size:', ext_stamp.shape)
 
-            # Rotate the stamp image if requested
-            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+            # Rotate the stamp image if requested, but don't do so based on ra, dec if input coordinates are in pixels
+            if not pixelflag:
+                ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
 
             eshape = np.array(ext_stamp.shape)
             if len(eshape) == 2:
