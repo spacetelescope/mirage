@@ -1431,7 +1431,7 @@ class Catalog_seed():
                 x_frames = np.array(x_frames)
                 y_frames = np.array(y_frames)
 
-                # Use the initial location to determine the PSF to uses
+                # Use the initial location to determine the PSF to use
                 pixelx = x_frames[1]
                 pixely = y_frames[1]
                 ra = ra_frames[1]
@@ -1841,25 +1841,12 @@ class Catalog_seed():
             if 'ephemeris_file' in ptsrc.colnames:
                 ptsrc = self.ephemeris_radec_value_at_obstime(ptsrc)
 
-                #hour, minute, second = self.params['Output']['time_obs'].split(':')
-                #seconds = np.float(second)
-                #sec_int = np.int(np.floor(seconds))
-                #microsec = np.int((seconds - sec_int) * 1e6)
-                #time_string = '{}:{}:{}:{}'.format(hour, minute, str(sec_int), str(microsec))
-                #ob_time = '{}T{}'.format(self.params['Output']['date_obs'], time_string)
-                #start_date = ephemeris_tools.to_timestamp(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S:%f'))
-                #ra_eph, dec_eph = self.get_ephemeris(ptsrc['ephemeris_file'][0])
-                #print('\n\n\n*****If this works, add it to the galaxy and extended blocks below as well****\n\n\n')
-                ## Create list of positions for all frames
-                #ptsrc['x_or_RA'] = ra_eph(start_date)
-                #ptsrc['y_or_Dec'] = dec_eph(start_date)
-
             temp_ptsrc_filename = os.path.join(self.params['Output']['directory'],
                                                'temp_non_sidereal_point_sources.list')
             ptsrc.write(temp_ptsrc_filename, format='ascii', overwrite=True)
 
-            ptsrc = self.get_point_source_list(temp_ptsrc_filename)
-            ptsrcCRImage, ptsrcCRSegmap = self.make_point_source_image(ptsrc)
+            ptsrc_list = self.get_point_source_list(temp_ptsrc_filename)
+            ptsrcCRImage, ptsrcCRSegmap = self.make_point_source_image(ptsrc_list)
 
             totalCRList.append(ptsrcCRImage)
             totalSegList.append(ptsrcCRSegmap.segmap)
@@ -1960,6 +1947,17 @@ class Catalog_seed():
     def ephemeris_radec_value_at_obstime(self, src_catalog):
         """Calculate the RA, Dec of the target at the observation time
         from the yaml file
+
+        Parameters
+        ----------
+        src_catalog : str
+            Name of ascii catalog containing ```ephemeris_file``` column
+
+        Returns
+        -------
+        src_catalog : str
+            Modified source catalog with RA, Dec values corresponding to the
+            observation date
         """
         # In this block we now assume a single target in the catalog.
         hour, minute, second = self.params['Output']['time_obs'].split(':')
