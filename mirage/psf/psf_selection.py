@@ -439,7 +439,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
             # If so, add to the list of all matches
             if match:
                 matches.append(filename)
-        except (KeyError, ValueError) as e:
+        except KeyError as e:
             warnings.warn('While searching for PSF file, error raised when examining {}:\n{}\nContinuing.'.format(os.path.basename(filename), e))
             continue
 
