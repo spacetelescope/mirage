@@ -1412,7 +1412,13 @@ class Catalog_seed():
             eph = None
             if 'ephemeris_file' in entry.colnames:
                 ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
-                start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
+
+                # Allow time_obs to have an integer or fractional number of seconds
+                try:
+                    start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
+                except ValueError:
+                    start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f')
+
                 all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
                 ra_eph, dec_eph = self.get_ephemeris(entry['ephemeris_file'])
 
@@ -1466,13 +1472,6 @@ class Catalog_seed():
                     # x,y in each frame directly
                     x_frames = pixelx + (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                     y_frames = pixely + (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
-
-
-
-
-
-
-
 
             # Get countrate and PSF size info
             if entry[mag_column] is not None:
@@ -1950,23 +1949,25 @@ class Catalog_seed():
 
         Parameters
         ----------
-        src_catalog : str
-            Name of ascii catalog containing ```ephemeris_file``` column
+        src_catalog : astropy.table.Table
+            Source catalog table or row
 
         Returns
         -------
-        src_catalog : str
-            Modified source catalog with RA, Dec values corresponding to the
-            observation date
+        src_catalog : astropy.table.Table
+            Modified source catalog table or row with RA, Dec values
+            corresponding to the observation date
         """
-        # In this block we now assume a single target in the catalog.
-        hour, minute, second = self.params['Output']['time_obs'].split(':')
-        seconds = np.float(second)
-        sec_int = np.int(np.floor(seconds))
-        microsec = np.int((seconds - sec_int) * 1e6)
-        time_string = '{}:{}:{}:{}'.format(hour, minute, str(sec_int), str(microsec))
-        ob_time = '{}T{}'.format(self.params['Output']['date_obs'], time_string)
-        start_date = ephemeris_tools.to_timestamp(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S:%f'))
+        # In this block we now assume a single target in the catalog
+        # (or that ```src_catalog``` is a single row)
+        ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+
+        # Allow time_obs to have an integer or fractional number of seconds
+        try:
+            start_date = ephemeris_tools.to_timestamp(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S'))
+        except ValueError:
+            start_date = ephemeris_tools.to_timestamp(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f'))
+
         ra_eph, dec_eph = self.get_ephemeris(src_catalog['ephemeris_file'][0])
         src_catalog['x_or_RA'] = ra_eph(start_date)
         src_catalog['y_or_Dec'] = dec_eph(start_date)
@@ -2520,10 +2521,35 @@ class Catalog_seed():
                 # if it cannot be converted to a float, then the unit is 'hour'
                 ra_unit = 'hour'
 
+            # Temporarily replace any input positions that are None or N/A
+            # with dummy values. This will allow users to supply an ephemeris
+            # file and not have to add in RA, Dec numbers, which could be
+            # confusing and which are ignored by Mirage anyway.
+            allowed_dummy_values = ['none', 'n/a']
+            for i, row in enumerate(source):
+                if isinstance(row['x_or_RA'], str) and isinstance(row['y_or_Dec'], str):
+                    if 'ephemeris_file' in row.colnames:
+                        if row['x_or_RA'].lower() in allowed_dummy_values and row['y_or_Dec'].lower() in allowed_dummy_values:
+                            catalog_x[i] = 0.
+                            catalog_y[i] = 0.
+                        else:
+                            raise ValueError(('Source catalog contains x, y or RA, Dec positions that are not numbers '
+                                              'and are not "None" or "N/A"'))
+                    else:
+                        raise ValueError('Source catalog contains x, y or RA, Dec positions that are not numbers.')
+
             # Assume that units are consisent within each column. (i.e. no mixing of
             # 12h:23m:34.5s and 189.87463 degrees within a column)
             catalog = SkyCoord(ra=catalog_x, dec=catalog_y, unit=(ra_unit, dec_unit))
             good = np.where(reference.separation(catalog) < delta_degrees)[0]
+
+            # If an ephemeris column is present, mark any rows that contain
+            # an ephemeris file as good. Regardless of the RA, Dec values in
+            # the catalog at this point, the true RA, Dec values will be calculated
+            # from the ephemeris
+            if 'ephemeris_file' in source.colnames:
+                good_eph = np.array([i for i, row in enumerate(source) if row['ephemeris_file'].lower() != 'none'])
+                good = np.array(list(set(np.append(good, good_eph))))
 
         filtered_sources = source[good]
         filtered_indexes = index[good]
