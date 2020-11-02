@@ -389,26 +389,50 @@ class MovingPointSourceCatalog(PointSourceCatalog):
         # Add location information
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
 
-        if len(ephemeris_file) > 0 and (len(ra_velocity) > 0 or len(x_velocity) > 0):
-            print("Ephemeris information overrides provided RA/Dec and x/y velocities.")
+        if len(ephemeris_file) > 0:
+            self._ephemeris_file = ephemeris_file
+
+            need to loop over entries here because there can be a mix of ephemeris files and manual velocities
+
+
+
+
+            if (len(ra) > 0 or len(x) > 0):
+                print("Ephemeris information overrides provided RA,Dec and x,y.")
+                print("Setting these 'None' in order to avoid confusion.")
+                self._ra = [None] * len(ephemeris_file)
+                self._dec = [None] * len(ephemeris_file)
+
+            if (len(ra_velocity) > 0 or len(x_velocity) > 0):
+                print("Ephemeris information overrides provided RA,Dec and x,y velocities.")
+                print("Setting these to 'None' in order to avoid confusion.")
+                ra_velocity = []
+                dec_velocity = []
+                x_velocity = []
+                y_velocity = []
 
         if len(ra_velocity) > 0 and len(x_velocity) > 0:
             raise ValueError(("WARNING: Provide either RA and Dec velocities, or x and y "
                               "velocities, but not both."))
 
-        if len(ephemeris_file) > 0:
-            self._ephemeris_file = ephemeris_file
 
         # Object velocities
         if len(ra_velocity) > 0:
-            self._ra_velocity = ra_velocity
-            print('should we set to None if ephem file is given?')
-            self._dec_velocity = dec_velocity
+            if len(ephemeris_file) > 0:
+                self._ra_velocity = [None] * len(ephemeris_file)
+                self._dec_velocity = [None] * len(ephemeris_file)
+            else:
+                self._ra_velocity = ra_velocity
+                self._dec_velocity = dec_velocity
             self._velocity_units = 'velocity_RA_Dec'
+
         elif len(x_velocity) > 0:
-            self._ra_velocity = x_velocity
-            print('should we set to None if ephem file is given?')
-            self._dec_velocity = y_velocity
+            if len(ephemeris_file) > 0:
+                self._ra_velocity = [None] * len(ephemeris_file)
+                self._dec_velocity = [None] * len(ephemeris_file)
+            else:
+                self._ra_velocity = x_velocity
+                self._dec_velocity = y_velocity
             self._velocity_units = 'velocity_pixels'
 
     def create_table(self):
