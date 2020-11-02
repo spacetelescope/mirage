@@ -126,6 +126,7 @@ def query_horizons(object_name, start_date, stop_date, step_size):
                    epochs={'start':start_date, 'stop':stop_date,
                            'step':step_size})
     #eph = obj.ephemerides()
+    raise NotImplementedError('Horizons query from within Mirage not yet implemented.')
     return eph
 
 
