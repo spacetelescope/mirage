@@ -615,7 +615,7 @@ class Catalog_seed():
                         counter += 1
 
                         # Save the seed image segment to a file
-                        self.logger.debug('\n\n\ntotal_seed_segments_and_parts: ', self.total_seed_segments_and_parts)
+                        self.logger.debug('\n\n\nTotal_seed_segments_and_parts: {}'.format(self.total_seed_segments_and_parts))
                         seg_string = str(self.segment_number).zfill(3)
                         part_string = str(self.segment_part_number).zfill(3)
                         self.seed_file = '{}_{}_{}_seg{}_part{}_seed_image.fits'.format(self.basename, self.params['Readout']['filter'],

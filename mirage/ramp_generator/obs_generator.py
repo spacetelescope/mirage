@@ -951,7 +951,8 @@ class Observation():
                 nints = header_data['SEGINT']
                 ngroups = header_data['SEGGROUP']
 
-                self.logger.info('Final seed image shape: ({}, {}, {}, {})'.format(nints, ngroups, ydim, xdim))
+                self.logger.info(('Final seed image shape before averaging/skipping frames to create groups: '
+                                  '({}, {}, {}, {})'.format(nints, ngroups, ydim, xdim)))
                 seed = np.zeros((nints, ngroups, ydim, xdim))
                 segmap = seg_data
 
@@ -3293,8 +3294,7 @@ class Observation():
                 for dark_element in self.linDark:
                     mapping[dark_element] = self.seed
             else:
-                raise ValueError("Unsupported length of self.linDark ({}) and self.seed ({})."
-                                 .format(len(self.linDark), len(self.seed)))
+                mapping = self.map_seeds_to_dark()
         elif isinstance(self.seed, np.ndarray):
             for dark_element in self.linDark:
                 mapping[dark_element] = self.seed

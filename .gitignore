@@ -22,8 +22,9 @@ mirage/catalogs/*.list
 *.csv
 *.txt~
 
-# Test data
-###########
+# Log files #
+#############
+tests/mirage_logs/*
 tests/test_data/*/mirage_logs/*
 tests/test_data/*/*/mirage_logs/*
 
