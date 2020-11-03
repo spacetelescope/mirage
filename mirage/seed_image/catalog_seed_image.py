@@ -1018,12 +1018,14 @@ class Catalog_seed():
             tracking = False
             ra_vel = None
             dec_vel = None
+            vel_flag = False
             ra_interp_fncn = None
             dec_interp_fncn = None
         else:
             tracking = True
             ra_vel = self.ra_vel
             dec_vel = self.dec_vel
+            vel_flag = self.nonsidereal_pix_vel_flag
             ra_interp_fncn = self.nonsidereal_ra_interp
             dec_interp_fncn = self.nonsidereal_dec_interp
 
@@ -1039,6 +1041,7 @@ class Catalog_seed():
                                                                        MT_tracking=tracking,
                                                                        tracking_ra_vel=ra_vel,
                                                                        tracking_dec_vel=dec_vel,
+                                                                       trackingPixVelFlag=vel_flag,
                                                                        non_sidereal_ra_interp_function=ra_interp_fncn,
                                                                        non_sidereal_dec_interp_function=dec_interp_fncn
                                                                        )
@@ -1054,6 +1057,7 @@ class Catalog_seed():
                                                                          MT_tracking=tracking,
                                                                          tracking_ra_vel=ra_vel,
                                                                          tracking_dec_vel=dec_vel,
+                                                                         trackingPixVelFlag=vel_flag,
                                                                          non_sidereal_ra_interp_function=ra_interp_fncn,
                                                                          non_sidereal_dec_interp_function=dec_interp_fncn
                                                                          )
@@ -1072,6 +1076,7 @@ class Catalog_seed():
                                                                    MT_tracking=tracking,
                                                                    tracking_ra_vel=ra_vel,
                                                                    tracking_dec_vel=dec_vel,
+                                                                   trackingPixVelFlag=vel_flag,
                                                                    non_sidereal_ra_interp_function=ra_interp_fncn,
                                                                    non_sidereal_dec_interp_function=dec_interp_fncn
                                                                    )
@@ -1114,7 +1119,7 @@ class Catalog_seed():
 
         # Create a count rate image containing only the non-sidereal target(s)
         # These will be stationary in the fov
-        nonsidereal_countrate, nonsidereal_segmap, self.ra_vel, self.dec_vel, vel_flag, self.nonsidereal_ra_interp, \
+        nonsidereal_countrate, nonsidereal_segmap, self.ra_vel, self.dec_vel, self.nonsidereal_pix_vel_flag, self.nonsidereal_ra_interp, \
            self.nonsidereal_dec_interp = self.nonsidereal_CRImage(self.params['simSignals']['movingTargetToTrack'])
 
         # Expand into a RAPID exposure and convert from signal rate to signals
@@ -1147,7 +1152,7 @@ class Catalog_seed():
                                                                   MT_tracking=True,
                                                                   tracking_ra_vel=self.ra_vel,
                                                                   tracking_dec_vel=self.dec_vel,
-                                                                  trackingPixVelFlag=vel_flag,
+                                                                  trackingPixVelFlag=self.nonsidereal_pix_vel_flag,
                                                                   non_sidereal_ra_interp_function=self.nonsidereal_ra_interp,
                                                                   non_sidereal_dec_interp_function=self.nonsidereal_dec_interp)
             mtt_data_list.append(mtt_ptsrc)
@@ -1165,7 +1170,7 @@ class Catalog_seed():
                                                                         MT_tracking=True,
                                                                         tracking_ra_vel=self.ra_vel,
                                                                         tracking_dec_vel=self.dec_vel,
-                                                                        trackingPixVelFlag=vel_flag,
+                                                                        trackingPixVelFlag=self.nonsidereal_pix_vel_flag,
                                                                         non_sidereal_ra_interp_function=ra_interp,
                                                                         non_sidereal_dec_interp_function=dec_interp)
             mtt_data_list.append(mtt_galaxies)
@@ -1184,7 +1189,7 @@ class Catalog_seed():
                                                               MT_tracking=True,
                                                               tracking_ra_vel=self.ra_vel,
                                                               tracking_dec_vel=self.dec_vel,
-                                                              trackingPixVelFlag=vel_flag,
+                                                              trackingPixVelFlag=self.nonsidereal_pix_vel_flag,
                                                               non_sidereal_ra_interp_function=ra_interp,
                                                               non_sidereal_dec_interp_function=dec_interp)
             mtt_data_list.append(mtt_ext)
@@ -1431,6 +1436,12 @@ class Catalog_seed():
                 start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f')
             all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
 
+        # If the ephemeris_file column is not present, add it and populate it with
+        # 'none' for all entries. This will make for fewer possibilities when looping
+        # over sources later
+        if 'ephemeris_file' not in mtlist.colnames:
+            mtlist['ephemeris_file'] = ['None'] * len(mtlist['x_or_RA'])
+
         # If there is an interpolation function for the non-sidereal source's position,
         # get the position of the source at all times. The catalog may have different
         # ephemeris files for different sources, so we can't get background source
@@ -1456,21 +1467,11 @@ class Catalog_seed():
                 # Convert to pixels per second and multply by frame times
                 delta_non_sidereal_x = (tracking_ra_vel / 3600.) * frameexptimes
                 delta_non_sidereal_y = (tracking_dec_vel / 3600.) * frameexptimes
-
-
-                print('NONSIDEREAL VEL IN PIX/HOUR')
-                print(tracking_ra_vel)
-                print(self.ra_vel)
-                print(delta_non_sidereal_x, delta_non_sidereal_y)
             else:
                 # Here the non-sidereal source velocity is in units of arcsec/hour.
                 # Convert to degrees per hour and multply by frame times
                 delta_non_sidereal_ra = (tracking_ra_vel / 3600. / 3600.) * frameexptimes
                 delta_non_sidereal_dec = (tracking_dec_vel / 3600. / 3600.) * frameexptimes
-
-
-                print('NONSIDEREAL VEL IN ARCSEC/HOUR')
-                print(delta_non_sidereal_ra, delta_non_sidereal_dec)
 
         # Loop over sources in the catalog
         times = []
@@ -1485,16 +1486,10 @@ class Catalog_seed():
             x_frames = None
             y_frames = None
 
-            # If the ephemeris file is set to 'None', then strip that
-            # column from entry to make things easier
-            if 'ephemeris_file' in entry.colnames:
-                if entry['ephemeris_file'].lower() == 'none':
-                    entry.remove_column('ephemeris_file')
-
             # Get the RA, Dec or x,y for the source in all frames
             # not including any effects from non-sidereal tracking.
             # If an ephemeris file is given read it in
-            if 'ephemeris_file' in entry.colnames:
+            if entry['ephemeris_file'].lower() != 'none':
                 self.logger.info(("Using ephemeris file {} to find the location of source #{} in {}."
                                   .format(entry['ephemeris_file'], index, filename)))
                 ra_eph, dec_eph = self.get_ephemeris(entry['ephemeris_file'])
@@ -1504,7 +1499,7 @@ class Catalog_seed():
                 dec_frames = dec_eph(all_times)
             else:
                 self.logger.info(("Using provided velocities to find the location of source #{} in {}.".format(index, filename)))
-                if pixelvelflag:
+                if pixvelflag:
                     delta_x_frames = (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                     delta_y_frames = (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
                 else:
@@ -1514,7 +1509,7 @@ class Catalog_seed():
                 if pixelFlag:
                     # Moving target position given in x, y pixel units. Add delta x, y
                     # to get target location at each frame
-                    if pixelvelflag:
+                    if pixvelflag:
                         x_frames = entry['x_or_RA'] + delta_x_frames
                         y_frames = entry['y_or_Dec'] + delta_y_frames
                     else:
@@ -1527,7 +1522,7 @@ class Catalog_seed():
                         x_frames = None
                         y_frames = None
                 else:
-                    if pixelvelflag:
+                    if pixvelflag:
                         # Here locations are in RA, Dec, and velocities are in x, y
                         # So translate locations to x, y first.
                         entry_x, entry_y, _, _, _, _ = self.get_positions(entry['x_or_RA'], entry['y_or_Dec'], False, 4096)
@@ -1562,20 +1557,8 @@ class Catalog_seed():
 
                     # Now that the background source's positions are guaranteed to be in units
                     # of x,y, add the non-sidereal offsets
-
-                    print(x_frames)
-                    print(y_frames)
-
-
-
-
                     x_frames -= delta_non_sidereal_x
                     y_frames -= delta_non_sidereal_y
-
-                    print(delta_non_sidereal_x)
-                    print(delta_non_sidereal_y)
-                    print(x_frames)
-                    print(y_frames)
 
                 else:
                     # Here the non-sidereal target's offsets are in units of RA, Dec
@@ -1588,14 +1571,8 @@ class Catalog_seed():
 
                     # Now that the background source's positions are guaranteed to be in
                     # units of RA, Dec, add the non-sidereal offsets
-                    print(ra_frames, dec_frames)
-
-
                     ra_frames -= delta_non_sidereal_ra
                     dec_frames -= delta_non_sidereal_dec
-
-                    print(delta_non_sidereal_ra, delta_non_sidereal_dec)
-                    print(ra_frames, dec_frames)
 
             # Make sure that ra_frames and x_frames are both populated
             if x_frames is None:
@@ -2750,14 +2727,20 @@ class Catalog_seed():
             # confusing and which are ignored by Mirage anyway.
             allowed_dummy_values = ['none', 'n/a']
             for i, row in enumerate(source):
-                if isinstance(row['x_or_RA'], str) and isinstance(row['y_or_Dec'], str):
+
+                print('in remove_outside...')
+                print(type(row['x_or_RA']))
+                print(row['x_or_RA'])
+
+
+                #if isinstance(row['x_or_RA'], str) and isinstance(row['y_or_Dec'], str):
+                if row['x_or_RA'] == np.nan or row['y_or_Dec'] == np.nan:
                     if 'ephemeris_file' in row.colnames:
-                        if row['x_or_RA'].lower() in allowed_dummy_values and row['y_or_Dec'].lower() in allowed_dummy_values:
+                        if row['ephemeris_file'].lower != 'none':
                             catalog_x[i] = 0.
                             catalog_y[i] = 0.
                         else:
-                            raise ValueError(('Source catalog contains x, y or RA, Dec positions that are not numbers '
-                                              'and are not "None" or "N/A"'))
+                            raise ValueError('Source catalog contains x, y or RA, Dec positions that are not numbers.')
                     else:
                         raise ValueError('Source catalog contains x, y or RA, Dec positions that are not numbers.')
 
