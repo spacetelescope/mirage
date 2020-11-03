@@ -3058,7 +3058,11 @@ class Catalog_seed():
                     # name format, so if the new format column name is not
                     # present, then we can only fall back to looking for
                     # a generic 'magnitude' column.
-                    pass
+
+                    # The weak lenses do not have much effect on throughput, so
+                    # to first order, we can fall back to use a column for the
+                    # same filter but without the weak lenses
+                    specific_mag_col = "nircam_{}_magnitude".format(actual_filter_name)
 
         elif self.params['Inst']['instrument'].lower() == 'niriss':
             if self.params['Readout']['pupil'][0].upper() == 'F':
@@ -3799,8 +3803,11 @@ class Catalog_seed():
             # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
             # print('extended source size:', ext_stamp.shape)
 
-            # Rotate the stamp image if requested
-            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+            # Rotate the stamp image if requested, but don't do so if the specified PA is None
+            # check for both Python None and string 'None' or 'none'
+            if values['pos_angle'] is not None and str(values['pos_angle']).lower() != 'none':
+
+                ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
 
             eshape = np.array(ext_stamp.shape)
             if len(eshape) == 2:

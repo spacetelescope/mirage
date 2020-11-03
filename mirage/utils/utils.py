@@ -636,6 +636,11 @@ def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_modul
         # only throughput files for WLP8
         if pupil_name.upper() == 'WLM8':
             pupil_name = 'WLP8'
+        # For WFSC team practice purposes, the throughput of the DHS grisms is
+        # tracked outside of MIRAGE, so we can safely ignore that here
+        if pupil_name.upper() == 'GDHS0' or pupil_name.upper() == 'GDHS60':
+            pupil_name = 'CLEAR'
+
         tp_file = '{}_{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
                                                                              pupil_name.upper(),
                                                                              nircam_module.lower())
@@ -1031,7 +1036,7 @@ def standardize_filters(instrument, filter_values):
     if instrument.lower() == 'fgs':
         return filter_values
     elif instrument.lower() == 'nircam':
-        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC']
+        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC', 'GDHS0', 'GDHS60']
         reverse_nircam_2_filter_crosses = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in NIRCAM_2_FILTER_CROSSES]
         wlp8_combinations = ['{}/WLP8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
         wlm8_combinations = ['{}/WLM8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
