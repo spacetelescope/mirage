@@ -389,51 +389,39 @@ class MovingPointSourceCatalog(PointSourceCatalog):
         # Add location information
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
 
-        if len(ephemeris_file) > 0:
-            self._ephemeris_file = ephemeris_file
-
-            need to loop over entries here because there can be a mix of ephemeris files and manual velocities
-
-
-
-
-            if (len(ra) > 0 or len(x) > 0):
-                print("Ephemeris information overrides provided RA,Dec and x,y.")
-                print("Setting these 'None' in order to avoid confusion.")
-                self._ra = [None] * len(ephemeris_file)
-                self._dec = [None] * len(ephemeris_file)
-
-            if (len(ra_velocity) > 0 or len(x_velocity) > 0):
-                print("Ephemeris information overrides provided RA,Dec and x,y velocities.")
-                print("Setting these to 'None' in order to avoid confusion.")
-                ra_velocity = []
-                dec_velocity = []
-                x_velocity = []
-                y_velocity = []
-
         if len(ra_velocity) > 0 and len(x_velocity) > 0:
             raise ValueError(("WARNING: Provide either RA and Dec velocities, or x and y "
                               "velocities, but not both."))
 
-
-        # Object velocities
         if len(ra_velocity) > 0:
-            if len(ephemeris_file) > 0:
-                self._ra_velocity = [None] * len(ephemeris_file)
-                self._dec_velocity = [None] * len(ephemeris_file)
-            else:
-                self._ra_velocity = ra_velocity
-                self._dec_velocity = dec_velocity
+            self._ra_velocity = np.array(ra_velocity)
+            self._dec_velocity = np.array(dec_velocity)
             self._velocity_units = 'velocity_RA_Dec'
-
-        elif len(x_velocity) > 0:
-            if len(ephemeris_file) > 0:
-                self._ra_velocity = [None] * len(ephemeris_file)
-                self._dec_velocity = [None] * len(ephemeris_file)
-            else:
-                self._ra_velocity = x_velocity
-                self._dec_velocity = y_velocity
+        else:
+            self._ra_velocity = np.array(x_velocity)
+            self._dec_velocity = np.array(y_velocity)
             self._velocity_units = 'velocity_pixels'
+
+        if len(ephemeris_file) > 0:
+            self._ephemeris_file = np.array(ephemeris_file)
+        else:
+            self._ephemeris_file = np.array(['None'] * len(self._ra_velocity))
+
+        # If ephemeris files are given, modify the position and velocity
+        # values such that they are None in rows where there is an ephemeris file
+        eph_set = set(self._ephemeris_file)
+
+        if eph_set != set(['None']):
+            print(("Ephemeris information overrides provided source positions and velocities. "
+                  "Setting these to NaN in cases where an ephemeris file is given, in order "
+                  "to avoid confusion."))
+            eph_files = self._ephemeris_file != 'None'
+
+            self._ra[eph_files] = None
+            self._dec[eph_files] = None
+            self._ra_velocity[eph_files] = None
+            self._dec_velocity[eph_files] = None
+
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
@@ -464,12 +452,12 @@ class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
                  y_velocity=[], ellipticity=[], radius=[], sersic_index=[], position_angle=[],
                  radius_units='arcsec', ephemeris_file=[]):
         # Add location information
-        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
-                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file)
         GalaxyCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ellipticity=ellipticity, radius=radius,
                                sersic_index=sersic_index, position_angle=position_angle,
                                radius_units='arcsec')
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file)
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
@@ -492,11 +480,11 @@ class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
                  y_velocity=[], filenames=[], position_angle=[], ephemeris_file=[]):
         # Add location information
+        ExtendedCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, filenames=filenames,
+                                 position_angle=position_angle)
         MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
                                           dec_velocity=dec_velocity, x_velocity=x_velocity,
                                           y_velocity=y_velocity, ephemeris_file=ephemeris_file)
-        ExtendedCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, filenames=filenames,
-                                 position_angle=position_angle)
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,

@@ -1449,18 +1449,28 @@ class Catalog_seed():
         elif tracking_ra_vel is not None:
             # If the non-sidereal source velocity is given using manual inputs rather
             # than an ephemeris file, use that to get the source location vs time
-            self.loggeer.info(("Using the provided non-sidereal velocity values to determine "
+            self.logger.info(("Using the provided non-sidereal velocity values to determine "
                                "offsets to apply to the background sources."))
             if trackingPixVelFlag:
                 # Here the non-sidereal source velocity is in units of pix/hour.
                 # Convert to pixels per second and multply by frame times
                 delta_non_sidereal_x = (tracking_ra_vel / 3600.) * frameexptimes
                 delta_non_sidereal_y = (tracking_dec_vel / 3600.) * frameexptimes
+
+
+                print('NONSIDEREAL VEL IN PIX/HOUR')
+                print(tracking_ra_vel)
+                print(self.ra_vel)
+                print(delta_non_sidereal_x, delta_non_sidereal_y)
             else:
                 # Here the non-sidereal source velocity is in units of arcsec/hour.
                 # Convert to degrees per hour and multply by frame times
                 delta_non_sidereal_ra = (tracking_ra_vel / 3600. / 3600.) * frameexptimes
                 delta_non_sidereal_dec = (tracking_dec_vel / 3600. / 3600.) * frameexptimes
+
+
+                print('NONSIDEREAL VEL IN ARCSEC/HOUR')
+                print(delta_non_sidereal_ra, delta_non_sidereal_dec)
 
         # Loop over sources in the catalog
         times = []
@@ -1543,14 +1553,29 @@ class Catalog_seed():
                     if ra_frames is not None:
                         # Here the background target position is in units of RA, Dec.
                         # So we need to first convert it to x, y
+
+                        print('converting bkgd source locations to x,y')
+
                         x_frames, y_frames = self.radec_list_to_xy_list(ra_frames, dec_frames)
                         ra_frames = None
                         dec_frames = None
 
                     # Now that the background source's positions are guaranteed to be in units
                     # of x,y, add the non-sidereal offsets
+
+                    print(x_frames)
+                    print(y_frames)
+
+
+
+
                     x_frames -= delta_non_sidereal_x
                     y_frames -= delta_non_sidereal_y
+
+                    print(delta_non_sidereal_x)
+                    print(delta_non_sidereal_y)
+                    print(x_frames)
+                    print(y_frames)
 
                 else:
                     # Here the non-sidereal target's offsets are in units of RA, Dec
@@ -1563,8 +1588,14 @@ class Catalog_seed():
 
                     # Now that the background source's positions are guaranteed to be in
                     # units of RA, Dec, add the non-sidereal offsets
+                    print(ra_frames, dec_frames)
+
+
                     ra_frames -= delta_non_sidereal_ra
                     dec_frames -= delta_non_sidereal_dec
+
+                    print(delta_non_sidereal_ra, delta_non_sidereal_dec)
+                    print(ra_frames, dec_frames)
 
             # Make sure that ra_frames and x_frames are both populated
             if x_frames is None:
