@@ -83,9 +83,9 @@ An example point source catalog is shown below with the positions given in RA an
 	# abmag
 	#
 	# Magnitudes are converted from input flux densities.
-	x_or_RA          y_or_Dec      nircam_f200w_clear_magnitude
-	53.0886395   -27.8399952              20.0
-	53.0985009   -27.8398137              19.2
+	index    x_or_RA          y_or_Dec      nircam_f200w_clear_magnitude
+	1       53.0886395   -27.8399952              20.0
+	2       53.0985009   -27.8398137              19.2
 
 Mirage looks for the exact column names shown above when reading point source catalogs. Changing these column names will cause the simulator to fail when attempting to read in the file.
 
@@ -112,9 +112,9 @@ The simulator software looks for the exact column names shown below when reading
 	# abmag
 	#
 	# Magnitudes are converted from input flux densities.
-	x_or_RA         y_or_Dec     radius    ellipticity    pos_angle       sersic_index      niriss_f200w_clear_magnitude
-	53.05           -27.83        0.17        0.46         104.35              3.3                 18.06
-	53.10           -27.83        0.73        0.01         195.50              2.7                 16.86
+	index   x_or_RA         y_or_Dec     radius    ellipticity    pos_angle       sersic_index      niriss_f200w_clear_magnitude
+	1        53.05           -27.83        0.17        0.46         104.35              3.3                 18.06
+	2        53.10           -27.83        0.73        0.01         195.50              2.7                 16.86
 
 .. _extended_obj:
 
@@ -142,8 +142,8 @@ For stamp images where it may not make sense to specify a magnitude (such as a g
 	#
 	#
 	#
-	x_or_RA        y_or_Dec       pos_angle      nircam_f200w_clear_magnitude       filename
-	359.65          0.0006           20                 16.000             ring_nebula.fits
+	index    x_or_RA        y_or_Dec       pos_angle      nircam_f200w_clear_magnitude       filename
+	1        359.65          0.0006           20                 16.000             ring_nebula.fits
 
 
 .. _nonsidereal:
@@ -151,7 +151,8 @@ For stamp images where it may not make sense to specify a magnitude (such as a g
 Non-sidereal Source
 -------------------
 
-This catalog is used when creating non-sidereal simulated exposures. In this case, all targets other than the non-sidereal target will then trail through the field of view during the observation. This mode is meant to simulate observations of solar system targets with non-sidereal velocities. This catalog should contain only one entry, with RA, Dec or x, y position, as well as velocity values (arcsec/hour or pixels/hour) and object magnitude.
+This catalog is used when creating non-sidereal simulated exposures. In this case, all targets other than that specified in this catalog will then trail through the field of view during the observation. This mode is meant to simulate observations of solar system targets with non-sidereal velocities. **This catalog should contain only one entry**, with RA, Dec or x, y position, as well as velocity values (arcsec/hour or pixels/hour) and object magnitude. An optional **ephemeris_file** column can list a `Horizons-formatted ephemeris file <https://ssd.jpl.nasa.gov/horizons.cgi>`_. If an ephemeris file is given, the RA and Dec of the object, along with it's RA and Dec velocities, will be calculated at runtime using the ephemeris file and the observation :ref:`date <date_obs>` and :ref:`time <time_obs>` provided in the input yaml file. In this case, any RA, Dec, and velocity values given in the catalog will be ignored. To avoid confusion, it is possible to set the RA, Dec and RA and Dec velocity entries to 'nan' in this case. If the **ephemeris_file** column is not present (or if the column is present in the catalog but set to 'None'), then the provided RA, Dec and velocity values will be used. For a simulation containing mulitple non-sidereal sources (such as a planet and its moons), place the source that you wish to have JWST track in this catalog, and place the other non-sidereal sources in the :ref:`Moving Point Source <moving_point_source>`, :ref:`Moving 2D Sersic <moving_sersic>` or :ref:`Moving Extended Source <moving_extended>` catalogs.
+
 
 ::
 
@@ -169,17 +170,44 @@ This catalog is used when creating non-sidereal simulated exposures. In this cas
 	# x_or_RA_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# if the units are pixels per hour, include 'velocity pixels' in line 2 above.
-	object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_clear_magnitude
-	pointSource  53.101      -27.801       2103840.              0.0                       17.
+	index   object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_clear_magnitude   ephemeris_file
+	1     pointSource    53.101      -27.801       2103840.              0.0                       17.                       none
+
+or, with a provided ephemeris file:
+
+::
+
+	#
+	#
+	#
+	# abmag
+	#
+	# radius can also be in units of pixels or arcseconds. Put 'radius_pixels' at top of file
+	# to specify radii in pixels.
+	# position angle is given in degrees counterclockwise.
+	# An "object" value containing 'point' will be interpreted as a point source.
+	# Anything containing "sersic" will create a 2D sersic profile.
+	# Any other value will be interpreted as an extended source.
+	# x_or_RA_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
+	# Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
+	# if the units are pixels per hour, include 'velocity pixels' in line 2 above.
+	index  object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_clear_magnitude   ephemeris_file
+	1    pointSource     nan         nan          nan                  nan                        17.                 neptune_2030.txt
+
 
 .. _moving_point_source:
 
 Moving Point Sources
 --------------------
 
-The moving point source catalog contains a list of point sources to move through the field of view during the integration. Similar to the static point source catalog, the position of each object (at the beginning of the integration) in RA, Dec or x,y must be provided, along with the object's magnitude in the filter used for the simulation. In addition, the velocity of the object must be specified. This is done in units of delta RA, delta Dec (arcsec/hour), or delta x, delta y (pixels/hour). ‘velocity_pixels’ must be placed in one of the top 4 lines of the file if the provided velocities are in units of pixels per hour rather than arcseconds per hour.
+The moving point source catalog contains a list of point sources to move through the field of view during the integration. Similar to the static point source catalog, the position of each object (at the beginning of the integration) in RA, Dec or x,y must be provided, along with the object's magnitude in the filter used for the simulation. In addition, the velocity of the object must be specified. This can be done in one
+of two ways:
 
-Below is an example catalog:
+1. Provide the name of a `Horizons-formatted ephemeris file <https://ssd.jpl.nasa.gov/horizons.cgi>`_ in the optional **ephemeris_file** column. In this case, the source's location and velocity will be calculated at runtime using the ephemeris file and the observation :ref:`date <date_obs>` and :ref:`time<time_obs>` provided in the input yaml file. This will override any values provided in x_or_RA, y_or_Dec, x_or_RA_velocity, and y_or_Dec_velocity columns. Note that it is possible to set the values in these columns to 'nan' in order to avoid any confustion.
+
+2. If the **ephemeris_file** column is not present, or has a value of 'None', then the source's velocity must be specified using the x_or_RA_velocity and y_or_Dec_velocity columns. The units for these columns can be arcsec/hour or pixels/hour. ‘velocity_pixels’ must be placed in one of the top 4 lines of the file if the provided velocities are in units of pixels/hour rather than arcseconds/hour.
+
+Here is an example catalog:
 
 ::
 
@@ -196,15 +224,16 @@ Below is an example catalog:
 	# strictly correct because in reality distortion will cause object's
 	# velocities to vary in pixels/hour. Velocities in arcsec/hour will be
 	# constant.
-	x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude  x_or_RA_velocity   y_or_Dec_velocity
-	53.0985    -27.8015       14                        180                 180
+	index   x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude  x_or_RA_velocity   y_or_Dec_velocity   ephemeris_file
+	1       53.0985    -27.8015       14                        180                 180                 None
+	2       nan        nan            14                        nan                 nan                 mars_2030.txt
 
 .. _moving_sersic:
 
 Moving 2D Sersic Objects
 ------------------------
 
-This option may be useful for simulating moving moons around a primary target that is being tracked. Similar to the static galaxy inputs, each moving target in this catalog must have an initial position in RA, Dec or x,y specified, along with a radius in arcseconds or pixels, ellipticity, position angle, Sersic index, and magnitude. In addition, velocities in the RA, Dec or x,y directions must be specified in units of arcseconds or pixels per hour.
+This option may be useful for simulating moving moons around a primary target that is being tracked. Similar to the static galaxy inputs, each moving target in this catalog must have an initial position in RA, Dec or x,y specified, along with a radius in arcseconds or pixels, ellipticity, position angle, Sersic index, and magnitude. In addition, velocities in the RA, Dec or x,y directions must be specified in units of arcseconds or pixels per hour. See the :ref:`moving point source <moving_point_source>` section above for a detailed description of how to specify velocity using either an ephemeris file or manual velocities.
 
 ::
 
@@ -222,8 +251,9 @@ This option may be useful for simulating moving moons around a primary target th
 	#
 	# pos_angle is the position angle of the semimajor axis, in degrees.
 	# 0 causes the semi-major axis to be horizontal.
-	x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  nircam_f200w_clear_magnitude  x_or_RA_velocity  y_or_Dec_velocity
-	354.765   0.00064    1.0       0.25         20          2.0            16.000                  -0.5              -0.02
+	index   x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  nircam_f200w_clear_magnitude  x_or_RA_velocity  y_or_Dec_velocity  ephemeris_file
+	1       354.765   0.00064    1.0       0.25         20          2.0            16.000                  -0.5              -0.02               None
+	2       nan       nan        1.0       0.25         20          2.0            16.000                  nan               nan              kbo.txt
 
 
 .. _moving_extended:
@@ -231,7 +261,7 @@ This option may be useful for simulating moving moons around a primary target th
 Moving Extended Sources
 -----------------------
 
-Similar to the catalog of static extended targets, this catalog contains a fits filename for each source containing the stamp image to use for the object, along with an initial position in RA, Dec or x,y, the object's magnitude, and position angle (of the array as read in from the fits file). In addition, velocities in the RA, Dec (arcsec/hour) or x,y directions (pixels/hour) must be specified.
+Similar to the catalog of static extended targets, this catalog contains a fits filename for each source containing the stamp image to use for the object, along with an initial position in RA, Dec or x,y, the object's magnitude, and position angle (of the array as read in from the fits file). In addition, velocities in the RA, Dec (arcsec/hour) or x,y directions (pixels/hour) must be specified. See the :ref:`moving point source <moving_point_source>` section above for a detailed description of how to specify velocity using either an ephemeris file or manual velocities.
 
 ::
 
@@ -248,8 +278,9 @@ Similar to the catalog of static extended targets, this catalog contains a fits 
 	# strictly correct because in reality distortion will cause object's
 	# velocities to vary in pixels/sec. Velocities in arcsec/hour will be
 	# constant.
-	filename            x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity
-	ring_nebula.fits    0.007       0.003             12.0               0.0             -0.5               -0.02
+	index   filename            x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity  ephemeris_file
+	1    ring_nebula.fits       0.007       0.003             12.0               0.0             -0.5               -0.02                   None
+	2    my_targ.fits           nan         nan               12.0               0.0             nan                nan                  targ_ephem.txt
 
 
 .. _grism_tso_cat:

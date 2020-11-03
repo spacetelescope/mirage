@@ -385,26 +385,48 @@ class ExtendedCatalog(PointSourceCatalog):
 
 class MovingPointSourceCatalog(PointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[]):
+                 y_velocity=[], ephemeris_file=[]):
         # Add location information
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
 
         if len(ra_velocity) > 0 and len(x_velocity) > 0:
             raise ValueError(("WARNING: Provide either RA and Dec velocities, or x and y "
                               "velocities, but not both."))
-        # Object velocities
+
         if len(ra_velocity) > 0:
-            self._ra_velocity = ra_velocity
-            self._dec_velocity = dec_velocity
+            self._ra_velocity = np.array(ra_velocity)
+            self._dec_velocity = np.array(dec_velocity)
             self._velocity_units = 'velocity_RA_Dec'
         else:
-            self._ra_velocity = x_velocity
-            self._dec_velocity = y_velocity
+            self._ra_velocity = np.array(x_velocity)
+            self._dec_velocity = np.array(y_velocity)
             self._velocity_units = 'velocity_pixels'
+
+        if len(ephemeris_file) > 0:
+            self._ephemeris_file = np.array(ephemeris_file)
+        else:
+            self._ephemeris_file = np.array(['None'] * len(self._ra_velocity))
+
+        # If ephemeris files are given, modify the position and velocity
+        # values such that they are None in rows where there is an ephemeris file
+        eph_set = set(self._ephemeris_file)
+
+        if eph_set != set(['None']):
+            print(("Ephemeris information overrides provided source positions and velocities. "
+                  "Setting these to NaN in cases where an ephemeris file is given, in order "
+                  "to avoid confusion."))
+            eph_files = self._ephemeris_file != 'None'
+
+            self._ra[eph_files] = None
+            self._dec[eph_files] = None
+            self._ra_velocity[eph_files] = None
+            self._dec_velocity[eph_files] = None
+
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file)
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
@@ -428,18 +450,19 @@ class MovingPointSourceCatalog(PointSourceCatalog):
 class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
                  y_velocity=[], ellipticity=[], radius=[], sersic_index=[], position_angle=[],
-                 radius_units='arcsec'):
+                 radius_units='arcsec', ephemeris_file=[]):
         # Add location information
-        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
-                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity)
         GalaxyCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ellipticity=ellipticity, radius=radius,
                                sersic_index=sersic_index, position_angle=position_angle,
                                radius_units='arcsec')
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file)
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file)
         # Add morphology columns
         for key in self._morphology:
             values = self._morphology[key]
@@ -455,17 +478,18 @@ class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
 
 class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[], filenames=[], position_angle=[]):
+                 y_velocity=[], filenames=[], position_angle=[], ephemeris_file=[]):
         # Add location information
-        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
-                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity)
         ExtendedCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, filenames=filenames,
                                  position_angle=position_angle)
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file)
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file)
         # Add filename column
         file_col = Column(self._filenames, name='filename')
         tab.add_column(file_col, index=1)
@@ -480,11 +504,11 @@ class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
 
 class NonSiderealCatalog(MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[], object_type=[]):
+                 y_velocity=[], object_type=[], ephemeris_file=[]):
         # Add location information
         MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
                                           dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity)
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file)
 
         # List of the type of sources in the non-sidereal catalog
         valid_objects = ['pointSource', 'galaxies', 'extended']
@@ -498,7 +522,8 @@ class NonSiderealCatalog(MovingPointSourceCatalog):
         """Create an astropy table containing the catalog
         """
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file)
         obj_col = Column(self.object_type, name='object')
         tab.add_column(obj_col, index=1)
 
@@ -660,9 +685,49 @@ class GrismTSOCatalog(PointSourceCatalog):
         return self._transmission_spectrum
 
 
-def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_units):
+def add_ephemeris_column(input_table, ephemeris_files):
+    """Add a column containing ephemeris filenames
+
+    Arguments
+    ---------
+    input_table : astropy.table.Table
+        Input catalog
+
+    ephemeris_files : list
+        Ephemeris filenames to be added
+
+    Returns
+    -------
+    input_table : astropy.table.Table
+        Input catalog with ephemeris_file column added
     """
-    DO IT
+    eph_col = Column(ephemeris_files, name='ephemeris_file')
+    input_table.add_column(eph_col, index=6)
+    return input_table
+
+
+def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_units):
+    """Add RA/Dec velocity columns to table of source information
+
+    Arguments
+    ---------
+    input_table : astropy.table.Table
+        Input catalog
+
+    ra_velocities : list
+        RA velocity values to be added (arcsec/hour)
+
+    dec_velocities : list
+        Dec velocity values to be added (arcsec/hour)
+
+    velocity_units : str
+        Velocity units. Will be stored in a comment in the catalog
+
+    Returns
+    -------
+    input_table : astropy.table.Table
+        Input catalog with ephemeris_file column added
+
     """
     ra_vel_col = Column(ra_velocities, name='x_or_RA_velocity')
     dec_vel_col = Column(dec_velocities, name='y_or_Dec_velocity')
@@ -848,9 +913,11 @@ def create_basic_table(ra_values, dec_values, magnitudes, location_units, minimu
 
 
 def create_basic_velocity_table(ra_values, dec_values, magnitudes, location_units,
-                                ra_velocities, dec_velocities, velocity_units):
+                                ra_velocities, dec_velocities, velocity_units,
+                                ephemeris_values):
     tab = create_basic_table(ra_values, dec_values, magnitudes, location_units)
     tab = add_velocity_columns(tab, ra_velocities, dec_velocities, velocity_units)
+    tab = add_ephemeris_column(tab, ephemeris_values)
     return tab
 
 

@@ -78,6 +78,67 @@ def test_galaxy_catalog_creation():
     assert all(gal.table == as_read_in)
     os.remove(output_file)
 
+
+def test_moving_point_source_catalog_generation():
+    """Look specifically at the position and location columns
+    in the case where an ephemeris file is provided.
+    """
+    mags = [15, 16, 17]
+    ra_list = [10., 11., 12.]
+    dec_list = [34., 35., 36.]
+
+    ra_vel_list = [0.2, 0.3, 0.4]
+    dec_vel_list = [1.0, 1.1, 1.2]
+
+    ephemeris_list = ['e1.txt', 'e2.txt', 'e3.txt']
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra_list, dec=dec_list, ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list)
+    mpt.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+
+    comparison = Table()
+    comparison['index'] = [1, 2, 3]
+    comparison['x_or_RA'] = [np.nan, np.nan, np.nan]
+    comparison['y_or_Dec'] = [np.nan, np.nan, np.nan]
+    comparison['x_or_RA_velocity'] = [np.nan, np.nan, np.nan]
+    comparison['y_or_Dec_velocity'] = [np.nan, np.nan, np.nan]
+    comparison['ephemeris_file'] = [ephemeris_list]
+    comparison['nircam_f444w_clear_magnidute'] = mags
+
+    nan_cols = ['x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity']
+    for colname in nan_cols:
+        print()
+        assert np.all(np.isnan(comparison[colname]) == np.isnan(mpt.table[colname]))
+    assert np.all(comparison['ephemeris_file'] == mpt.table['ephemeris_file'])
+
+    mixed_ephemeris_list = ['e1.txt', 'None', 'ex3.txt']
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra_list, dec=dec_list, ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                     ephemeris_file=mixed_ephemeris_list)
+    mpt.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+
+    comparison['x_or_RA'] = [np.nan, 11., np.nan]
+    comparison['y_or_Dec'] = [np.nan, 35., np.nan]
+    comparison['x_or_RA_velocity'] = [np.nan, 0.3, np.nan]
+    comparison['y_or_Dec_velocity'] = [np.nan, 1.1, np.nan]
+    comparison['ephemeris_file'] = mixed_ephemeris_list
+
+    for colname in nan_cols:
+        assert np.all(np.isnan(comparison[colname]) == np.isnan(mpt.table[colname]))
+    assert np.all(comparison['ephemeris_file'] == mpt.table['ephemeris_file'])
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra_list, dec=dec_list, ra_velocity=ra_vel_list, dec_velocity=dec_vel_list)
+    mpt.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+
+    comparison['x_or_RA'] = ra_list
+    comparison['y_or_Dec'] = dec_list
+    comparison['x_or_RA_velocity'] = ra_vel_list
+    comparison['y_or_Dec_velocity'] = dec_vel_list
+    comparison['ephemeris_file'] = ['None'] * 3
+
+    for colname in nan_cols + ['ephemeris_file']:
+        assert np.all(comparison[colname] == mpt.table[colname])
+
+
 @pytest.mark.skip(reason='Travis and astroquery not getting along')
 def test_2mass_catalog_generation():
     """Test the generation of a catalog from a 2MASS query
