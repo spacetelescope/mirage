@@ -151,7 +151,7 @@ For stamp images where it may not make sense to specify a magnitude (such as a g
 Non-sidereal Source
 -------------------
 
-This catalog is used when creating non-sidereal simulated exposures. In this case, all targets other than the non-sidereal target will then trail through the field of view during the observation. This mode is meant to simulate observations of solar system targets with non-sidereal velocities. This catalog should contain only one entry, with RA, Dec or x, y position, as well as velocity values (arcsec/hour or pixels/hour) and object magnitude. An optional **ephemeris_file** column can list a `Horizons-formatted ephemeris file <https://ssd.jpl.nasa.gov/horizons.cgi>`_. If an ephemeris file is given, the RA and Dec of the object, along with it's RA and Dec velocities, will be calculated at runtime using the ephemeris file and the observation :ref:`date <date_obs>` and :ref:`time <time_obs>` provided in the input yaml file. In this case, any the RA, Dec, and velocity values given in the catalog will be ignored. To avoid confusion, it is possible to set the RA, Dec and RA and Dec velocity entries to 'None' in this case. If the **ephemeris_file** column is not present (or if the column is present in the catalog but set to 'None'), then the provided RA, Dec and velocity values will be used.
+This catalog is used when creating non-sidereal simulated exposures. In this case, all targets other than that specified in this catalog will then trail through the field of view during the observation. This mode is meant to simulate observations of solar system targets with non-sidereal velocities. **This catalog should contain only one entry**, with RA, Dec or x, y position, as well as velocity values (arcsec/hour or pixels/hour) and object magnitude. An optional **ephemeris_file** column can list a `Horizons-formatted ephemeris file <https://ssd.jpl.nasa.gov/horizons.cgi>`_. If an ephemeris file is given, the RA and Dec of the object, along with it's RA and Dec velocities, will be calculated at runtime using the ephemeris file and the observation :ref:`date <date_obs>` and :ref:`time <time_obs>` provided in the input yaml file. In this case, any RA, Dec, and velocity values given in the catalog will be ignored. To avoid confusion, it is possible to set the RA, Dec and RA and Dec velocity entries to 'nan' in this case. If the **ephemeris_file** column is not present (or if the column is present in the catalog but set to 'None'), then the provided RA, Dec and velocity values will be used. For a simulation containing mulitple non-sidereal sources (such as a planet and its moons), place the source that you wish to have JWST track in this catalog, and place the other non-sidereal sources in the :ref:`Moving Point Source <moving_point_source>`, :ref:`Moving 2D Sersic <moving_sersic>` or :ref:`Moving Extended Source <moving_extended>` catalogs.
 
 
 ::
@@ -192,7 +192,7 @@ or, with a provided ephemeris file:
 	# Y_or_Dec_velocity is the proper motion of the target in units of arcsec (or pixels) per hour
 	# if the units are pixels per hour, include 'velocity pixels' in line 2 above.
 	index  object       x_or_RA    y_or_Dec   x_or_RA_velocity    y_or_Dec_velocity     nircam_f200w_clear_magnitude   ephemeris_file
-	1    pointSource     None       None          None                 None                        17.                 neptune_2030.txt
+	1    pointSource     nan         nan          nan                  nan                        17.                 neptune_2030.txt
 
 
 .. _moving_point_source:
@@ -203,7 +203,7 @@ Moving Point Sources
 The moving point source catalog contains a list of point sources to move through the field of view during the integration. Similar to the static point source catalog, the position of each object (at the beginning of the integration) in RA, Dec or x,y must be provided, along with the object's magnitude in the filter used for the simulation. In addition, the velocity of the object must be specified. This can be done in one
 of two ways:
 
-1. Provide the name of a `Horizons-formatted ephemeris file <https://ssd.jpl.nasa.gov/horizons.cgi>`_ in the optional **ephemeris_file** column. In this case, the source's location will be calculated at runtime using the ephemeris file and the observation :ref:`date <date_obs>` and :ref:`time<time_obs>` provided in the input yaml file. This will override any values provided in x_or_RA, y_or_Dec, x_or_RA_velocity, and y_or_Dec_velocity columns. Note that it is possible to set the values in these columns to 'None' in order to avoid any confustion.
+1. Provide the name of a `Horizons-formatted ephemeris file <https://ssd.jpl.nasa.gov/horizons.cgi>`_ in the optional **ephemeris_file** column. In this case, the source's location and velocity will be calculated at runtime using the ephemeris file and the observation :ref:`date <date_obs>` and :ref:`time<time_obs>` provided in the input yaml file. This will override any values provided in x_or_RA, y_or_Dec, x_or_RA_velocity, and y_or_Dec_velocity columns. Note that it is possible to set the values in these columns to 'nan' in order to avoid any confustion.
 
 2. If the **ephemeris_file** column is not present, or has a value of 'None', then the source's velocity must be specified using the x_or_RA_velocity and y_or_Dec_velocity columns. The units for these columns can be arcsec/hour or pixels/hour. ‘velocity_pixels’ must be placed in one of the top 4 lines of the file if the provided velocities are in units of pixels/hour rather than arcseconds/hour.
 
@@ -226,7 +226,7 @@ Here is an example catalog:
 	# constant.
 	index   x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude  x_or_RA_velocity   y_or_Dec_velocity   ephemeris_file
 	1       53.0985    -27.8015       14                        180                 180                 None
-	2       None        None          14                        None                None                mars_2030.txt
+	2       nan        nan            14                        nan                 nan                 mars_2030.txt
 
 .. _moving_sersic:
 
@@ -253,7 +253,7 @@ This option may be useful for simulating moving moons around a primary target th
 	# 0 causes the semi-major axis to be horizontal.
 	index   x_or_RA   y_or_Dec  radius  ellipticity  pos_angle  sersic_index  nircam_f200w_clear_magnitude  x_or_RA_velocity  y_or_Dec_velocity  ephemeris_file
 	1       354.765   0.00064    1.0       0.25         20          2.0            16.000                  -0.5              -0.02               None
-	2       None      None       1.0       0.25         20          2.0            16.000                  None              None               kbo.txt
+	2       nan       nan        1.0       0.25         20          2.0            16.000                  nan               nan              kbo.txt
 
 
 .. _moving_extended:
@@ -280,7 +280,7 @@ Similar to the catalog of static extended targets, this catalog contains a fits 
 	# constant.
 	index   filename            x_or_RA    y_or_Dec   nircam_f200w_clear_magnitude   pos_angle    x_or_RA_velocity   y_or_Dec_velocity  ephemeris_file
 	1    ring_nebula.fits       0.007       0.003             12.0               0.0             -0.5               -0.02                   None
-	2    my_targ.fits           None        None              12.0               0.0             None               None                 targ_ephem.txt
+	2    my_targ.fits           nan         nan               12.0               0.0             nan                nan                  targ_ephem.txt
 
 
 .. _grism_tso_cat:
