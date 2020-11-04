@@ -3314,6 +3314,12 @@ class Observation():
             + (self.params['Readout']['ngroup'] - 1) * self.params['Readout']['nskip']) * self.params['Readout']['nint'])
         duration = total_photon_collection_time + self.frametime * (self.num_resets_before_exposure + \
             NUM_RESETS_BEFORE_INT[self.instrument.lower()] * (self.params['Readout']['nint'] - 1))
+
+        # Kevin says that NIRISS also does a row-by-row reset of the full detector between
+        # subarray integrations. This will add 10 usec * 2048 rows * (Nints-1)
+        if self.params['Inst']['instrument'].lower() == 'niriss' and 'CEN' not in self.params['Readout']['array_name']:
+            duration += 1e-5 * 2048 * (self.params['Readout']['nint'] - 1)
+
         return duration
 
     def seed_mapping(self):
