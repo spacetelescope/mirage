@@ -1467,6 +1467,7 @@ class Catalog_seed():
 
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
+                # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
                 stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
 
                 # If no magnitude is given, use the extended image as-is
@@ -3803,11 +3804,8 @@ class Catalog_seed():
             # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
             # print('extended source size:', ext_stamp.shape)
 
-            # Rotate the stamp image if requested, but don't do so if the specified PA is None
-            # check for both Python None and string 'None' or 'none'
-            if values['pos_angle'] is not None and str(values['pos_angle']).lower() != 'none':
-
-                ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+            # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
+            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
 
             eshape = np.array(ext_stamp.shape)
             if len(eshape) == 2:
@@ -3913,7 +3911,9 @@ class Catalog_seed():
             2D stamp image of the extended source
 
         pos_angle : float
-            Position angle of stamp image relative to north in degrees
+            Position angle of stamp image relative to north in degrees. A value of None
+            or string 'None' will result in no rotation, i.e. the input stamp is returned
+            without modification.
 
         right_ascention : float
             RA of source, in decimal degrees
@@ -3926,6 +3926,12 @@ class Catalog_seed():
         rotated : numpy.ndarray
             Rotated stamp image
         """
+
+        # Don't rotate if the specified position angle is None.
+        # check for both Python None and string 'None' or 'none'
+        if pos_angle is None or str(pos_angle).lower() == 'none':
+            return stamp_image
+
         # Add later: check for WCS and use that
         # if no WCS:
         pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
