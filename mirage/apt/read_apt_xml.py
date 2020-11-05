@@ -582,12 +582,12 @@ class ReadAPTXML():
                     # Handle the special case for 2PLUS
                     number_of_primary_dithers = 2
 
-                if observation_dict[dither_key_name] in ['2TIGHTGAPS']:
+                # Deal with cases like 2TIGHTGAPS, 8NIRSPEC, etc.
+                try:
+                    test = np.int(number_of_primary_dithers)
+                except ValueError:
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
-
-                # Special case for 8NIRSPEC dither pattern
-                if number_of_primary_dithers == '8NIRSPEC':
-                    number_of_primary_dithers = '8'
+                    observation_dict[dither_key_name] = number_of_primary_dithers
 
             else:
                 self.logger.info('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
