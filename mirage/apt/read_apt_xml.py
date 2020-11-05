@@ -587,7 +587,6 @@ class ReadAPTXML():
                     test = np.int(number_of_primary_dithers)
                 except ValueError:
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
-                    observation_dict[dither_key_name] = number_of_primary_dithers
 
             else:
                 self.logger.info('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
