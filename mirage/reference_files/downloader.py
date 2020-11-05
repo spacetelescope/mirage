@@ -227,7 +227,7 @@ def download_file(url, file_name, output_directory='./'):
 
 
 def download_reffiles(directory, instrument='all', dark_type='linearized',
-                      skip_darks=False, skip_cosmic_rays=False, skip_psfs=False):
+                      skip_darks=False, single_dark=False, skip_cosmic_rays=False, skip_psfs=False):
     """Download tarred and gzipped reference files. Expand, unzip and
     organize into the necessary directory structure such that Mirage
     can use them.
@@ -260,6 +260,12 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
         If False (default), download the requested darks. If True,
         do not download the darks
 
+    single_dark : bool
+        If True, download only a single dark current file for each
+        detector. This is to allow users to get started using Mirage
+        more quickly. Default is False, in which case all darks are
+        downloaded.
+
     skip_comsic_rays : bool
         If False (default), download the requested cosmic ray libraries.
         If True, do not download the cosmic ray library.
@@ -271,6 +277,7 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
     # Be sure the input instrument is a list
     file_list = get_file_list(instrument.lower(), dark_type.lower(),
                               skip_darks=skip_darks,
+                              single_dark=single_dark,
                               skip_cosmic_rays=skip_cosmic_rays,
                               skip_psfs=skip_psfs)
 
@@ -340,7 +347,7 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
     print('export MIRAGE_DATA="{}"'.format(os.path.join(full_dir, 'mirage_data')))
 
 
-def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=False,
+def get_file_list(instruments, dark_current, skip_darks=False, single_dark=False, skip_cosmic_rays=False,
                   skip_psfs=False):
     """Collect the list of URLs corresponding to the Mirage reference
     files to be downloaded
@@ -359,6 +366,12 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
     skip_darks : bool
         If False (default), include the requested darks. If True,
         do not include the darks
+
+    single_dark : bool
+        If True, download only a single dark current file for each
+        detector. This is to allow users to get started using Mirage
+        more quickly. Default is False, in which case all darks are
+        downloaded.
 
     skip_comsic_rays : bool
         If False (default), include the requested cosmic ray libraries.
@@ -398,16 +411,30 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                 print('Size of NIRCam PSF library file: {} Gb'.format(added_size))
 
             if not skip_darks:
-                if dark_current in ['linearized', 'both']:
-                    urls.extend(NIRCAM_LINEARIZED_DARK_URLS)
-                    added_size = DISK_USAGE['nircam']['lin_darks']
-                    total_download_size += added_size
-                    print('Size of NIRCam linearized dark files: {} Gb'.format(added_size))
-                if dark_current in ['raw', 'both']:
-                    urls.extend(NIRCAM_RAW_DARK_URLS)
-                    added_size = DISK_USAGE['nircam']['raw_darks']
-                    total_download_size += added_size
-                    print('Size of NIRCam raw dark files: {} Gb'.format(added_size))
+                if not single_dark:
+                    if dark_current in ['linearized', 'both']:
+                        urls.extend(NIRCAM_LINEARIZED_DARK_URLS)
+                        added_size = DISK_USAGE['nircam']['lin_darks']
+                        total_download_size += added_size
+                        print('Size of NIRCam linearized dark files: {} Gb'.format(added_size))
+                    if dark_current in ['raw', 'both']:
+                        urls.extend(NIRCAM_RAW_DARK_URLS)
+                        added_size = DISK_USAGE['nircam']['raw_darks']
+                        total_download_size += added_size
+                        print('Size of NIRCam raw dark files: {} Gb'.format(added_size))
+                else:
+                    if dark_current in ['linearized', 'both']:
+                        one_dark_per_detector = single_dark_per_det(NIRCAM_LINEARIZED_DARK_URLS)
+                        urls.extend(one_dark_per_detector)
+                        added_size = DISK_USAGE['nircam']['lin_darks'] / len(NIRCAM_LINEARIZED_DARK_URLS) * 10.
+                        total_download_size += added_size
+                        print('Size of NIRCam linearized dark files (one dark per detector): {} Gb'.format(added_size))
+                    if dark_current in ['raw', 'both']:
+                        one_dark_per_detector = single_dark_per_det(NIRCAM_RAW_DARK_URLS)
+                        urls.extend(one_dark_per_detector)
+                        added_size = DISK_USAGE['nircam']['raw_darks'] / len(NIRCAM_RAW_DARK_URLS) * 10.
+                        total_download_size += added_size
+                        print('Size of NIRCam raw dark files (one dark per detector): {} Gb'.format(added_size))
 
             # Get the temporary distortion reference files with the
             # correct coefficients
@@ -428,16 +455,28 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                 print('Size of NIRISS PSF library file: {} Gb'.format(added_size))
 
             if not skip_darks:
-                if dark_current in ['linearized', 'both']:
-                    urls.extend(NIRISS_LINEARIZED_DARK_URLS)
-                    added_size = DISK_USAGE['niriss']['lin_darks']
-                    total_download_size += added_size
-                    print('Size of NIRISS linearized dark files: {} Gb'.format(added_size))
-                if dark_current in ['raw', 'both']:
-                    urls.extend(NIRISS_RAW_DARK_URLS)
-                    added_size = DISK_USAGE['niriss']['raw_darks']
-                    total_download_size += added_size
-                    print('Size of NIRISS raw dark files: {} Gb'.format(added_size))
+                if not single_dark:
+                    if dark_current in ['linearized', 'both']:
+                        urls.extend(NIRISS_LINEARIZED_DARK_URLS)
+                        added_size = DISK_USAGE['niriss']['lin_darks']
+                        total_download_size += added_size
+                        print('Size of NIRISS linearized dark files: {} Gb'.format(added_size))
+                    if dark_current in ['raw', 'both']:
+                        urls.extend(NIRISS_RAW_DARK_URLS)
+                        added_size = DISK_USAGE['niriss']['raw_darks']
+                        total_download_size += added_size
+                        print('Size of NIRISS raw dark files: {} Gb'.format(added_size))
+                else:
+                    if dark_current in ['linearized', 'both']:
+                        urls.extend([NIRISS_LINEARIZED_DARK_URLS[0]])
+                        added_size = DISK_USAGE['niriss']['lin_darks'] / len(NIRISS_LINEARIZED_DARK_URLS)
+                        total_download_size += added_size
+                        print('Size of NIRISS linearized dark file: {} Gb'.format(added_size))
+                    if dark_current in ['raw', 'both']:
+                        urls.extend([NIRISS_RAW_DARK_URLS[0]])
+                        added_size = DISK_USAGE['niriss']['raw_darks'] / len(NIRISS_RAW_DARK_URLS)
+                        total_download_size += added_size
+                        print('Size of NIRISS raw dark file: {} Gb'.format(added_size))
 
         # FGS
         elif instrument_name.lower() == 'fgs':
@@ -454,19 +493,53 @@ def get_file_list(instruments, dark_current, skip_darks=False, skip_cosmic_rays=
                 print('Size of FGS PSF library file: {} Gb'.format(added_size))
 
             if not skip_darks:
-                if dark_current in ['linearized', 'both']:
-                    urls.extend(FGS_LINEARIZED_DARK_URLS)
-                    added_size = DISK_USAGE['fgs']['lin_darks']
-                    total_download_size += added_size
-                    print('Size of FGS linearized dark files: {} Gb'.format(added_size))
-                if dark_current in ['raw', 'both']:
-                    urls.extend(FGS_RAW_DARK_URLS)
-                    added_size = DISK_USAGE['fgs']['raw_darks']
-                    total_download_size += added_size
-                    print('Size of FGS raw dark files: {} Gb'.format(added_size))
+                if not single_dark:
+                    if dark_current in ['linearized', 'both']:
+                        urls.extend(FGS_LINEARIZED_DARK_URLS)
+                        added_size = DISK_USAGE['fgs']['lin_darks']
+                        total_download_size += added_size
+                        print('Size of FGS linearized dark files: {} Gb'.format(added_size))
+                    if dark_current in ['raw', 'both']:
+                        urls.extend(FGS_RAW_DARK_URLS)
+                        added_size = DISK_USAGE['fgs']['raw_darks']
+                        total_download_size += added_size
+                        print('Size of FGS raw dark files: {} Gb'.format(added_size))
+                else:
+                    if dark_current in ['linearized', 'both']:
+                        urls.extend([FGS_LINEARIZED_DARK_URLS[0]])
+                        added_size = DISK_USAGE['fgs']['lin_darks'] / len(FGS_LINEARIZED_DARK_URLS)
+                        total_download_size += added_size
+                        print('Size of FGS linearized dark file: {} Gb'.format(added_size))
+                    if dark_current in ['raw', 'both']:
+                        urls.extend([FGS_RAW_DARK_URLS[0]])
+                        added_size = DISK_USAGE['fgs']['raw_darks'] / len(FGS_RAW_DARK_URLS)
+                        total_download_size += added_size
+                        print('Size of FGS raw dark file: {} Gb'.format(added_size))
+
 
     print("Total size of files to be downloaded: {} Gb".format(total_download_size))
     return urls
+
+
+def single_dark_per_det(url_list):
+    """Given a list of URLs for dark current files, return a single URL per detector.
+
+    Parameters
+    ----------
+    url_list : list
+        List of URLs from which to select darks
+
+    Returns
+    -------
+    single_darks : list
+        List of URLs containing one entry per detector
+    """
+    single_darks = []
+    dets = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5']
+    for det in dets:
+        match = [ele for ele in url_list if '/{}/'.format(det) in ele]
+        single_darks.append(match[0])
+    return single_darks
 
 
 def unzip_file(filename):
