@@ -599,7 +599,7 @@ class ReadAPTXML():
                     number_of_subpixel_dithers = 3
                 elif "-WITH-NIRISS" in observation_dict['SubpixelDitherType']:
                     number_of_subpixel_dithers = np.int(observation_dict['SubpixelDitherType'][0])
-                elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING']:
+                elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING', 'SMALL-GRID-DITHER']:
                     number_of_subpixel_dithers = np.int(observation_dict['SubpixelPositions'])
             else:
                 # For parallel instrument we ignore any dither info and set values to 0
