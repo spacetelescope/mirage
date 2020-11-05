@@ -21,6 +21,15 @@ EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NIS_WFSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
 
+# Number of detector resets prior to the start of an exposure
+NUM_RESETS_BEFORE_EXP = {"nircam": {"full": 0, "sub": 1},
+                         "niriss": {"full": 0, "sub": 1},
+                         "fgs": {"full": 0, "sub": 0}
+                         }
+
+# Numer of detector resets between integrations in an exposure
+NUM_RESETS_BEFORE_INT = {"nircam": 1, "niriss": 1, "fgs":1}
+
 # SEARCH STRINGS TO USE FOR FGS DARKS (needed because darks for the two
 # detectors are mixed in a single directory)
 FGS1_DARK_SEARCH_STRING = '*_497_*fits'

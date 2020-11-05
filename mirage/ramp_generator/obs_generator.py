@@ -53,7 +53,8 @@ from mirage.ramp_generator import unlinearize
 from mirage.reference_files import crds_tools
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
-from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, \
+                                   STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT
 from mirage.utils.timer import Timer
 
 
@@ -1121,6 +1122,18 @@ class Observation():
                                                tmpx, tmpy, self.params['Readout']['namp'])
         self.logger.info("Frametime is {}".format(self.frametime))
 
+        # ramptime is the exposure time for a single integration, including the
+        # time for one reset prior to the integration
+        self.ramptime = self.frametime * (1 + self.params['Readout']['ngroup'] *
+                                     (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
+
+        # rampexptime is the exposure time for the ramp excluding any resets
+        self.rampexptime = self.frametime * (self.params['Readout']['ngroup'] *
+                                        (self.params['Readout']['nframe']+self.params['Readout']['nskip']))
+
+        # Find the number of resets that occur at the start of the exposure
+        self.resets_before_exp()
+
         # Calculate the rate of cosmic ray hits expected per frame
         self.get_cr_rate()
 
@@ -1132,7 +1145,6 @@ class Observation():
                                  '{} for all pixels.'.format(self.params['nonlin']['limit'])))
             dy, dx = self.linear_dark.data.shape[2:]
             self.satmap = np.zeros((dy, dx)) + self.params['nonlin']['limit']
-
 
         # Read in non-linearity correction coefficients. We need these
         # regardless of whether we are saving the linearized data or going
@@ -2686,8 +2698,14 @@ class Observation():
         start_time_string = date_obs + 'T' + time_obs
         start_time = Time(start_time_string)
 
+        # There may or may not be an initial reset at the start of the
+        # exposure. If not, this will shift the start times of the
+        # subsequent integrations
+        integ_0_time_delta = TimeDelta((integration_time - self.num_resets_before_exposure * self.frametime) * u.second)
+
         integ_time_delta = TimeDelta(integration_time * u.second)
-        start_times = start_time + (integ_time_delta * integration_numbers)
+
+        start_times = start_time + integ_0_time_delta + (integ_time_delta * (integration_numbers - 1))
 
         integration_time_exclude_reset = TimeDelta((integration_time - self.frametime) * u.second)
         end_times = start_times + integration_time_exclude_reset
@@ -2885,18 +2903,11 @@ class Observation():
         outModel.meta.pointing.ra_v1 = pointing_ra_v1
         outModel.meta.pointing.dec_v1 = pointing_dec_v1
         outModel.meta.pointing.pa_v3 = self.params['Telescope']['rotation']
-
-        ramptime = self.frametime * (1 + self.params['Readout']['ngroup'] *
-                                     (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
-        # Add time for the reset frame....
-        rampexptime = self.frametime * (self.params['Readout']['ngroup'] *
-                                        (self.params['Readout']['nframe']+self.params['Readout']['nskip']))
-
         outModel.meta.observation.date = self.params['Output']['date_obs']
         outModel.meta.observation.time = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
+        int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
                                          outModel.data.shape[0])
         outModel.int_times = int_times
 
@@ -2970,8 +2981,8 @@ class Observation():
 
         outModel.meta.exposure.nresets_at_start = 1
         outModel.meta.exposure.nresets_between_ints = 1
-        outModel.meta.exposure.integration_time = rampexptime
-        outModel.meta.exposure.exposure_time = rampexptime * self.params['Readout']['nint']
+        outModel.meta.exposure.integration_time = self.rampexptime
+        outModel.meta.exposure.exposure_time = self.rampexptime * self.params['Readout']['nint']
         outModel.meta.model_type = 'RampModel'
 
         # set the exposure start time
@@ -2979,13 +2990,13 @@ class Observation():
         endingTime = ct.mjd + outModel.meta.exposure.exposure_time/3600./24.
         outModel.meta.exposure.end_time = endingTime
         outModel.meta.exposure.mid_time = ct.mjd + outModel.meta.exposure.exposure_time/3600./24./2.
-        outModel.meta.exposure.duration = ramptime
+        outModel.meta.exposure.duration = self.get_duration()
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel.data.shape
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, rampexptime,
+            outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, self.rampexptime,
                                                        n_int, n_group, n_y, n_x)
 
         outModel.save(filename)
@@ -3174,12 +3185,6 @@ class Observation():
         outModel[0].header['DEC_V1'] = pointing_dec_v1
         outModel[0].header['PA_V3'] = self.params['Telescope']['rotation']
 
-        ramptime = self.frametime * (1 + self.params['Readout']['ngroup'] *
-                                     (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
-        # Add time for the reset frame....
-        rampexptime = self.frametime * (self.params['Readout']['ngroup'] * (self.params['Readout']['nframe'] +
-                                                                            self.params['Readout']['nskip']))
-
         # elapsed time from the end and from the start of the supposid ramp, in seconds
         # put the end of the ramp 1 second before the time the file is written
         # these only go in the fake ramp, not in the signal images....
@@ -3187,7 +3192,7 @@ class Observation():
         outModel[0].header['TIME-OBS'] = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
+        int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
                                          outModel['SCI'].data.shape[0])
         outModel['INT_TIMES'].data = int_times
 
@@ -3259,24 +3264,63 @@ class Observation():
 
         outModel[0].header['NRSTSTRT'] = 1
         outModel[0].header['NRESETS'] = 1
-        outModel[0].header['EFFINTTM'] = rampexptime
-        outModel[0].header['EFFEXPTM'] = rampexptime * self.params['Readout']['nint']
+        outModel[0].header['EFFINTTM'] = self.rampexptime
+        outModel[0].header['EFFEXPTM'] = self.rampexptime * self.params['Readout']['nint']
 
         # set the exposure start time as the current time
         outModel[0].header['EXPSTART'] = ct.mjd
         outModel[0].header['EXPEND'] = ct.mjd + outModel[0].header['EFFEXPTM']/3600./24.
         outModel[0].header['EXPMID'] = ct.mjd + outModel[0].header['EFFEXPTM']/3600./24./2.
 
-        outModel[0].header['DURATION'] = ramptime
+        outModel[0].header['DURATION'] = self.get_duration()
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], rampexptime,
+            outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], self.rampexptime,
                                                                    n_int, n_group, n_y, n_x)
         outModel.writeto(filename, overwrite=True)
         return filename
+
+    def resets_before_exp(self):
+        """Find the number of detector resets that happen at the start
+        of the exposure. This will only be used to get the start times
+        of the integrations correct in the output file
+        """
+        aperture_type = "sub"
+        if self.params['Inst']['instrument'].lower() == 'nircam':
+            if 'full' in self.params['Readout']['array_name'].lower():
+                aperture_type = "full"
+        elif self.params['Inst']['instrument'].lower() == 'niriss':
+            if 'cen' in self.params['Readout']['array_name'].lower():
+                aperture_type = "full"
+        elif self.params['Inst']['instrument'].lower() == 'fgs':
+            if 'full' in self.params['Readout']['array_name'].lower():
+                aperture_type = "full"
+
+        self.num_resets_before_exposure = NUM_RESETS_BEFORE_EXP[self.instrument.lower()][aperture_type]
+
+    def get_duration(self):
+        """Calcualte the duration time of an exposure, following the JWST keyword
+        dictionary definition of "duration"
+
+        Returns
+        -------
+        duration : float
+            Duration of the exposure in seconds
+        """
+        total_photon_collection_time = self.frametime * ((self.params['Readout']['ngroup'] * self.params['Readout']['nframe'] \
+            + (self.params['Readout']['ngroup'] - 1) * self.params['Readout']['nskip']) * self.params['Readout']['nint'])
+        duration = total_photon_collection_time + self.frametime * (self.num_resets_before_exposure + \
+            NUM_RESETS_BEFORE_INT[self.instrument.lower()] * (self.params['Readout']['nint'] - 1))
+
+        # Kevin says that NIRISS also does a row-by-row reset of the full detector between
+        # subarray integrations. This will add 10 usec * 2048 rows * (Nints-1)
+        if self.params['Inst']['instrument'].lower() == 'niriss' and 'CEN' not in self.params['Readout']['array_name']:
+            duration += 1e-5 * 2048 * (self.params['Readout']['nint'] - 1)
+
+        return duration
 
     def seed_mapping(self):
         """Create a mapping of the seed images to the dark data. Take into
@@ -3299,7 +3343,6 @@ class Observation():
             for dark_element in self.linDark:
                 mapping[dark_element] = self.seed
         return mapping
-
 
     def simple_get_image(self, name):
         """Read in an array from a fits file and crop using subarray_bounds
