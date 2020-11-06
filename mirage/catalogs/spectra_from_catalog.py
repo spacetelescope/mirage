@@ -90,6 +90,10 @@ def add_flam_columns(cat, mag_sys):
             niriss_mag_cols.append(col)
         elif 'fgs' in col.lower():
             fgs_mag_cols.append(col)
+        elif col.lower() == 'magnitude':
+            raise ValueError(("Mirage no longer supports a source catalog column named simply 'magnitude'. Please "
+                              "use a column name that specifies instrument and optical elements. (e.g. 'nircam_f444w_clear_magnitude', "
+                              "niriss_f090w_magnitude."))
 
     # Get PHOTFLAM and filter zeropoint values
     parameters = {}
