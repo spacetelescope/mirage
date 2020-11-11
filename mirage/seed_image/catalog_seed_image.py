@@ -40,6 +40,7 @@ from . import moving_targets
 from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
+from mirage.catalogs.utils import catalog_index_check
 from mirage.seed_image import tso, ephemeris_tools
 from ..logging import logging_functions
 from ..reference_files import crds_tools
@@ -146,6 +147,19 @@ class Catalog_seed():
         self.logger.info('\n\nRunning catalog_seed_image..\n')
         self.logger.info('Reading parameter file: {}\n'.format(self.paramfile))
         self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
+
+        # Quick source catalog index number check. If there are multiple
+        # catalogs, raise a warning if there are overlapping source
+        # indicies. It may not be a big deal for imaging mode sims,
+        # but for WFSS sims where there is an associated hdf5 file,
+        # it would mean trouble.
+        used_cats = determine_used_cats(self.params['Inst']['mode'], self.params['simSignals'])
+        overlapping_indexes = catalog_index_check(used_cats)
+        if overlapping_indexes:
+            error_list = [key for key in used_cats]
+            raise ValueError(('At least two of the input source catalogs have overlapping index values. '
+                              'Each source across all catalogs should have a unique index value.\n'
+                              'Catalogs checked: {}'.format(error_list)))
 
         # Make filter/pupil values respect the filter/pupil wheel they are in
         self.params['Readout']['filter'], self.params['Readout']['pupil'] = \
@@ -1276,36 +1290,6 @@ class Catalog_seed():
 
         return mtlist, pixelflag, pixelvelflag, msys.lower()
 
-    def get_index_numbers(self, catalog_table):
-        """Get index numbers associated with the sources in a catalog
-
-        Parameters
-        ----------
-        catalog_table : astropy.table.Table
-            Source catalog read in from an ascii file
-
-        Returns
-        -------
-        indexes : list
-            List of index numbers corresponding to sources in the catalog
-        """
-        # If the input catalog has an index column
-        # use that, otherwise add one
-        if 'index' in catalog_table.colnames:
-            indexes = catalog_table['index']
-        else:
-            indexes = np.arange(1, len(catalog_table['x_or_RA']) + 1)
-        # Make sure there is no 0th object
-        if np.min(indexes) == 0:
-            indexes += 1
-        # Make sure the index numbers don't overlap with any
-        # sources already present. Increment the maxindex
-        # value.
-        if np.min(indexes) <= self.maxindex:
-            indexes += self.maxindex
-        self.maxindex = np.max(indexes)
-        return indexes
-
     def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False, non_sidereal_ra_interp_function=None,
@@ -1375,9 +1359,8 @@ class Catalog_seed():
             mtlist['y_or_Dec_velocity'] = [0.] * nelem
             pixelvelflag = pixelFlag
 
-        # If the input catalog has an index column
-        # use that, otherwise add one
-        indexes = self.get_index_numbers(mtlist)
+        # Get catalog index numbers
+        indexes = mtlist['index']
 
         # Exposure times for all frames
         numints = self.params['Readout']['nint']
@@ -2457,9 +2440,8 @@ class Catalog_seed():
         psfile = self.params['Output']['file'][0:-5] + '_{}.list'.format(source_type)
         pslist = open(psfile, 'w')
 
-        # If the input catalog has an index column
-        # use that, otherwise add one
-        indexes = self.get_index_numbers(lines)
+        # Get source index numbers
+        indexes = lines['index']
 
         dtor = math.radians(1.)
         nx = (self.subarray_bounds[2] - self.subarray_bounds[0]) + 1
@@ -2727,12 +2709,6 @@ class Catalog_seed():
             # confusing and which are ignored by Mirage anyway.
             allowed_dummy_values = ['none', 'n/a']
             for i, row in enumerate(source):
-
-                print('in remove_outside...')
-                print(type(row['x_or_RA']))
-                print(row['x_or_RA'])
-
-
                 #if isinstance(row['x_or_RA'], str) and isinstance(row['y_or_Dec'], str):
                 if row['x_or_RA'] == np.nan or row['y_or_Dec'] == np.nan:
                     if 'ephemeris_file' in row.colnames:
@@ -3685,9 +3661,8 @@ class Catalog_seed():
             nx = transmission_xdim
             ny = transmission_ydim
 
-        # If an index column is present use that, otherwise
-        # create one
-        indexes = self.get_index_numbers(galaxylist)
+        # Get source index numbers
+        indexes = galaxylist['index']
 
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
@@ -4142,8 +4117,8 @@ class Catalog_seed():
         eslist.write(("#    Index   RA_(hh:mm:ss)   DEC_(dd:mm:ss)   RA_degrees      "
                       "DEC_degrees     pixel_x   pixel_y    magnitude   counts/sec    counts/frame\n"))
 
-        # Add an index column if not present
-        indexes = self.get_index_numbers(lines)
+        # Get source index numbers
+        indexes = lines['index']
 
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate

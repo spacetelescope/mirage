@@ -5,6 +5,7 @@ Source Catalog File Formats
 
 Mirage accepts 7 different types of ascii source catalogs, all of which can be generated using `Mirage's` :ref:`catalog generation <catalog_generation>` functionality. These include:
 
+1. :ref:`Common formatting details <common_formatting>`
 1. :ref:`Point sources <point_source>`
 2. :ref:`Galaxies (2d Sersic profiles) <galaxies>`
 3. :ref:`Extended targets <extended_obj>`
@@ -45,9 +46,14 @@ The type of source catalog(s) you need depends on the scene you are simulating. 
 |                     |  - Imaging Time Series |                                  |
 +---------------------+------------------------+----------------------------------+
 
+.. _common_formatting:
 
 Common formatting details
 -------------------------
+
+Position and Velocity Units
++++++++++++++++++++++++++++
+
 Mirage scans the top 4 lines of each catalog for certain phrases that can be used to characterize the inputs. These phrases are used to specify the units of source locations or velocities, as well as the magnitude system to use. Multiple phrases can be used in a single catalog, but only one phrase per line is allowed. Examples are shown in the catalogs below.
 
 The locations of sources can be specified in RA, Dec or in (x,y) pixel locations on the detector. If you wish to provide positions in units of (x, y) detector pixels, then the string ‘position_pixels’ must be added after the # in one of the top 4 lines of the file.
@@ -66,6 +72,12 @@ The locations of sources can be specified in RA, Dec or in (x,y) pixel locations
 Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system by specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**. **All sources in a given catalog must be in the same magnitude system.**
 
 For moving targets (both those that are moving across the field of view, as well as non-sidereal targets), the default unit for velocity is arcseconds per hour. If you wish to instead use pixels per hour, then **velocity_pixels** must be added to one of the 4 top lines of the catalog.
+
+Source Index Numbers
+++++++++++++++++++++
+
+When using Mirage's catalog_generator.py to create source catalogs, the left-most column of the catalogs is an Index column, which labels each source with a unique number. This can be useful when comparing source catalogs and segmentation images. By default, Mirage will begin counting at 1 and increase values from there. However, if you are planning to produce a simulation using multiple catalogs (e.g. a point source catalog and a galaxy catalog), then best practice is to be sure that the source index numbers do not overlap between the two catalogs. To prevent having repeated source indexes
+
 
 .. _point_source:
 
