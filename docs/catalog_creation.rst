@@ -39,7 +39,7 @@ The `save` method will save the table in an ascii file in the appropriate format
     nrc_f150_wlp8_mag = np.random.random(10) + 19.
     nis_f090w_mag = np.random.random(10) + 15.5
 
-    ptsrc = catalog_generator.PointSourceCatalog(ra=ra_list, dec=dec_list)
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra_list, dec=dec_list, starting_index=1)
     ptsrc.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f405n_mag, instrument='nircam', filter='F444W/F405N', mag_sys='abmag')
@@ -53,7 +53,7 @@ The `save` method will save the table in an ascii file in the appropriate format
     x_list = np.random.random(10) * 2048
     y_list = np.random.random(10) * 2048
 
-    ptsrc = catalog_generator.PointSourceCatalog(x=x_list, y=y_list)
+    ptsrc = catalog_generator.PointSourceCatalog(x=x_list, y=y_list, starting_index=1)
     ptsrc.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
     ptsrc.add_magnitude_column(nis_f090w_mag, instrument='niriss', filter='F090W', mag_sys='abmag')
@@ -81,7 +81,8 @@ The example below creates a galaxy catalog. The main difference compared to the 
     nis_f090w_mag = np.random.random(10) + 15.5
 
     gal = catalog_generator.GalaxyCatalog(ra=ra_list, dec=dec_list, ellipticity=ellipticity,
-                                          sersic_index=sersic_index, position_angle=position_angle)
+                                          sersic_index=sersic_index, position_angle=position_angle,
+                                          starting_index=1)
     gal.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     gal.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
     gal.add_magnitude_column(nis_f090w_mag, instrument='niriss', filter='F090W', mag_sys='abmag')
