@@ -277,7 +277,6 @@ def test_for_proposal():
             pass
 
 
-@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
@@ -285,11 +284,11 @@ def test_get_all_catalogs():
     width = 120.
     ins = 'NIRCAM'
     filters = ['F150W', 'F356W', 'F444W', 'F480M']
+    besancon_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/besancon_example.cat')
 
-    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, kmag_limits=(13, 29),
-                                                   email='hilbert@stsci.edu', instrument=ins, filters=filters,
-                                                   besancon_seed=1234)
-    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/get_all_catalogs.cat')
+    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, instrument=ins, filters=filters,
+                                                   besancon_catalog_file=besancon_file)
+    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/get_all_catalogs_truth.cat')
     comparison_data = ascii.read(comparison_file)
 
     # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
