@@ -50,15 +50,23 @@ def catalog_index_check(catalogs):
     sorter = np.argsort(min_indexes)
     min_indexes = min_indexes[sorter]
     max_indexes = max_indexes[sorter]
-    catalogs = catalogs[sorter]
 
     # Create an array of min and max indexes and make sure the list is
     # monotonically increasing
     indexes = [[mn, mx] for mn, mx in zip(min_indexes, max_indexes)]
-    indexes = [item for sublist in indexes for item in sublist]
+    indexes = np.array([item for sublist in indexes for item in sublist])
+
+
+    print('min_indexes: ', min_indexes)
+    print('max_indexes: ', max_indexes)
+    print('indexes: ', indexes)
+
 
     # Check that each element of the array is less than the preceding element
     overlaps = ~np.all(indexes[1:] >= indexes[:-1])
+
+    print('overlaps: ', overlaps)
+
     return overlaps
 
 

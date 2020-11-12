@@ -21,7 +21,7 @@ from astropy.table import Table
 import pytest
 
 from mirage.catalogs import catalog_generator
-from mirage.catalogs import create_catalog
+from mirage.catalogs import create_catalog, utils
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
 
@@ -54,6 +54,7 @@ def test_ptsrc_catalog_creation():
 def test_galaxy_catalog_creation():
     """Test the creation of a basic galaxy object catalog
     """
+    indexes = np.arange(10, 20)
     ra = np.zeros(10) + 80.0
     dec = np.zeros(10) - 69.8
     mags = np.zeros(10) + 19.
@@ -64,7 +65,8 @@ def test_galaxy_catalog_creation():
 
     output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/galaxy_test.cat')
     gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
-                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec')
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=10)
     gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
     gal.save(output_file)
     as_read_in = ascii.read(output_file)
@@ -75,6 +77,7 @@ def test_galaxy_catalog_creation():
     assert all(gal.ellipticity == ellip)
     assert all(gal.position_angle == posang)
     assert all(gal.sersic_index == sersic)
+    assert all(gal.table['index'].data == indexes)
     assert all(gal.table == as_read_in)
     os.remove(output_file)
 
@@ -397,4 +400,139 @@ def test_johnson_catalog_to_mirage_catalog():
         assert np.allclose(truth.table[col].data, transformed.table[col].data)
 
 
+def test_catalog_index_check():
+    """Test the code that assures no overlap of source indexes
+    """
+    #Make point source catalog
+    ra = np.zeros(10) + 80.0
+    dec = np.zeros(10) - 69.8
+    mags = np.zeros(10) + 19.
+
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=1)
+    ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    ptsrc_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/ptsrc_test.cat')
+    ptsrc.save(ptsrc_output_file)
+
+    # Make galaxy catalog
+    indexes = np.arange(10, 20)
+    radius = np.zeros(10) + 0.5
+    ellip = np.zeros(10) + 0.45
+    posang = np.zeros(10) + 27.
+    sersic = np.zeros(10) + 3.3
+
+    gal_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/galaxy_test.cat')
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=11)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    # Make moving point source catalog
+    ra_vel_list = [0.2, 0.3, 0.4]
+    dec_vel_list = [1.0, 1.1, 1.2]
+    ephemeris_list = ['e1.txt', 'e2.txt', 'e3.txt']
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra[0:3], dec=dec[0:3], ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list, starting_index=21)
+    mpt.add_magnitude_column(mags[0:3], magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+    mpt_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/moving_ptsrc_test.cat')
+    mpt.save(mpt_output_file)
+
+
+    # First a case where there is no overlap
+    cat_list = [ptsrc_output_file, gal_output_file, mpt_output_file]
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == False
+
+    # Now a case where there is overlap
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=4)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    overlap = utils.catalog_index_check(cat_list)
+
+    print(ptsrc.table['index'])
+    print(gal.table['index'])
+    print(mpt.table['index'])
+
+    assert overlap == True
+
+    # Overlap, but indexes between catalogs are out of order
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=25)
+    ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    ptsrc.save(ptsrc_output_file)
+
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=1)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra[0:3], dec=dec[0:3], ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list, starting_index=29)
+    mpt.add_magnitude_column(mags[0:3], magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+    mpt_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/moving_ptsrc_test.cat')
+    mpt.save(mpt_output_file)
+
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == True
+
+    # No overlap, but indexes between catalogs are out of order
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=25)
+    ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    ptsrc.save(ptsrc_output_file)
+
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=1)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra[0:3], dec=dec[0:3], ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list, starting_index=36)
+    mpt.add_magnitude_column(mags[0:3], magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+    mpt_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/moving_ptsrc_test.cat')
+    mpt.save(mpt_output_file)
+
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == False
+
+    # Clean up
+    os.remove(ptsrc_output_file)
+    os.remove(gal_output_file)
+    os.remove(mpt_output_file)
+
+
+def test_determine_used_cats():
+    """Test the evaluation of which source catalogs are used for an obs mode
+    """
+    catalogs = {}
+    catalogs['pointsource'] = 'ptsrc.cat'
+    catalogs['galaxyListFile'] = 'galaxies.cat'
+    catalogs['extended'] = 'extended.cat'
+    catalogs['movingTargetList'] = 'moving_ptsrc.cat'
+    catalogs['movingTargetSersic'] = 'moving_galaxies.cat'
+    catalogs['movingTargetExtended'] = 'moving_extended.cat'
+    catalogs['movingTargetToTrack'] = 'nonsidereal.cat'
+    catalogs['tso_imaging_catalog'] = 'img_tso.cat'
+    catalogs['tso_grism_catalog'] = 'grism_tso.cat'
+
+    img_cats = utils.determine_used_cats('imaging', catalogs)
+    img_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'moving_ptsrc.cat',
+                 'moving_galaxies.cat', 'moving_extended.cat', 'nonsidereal.cat']
+    assert img_cats == img_truth
+
+    wfss_cats = utils.determine_used_cats('wfss', catalogs)
+    wfss_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat']
+    assert wfss_cats == wfss_truth
+
+    tsoimg_cats = utils.determine_used_cats('ts_imaging', catalogs)
+    tsoimg_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'img_tso.cat']
+    assert tsoimg_cats == tsoimg_truth
+
+    tsogrism_cats = utils.determine_used_cats('ts_grism', catalogs)
+    tsogrism_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'grism_tso.cat']
+    assert tsogrism_cats == tsogrism_truth
 
