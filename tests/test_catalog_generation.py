@@ -277,6 +277,7 @@ def test_for_proposal():
             pass
 
 
+@pytest.mark.skip(reason="Repeated HTML response errors.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
