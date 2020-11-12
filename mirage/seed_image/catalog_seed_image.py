@@ -40,7 +40,7 @@ from . import moving_targets
 from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
-from mirage.catalogs.utils import catalog_index_check
+from mirage.catalogs.utils import catalog_index_check, determine_used_cats
 from mirage.seed_image import tso, ephemeris_tools
 from ..logging import logging_functions
 from ..reference_files import crds_tools
