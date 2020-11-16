@@ -21,6 +21,8 @@ Columns containing AB magnitudes in the NIRCam F200W and F212N filters, as well 
 
 The `mag_sys` keyword is optional and allows uses to specify the magnitude system. Allowed values are "abmag", "stmag", and "vegamag". The default is "abmag". **Note that all magnitude columns in a given catalog MUST be in the same magnitude system.**
 
+The `starting_index` keyword is also optional. The value of the keyword is the first value to be placed in the "index" column of the catalog. Index values will increment upwards from this starting value for each source. With this keyword, users creating multiple catalogs to be input into a single simulation can be sure that every source going into the simulation has a unique index number. See the :ref:`Source Index Numbers <source_index_numbers>` section for more details.
+
 Once the catalog has been created and at least one magnitude column has been added, the table can be printed to the screen using the `table` method.
 
 The `save` method will save the table in an ascii file in the appropriate format for Mirage to use.
@@ -39,7 +41,7 @@ The `save` method will save the table in an ascii file in the appropriate format
     nrc_f150_wlp8_mag = np.random.random(10) + 19.
     nis_f090w_mag = np.random.random(10) + 15.5
 
-    ptsrc = catalog_generator.PointSourceCatalog(ra=ra_list, dec=dec_list)
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra_list, dec=dec_list, starting_index=1)
     ptsrc.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f405n_mag, instrument='nircam', filter='F444W/F405N', mag_sys='abmag')
@@ -53,7 +55,7 @@ The `save` method will save the table in an ascii file in the appropriate format
     x_list = np.random.random(10) * 2048
     y_list = np.random.random(10) * 2048
 
-    ptsrc = catalog_generator.PointSourceCatalog(x=x_list, y=y_list)
+    ptsrc = catalog_generator.PointSourceCatalog(x=x_list, y=y_list, starting_index=1)
     ptsrc.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     ptsrc.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
     ptsrc.add_magnitude_column(nis_f090w_mag, instrument='niriss', filter='F090W', mag_sys='abmag')
@@ -63,7 +65,7 @@ The `save` method will save the table in an ascii file in the appropriate format
 Galaxy Catalog
 ++++++++++++++
 
-The example below creates a galaxy catalog. The main difference compared to the point source catalog is that the user must provide values for the ellipticity, sersic index, and position angle when instantiating the class.
+The example below creates a galaxy catalog. The main difference compared to the point source catalog is that the user must provide values for the ellipticity, sersic index, and position angle when instantiating the class. In this example, we assume the galaxy catalog will be used in combination with the point source catalog above in a single simulation. Therefore, we set starting_index equal to 11, since the point source catalog contains sources 1 through 10. See the :ref:`Source Index Numbers <source_index_numbers>` section for more details.
 
 ::
 
@@ -81,7 +83,8 @@ The example below creates a galaxy catalog. The main difference compared to the 
     nis_f090w_mag = np.random.random(10) + 15.5
 
     gal = catalog_generator.GalaxyCatalog(ra=ra_list, dec=dec_list, ellipticity=ellipticity,
-                                          sersic_index=sersic_index, position_angle=position_angle)
+                                          sersic_index=sersic_index, position_angle=position_angle,
+                                          starting_index=11)
     gal.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter='F200W', mag_sys='abmag')
     gal.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter='F212N', mag_sys='abmag')
     gal.add_magnitude_column(nis_f090w_mag, instrument='niriss', filter='F090W', mag_sys='abmag')
@@ -97,7 +100,7 @@ Create_catalogs - create catalogs using online astronomical databases
 
 The functions in this module use `astroquery <https://astroquery.readthedocs.io/en/latest/>`_ to search astronomical databases and retrieve source lists for a given pointing. In this way, a user can quickly generate reasonably realistic catalogs of point sources and galaxies for a given pointing.
 
-The **get_all_catalogs** function takes the RA and Dec of a particular pointing along with the width in arcseconds of the area for which to produce the catalog, and queries multiple databases to produce a point source catalog. An example call to create a 120 x 120 arcsecond catalog is shown below. The resulting point source catalog can then be placed in the :ref:`pointSource <pointsource>` entry of the :ref:`yaml input file <example_yaml>`. The *besancon_catalog_file* in the command below is the result from a query of the `Besancon model <https://model.obs-besancon.fr/modele_home.php>`_. Details of how to query the model and download the result are shown in the :ref:`Background Stars <background_stars>` section below.
+The **get_all_catalogs** function takes the RA and Dec of a particular pointing along with the width in arcseconds of the area for which to produce the catalog, and queries multiple databases to produce a point source catalog. An example call to create a 120 x 120 arcsecond catalog is shown below. The resulting point source catalog can then be placed in the :ref:`pointSource <pointsource>` entry of the :ref:`yaml input file <example_yaml>`. The *besancon_catalog_file* in the command below is the result from a query of the `Besancon model <https://model.obs-besancon.fr/modele_home.php>`_. Details of how to query the model and download the result are shown in the :ref:`Background Stars <background_stars>` section below. Note that starting_index is also an optional keyword here, so that users can control the index values of the sources. See the :ref:`Source Index Numbers <source_index_numbers>` section for more details.
 
 ::
 
@@ -108,8 +111,8 @@ The **get_all_catalogs** function takes the RA and Dec of a particular pointing 
     box_width = 120  # arcseconds
     filter_list = ['F444W', 'F480M', 'F150W/WLM8', 'F444W/F405N']
     cat, mag_column_names = create_catalog.get_all_catalogs(ra, dec, box_width, besancon_catalog_file='besancon.cat',
-                                                            instrument='NIRCAM', filters=filter_list
-                                                            )
+                                                            instrument='NIRCAM', filters=filter_list,
+                                                            starting_index=1)
 
 
 .. _foreground_stars:
@@ -141,7 +144,7 @@ Once the query is complete, you will receive an email with a link to download th
 Background Galaxies
 +++++++++++++++++++
 
-For a given pointing, Mirage can also generate a catalog containing a **representative sample** of background galaxies. Similar to the Besancon query described above, Mirage will generate a catalog containing a realistic density of galaxies across the field at reasonable magnitudes. To accomplish this, Mirage queries the `GOODS-S catalog from 3DHST <https://3dhst.research.yale.edu/Data.php>`_ and extracts an appropriate number of galaxies to populate the catalog at a reasonable density. Currently this function will fail if the user requests a catalog with an area larger than the GOODS-S field: 606,909 arcsec :sup:`2`. An example is shown below. The resulting file can then be placed in the :ref:`galaxyListFile <galaxylistfile>` entry of the :ref:`yaml input file <example_yaml>`.
+For a given pointing, Mirage can also generate a catalog containing a **representative sample** of background galaxies. Similar to the Besancon query described above, Mirage will generate a catalog containing a realistic density of galaxies across the field at reasonable magnitudes. To accomplish this, Mirage queries the `GOODS-S catalog from 3DHST <https://3dhst.research.yale.edu/Data.php>`_ and extracts an appropriate number of galaxies to populate the catalog at a reasonable density. Currently this function will fail if the user requests a catalog with an area larger than the GOODS-S field: 606,909 arcsec :sup:`2`. An example is shown below. The resulting file can then be placed in the :ref:`galaxyListFile <galaxylistfile>` entry of the :ref:`yaml input file <example_yaml>`. Note that the starting_index keyword is also available in this function. See the :ref:`Source Index Numbers <source_index_numbers>` section for more details.
 
 
 ::
@@ -162,7 +165,7 @@ For a given pointing, Mirage can also generate a catalog containing a **represen
 
     # Create the catalog
     gal_cat, gal_seed = create_catalog.galaxy_background(ra, dec, roll_angle, box_width,
-                                                         'nircam', filter_list)
+                                                         'nircam', filter_list, starting_index=1000)
     galaxy_catalog = 'galaxies.cat'
     gal_cat.save(galaxy_catalog)
 

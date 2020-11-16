@@ -246,6 +246,8 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         if out_dir is None:
             out_dir = os.path.dirname(xml_filename)
 
+        starting_index = 1
+
         if point_source:
             for i, instrument in enumerate(instrument_filter_dict):
                 logger.info('\n--- Creating {} point source catalog ---'.format(instrument))
@@ -253,11 +255,14 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
                                                         besancon_catalog_file=besancon_catalog_file,
                                                         instrument=instrument, filters=filter_list,
-                                                        ra_column_name=ra_column_name, dec_column_name=dec_column_name)
+                                                        ra_column_name=ra_column_name, dec_column_name=dec_column_name,
+                                                        starting_index=starting_index)
                 if i == 0:
                     ptsrc_cat = copy.deepcopy(tmp_cat)
                 else:
-                    ptsrc_cat = combine_catalogs(ptsrc_cat, tmp_cat)
+                    ptsrc_cat = combine_catalogs(ptsrc_cat, tmp_cat, starting_index=starting_index)
+
+            starting_index += len(ptsrc_cat['index'])
 
             if save_catalogs:
                 ptsrc_catalog_name = 'ptsrc_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -284,13 +289,14 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
                                                       filter_list, boxflag=False, brightlimit=14.0,
-                                                      seed=galaxy_seed)
+                                                      seed=galaxy_seed, starting_index=starting_index)
 
                 if i == 0:
                     galaxy_cat = copy.deepcopy(tmp_cat)
                 else:
-                    galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat)
+                    galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
 
+            starting_index += len(galaxy_cat['index'])
 
             if save_catalogs:
                 gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -507,7 +513,7 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', 
 
 
 def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument='NIRISS', filters=[],
-                     ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                     ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
     """
     This is a driver function to query the GAIA/2MASS/WISE catalogues
     plus the Besancon model and combine these into a single JWST source list.
@@ -559,6 +565,9 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
             Name of the column within ``besancon_catalog_file`` containing the
             declination of the sources
 
+        starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
         source_list : mirage.catalogs.create_catalogs.PointSourceCatalog
@@ -595,12 +604,13 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
 
     # Combine data from GAIA/2MASS/WISE to create single catalog with JWST filters
     observed_jwst = combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise,
-                                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters)
+                                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters,
+                                            starting_index=starting_index)
 
     if besancon_catalog_file is not None:
         logger.info('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_jwst.ra),
                                                                                       len(observed_jwst.ra)))
-        source_list = combine_catalogs(observed_jwst, besancon_jwst)
+        source_list = combine_catalogs(observed_jwst, besancon_jwst, starting_index=starting_index)
     else:
         source_list = observed_jwst
     return source_list, filter_names
@@ -696,7 +706,7 @@ def catalog_colors_to_vjhk(color_catalog):
 
 
 def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ2000', dec_column_name='DECJ2000',
-                                      magnitude_system='abmag', output_file=None):
+                                      magnitude_system='abmag', output_file=None, starting_index=1):
     """Create a Mirage-formatted catalog containing sources from a query of the Besancon model
 
     Parameters
@@ -728,6 +738,9 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
 
     output_file : str
         If not None, save the catalog to a file with this name
+
+    starting_index : int
+        Beginning value to use for the 'index' column of the catalog. Default is 1.
 
     Returns
     -------
@@ -778,7 +791,8 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     # Extract the relevant columns and create a Mirage-formatted point
     # source catalog
     mirage_cat = PointSourceCatalog(ra=catalog[ra_column_name].data,
-                                    dec=catalog[dec_column_name].data)
+                                    dec=catalog[dec_column_name].data,
+                                    starting_index=starting_index)
 
     for filt in all_filters:
         #instrument, filter_name, _ = filt.split('_')
@@ -969,7 +983,8 @@ def read_standard_magnitudes():
 
 
 def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise,
-                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filter_names):
+                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filter_names,
+                            starting_index):
     """
     This function combines GAIA/2MASS/WISE photometry to estimate JWST filter
     magnitudes.  The algorithm depends a bit on what magnitudes are available.
@@ -1016,6 +1031,9 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
         List of names  of the filters to select for the instrument.
         If the list is empty, or the value is None, all filters are
         selected.
+
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
 
     Returns
     -------
@@ -1151,7 +1169,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     raout = np.copy(raout[0:nfinal])
     decout = np.copy(decout[0:nfinal])
     out_magnitudes = np.copy(out_magnitudes[0:nfinal, :])
-    outcat = PointSourceCatalog(ra=raout, dec=decout)
+    outcat = PointSourceCatalog(ra=raout, dec=decout, starting_index=starting_index)
     n1 = 0
     for column_value in out_filter_names:
         outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value)
@@ -1444,7 +1462,7 @@ def add_filter_names(headerlist, filter_names, filter_labels, filters):
     return headerlist
 
 
-def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
+def combine_catalogs(cat1, cat2, magnitude_fill_value=99., starting_index=1):
     """Combine two Mirage catalog objects. Catalogs must be of the same
     type (e.g. PointSourceCatalog), and have the same values for position
     units (RA, Dec or x, y) velocity units (arcsec/hour vs pixels/hour),
@@ -1461,6 +1479,13 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
 
     cat2 : mirage.catalogs.catalog_generator.XXCatalog
         Second catalog to be joined
+
+    magnitude_fill_value : float
+        Magnitude value to use for sources that are undefined in one catalog
+
+    starting_index : int
+        Index value to begin counting with inside the new catalog. These values
+        will be placed in the 'index' column of the new catalog
 
     Returns
     -------
@@ -1503,7 +1528,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
             else:
                 new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
                                               dec=combined['y_or_Dec'].data,
@@ -1513,7 +1539,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
         else:
             if cat1.velocity_units == 'velocity_RA_Dec':
                 new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
@@ -1524,7 +1551,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
             else:
                 new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
                                               y=combined['y_or_Dec'].data,
@@ -1534,7 +1562,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
 
     # --------------Moving Extended Sources-------------------------------
     elif isinstance(cat1, MovingExtendedCatalog):
@@ -1548,14 +1577,16 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                 ra_velocity=combined['ra_velocity'].data,
                                                 dec_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
             else:
                 new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
                                                 dec=combined['y_or_Dec'].data,
                                                 x_velocity=combined['ra_velocity'].data,
                                                 y_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
         else:
             if cat1.velocity_units == 'velocity_RA_Dec':
                 new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
@@ -1563,14 +1594,16 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                 ra_velocity=combined['ra_velocity'].data,
                                                 dec_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
             else:
                 new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
                                                 y=combined['y_or_Dec'].data,
                                                 x_velocity=combined['ra_velocity'].data,
                                                 y_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
 
     # --------------------Galaxies------------------------------------
     elif isinstance(cat1, GalaxyCatalog):
@@ -1584,7 +1617,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                     radius=combined['radius'].data,
                                     sersic_index=combined['sersic_index'].data,
                                     position_angle=combined['pos_angle'].data,
-                                    radius_units=cat1.radius_units)
+                                    radius_units=cat1.radius_units,
+                                    starting_index=starting_index)
         else:
             new_cat = GalaxyCatalog(x=combined['x_or_RA'].data,
                                     y=combined['y_or_Dec'].data,
@@ -1592,7 +1626,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                     radius=combined['radius'].data,
                                     sersic_index=combined['sersic_index'].data,
                                     position_angle=combined['pos_angle'].data,
-                                    radius_units=cat1.radius_units)
+                                    radius_units=cat1.radius_units,
+                                    starting_index=starting_index)
 
     # ------------------Extended Sources-------------------------------
     elif isinstance(cat1, ExtendedCatalog):
@@ -1600,12 +1635,14 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
             new_cat = ExtendedCatalog(ra=combined['x_or_RA'].data,
                                       dec=combined['y_or_Dec'].data,
                                       filenames=combined['filename'].data,
-                                      position_angle=combined['pos_angle'].data)
+                                      position_angle=combined['pos_angle'].data,
+                                      starting_index=starting_index)
         else:
             new_cat = ExtendedCatalog(x=combined['x_or_RA'].data,
                                       y=combined['y_or_Dec'].data,
                                       filenames=combined['filename'].data,
-                                      position_angle=combined['pos_angle'].data)
+                                      position_angle=combined['pos_angle'].data,
+                                      starting_index=starting_index)
 
     # -------------Moving Point Sources--------------------------------
     elif isinstance(cat1, MovingPointSourceCatalog):
@@ -1617,33 +1654,39 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                 new_cat = MovingPointSourceCatalog(ra=combined['x_or_RA'].data,
                                                    dec=combined['y_or_Dec'].data,
                                                    ra_velocity=combined['ra_velocity'].data,
-                                                   dec_velocity=combined['dec_velocity'].data)
+                                                   dec_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
             else:
                 new_cat = MovingPointSourceCatalog(ra=combined['x_or_RA'].data,
                                                    dec=combined['y_or_Dec'].data,
                                                    x_velocity=combined['ra_velocity'].data,
-                                                   y_velocity=combined['dec_velocity'].data)
+                                                   y_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
         else:
             if cat1.location_units == 'velocity_RA_Dec':
                 new_cat = MovingPointSourceCatalog(x=combined['x_or_RA'].data,
                                                    y=combined['y_or_Dec'].data,
                                                    ra_velocity=combined['ra_velocity'].data,
-                                                   dec_velocity=combined['dec_velocity'].data)
+                                                   dec_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
             else:
                 new_cat = MovingPointSourceCatalog(x=combined['x_or_RA'].data,
                                                    y=combined['y_or_Dec'].data,
                                                    x_velocity=combined['ra_velocity'].data,
-                                                   y_velocity=combined['dec_velocity'].data)
+                                                   y_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
 
     # --------------------Point Sources-------------------------------
     elif isinstance(cat1, PointSourceCatalog):
         # Create new catalog object and populate
         if cat1.location_units == 'position_RA_Dec':
             new_cat = PointSourceCatalog(ra=combined['x_or_RA'].data,
-                                         dec=combined['y_or_Dec'].data)
+                                         dec=combined['y_or_Dec'].data,
+                                         starting_index=starting_index)
         else:
             new_cat = PointSourceCatalog(x=combined['x_or_RA'].data,
-                                         y=combined['y_or_Dec'].data)
+                                         y=combined['y_or_Dec'].data,
+                                         starting_index=starting_index)
 
 
     # -------------Add magnitude columns-------------------------------
@@ -1956,7 +1999,7 @@ def crop_besancon(ra, dec, box_width, catalog_file, ra_column_name='RAJ2000', de
 
 
 def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
-                   ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function.
 
@@ -1988,6 +2031,9 @@ def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
         Name of the column within ``besancon_catalog_file`` containing the
         declination of the sources
 
+    starting_index : int
+        Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2000,12 +2046,12 @@ def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name)
+                                               dec_column_name=dec_column_name, starting_index=starting_index)
     return cat
 
 
 def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
-                          ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                          ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
     """Convenience function to create typical scene looking out of the plane of
     the Milky Way by querying the Besancon model
 
@@ -2037,6 +2083,9 @@ def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_f
         Name of the column within ``besancon_catalog_file`` containing the
         declination of the sources
 
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2049,12 +2098,12 @@ def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_f
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name)
+                                               dec_column_name=dec_column_name, starting_index=starting_index)
     return cat
 
 
 def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
-                   ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
 
@@ -2086,6 +2135,9 @@ def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
         Name of the column within ``besancon_catalog_file`` containing the
         declination of the sources
 
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2098,7 +2150,7 @@ def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name)
+                                               dec_column_name=dec_column_name, starting_index=starting_index)
     return cat
 
 
@@ -2177,7 +2229,7 @@ def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max, seed=None
 
 
 def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
-                      boxflag=True, brightlimit=14.0, seed=None):
+                      boxflag=True, brightlimit=14.0, seed=None, starting_index=1):
     """
     Given a sky position (ra0,dec0), and a V3 rotation angle (v3rotangle) this
     routine makes a fake galaxy background for a square region of sky or a circle
@@ -2223,6 +2275,9 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
         generator so that a scene can be reproduced.  If the value
         is None the seed is set randomly.  If a non-integer value is
         given it is converted to integer.
+
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
 
     Returns
     -------
@@ -2363,7 +2418,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             paout[loop] = paout[loop]-360.
     galaxy_cat = GalaxyCatalog(ra=raout, dec=decout, ellipticity=elout,
                                radius=rout, sersic_index=sindout,
-                               position_angle=paout, radius_units='arcsec')
+                               position_angle=paout, radius_units='arcsec',
+                               starting_index=starting_index)
     for loop in range(len(filter_names)):
         mag1 = catalog_values[outputinds, outinds[loop]]
         dmag1 = -0.2*np.random.random(nout)+0.1

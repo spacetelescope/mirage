@@ -82,6 +82,14 @@ CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTarg
                         'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack',
                         'tso_imaging_catalog', 'tso_grism_catalog']
 
+IMAGING_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
+                            'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
+
+WFSS_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended']
+
+TS_IMAGING_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended', 'tso_imaging_catalog']
+TS_GRISM_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended', 'tso_grism_catalog']
+
 TSO_MODES = ['ts_imaging', 'ts_grism']
 
 # Upper limit to the size of a seed image or dark current array. Arrays

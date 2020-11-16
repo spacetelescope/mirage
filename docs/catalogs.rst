@@ -3,17 +3,18 @@
 Source Catalog File Formats
 ===========================
 
-Mirage accepts 7 different types of ascii source catalogs, all of which can be generated using `Mirage's` :ref:`catalog generation <catalog_generation>` functionality. These include:
+Mirage accepts 7 different types of ascii source catalogs, all of which can be generated using `Mirage's` :ref:`catalog generation <catalog_generation>` functionality. Each of these are discussed in the sections below.
 
-1. :ref:`Point sources <point_source>`
-2. :ref:`Galaxies (2d Sersic profiles) <galaxies>`
-3. :ref:`Extended targets <extended_obj>`
-4. :ref:`Non-sidereal source <nonsidereal>`
-5. :ref:`Moving point sources <moving_point_source>`
-6. :ref:`Moving Sersic sources <moving_sersic>`
-7. :ref:`Moving extended sources <moving_extended>`
-8. :ref:`Grism time series sources <grism_tso_cat>`
-9. :ref:`Imaging time series sources <imaging_tso_cat>`
+1. :ref:`Common formatting details <common_formatting>`
+2. :ref:`Point sources <point_source>`
+3. :ref:`Galaxies (2d Sersic profiles) <galaxies>`
+4. :ref:`Extended targets <extended_obj>`
+5. :ref:`Non-sidereal source <nonsidereal>`
+6. :ref:`Moving point sources <moving_point_source>`
+7. :ref:`Moving Sersic sources <moving_sersic>`
+8. :ref:`Moving extended sources <moving_extended>`
+9. :ref:`Grism time series sources <grism_tso_cat>`
+10. :ref:`Imaging time series sources <imaging_tso_cat>`
 
 .. tip::
     For information on the optional hdf5 catalog that can be used when simulating WFSS data, see the :ref:`WFSS simulation page<wfss_data>`.
@@ -45,9 +46,16 @@ The type of source catalog(s) you need depends on the scene you are simulating. 
 |                     |  - Imaging Time Series |                                  |
 +---------------------+------------------------+----------------------------------+
 
+.. _common_formatting:
 
 Common formatting details
 -------------------------
+
+.. _pos_vel_units:
+
+Position and Velocity Units
++++++++++++++++++++++++++++
+
 Mirage scans the top 4 lines of each catalog for certain phrases that can be used to characterize the inputs. These phrases are used to specify the units of source locations or velocities, as well as the magnitude system to use. Multiple phrases can be used in a single catalog, but only one phrase per line is allowed. Examples are shown in the catalogs below.
 
 The locations of sources can be specified in RA, Dec or in (x,y) pixel locations on the detector. If you wish to provide positions in units of (x, y) detector pixels, then the string ‘position_pixels’ must be added after the # in one of the top 4 lines of the file.
@@ -66,6 +74,41 @@ The locations of sources can be specified in RA, Dec or in (x,y) pixel locations
 Mirage uses AB magnitudes as the default for input sources. However, you can change the magnitude system by specifying an alternative in one of the top 4 lines. The three acceptible options are **vegamag**, **stmag**, and **abmag**. **All sources in a given catalog must be in the same magnitude system.**
 
 For moving targets (both those that are moving across the field of view, as well as non-sidereal targets), the default unit for velocity is arcseconds per hour. If you wish to instead use pixels per hour, then **velocity_pixels** must be added to one of the 4 top lines of the catalog.
+
+.. _source_index_numbers:
+
+Source Index Numbers
+++++++++++++++++++++
+
+When using Mirage's catalog_generator.py to create source catalogs, the left-most column of the catalogs is an "index" column, which labels each source with a unique number. This can be useful when comparing source catalogs with segmentation images. By default, Mirage will begin counting at 1 and increase values from there. However, if you are planning to produce a simulation using multiple catalogs (e.g. a point source catalog and a galaxy catalog), then you must be sure that the source index numbers do not overlap between the two catalogs. To prevent having repeated source indexes, you can set the minimum index value for each catalog when calling the catalog generator by using the 'starting_index' keyword. In the example below, the point source catalog index column starts at 1 (the default), while the galaxy catalog index column starts at 4, since the values of 1, 2, and 3 are present in the point source catalog.
+
+::
+
+    from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog
+
+    ra = [1.1, 1.12, 1.13]
+    dec = [45.2, 45.25, 45.3]
+    mags = [18.1, 17.3, 19.3]
+
+    ptsrc = PointSourceCatalog(ra=ra, dec=dec)
+    ptsrc.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam',
+                               filter_name='f200w')
+    ptsrc.save('my_point_sources.cat')
+
+    gal_ra = [1.13, 1.15, 1.17]
+    gal_dec = [45.25, 45.26, 45.32]
+    ellipticity = [0.1, 0.05, 0.4]
+    radius = [0.02, 0.1, 0.1]
+    sersic_index = [1.0, 3.4, 1.5]
+    position_angle = [5.2, 10.5, 127.8]
+
+    gal = GalaxyCatalog(ra=gal_ra, dec=gal_dec, ellipticity=ellipticity, radius=radius,
+    					sersic_index=sersic_index, position_angle=position_angle,
+    					starting_index=4)
+    gal.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam',
+                             filter_name='f200w')
+    gal.save('my_galaxies.cat')
+
 
 .. _point_source:
 
