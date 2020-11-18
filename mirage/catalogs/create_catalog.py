@@ -1932,7 +1932,7 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
                '-p ref_filter K -p acol {} -p band_min {} -p band_max {} --run')
                .format(client, username, min_ra.value, min_dec.value, max_ra.value, max_dec.value,
                        colors, band_min, band_max))
-    logger.info('Running command: ', command)
+    logger.info('Running command: \n {}'.format(command))
     os.system(command)
 
 
