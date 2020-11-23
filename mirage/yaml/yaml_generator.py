@@ -116,7 +116,7 @@ from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
-from ..utils import utils
+from ..utils import siaf_interface, utils
 
 ENV_VAR = 'MIRAGE_DATA'
 
@@ -128,7 +128,7 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
                  reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
-                 background=None, roll_angle=None, dates=None,
+                 background=None, roll_angle=None, dates=None, times=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
                  dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
                  offline=False):
@@ -220,6 +220,11 @@ class SimInput:
             See Mirage's onling documentation for examples:
             https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
 
+        times : str or dict
+            Observation times assocated with the exposures or program. Used only
+            in the case of non-sidereal observations, where it is used to determine
+            target location for each exposure.
+
         observation_list_file=None
         verbose : bool
             Print more information to the screen while running
@@ -256,7 +261,7 @@ class SimInput:
         self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
-                               'dates': dates}
+                               'dates': dates, 'times': times}
 
         self.info = {}
         self.input_xml = input_xml
@@ -273,6 +278,7 @@ class SimInput:
             raise ValueError("reffile_defaults must be 'crds' or 'crds_full_name'")
         self.reffile_overrides = reffile_overrides
 
+        self.catalogs = catalogs
         self.table_file = None
         self.use_nonstsci_names = False
         self.use_linearized_darks = True
@@ -650,6 +656,11 @@ class SimInput:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 self.make_start_times()
+
+            # If we have a non-sidereal observation, then we need to
+            # update the pointing information based on the input
+            # ephemeris file or target velocity
+            self.nonsidereal_pointing_updates()
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
@@ -1166,6 +1177,212 @@ class SimInput:
         self.info['yamlfile'] = yaml_names
         self.info['outputfits'] = fits_names
         # Table([self.info['yamlfile']]).pprint()
+
+    def nonsidereal_pointing_updates(self):
+        """The pointing info for non-sidereal observations will be incorrect
+        because you cannot specify a time in APT. Once observation times/dates
+        have been calculated here, we can now get the pointing information
+        correct.
+        """
+        for k in self.info.keys():
+            print(k)
+
+        print(self.info['ObservationID'])
+        print(self.info['Instrument'])
+        print(self.info['TargetID'])
+        print(self.info['Tracking'])
+        print(self.info['Date'])
+        print(self.info['Dither'])
+        print(self.info['Exposures'])
+        print(self.info['entry_number'])
+        print(self.info['exposure'])
+        print(self.info['dither'])
+        stop
+
+        obs = np.array(self.info['ObservationID'])
+        all_date_obs = np.array(self.info['date_obs'])
+        all_time_obs = np.array(self.info['time_obs'])
+        all_exposure = np.array(sel.info['exposre'])
+        tracking = np.array(self.info['Tracking'])
+        targs = np.array(self.info['TargetID'])
+        inst = np.array(self.info['Instrument'])
+        ra_from_pointing_file = np.array(self.info['ra'])
+        dec_from_pointing_file = np.array(self.info['dec'])
+        nonsidereal_index = np.where(np.array(tracking) == 'non-sidereal')
+        all_nonsidereal_targs = targs[nonsidereal_index]
+        nonsidereal_targs, u_indexes = np.unique(targs[nonsidereal_index], return_indexes=True)
+        nonsidereal_instruments = inst[nonsidereal_index][u_indexes]
+
+        # Check that all non-sidereal targets have catalogs associated with them
+        for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
+            ns_catalog = get_nonsidereal_catalog_name(self.catalogs, targ, inst)
+            catalog_table, pos_in_xy, vel_in_xy = read_nonsidereal_catalog(ns_catalog)
+
+            # Find the observations that use this target
+            exp_index_this_target = targs == targ
+            obs_this_target = np.unique(obs[exp_index_this_target])
+
+            # Loop over observations
+            for obs_name in obs_this_target:
+
+                # Get date/time for every exposure
+                obs_exp_indexes = np.where(obs == obs_name)
+                obs_dates = all_date_obs[obs_exp_indexes]
+                obs_times = all_time_obs[obs_exp_indexes]
+                exposures = all_exposure[obs_exp_indexes]
+
+                start_dates = []
+                for date_obs, time_obs in zip(obs_dates, obs_times):
+                    ob_time = '{}T{}'.format(date_obs, time_obs)
+                    try:
+                        start_dates.append(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S'))
+                    except ValueError:
+                        start_dates.append(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f'))
+
+                if 'ephemeris_file' in catalog_table.colnames:
+                    ephemeris_file = catalog_table['ephemeris_file'][0]
+                    ra_ephem, dec_ephem = ephemeris_tools.read_ephemeris_file(ephemeris_file)
+                    all_times = [ephemeris_tools.to_timestamp(elem) for elem in start_dates]
+
+                    # Create list of positions for all frames
+                    ra_target = ra_eph(all_times)
+                    dec_target = dec_eph(all_times)
+                else:
+                    if not pos_in_xy:
+                        if not vel_in_xy:
+                            # Here we assume that the source (and aperture reference location)
+                            # is located at the given RA, Dec at the start of the first exposure
+                            base_ra = ra_from_pointing_file[obs_exp_indexes]
+                            base_dec = dec_from_pointing_file[obs_exp_indexes]
+                            ra_target = [base_ra]
+                            dec_target = [base_dec]
+                            for ob_date in start_dates[1:]:
+                                delta_time = ob_date - start_dates[0]
+                                delta_ra = 0.05 * delta_time.total_seconds() / 3600.
+                                delta_dec = 0.02 * delta_time.total_seconds() / 3600.
+                                ra_target.append(base_ra + delta_ra)
+                                dec_target.append(base_dec + delta_dec)
+                        else:
+                            # Velocity is in units of pixels/hr. Need to translate to arcsec/hr
+                            print('To do')
+                    else:
+                        # Input position should be at the aperture reference location
+                        # or else we're not tracking the target, right?
+                        if not vel_in_xy:
+                            print('to do')
+                        else:
+                            # Velocity is in units of pixels/hr. Need to translate to arcsec/hr
+                            print('to do')
+
+
+                ra_from_pointing_file[obs_exp_indexes] = ra_target
+                dec_from_pointing_file[obs_exp_indexes] = dec_target
+
+        self.info['ra'] = ra_from_pointing_file
+        self.info['dec'] = dec_from_pointing_file
+
+        # Create a pysiaf.Siaf instance for each instrument in the proposal
+        print('Lines below are untested')
+        siaf_dictionary = {}
+        for instrument_name in np.unique(self.info['Instrument']):
+            siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
+
+        print('hopefully this updates pointings base on the new ra dec values. check carefully')
+        self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
+
+
+            """
+            read in catalog
+            determine ephemeris file or velocities
+
+                1. read in ephemeris file
+                2. get ra, dec at observation date+time
+
+                or
+
+                1. calculate ra, dec from ra,dec,ra_vel,dec_vel and observation date+time
+            """
+
+
+
+
+        stop
+
+
+
+    @staticmethod
+    def read_nonsidereal_catalog(filename):
+        """Read in a Mirage formatted non-sidereal source catalog
+        """
+        catalog_table = ascii.read(ns_catalog, comment='#')
+
+        # Check to see whether the position is in x,y or ra,dec
+        pixelflag = False
+        try:
+            if 'position_pixels' in catalog_table.meta['comments'][0:4]:
+                pixelflag = True
+        except:
+            pass
+
+        # If present, check whether the velocity entries are pix/sec
+        # or arcsec/sec.
+        pixelvelflag = False
+        try:
+            if 'velocity_pixels' in catalog_table.meta['comments'][0:4]:
+                pixelvelflag = True
+        except:
+            pass
+        return catalog_table, pixelflag, pixelvelflag
+
+
+
+    @staticmethod
+    def get_nonsidereal_catalog_name(cat_dict, target_name, instrument_name):
+        """Given a dictionary or nested dictionary of source catalogs,
+        return the name of the non-sidereal catalog for the given target
+        name.
+
+        Parameters
+        ----------
+        cat_dict : dict
+            Dictionary of source catalogs as input by the user
+
+        target_name : str
+            Target name to search for
+
+        instrument_name : str
+            Name of instrument used to observe ``target_name``
+
+        Returns
+        -------
+        cat_file : str
+            Name of source catalog
+        """
+        target_cat = cat_dict[target_name]
+        if 'moving_target_to_track' in target_cat.keys():
+            if not os.path.isfile(target_cat['moving_target_to_track']):
+                raise ValueError(("{} is listed as the non-sidereal target catalog for "
+                                  "{}, but it appears this file does not exist.".format(target_cat['moving_target_to_track'],
+                                                                                        target_name)))
+            else:
+                cat_file = target_cat['moving_target_to_track']
+        else:
+            if instrument_name not in target_cat.keys():
+                raise ValueError(("Catalog dictionary does not contain a 'moving_target_to_track' catalog "
+                                  "for {}. Unable to proceed.".format(target_name)))
+            else:
+                if 'moving_target_to_track' in target_cat[instrument_name].keys():
+                    if not os.path.isfile(target_cat[instrument_name]['moving_target_to_track']):
+                        raise ValueError(("{} is listed as the non-sidereal target catalog for "
+                                          "{}, but it appears this file does not exist."
+                                          .format(target_cat['moving_target_to_track'], target_name)))
+                    else:
+                        cat_file = target_cat[instrument_name]['moving_target_to_track']
+                else:
+                    raise ValueError(("Catalog dictionary does not contain a 'moving_target_to_track' catalog "
+                                      "for {}. Unable to proceed.".format(target_name)))
+        return cat_file
+
 
     def set_global_definitions(self):
         """Store the subarray definitions of all supported instruments."""

@@ -83,7 +83,7 @@ class ReadAPTXML():
         self.observation_info = OrderedDict()
 
     def get_tracking_type(self, observation):
-        """Deetermine whether the observation uses sidereal or non-sidereal
+        """Determine whether the observation uses sidereal or non-sidereal
         tracking
 
         Parameters
