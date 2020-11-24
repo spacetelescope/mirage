@@ -34,6 +34,38 @@ def create_interpol_function(ephemeris):
     return ra_interp, dec_interp
 
 
+def get_ephemeris(method):
+    """Wrapper function to simplify the creation of an ephemeris
+
+    Parameters
+    ----------
+    method : str
+        Method to use to create the ephemeris. Can be one of two
+        options:
+        1) Name of an ascii file containing an ephemeris.
+        2) 'create' - Horizons is queried in order to produce an ephemeris
+
+    Returns
+    -------
+    ephemeris : tup
+        Tuple of interpolation functions for (RA, Dec). Interpolation
+        functions are for RA (or Dec) in degrees as a function of
+        calendar timestamp
+    """
+    if method.lower() != 'create':
+        ephem = read_ephemeris_file(method)
+    else:
+        raise NotImplementedError('Horizons query not yet working')
+        start_date = datetime.datetime.strptime(starting_date, '%Y-%m-%d')
+        earlier = start_date - datetime.timedelta(days=1)
+        later = start_date + datetime.timedelta(days=1)
+        step_size = 0.1  # days
+        ephem = query_horizons(target_name, earlier, later, step_size)
+
+    ephemeris = create_interpol_function(ephem)
+    return ephemeris
+
+
 def to_timestamp(date):
     """Convert a datetime object into a calendar timestamp object
 
