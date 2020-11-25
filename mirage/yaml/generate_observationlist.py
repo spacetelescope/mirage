@@ -459,7 +459,7 @@ def expand_for_dithers(indict, verbose=True):
 
 
 def get_observation_dict(xml_file, yaml_file, catalogs,
-                         parameter_overrides={'cosmic_rays': None, 'background': None, 'roll_angle': None, 'dates': None, 'times': None},
+                         parameter_overrides={'cosmic_rays': None, 'background': None, 'roll_angle': None, 'dates': None},
                          verbose=False):
     """Write observation list file (required mirage input) on the basis of APT files.
 
@@ -516,9 +516,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # Set default values. These are overwritten if there is an appropriate
     # entry in parameter_defaults
+    default_time = '00:00:00'
     default_values = {}
-    default_values['Date'] = '2021-10-04'
-    default_values['Time'] = '12:34'
+    default_values['Date'] = '2022-10-04T00:00:00'
     default_values['PAV3'] = '0.'
     default_values['PointsourceCatalog'] = 'None'
     default_values['GalaxyCatalog'] = 'None'
@@ -586,27 +586,21 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # Dates
     # dates = '2019-5-25'
-    # dates = {'001': '2019-05-25', '002': '2019-11-15'}
+    # dates = {'001': '2019-05-25', '002': '2019-11-15T12:13:14'}
     dates = parameter_overrides['dates']
     if dates is not None:
         if isinstance(dates, str):
-            default_values['Date'] = dates
+            if 'T' in dates:
+                # In the end we need dates in the format of YYYY-MM-DDTHH:MM:SS
+                default_values['Date'] = dates
+            else:
+                # If the time part is not present in the input, then add it.
+                default_values['Date'] = '{}T{}'.format(dates, default_time)
             # Now set dates to None so that it won't be used when looping
             # over observations below
             dates = None
         else:
             # Just use dates below when looping over observations
-            pass
-
-    times = parameter_overrides['times']
-    if times is not None:
-        if isinstance(times, str):
-            default_values['Time'] = times
-            # Now set times to None so that it won't be used when looping
-            # over observations below
-            times = None
-        else:
-            # Just use times below when looping over observations
             pass
 
     # Roll angle, aka PAV3
@@ -696,20 +690,13 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     date_value = default_values['Date']
                 else:
                     try:
-                        date_value = dates[observation_number]
+                        value = dates[observation_number]
+                        if 'T' in value:
+                            date_value = dates[observation_number]
+                        else:
+                            date_value = '{}T{}'.format(dates[observation_number], default_time)
                     except KeyError:
                         logger.error(("\n\nERROR: No date value specified for Observation {} in date dictionary. "
-                                      "Quitting.\n\n".format(observation_number)))
-                        raise KeyError
-
-                # Get the proper time value
-                if times is None:
-                    time_value = default_values['Time']
-                else:
-                    try:
-                        time_value = times[observation_number]
-                    except KeyError:
-                        logger.error(("\n\nERROR: No time value specified for Observation {} in time dictionary. "
                                       "Quitting.\n\n".format(observation_number)))
                         raise KeyError
 
@@ -771,7 +758,6 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     "  EntryNumber{}:\n".format(entry_number),
                     "    Instrument: {}\n".format(instrument),
                     "    Date: {}\n".format(date_value),
-                    "    Time: {}\n".format(time_value),
                     "    PAV3: {}\n".format(pav3_value),
                     "    DitherIndex: {}\n".format(dither_index),
                     "    CosmicRayLibrary: {}\n".format(cr_library_value),

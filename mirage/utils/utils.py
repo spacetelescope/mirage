@@ -941,8 +941,8 @@ def organize_config_files():
             psf_wing_threshold_file = 'N/A'
             psfpath = 'N/A'
         if instrument in 'niriss fgs nircam'.split():
-            config_info['global_subarray_definitions'][instrument] = ascii.read(filename=os.path.join(modpath, 'config', subarray_def_file))
-            config_info['global_readout_patterns'][instrument] = ascii.read(filename=os.path.join(modpath, 'config', readout_pattern_file))
+            config_info['global_subarray_definitions'][instrument] = asc.read(os.path.join(modpath, 'config', subarray_def_file))
+            config_info['global_readout_patterns'][instrument] = asc.read(os.path.join(modpath, 'config', readout_pattern_file))
         config_info['global_subarray_definition_files'][instrument] = os.path.join(modpath, 'config', subarray_def_file)
         config_info['global_readout_pattern_files'][instrument] = os.path.join(modpath, 'config', readout_pattern_file)
         config_info['global_crosstalk_files'][instrument] = os.path.join(modpath, 'config', crosstalk_file)
@@ -977,6 +977,14 @@ def parse_RA_Dec(ra_string, dec_string):
     dec_degrees : float
         Declination value in degrees
     """
+    # First, a quick check to see if the inputs are in
+    # decimal degrees already.
+    try:
+        return np.float(ra_string), np.float(dec_string)
+    except ValueError:
+        pass
+
+    # Convert from HMS or ::: to decimal degrees
     try:
         ra_string = ra_string.lower()
         ra_string = ra_string.replace("h", ":")

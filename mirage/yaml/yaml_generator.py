@@ -130,7 +130,7 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 class SimInput:
     def __init__(self, input_xml=None, pointing_file=None, datatype='linear', reffile_defaults='crds',
                  reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
-                 background=None, roll_angle=None, dates=None, times=None,
+                 background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
                  dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
                  offline=False):
@@ -266,7 +266,7 @@ class SimInput:
         self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
 
         parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
-                               'dates': dates, 'times': times}
+                               'dates': dates}
 
         self.info = {}
         self.input_xml = input_xml
@@ -313,8 +313,6 @@ class SimInput:
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
-        update the line below to use utils.organize_config_files instead
-        #self.set_global_definitions()
         self.config_information = utils.organize_config_files()
 
         self.path_defs()
@@ -699,10 +697,13 @@ class SimInput:
             #    self.make_start_times()
 
 
-            print('*****After (the later) make_start_times:')
-            for key in self.info:
-                print(key)
-            stop
+            #print('*****After (the later) make_start_times:')
+            #for key in self.info:
+            #    print(key)
+
+            #for ob, ap, date, time, act, vis in zip(self.info['ObservationID'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'], self.info['act_id'], self.info['visit_num']):
+            #    print(ob, vis, act, ap, date, time)
+            #stop
 
 
 
@@ -1250,11 +1251,10 @@ class SimInput:
         print(self.info['exposure'])
         print(self.info['dither'])
 
-        for t_ele, a_ele, act_ele, v_ele, obsl_ele, d_ele in zip(self.info['time_obs'], self.info['aperture'],
-                                                                 self.info['act_id'], self.info['visit_num'],
-                                                                 self.info['obs_label'], self.info['dither']):
-            print(t_ele, a_ele, act_ele, v_ele, obsl_ele, d_ele)
-        stop
+        #for t_ele, a_ele, act_ele, v_ele, obsl_ele, d_ele in zip(self.info['time_obs'], self.info['aperture'],
+        #                                                         self.info['act_id'], self.info['visit_num'],
+        #                                                         self.info['obs_label'], self.info['dither']):
+        #    print(t_ele, a_ele, act_ele, v_ele, obsl_ele, d_ele)
 
         obs = np.array(self.info['ObservationID'])
         all_date_obs = np.array(self.info['date_obs'])
@@ -1302,8 +1302,13 @@ class SimInput:
                     all_times = [ephemeris_tools.to_timestamp(elem) for elem in start_dates]
 
                     # Create list of positions for all frames
-                    ra_target = ra_ephem(all_times)
-                    dec_target = dec_ephem(all_times)
+                    try:
+                        ra_target = ra_ephem(all_times)
+                        dec_target = dec_ephem(all_times)
+
+                    except ValueError:
+                        raise ValueError(("Observation dates ({} - {}) are not present within the ephemeris file {}"
+                                          .format(start_dates[0], start_dates[-1], ephemeris_file)))
                 else:
                     if not pos_in_xy:
                         if not vel_in_xy:
@@ -1335,10 +1340,22 @@ class SimInput:
                 ra_from_pointing_file[obs_exp_indexes] = ra_target
                 dec_from_pointing_file[obs_exp_indexes] = dec_target
 
+
+        print('Before modifying:')
+        print(type(self.info['TargetRA'][0]))
+        print(self.info['TargetRA'][0])
+        print(type(self.info['ra'][0]))
+        print(self.info['ra'][0])
+
+
         self.info['TargetRA'] = ra_from_pointing_file
         self.info['TargetDec'] = dec_from_pointing_file
-        self.info['ra'] = ra_from_pointing_file
-        self.info['dec'] = dec_from_pointing_file
+
+        # Need to update these values (which come from the pointing file)
+        # so that below we can adjust them for the different detectors/apertures
+        self.info['ra'] = [np.float64(ele) for ele in ra_from_pointing_file]
+        self.info['dec'] = [np.float64(ele) for ele in dec_from_pointing_file]
+
 
 
 
@@ -1361,7 +1378,9 @@ class SimInput:
         for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
             print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
 
-
+        # These go into the pointing in the yaml file
+        self.info['ra_ref'] = ra_from_pointing_file
+        self.info['dec_ref'] = dec_from_pointing_file
 
         """
         read in catalog
@@ -1375,10 +1394,6 @@ class SimInput:
             1. calculate ra, dec from ra,dec,ra_vel,dec_vel and observation date+time
         """
 
-
-
-
-        stop
 
 
     def set_global_definitions(self):
@@ -1551,10 +1566,10 @@ class SimInput:
 
             else:
                 # Now read in readpattern definitions
-                readpatt_def = self.global_readout_patterns[instrument.lower()]
+                readpatt_def = self.config_information['global_readout_patterns'][instrument.lower()]
 
                 # Read in file containing subarray definitions
-                subarray_def = self.global_subarray_definitions[instrument.lower()]
+                subarray_def = self.config_information['global_subarray_definitions'][instrument.lower()]
 
                 match2 = readpatt == readpatt_def['name']
                 if np.sum(match2) == 0:
@@ -1754,10 +1769,10 @@ class SimInput:
 
             else:
                 # Now read in readpattern definitions
-                readpatt_def = self.global_readout_patterns[instrument.lower()]
+                readpatt_def = self.config_information['global_readout_patterns'][instrument.lower()]
 
                 # Read in file containing subarray definitions
-                subarray_def = self.global_subarray_definitions[instrument.lower()]
+                subarray_def = self.config_information['global_subarray_definitions'][instrument.lower()]
 
                 match2 = readpatt == readpatt_def['name']
                 if np.sum(match2) == 0:
@@ -2130,7 +2145,7 @@ class SimInput:
             self.logger.info('No PSF path provided. Using default path as PSF path for all yamls.')
             paths_out = []
             for instrument in self.info['Instrument']:
-                default_path = self.global_psfpath[instrument.lower()]
+                default_path = self.config_information['global_psfpath'][instrument.lower()]
                 paths_out.append(default_path)
             return paths_out
 
@@ -2404,7 +2419,7 @@ class SimInput:
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
-            subarray_definitions = self.global_subarray_definitions[instrument.lower()]
+            subarray_definitions = self.config_information['global_subarray_definitions'][instrument.lower()]
 
 
             if full_ap not in subarray_definitions['AperName']:
@@ -2600,6 +2615,7 @@ class SimInput:
             # For now, skip populating the target RA and Dec in WFSC data.
             # The read_xxxxx funtions for these observation types will have
             # to be updated to make use of the proposal_parameter_dictionary
+            print('writing out, TargetRA: ', input['TargetRA'], type(input['TargetRA']))
             if np.isreal(input['TargetRA']):
                 input['TargetRA'] = str(input['TargetRA'])
                 input['TargetDec'] = str(input['TargetDec'])

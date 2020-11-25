@@ -142,7 +142,7 @@ class AptInput:
         with open(self.observation_list_file, 'r') as infile:
             self.obstab = yaml.safe_load(infile)
 
-        OBSERVATION_LIST_FIELDS = 'Date Time PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
+        OBSERVATION_LIST_FIELDS = 'Date PAV3 Filter PointSourceCatalog GalaxyCatalog ' \
                                   'ExtendedCatalog ExtendedScale ExtendedCenter MovingTargetList ' \
                                   'MovingTargetSersic MovingTargetExtended ' \
                                   'MovingTargetConvolveExtended MovingTargetToTrack ' \
@@ -186,7 +186,7 @@ class AptInput:
             if instrument == 'nircam':
                 # keep the number of entries in the dictionary consistent
                 for key in OBSERVATION_LIST_FIELDS:
-                    if key in ['Date', 'Time', 'PAV3', 'Instrument', 'CosmicRayLibrary', 'CosmicRayScale']:
+                    if key in ['Date', 'PAV3', 'Instrument', 'CosmicRayLibrary', 'CosmicRayScale']:
                         value = str(entry[key])
                     else:
                         value = str(None)
@@ -313,9 +313,6 @@ class AptInput:
 
 
 
-        make_start_times???
-
-
 
 
 
@@ -330,6 +327,19 @@ class AptInput:
             observation_dictionary = self.global_alignment_pointing(observation_dictionary)
 
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
+
+
+
+        # Add start times for each exposure
+        self.exposure_tab = make_start_times(self.exposure_tab)
+
+
+        #for ob, ap, date, time, act, vis in zip(self.exposure_tab['ObservationID'], self.exposure_tab['aperture'], self.exposure_tab['date_obs'], self.exposure_tab['time_obs'], self.exposure_tab['act_id'], self.exposure_tab['visit_num']):
+        #    print(ob, vis, act, ap, date, time)
+        #stop
+
+
+
 
         # fix data for filename generation
         # set parallel seq id
@@ -960,212 +970,6 @@ class AptInput:
 
         return obs_dict
 
-    def make_start_times_test(self, obs_info):
-        """Create exposure start times for each entry in the observation dictionary."""
-        date_obs = []
-        time_obs = []
-        expstart = []
-        nframe = []
-        nskip = []
-        namp = []
-
-
-
-        # choose arbitrary start time for each epoch
-        epoch_base_time = '16:44:12'
-        epoch_base_time0 = copy.deepcopy(epoch_base_time)
-
-        if 'epoch_start_date' in obs_info.keys():
-            epoch_base_date = obs_info['epoch_start_date'][0]
-        else:
-            epoch_base_date = obs_info['Date'][0]
-        base = Time(epoch_base_date + 'T' + epoch_base_time)
-        base_date, base_time = base.iso.split()
-
-        # Pick some arbirary overhead values
-        act_overhead = 90  # seconds. (filter change)
-        visit_overhead = 600  # seconds. (slew)
-
-        # Get visit, activity_id, dither_id info for first exposure
-        ditherid = obs_info['dither'][0]
-        actid = obs_info['act_id'][0]
-        visit = obs_info['visit_num'][0]
-        # obsname = obs_info['obs_label'][0]
-
-        # for i in range(len(obs_info['Module'])):
-        for i, instrument in enumerate(obs_info['Instrument']):
-            # Get dither/visit
-            # Files with the same activity_id should have the same start time
-            # Overhead after a visit break should be large, smaller between
-            # exposures within a visit
-            next_actid = obs_info['act_id'][i]
-            next_visit = obs_info['visit_num'][i]
-            next_obsname = obs_info['obs_label'][i]
-            next_ditherid = obs_info['dither'][i]
-
-            # Find the readpattern of the file
-            readpatt = obs_info['ReadoutPattern'][i]
-            groups = np.int(obs_info['Groups'][i])
-            integrations = np.int(obs_info['Integrations'][i])
-
-            if instrument.lower() in ['miri', 'nirspec']:
-                nframe.append(0)
-                nskip.append(0)
-                namp.append(0)
-                date_obs.append(base_date)
-                time_obs.append(base_time)
-                expstart.append(base.mjd)
-
-            else:
-                # Now read in readpattern definitions
-                #readpatt_def = self.global_readout_patterns[instrument.lower()]
-                print('XXXXXTry setting up config info using the moved funcn in utils!!!!')
-                # Read in file containing subarray definitions
-                #subarray_def = self.global_subarray_definitions[instrument.lower()]
-                config_information = utils.organize_config_files()
-                readpatt_def = config_information['global_readout_patterns'][instrument.lower()]
-                subarray_def = config_information['global_subarray_definitions'][instrument.lower()]
-
-                match2 = readpatt == readpatt_def['name']
-                if np.sum(match2) == 0:
-                    raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
-                                        .format(readpatt)))
-
-                # Now get nframe and nskip so we know how many frames in a group
-                fpg = np.int(readpatt_def['nframe'][match2][0])
-                spg = np.int(readpatt_def['nskip'][match2][0])
-                nframe.append(fpg)
-                nskip.append(spg)
-
-                # Get the aperture name. For non-NIRCam instruments,
-                # this is simply the obs_info['aperture']. But for NIRCam,
-                # we need to be careful of entries like NRCBS_FULL, which is used
-                # for observations using all 4 shortwave B detectors. In that case,
-                # we need to build the aperture name from the combination of detector
-                # and subarray name.
-                aperture = obs_info['aperture'][i]
-
-                # Get the number of amps from the subarray definition file
-                match = aperture == subarray_def['AperName']
-
-                # needed for NIRCam case
-                if np.sum(match) == 0:
-                    aperture = [apername for apername, name in
-                                np.array(subarray_def['AperName', 'Name']) if
-                                (sub in apername) or (sub in name)]
-
-                    match = aperture == subarray_def['AperName']
-
-                    if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
-                        raise ValueError('Cannot combine detector {} and subarray {}\
-                            into valid aperture name.'.format(det, sub))
-                    # We don't want aperture as a list
-                    aperture = aperture[0]
-
-                # For grism tso observations, get the number of
-                # amplifiers to use from the APT file.
-                # For other modes, check the subarray def table.
-                try:
-                    amp = int(obs_info['NumOutputs'][i])
-                except ValueError:
-                    amp = subarray_def['num_amps'][match][0]
-
-                # Default to amps=4 for subarrays that can have 1 or 4
-                # if the number of amps is not defined. Hopefully we
-                # should never enter this code block given the lines above.
-                if amp == 0:
-                    amp = 4
-                    self.logger.info(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
-                                      'In the future this information should be made a user input.'.format(aperture)))
-                namp.append(amp)
-
-                # same activity ID
-                # Remove this for now, since Mirage was not correctly
-                # specifying activities. At the moment all exposures have
-                # the same activity ID, which means we must allow the
-                # the epoch_start_date to change even if the activity ID
-                # does not. This will change back in the future when we
-                # figure out more realistic activity ID values.
-                #if next_actid == actid:
-                #    # in this case, the start time should remain the same
-                #    date_obs.append(base_date)
-                #    time_obs.append(base_time)
-                #    expstart.append(base.mjd)
-                #    continue
-
-                epoch_date = obs_info['epoch_start_date'][i]
-                epoch_time = copy.deepcopy(epoch_base_time0)
-
-                # new epoch - update the base time
-                if epoch_date != epoch_base_date:
-                    epoch_base_date = copy.deepcopy(epoch_date)
-                    base = Time(epoch_base_date + 'T' + epoch_base_time)
-                    base_date, base_time = base.iso.split()
-                    basereset = True
-                    date_obs.append(base_date)
-                    time_obs.append(base_time)
-                    expstart.append(base.mjd)
-                    actid = copy.deepcopy(next_actid)
-                    visit = copy.deepcopy(next_visit)
-                    obsname = copy.deepcopy(next_obsname)
-                    continue
-
-                # new visit
-                if next_visit != visit:
-                    # visit break. Larger overhead
-                    overhead = visit_overhead
-
-                # This block should be updated when we have more realistic
-                # activity IDs
-                elif ((next_actid > actid) & (next_visit == visit)):
-                    # same visit, new activity. Smaller overhead
-                    overhead = act_overhead
-                elif ((next_ditherid != ditherid) & (next_visit == visit)):
-                    # same visit, new dither position. Smaller overhead
-                    overhead = act_overhead
-                else:
-                    # same observation, activity, dither. Filter changes
-                    # will still fall in here, which is not accurate
-                    overhead = 10.
-
-                # For cases where the base time needs to change
-                # continue down here
-                siaf_inst = obs_info['Instrument'][i].upper()
-                if siaf_inst == 'NIRCAM':
-                    siaf_inst = "NIRCam"
-                siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
-
-                # Calculate the readout time for a single frame
-                frametime = utils.calc_frame_time(siaf_inst, aperture,
-                                                  siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
-
-                # Estimate total exposure time
-                exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
-
-                # Delta should include the exposure time, plus overhead
-                delta = TimeDelta(exptime + overhead, format='sec')
-                base += delta
-                base_date, base_time = base.iso.split()
-
-                # Add updated dates and times to the list
-                date_obs.append(base_date)
-                time_obs.append(base_time)
-                expstart.append(base.mjd)
-
-                # increment the activity ID and visit
-                actid = copy.deepcopy(next_actid)
-                visit = copy.deepcopy(next_visit)
-                obsname = copy.deepcopy(next_obsname)
-                ditherid = copy.deepcopy(next_ditherid)
-
-        obs_info['date_obs'] = date_obs
-        obs_info['time_obs'] = time_obs
-        # obs_info['expstart'] = expstart
-        obs_info['nframe'] = nframe
-        obs_info['nskip'] = nskip
-        obs_info['namp'] = namp
-        return obs_info
-
     def tight_dithers(self, input_dict):
         """
         In NIRCam, when the 'FULL' dither pattern is
@@ -1360,6 +1164,243 @@ def get_filters(pointing_info):
 
         filters[inst.upper()] = filter_list
     return filters
+
+
+def make_start_times(obs_info):
+    """Create exposure start times for each entry in the observation dictionary.
+
+    Parameters
+    ----------
+    obs_info : dict
+        Dictionary of exposures. Development was around a dictionary containing
+        APT xml-derived properties as well as pointing file properties. Should
+        be before expanding to have one entry for each detector in each exposure.
+
+    Returns
+    -------
+    obs_info : dict
+        Modified dictionary with observation dates and times added
+    """
+    date_obs = []
+    time_obs = []
+    expstart = []
+    nframe = []
+    nskip = []
+    namp = []
+
+    # Read in file containing subarray definitions
+    config_information = utils.organize_config_files()
+
+    # choose arbitrary start time for each epoch
+    #epoch_base_time = '16:44:12'
+    #epoch_base_time0 = copy.deepcopy(epoch_base_time)
+
+    if 'epoch_start_date' in obs_info.keys():
+        epoch_base_date = obs_info['epoch_start_date'][0]
+    else:
+        epoch_base_date = obs_info['Date'][0]
+
+    base = Time(obs_info['epoch_start_date'][0])
+    #base = Time(epoch_base_date + 'T' + epoch_base_time)
+    base_date, base_time = base.iso.split()
+
+    # Pick some arbirary overhead values
+    act_overhead = 90  # seconds. (filter change)
+    visit_overhead = 600  # seconds. (slew)
+
+    # Get visit, activity_id, dither_id info for first exposure
+    ditherid = obs_info['dither'][0]
+    actid = obs_info['act_id'][0]
+    visit = obs_info['visit_num'][0]
+    obsid = obs_info['ObservationID'][0]
+
+    for i, instrument in enumerate(obs_info['Instrument']):
+        # Get dither/visit
+        # Files with the same activity_id should have the same start time
+        # Overhead after a visit break should be large, smaller between
+        # exposures within a visit
+        next_actid = obs_info['act_id'][i]
+        next_visit = obs_info['visit_num'][i]
+        next_obsname = obs_info['obs_label'][i]
+        next_ditherid = obs_info['dither'][i]
+        next_obsid = obs_info['ObservationID'][i]
+
+        # Find the readpattern of the file
+        readpatt = obs_info['ReadoutPattern'][i]
+        groups = np.int(obs_info['Groups'][i])
+        integrations = np.int(obs_info['Integrations'][i])
+
+        if instrument.lower() in ['miri', 'nirspec']:
+            nframe.append(0)
+            nskip.append(0)
+            namp.append(0)
+            date_obs.append(base_date)
+            time_obs.append(base_time)
+            expstart.append(base.mjd)
+
+        else:
+            readpatt_def = config_information['global_readout_patterns'][instrument.lower()]
+            subarray_def = config_information['global_subarray_definitions'][instrument.lower()]
+
+            match2 = readpatt == readpatt_def['name']
+            if np.sum(match2) == 0:
+                raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
+                                    .format(readpatt)))
+
+            # Now get nframe and nskip so we know how many frames in a group
+            fpg = np.int(readpatt_def['nframe'][match2][0])
+            spg = np.int(readpatt_def['nskip'][match2][0])
+            nframe.append(fpg)
+            nskip.append(spg)
+
+            # Get the aperture name. For non-NIRCam instruments,
+            # this is simply the obs_info['aperture']. But for NIRCam,
+            # we need to be careful of entries like NRCBS_FULL, which is used
+            # for observations using all 4 shortwave B detectors. In that case,
+            # we need to build the aperture name from the combination of detector
+            # and subarray name.
+            aperture = obs_info['aperture'][i]
+
+            # Get the number of amps from the subarray definition file
+            match = aperture == subarray_def['AperName']
+
+
+
+
+
+            # needed for NIRCam case
+            if np.sum(match) == 0:
+                self.logger.info(('Aperture: {} does not match any entries in the subarray definition file. Guessing at the '
+                                  'aperture for the purpose of calculating the exposure time and number of amps.'.format(aperture)))
+                sub = aperture.split('_')[1]
+                aperture = [apername for apername, name in
+                            np.array(subarray_def['AperName', 'Name']) if
+                            (sub in apername) or (sub in name)]
+
+                match = aperture == subarray_def['AperName']
+
+                if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+                    raise ValueError('Cannot combine detector {} and subarray {}\
+                                     into valid aperture name.'.format(det, sub))
+                # We don't want aperture as a list
+                aperture = aperture[0]
+
+            # For grism tso observations, get the number of
+            # amplifiers to use from the APT file.
+            # For other modes, check the subarray def table.
+            try:
+                amp = int(obs_info['NumOutputs'][i])
+            except ValueError:
+                amp = subarray_def['num_amps'][match][0]
+
+            # Default to amps=4 for subarrays that can have 1 or 4
+            # if the number of amps is not defined. Hopefully we
+            # should never enter this code block given the lines above.
+            if amp == 0:
+                amp = 4
+                self.logger.info(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
+                                  'In the future this information should be made a user input.'.format(aperture)))
+            namp.append(amp)
+
+            # same activity ID
+            # Remove this for now, since Mirage was not correctly
+            # specifying activities. At the moment all exposures have
+            # the same activity ID, which means we must allow the
+            # the epoch_start_date to change even if the activity ID
+            # does not. This will change back in the future when we
+            # figure out more realistic activity ID values.
+            #if next_actid == actid:
+            #    # in this case, the start time should remain the same
+            #    date_obs.append(base_date)
+            #    time_obs.append(base_time)
+            #    expstart.append(base.mjd)
+            #    continue
+
+            epoch_date = obs_info['epoch_start_date'][i]
+            #epoch_time = copy.deepcopy(epoch_base_time0)
+
+            # new epoch - update the base time
+            if epoch_date != epoch_base_date:
+                epoch_base_date = copy.deepcopy(epoch_date)
+                #base = Time(epoch_base_date + 'T' + epoch_base_time)
+                base = Time(obs_info['epoch_start_date'][i])
+                base_date, base_time = base.iso.split()
+                basereset = True
+                date_obs.append(base_date)
+                time_obs.append(base_time)
+                expstart.append(base.mjd)
+                actid = copy.deepcopy(next_actid)
+                visit = copy.deepcopy(next_visit)
+                obsid = copy.deepcopy(next_obsid)
+                obsname = copy.deepcopy(next_obsname)
+                ditherid = copy.deepcopy(next_ditherid)
+                continue
+
+            # new observation or visit (if a different epoch time has
+            # not been provided)
+            if ((next_obsid != obsid) | (next_visit != visit)):
+                # visit break. Larger overhead
+                overhead = visit_overhead
+                print("new visit/obs: {} {}".format(next_obsid, next_visit))
+            elif ((next_actid > actid) & (next_visit == visit)):
+                # This block should be updated when we have more realistic
+                # activity IDs
+                # same visit, new activity. Smaller overhead
+                overhead = act_overhead
+                print('Next activity: {}'.format(next_actid))
+            elif ((next_ditherid != ditherid) & (next_visit == visit)):
+                # same visit, new dither position. Smaller overhead
+                overhead = act_overhead
+                print('next dither: {}'.format(next_ditherid))
+            else:
+                # same observation, activity, dither. Filter changes
+                # will still fall in here, which is not accurate
+                overhead = 0.  # Reset frame captured in exptime below
+                print('same activity')
+
+            # For cases where the base time needs to change
+            # continue down here
+            siaf_inst = obs_info['Instrument'][i].upper()
+            siaf_obj = Siaf(siaf_inst)[aperture]
+
+            # Calculate the readout time for a single frame
+            frametime = utils.calc_frame_time(siaf_inst, aperture,
+                                              siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
+
+            # Estimate total exposure time
+            exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
+
+            if ((next_obsid == obsid) & (next_visit == visit) & (next_actid == actid) & (next_ditherid == ditherid)):
+                # If we are in the same exposure (but with a different detector),
+                # then we should keep the start time the same
+                delta = TimeDelta(0., format='sec')
+            else:
+                # If we are moving on to the next exposure, activity, or visit
+                # then move the start time by the expoure time of the current
+                # exposure, plus the overhead
+                delta = TimeDelta(exptime + overhead, format='sec')
+
+            base += delta
+            base_date, base_time = base.iso.split()
+
+            # Add updated dates and times to the list
+            date_obs.append(base_date)
+            time_obs.append(base_time)
+            expstart.append(base.mjd)
+
+            # increment the activity ID and visit
+            actid = copy.deepcopy(next_actid)
+            visit = copy.deepcopy(next_visit)
+            obsname = copy.deepcopy(next_obsname)
+            ditherid = copy.deepcopy(next_ditherid)
+            obsid = copy.deepcopy(next_obsid)
+
+    obs_info['date_obs'] = date_obs
+    obs_info['time_obs'] = time_obs
+    obs_info['nframe'] = nframe
+    obs_info['nskip'] = nskip
+    obs_info['namp'] = namp
+    return obs_info
 
 
 def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
