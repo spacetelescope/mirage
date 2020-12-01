@@ -714,6 +714,23 @@ class SimInput:
             # ephemeris file or target velocity
             self.nonsidereal_pointing_updates()
 
+            # Get the correct pointing for each aperture
+            print('calling ra_dec_update now.....')
+            siaf_dictionary = {}
+            for instrument_name in np.unique(self.info['Instrument']):
+                siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
+
+            self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
+
+
+            here we should update target_ra, dec to match pointing ra, dec for nonsidereal targs only
+
+
+            for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
+                print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
+
+
+
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
 
@@ -1359,28 +1376,32 @@ class SimInput:
 
 
 
-        for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
-            print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
 
 
 
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         print('Lines below are untested')
-        siaf_dictionary = {}
-        for instrument_name in np.unique(self.info['Instrument']):
-            siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
+        #siaf_dictionary = {}
+        #for instrument_name in np.unique(self.info['Instrument']):
+        #    siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
 
-        print('hopefully this updates pointings base on the new ra dec values. check carefully')
-        self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
+        print('move ra_dec_update to yaml_generator. check carefully')
+        #self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
 
 
-        for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
-            print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
+        #for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
+        #    print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
 
         # These go into the pointing in the yaml file
         self.info['ra_ref'] = ra_from_pointing_file
         self.info['dec_ref'] = dec_from_pointing_file
+
+        print('At the end of nonsidereal_pointing_updates:\n\n')
+        for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
+            print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
+
+
 
         """
         read in catalog

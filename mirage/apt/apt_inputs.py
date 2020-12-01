@@ -374,7 +374,8 @@ class AptInput:
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
         # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
-        self.exposure_tab = ra_dec_update(self.exposure_tab, self.siaf)
+        print('moving call to ra_dec_update to later in yaml_generator')
+        #self.exposure_tab = ra_dec_update(self.exposure_tab, self.siaf)
 
         # Output to a csv file.
         if self.output_csv is None:
