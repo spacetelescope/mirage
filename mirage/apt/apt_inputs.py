@@ -45,6 +45,7 @@ import logging
 import re
 import argparse
 import pkg_resources
+import warnings
 
 from astropy.table import Table, vstack
 from astropy.time import Time, TimeDelta
@@ -268,16 +269,13 @@ class AptInput:
 
     def create_input_table(self, verbose=False):
         """
-
-        Expansion for dithers is done upstream.
+        Main function for creating a table of parameters for each
+        exposure
 
         Parameters
         ----------
-        verbose
-
-        Returns
-        -------
-
+        verbose : bool
+            If True, extra information is printed to the log
         """
         # Expand paths to full paths
         # self.input_xml = os.path.abspath(self.input_xml)
@@ -287,11 +285,8 @@ class AptInput:
         if self.observation_list_file is not None:
             self.observation_list_file = os.path.abspath(self.observation_list_file)
 
-        # main_dir = os.path.split(self.input_xml)[0]
-
         # if APT.xml content has already been generated during observation list creation
         # (generate_observationlist.py) load it here
-
         if self.apt_xml_dict is None:
             raise RuntimeError('self.apt_xml_dict is not defined')
 
@@ -310,39 +305,29 @@ class AptInput:
         # Add epoch and catalog information
         observation_dictionary = self.add_observation_info(observation_dictionary)
 
-
-
-
-
-
-
-        # if verbose:
-        #     print('Summary of observation dictionary:')
-        #     for key in observation_dictionary.keys():
-        #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
+        if verbose:
+            self.logger.info('Summary of observation dictionary:')
+            for key in observation_dictionary.keys():
+                self.logger.info('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
         # Global Alignment observations need to have the pointing information for the
         # FGS exposures updated
         if 'WfscGlobalAlignment' in observation_dictionary['APTTemplate']:
             observation_dictionary = self.global_alignment_pointing(observation_dictionary)
 
+        # Expand the dictionary to have one entry for each detector in each exposure
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
-
-
         # Add start times for each exposure
-        self.exposure_tab = make_start_times(self.exposure_tab)
+        # Ignore warnings as astropy.time.Time will give a warning
+        # related to unknown leap seconds if the date is too far in
+        # the future.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.exposure_tab = make_start_times(self.exposure_tab)
 
-
-        #for ob, ap, date, time, act, vis in zip(self.exposure_tab['ObservationID'], self.exposure_tab['aperture'], self.exposure_tab['date_obs'], self.exposure_tab['time_obs'], self.exposure_tab['act_id'], self.exposure_tab['visit_num']):
-        #    print(ob, vis, act, ap, date, time)
-        #stop
-
-
-
-
-        # fix data for filename generation
-        # set parallel seq id
+        # Fix data for filename generation
+        # Set parallel seq id
         for j, isparallel in enumerate(self.exposure_tab['ParallelInstrument']):
             if isparallel:
                 self.exposure_tab['sequence_id'][j] = '2'
@@ -372,10 +357,6 @@ class AptInput:
         self.siaf = {}
         for instrument_name in np.unique(observation_dictionary['Instrument']):
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
-
-        # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
-        print('moving call to ra_dec_update to later in yaml_generator')
-        #self.exposure_tab = ra_dec_update(self.exposure_tab, self.siaf)
 
         # Output to a csv file.
         if self.output_csv is None:
@@ -1192,10 +1173,6 @@ def make_start_times(obs_info):
     # Read in file containing subarray definitions
     config_information = utils.organize_config_files()
 
-    # choose arbitrary start time for each epoch
-    #epoch_base_time = '16:44:12'
-    #epoch_base_time0 = copy.deepcopy(epoch_base_time)
-
     if 'epoch_start_date' in obs_info.keys():
         epoch_base_date = obs_info['epoch_start_date'][0]
     else:
@@ -1264,10 +1241,6 @@ def make_start_times(obs_info):
 
             # Get the number of amps from the subarray definition file
             match = aperture == subarray_def['AperName']
-
-
-
-
 
             # needed for NIRCam case
             if np.sum(match) == 0:
@@ -1342,22 +1315,18 @@ def make_start_times(obs_info):
             if ((next_obsid != obsid) | (next_visit != visit)):
                 # visit break. Larger overhead
                 overhead = visit_overhead
-                print("new visit/obs: {} {}".format(next_obsid, next_visit))
             elif ((next_actid > actid) & (next_visit == visit)):
                 # This block should be updated when we have more realistic
                 # activity IDs
                 # same visit, new activity. Smaller overhead
                 overhead = act_overhead
-                print('Next activity: {}'.format(next_actid))
             elif ((next_ditherid != ditherid) & (next_visit == visit)):
                 # same visit, new dither position. Smaller overhead
                 overhead = act_overhead
-                print('next dither: {}'.format(next_ditherid))
             else:
                 # same observation, activity, dither. Filter changes
                 # will still fall in here, which is not accurate
                 overhead = 0.  # Reset frame captured in exptime below
-                print('same activity')
 
             # For cases where the base time needs to change
             # continue down here
