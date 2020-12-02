@@ -1191,6 +1191,8 @@ def make_start_times(obs_info):
     actid = obs_info['act_id'][0]
     visit = obs_info['visit_num'][0]
     obsid = obs_info['ObservationID'][0]
+    exp = obs_info['exposure'][0]
+    entry_num = obs_info['entry_number'][0]
 
     for i, instrument in enumerate(obs_info['Instrument']):
         # Get dither/visit
@@ -1202,6 +1204,8 @@ def make_start_times(obs_info):
         next_obsname = obs_info['obs_label'][i]
         next_ditherid = obs_info['dither'][i]
         next_obsid = obs_info['ObservationID'][i]
+        next_exp = obs_info['exposure'][i]
+        next_entry_num = obs_info['entry_number'][i]
 
         # Find the readpattern of the file
         readpatt = obs_info['ReadoutPattern'][i]
@@ -1308,6 +1312,8 @@ def make_start_times(obs_info):
                 obsid = copy.deepcopy(next_obsid)
                 obsname = copy.deepcopy(next_obsname)
                 ditherid = copy.deepcopy(next_ditherid)
+                exp = copy.deepcopy(next_exp)
+                entry_num = copy.deepcopy(next_entry_num)
                 continue
 
             # new observation or visit (if a different epoch time has
@@ -1340,7 +1346,7 @@ def make_start_times(obs_info):
             # Estimate total exposure time
             exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
 
-            if ((next_obsid == obsid) & (next_visit == visit) & (next_actid == actid) & (next_ditherid == ditherid)):
+            if ((next_obsid == obsid) & (next_visit == visit) & (next_actid == actid) & (next_ditherid == ditherid) & (next_entry_num == entry_num)):
                 # If we are in the same exposure (but with a different detector),
                 # then we should keep the start time the same
                 delta = TimeDelta(0., format='sec')
@@ -1364,6 +1370,8 @@ def make_start_times(obs_info):
             obsname = copy.deepcopy(next_obsname)
             ditherid = copy.deepcopy(next_ditherid)
             obsid = copy.deepcopy(next_obsid)
+            exp = copy.deepcopy(next_exp)
+            entry_num = copy.deepcopy(next_entry_num)
 
     obs_info['date_obs'] = date_obs
     obs_info['time_obs'] = time_obs
@@ -1453,6 +1461,11 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
                 siaf_interface.get_siaf_information(siaf_instances[siaf_instrument], aperture_name,
                                                     pointing_ra, pointing_dec, telescope_roll,
                                                     v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+
+
+
+            print(siaf_instrument, aperture_name, local_roll, pointing_ra, pointing_dec, pointing_v2, pointing_v3, telescope_roll, aperture.V2Ref, aperture.V3Ref)
+
 
             # Calculate RA, Dec of reference location for the detector
             # Add in any offsets from the pointing file in the BaseX, BaseY columns

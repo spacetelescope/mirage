@@ -93,6 +93,7 @@ History
 import sys
 import os
 import argparse
+from collections import Counter
 import logging
 from copy import deepcopy
 from glob import glob
@@ -112,7 +113,8 @@ from ..reference_files import crds_tools
 from ..reference_files.utils import get_transmission_file
 from ..seed_image import ephemeris_tools
 from ..utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING
-from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
+from ..utils.siaf_interface import aperture_xy_to_radec
+from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable, parse_RA_Dec
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
 from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE, \
@@ -326,16 +328,6 @@ class SimInput:
             self.logger.error('No input xml file provided. Observation dictionary not constructed.')
 
         self.reffile_setup()
-
-
-        (print('****At end of yaml_generator __init__:'))
-        for key in self.apt_xml_dict:
-            print(key)
-
-
-
-
-
 
     def add_catalogs(self):
         """
@@ -674,7 +666,15 @@ class SimInput:
             for instrument_name in np.unique(self.info['Instrument']):
                 siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
 
+
+            print(self.info['ra_ref'], self.info['dec_ref'])
+
+
             self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
+
+
+            print(self.info['ra_ref'], self.info['dec_ref'])
+            print('')
 
 
             print('Final RA, Dec values:')
@@ -1208,6 +1208,7 @@ class SimInput:
         all_date_obs = np.array(self.info['date_obs'])
         all_time_obs = np.array(self.info['time_obs'])
         all_exposure = np.array(self.info['exposure'])
+        all_apertures = np.array(self.info['aperture'])
         tracking = np.array(self.info['Tracking'])
         targs = np.array(self.info['TargetID'])
         inst = np.array(self.info['Instrument'])
@@ -1215,13 +1216,30 @@ class SimInput:
         dec_from_pointing_file = np.array(self.info['dec'])
         nonsidereal_index = np.where(np.array(tracking) == 'non-sidereal')
         all_nonsidereal_targs = targs[nonsidereal_index]
-        nonsidereal_targs, u_indexes = np.unique(targs[nonsidereal_index], return_index=True)
-        nonsidereal_instruments = inst[nonsidereal_index][u_indexes]
+        all_nonsidereal_instruments = inst[nonsidereal_index]
+
+        # Get a list of the unique (target, instrument) combinations for
+        # non-sidereal observations
+        inst_targs = [[t, i] for t, i in zip(all_nonsidereal_targs, all_nonsidereal_instruments)]
+        ctr = Counter(tuple(x) for x in inst_targs)
+        unique = [list(key) for key in ctr.keys()]
 
         # Check that all non-sidereal targets have catalogs associated with them
-        for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
+        #for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
+        for element in unique:
+            targ, inst = element
             ns_catalog = get_nonsidereal_catalog_name(self.catalogs, targ, inst)
             catalog_table, pos_in_xy, vel_in_xy = read_nonsidereal_catalog(ns_catalog)
+
+            # If the ephemeris_file column is present but equal to 'none', then
+            # remove the column
+            if 'ephemeris_file' in catalog_table.colnames:
+                if catalog_table['ephemeris_file'][0].lower() == 'none':
+                    catalog_table.remove_column('ephemeris_file')
+
+            if 'ephemeris_file' in catalog_table.colnames:
+                ephemeris_file = catalog_table['ephemeris_file'][0]
+                ra_ephem, dec_ephem = ephemeris_tools.get_ephemeris(ephemeris_file)
 
             # Find the observations that use this target
             exp_index_this_target = targs == targ
@@ -1235,6 +1253,8 @@ class SimInput:
                 obs_dates = all_date_obs[obs_exp_indexes]
                 obs_times = all_time_obs[obs_exp_indexes]
                 exposures = all_exposure[obs_exp_indexes]
+                apertures = all_apertures[obs_exp_indexes]
+                unique_apertures = np.unique(apertures)
 
                 start_dates = []
                 for date_obs, time_obs in zip(obs_dates, obs_times):
@@ -1245,8 +1265,6 @@ class SimInput:
                         start_dates.append(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f'))
 
                 if 'ephemeris_file' in catalog_table.colnames:
-                    ephemeris_file = catalog_table['ephemeris_file'][0]
-                    ra_ephem, dec_ephem = ephemeris_tools.get_ephemeris(ephemeris_file)
                     all_times = [ephemeris_tools.to_timestamp(elem) for elem in start_dates]
 
                     # Create list of positions for all frames
@@ -1259,30 +1277,66 @@ class SimInput:
                                           .format(start_dates[0], start_dates[-1], ephemeris_file)))
                 else:
                     if not pos_in_xy:
-                        if not vel_in_xy:
-                            # Here we assume that the source (and aperture reference location)
-                            # is located at the given RA, Dec at the start of the first exposure
-                            base_ra = ra_from_pointing_file[obs_exp_indexes]
-                            base_dec = dec_from_pointing_file[obs_exp_indexes]
-                            ra_target = [base_ra]
-                            dec_target = [base_dec]
-                            for ob_date in start_dates[1:]:
-                                delta_time = ob_date - start_dates[0]
-                                delta_ra = 0.05 * delta_time.total_seconds() / 3600.
-                                delta_dec = 0.02 * delta_time.total_seconds() / 3600.
-                                ra_target.append(base_ra + delta_ra)
-                                dec_target.append(base_dec + delta_dec)
-                        else:
-                            # Velocity is in units of pixels/hr. Need to translate to arcsec/hr
-                            print('To do')
+                        # Here we assume that the source (and aperture reference location)
+                        # is located at the given RA, Dec at the start of the first exposure
+                        base_ra, base_dec = parse_RA_Dec(catalog_table['x_or_RA'].data[0], catalog_table['y_or_Dec'].data[0])
+                        ra_target = [base_ra]
+                        dec_target = [base_dec]
+
+                        ra_vel = catalog_table['x_or_RA_velocity'].data[0]
+                        dec_vel = catalog_table['y_or_Dec_velocity'].data[0]
+
+                        # If the source velocity is given in units of pixels/hour, then we need
+                        # to multiply this by the appropriate pixel scale.
+                        if vel_in_xy:
+                            print('UNIQUE APERTURES: ')
+                            print(unique_apertures, '\n')
+                            if len(unique_apertures) > 1:
+                                if inst.lower() == 'nircam':
+                                    det_ints = [int(ele.split('_')[0][-1]) for ele in unique_apertures]
+                                    # If the observation contains NIRCam exposures in both the LW and
+                                    # SW channels, then the source velocity is ambiguous due to the
+                                    # different pixel scales. In that case, raise an exception.
+                                    if np.min(det_ints) < 5 and np.max(det_ints) == 5:
+                                        raise ValueError(('Non-sidereal source {} has no ephemeris file, and a velocity that '
+                                                          'is specified in units of pixels/hour in the source catalog. '
+                                                          'Since observation {} contains NIRCam apertures within both the '
+                                                          'SW and LW channels (which have different pixel scales), '
+                                                          'Mirage does not know which pixel scale to use '
+                                                          'when placing the source.'.format(targ, obs_name)))
+
+                            # In this case, there is a well-defined pixel scale, so we can translate
+                            # velocities to units of arcsec/hour
+                            siaf = pysiaf.Siaf(inst)[unique_apertures[0]]
+                            ra_vel *= siaf.XSciScale
+                            dec_vel *= siaf.XSciScale
+
+                        # Calculate RA, Dec for each exposure given the velocities
+                        for ob_date in start_dates[1:]:
+                            delta_time = ob_date - start_dates[0]
+                            delta_ra = ra_vel * delta_time.total_seconds() / 3600.
+                            delta_dec = dec_vel * delta_time.total_seconds() / 3600.
+                            ra_target.append(base_ra + delta_ra)
+                            dec_target.append(base_dec + delta_dec)
+
                     else:
-                        # Input position should be at the aperture reference location
-                        # or else we're not tracking the target, right?
-                        if not vel_in_xy:
-                            print('to do')
-                        else:
-                            # Velocity is in units of pixels/hr. Need to translate to arcsec/hr
-                            print('to do')
+                        # Source location comes from the source catalog and is in units of pixels.
+                        # This can't really be supported, since we don't know which detector the
+                        # location is for. We could proceed, but Mirage would then put the source
+                        # pixel (x, y) in every aperture/detector.
+                        if len(unique_apertures) > 1:
+                            raise ValueError(('Non-sidereal source {} has no ephemeris file, and a location that '
+                                              'is specified in units of detector pixels in the source catalog. '
+                                              'Since observation {} contains multiple apertures (implying different '
+                                              'coordinate systems), Mirage does not know which coordinate system '
+                                              'to use when placing the source.'.format(targ, obs_name)))
+
+                        # If there is only a single aperture associated with the observation,
+                        # then we can proceed. We first need to translate the given x, y position
+                        # to RA, Dec
+                        base_ra, base_dec = aperture_xy_to_radec(catalog_table['x_or_RA'].data[0],
+                                                                 catalog_table['y_or_Dec'].data[0],
+                                                                 inst, aperture, fiducial_ra, fiducial_dec, pav3)
 
 
                 ra_from_pointing_file[obs_exp_indexes] = ra_target
