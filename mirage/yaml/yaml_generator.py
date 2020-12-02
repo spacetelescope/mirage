@@ -2164,7 +2164,6 @@ class SimInput:
             # For now, skip populating the target RA and Dec in WFSC data.
             # The read_xxxxx funtions for these observation types will have
             # to be updated to make use of the proposal_parameter_dictionary
-            print('writing out, TargetRA: ', input['TargetRA'], type(input['TargetRA']))
             if np.isreal(input['TargetRA']):
                 input['TargetRA'] = str(input['TargetRA'])
                 input['TargetDec'] = str(input['TargetDec'])
