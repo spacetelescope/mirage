@@ -411,6 +411,16 @@ class MovingPointSourceCatalog(PointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
                  y_velocity=[], ephemeris_file=[], starting_index=1):
 
+        # If the user provides ephemeris files, they shouldn't need to provide any
+        # other position or velocity information.
+        if len(ephemeris_file) > 0:
+            if len(ra) == 0 and len(x) == 0:
+                ra = [None] * len(ephemeris_file)
+                dec = [None] * len(ephemeris_file)
+            if len(ra_velocity) == 0 and len(x_velocity) == 0:
+                ra_velocity = [None] * len(ephemeris_file)
+                dec_velocity = [None] * len(ephemeris_file)
+
         # Add location information
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, starting_index=starting_index)
 
