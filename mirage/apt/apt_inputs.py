@@ -1083,6 +1083,8 @@ def make_start_times(obs_info):
     obs_info : dict
         Modified dictionary with observation dates and times added
     """
+    logger = logging.getLogger('mirage.apt.apt_inputs')
+
     date_obs = []
     time_obs = []
     expstart = []
@@ -1168,8 +1170,8 @@ def make_start_times(obs_info):
 
             # needed for NIRCam case
             if np.sum(match) == 0:
-                self.logger.info(('Aperture: {} does not match any entries in the subarray definition file. Guessing at the '
-                                  'aperture for the purpose of calculating the exposure time and number of amps.'.format(aperture)))
+                logger.info(('Aperture: {} does not match any entries in the subarray definition file. Guessing at the '
+                             'aperture for the purpose of calculating the exposure time and number of amps.'.format(aperture)))
                 sub = aperture.split('_')[1]
                 aperture = [apername for apername, name in
                             np.array(subarray_def['AperName', 'Name']) if
@@ -1196,8 +1198,8 @@ def make_start_times(obs_info):
             # should never enter this code block given the lines above.
             if amp == 0:
                 amp = 4
-                self.logger.info(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
-                                  'In the future this information should be made a user input.'.format(aperture)))
+                logger.info(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
+                             'In the future this information should be made a user input.'.format(aperture)))
             namp.append(amp)
 
             # same activity ID
