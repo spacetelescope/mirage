@@ -855,12 +855,7 @@ class AptInput:
                             type_str.append(elements[18])
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
-                            #if elements[18] == 'PARALLEL':
-                            #    ddist.append(None)
-                            #else:
-                                #print('line is: {}'.format(elements))
-                                #print(ddist)
-                                #ddist.append(np.float(elements[21]))
+
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.

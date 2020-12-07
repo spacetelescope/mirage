@@ -665,23 +665,7 @@ class SimInput:
             siaf_dictionary = {}
             for instrument_name in np.unique(self.info['Instrument']):
                 siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
-
-
-            print(self.info['ra_ref'], self.info['dec_ref'])
-
-
             self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
-
-
-            print(self.info['ra_ref'], self.info['dec_ref'])
-            print('')
-
-
-            print('Final RA, Dec values:')
-            for ele_ra, ele_raref, ele_ap, ele_date, ele_time in zip(self.info['ra'], self.info['ra_ref'], self.info['aperture'], self.info['date_obs'], self.info['time_obs'],):
-                print(ele_ap, ele_date, ele_time, ele_ra, ele_raref)
-
-
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
@@ -1289,8 +1273,6 @@ class SimInput:
                         # If the source velocity is given in units of pixels/hour, then we need
                         # to multiply this by the appropriate pixel scale.
                         if vel_in_xy:
-                            print('UNIQUE APERTURES: ')
-                            print(unique_apertures, '\n')
                             if len(unique_apertures) > 1:
                                 if inst.lower() == 'nircam':
                                     det_ints = [int(ele.split('_')[0][-1]) for ele in unique_apertures]
