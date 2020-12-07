@@ -1387,18 +1387,7 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
 
             # Calculate RA, Dec of reference location for the detector
             # Add in any offsets from the pointing file in the BaseX, BaseY columns
-            #if siaf_instrument.lower() != 'niriss':
             ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
-            #else:
-            #    ra, dec = exposure_dict['ra_ref'][i], exposure_dict['dec_ref'][i]
-
-
-
-            #print(exposure_dict['aperture'], exposure_dict['ra_ref'], exposure_dict['dec_ref'])
-            #print(ra, dec)
-            #stop
-
-
 
         aperture_ra.append(ra)
         aperture_dec.append(dec)
