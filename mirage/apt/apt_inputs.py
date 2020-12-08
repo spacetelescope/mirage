@@ -49,7 +49,7 @@ import pkg_resources
 from astropy.table import Table, vstack
 from astropy.io import ascii
 import numpy as np
-from pysiaf import rotations, Siaf
+from pysiaf import JWST_PRD_VERSION, rotations, Siaf
 import yaml
 
 from . import read_apt_xml
@@ -743,10 +743,25 @@ class AptInput:
         with open(file) as f:
             for line in f:
 
-                # skip comments and new lines
+                # Skip comments and new lines except for the line with the version of the PRD
                 if (line[0] == '#') or (line in ['\n']) or ('=====' in line):
-                    continue
-                # extract proposal ID
+
+                    # Compare the version of the PRD from APT and pysiaf
+                    if 'PRDOPSSOC' in line:
+                        apt_prd_version = line.split(' ')[-2]
+                        if apt_prd_version != JWST_PRD_VERSION:
+                            self.logger.warning(('\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n'
+                                                 'The pointing file from APT was created using PRD version: {},\n'
+                                                 'while the current installation of pysiaf uses PRD version: {}.\n'
+                                                 'This inconsistency may lead to errors in source locations or\n'
+                                                 'the WCS of simulated data if the apertures being simulated are\n'
+                                                 'shifted between the two versions. We highly recommend using a\n'
+                                                 'consistent version of the PRD between APT and pysiaf.\n'
+                                                 '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n'
+                                                 .format(apt_prd_version, JWST_PRD_VERSION)))
+                    else:
+                        continue
+                # Extract proposal ID
                 elif line.split()[0] == 'JWST':
                     propid_header = line.split()[7]
                     try:
