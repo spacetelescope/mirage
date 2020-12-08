@@ -883,6 +883,77 @@ def sigma_clipped_mean_value_of_image(array, sigma_value):
     return meanval
 
 
+def organize_config_files():
+    """Organize the names of the various config files for each instrument
+    """
+    data_dir = expand_environment_variable('MIRAGE_DATA')
+    modpath = pkg_resources.resource_filename('mirage', '')
+
+    config_info = {}
+
+    config_info['global_subarray_definitions'] = {}
+    config_info['global_readout_patterns'] = {}
+    config_info['global_subarray_definition_files'] = {}
+    config_info['global_readout_pattern_files'] = {}
+
+    config_info['global_crosstalk_files'] = {}
+    config_info['global_filtpupilcombo_files'] = {}
+    config_info['global_filter_position_files'] = {}
+    config_info['global_flux_cal_files'] = {}
+    config_info['global_psf_wing_threshold_file'] = {}
+    config_info['global_psfpath'] = {}
+
+    for instrument in 'niriss fgs nircam miri nirspec'.split():
+        if instrument.lower() == 'niriss':
+            readout_pattern_file = 'niriss_readout_pattern.txt'
+            subarray_def_file = 'niriss_subarrays.list'
+            crosstalk_file = 'niriss_xtalk_zeros.txt'
+            filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
+            filter_position_file = 'niriss_filter_and_pupil_wheel_positions.txt'
+            flux_cal_file = 'niriss_zeropoints.list'
+            psf_wing_threshold_file = 'niriss_psf_wing_rate_thresholds.txt'
+            psfpath = os.path.join(data_dir, 'niriss/gridded_psf_library')
+        elif instrument.lower() == 'fgs':
+            readout_pattern_file = 'guider_readout_pattern.txt'
+            subarray_def_file = 'guider_subarrays.list'
+            crosstalk_file = 'guider_xtalk_zeros.txt'
+            filtpupilcombo_file = 'guider_filter_dummy.list'
+            filter_position_file = 'dummy.txt'
+            flux_cal_file = 'guider_zeropoints.list'
+            psf_wing_threshold_file = 'fgs_psf_wing_rate_thresholds.txt'
+            psfpath = os.path.join(data_dir, 'fgs/gridded_psf_library')
+        elif instrument.lower() == 'nircam':
+            readout_pattern_file = 'nircam_read_pattern_definitions.list'
+            subarray_def_file = 'NIRCam_subarray_definitions.list'
+            crosstalk_file = 'xtalk20150303g0.errorcut.txt'
+            filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
+            filter_position_file = 'nircam_filter_and_pupil_wheel_positions.txt'
+            flux_cal_file = 'NIRCam_zeropoints.list'
+            psf_wing_threshold_file = 'nircam_psf_wing_rate_thresholds.txt'
+            psfpath = os.path.join(data_dir, 'nircam/gridded_psf_library')
+        else:
+            readout_pattern_file = 'N/A'
+            subarray_def_file = 'N/A'
+            crosstalk_file = 'N/A'
+            filtpupilcombo_file = 'N/A'
+            filter_position_file = 'N/A'
+            flux_cal_file = 'N/A'
+            psf_wing_threshold_file = 'N/A'
+            psfpath = 'N/A'
+        if instrument in 'niriss fgs nircam'.split():
+            config_info['global_subarray_definitions'][instrument] = asc.read(os.path.join(modpath, 'config', subarray_def_file))
+            config_info['global_readout_patterns'][instrument] = asc.read(os.path.join(modpath, 'config', readout_pattern_file))
+        config_info['global_subarray_definition_files'][instrument] = os.path.join(modpath, 'config', subarray_def_file)
+        config_info['global_readout_pattern_files'][instrument] = os.path.join(modpath, 'config', readout_pattern_file)
+        config_info['global_crosstalk_files'][instrument] = os.path.join(modpath, 'config', crosstalk_file)
+        config_info['global_filtpupilcombo_files'][instrument] = os.path.join(modpath, 'config', filtpupilcombo_file)
+        config_info['global_filter_position_files'][instrument] = os.path.join(modpath, 'config', filter_position_file)
+        config_info['global_flux_cal_files'][instrument] = os.path.join(modpath, 'config', flux_cal_file)
+        config_info['global_psf_wing_threshold_file'][instrument] = os.path.join(modpath, 'config', psf_wing_threshold_file)
+        config_info['global_psfpath'][instrument] = psfpath
+    return config_info
+
+
 def parse_RA_Dec(ra_string, dec_string):
     """Convert input RA and Dec strings to floats
 
@@ -906,6 +977,14 @@ def parse_RA_Dec(ra_string, dec_string):
     dec_degrees : float
         Declination value in degrees
     """
+    # First, a quick check to see if the inputs are in
+    # decimal degrees already.
+    try:
+        return np.float(ra_string), np.float(dec_string)
+    except ValueError:
+        pass
+
+    # Convert from HMS or ::: to decimal degrees
     try:
         ra_string = ra_string.lower()
         ra_string = ra_string.replace("h", ":")
