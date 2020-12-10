@@ -2146,9 +2146,18 @@ class Catalog_seed():
         if self.runStep['pointsource'] is True:
             if not self.expand_catalog_for_segments:
 
+                # CHECK IN INPUT IF THERE'S A BORESIGHT OFFSET TO BE APPLIED:
+                offset_vector = None
+                infile = glob.glob(os.path.join(self.params['simSignals']['psfpath'], "{}_{}_{}*.fits".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower())))[0]
+                if infile:
+                    header = fits.getheader(infile)                    
+                    if ('BSOFF_V2' in header) and ('BSOFF_V3' in header):
+                        offset_vector = header['BSOFF_V2']*60., header['BSOFF_V3']*60. #convert to arcseconds
+                        
                 # Translate the point source list into an image
                 self.logger.info('Creating point source lists')
-                pslist = self.get_point_source_list(self.params['simSignals']['pointsource'])
+                pslist = self.get_point_source_list(self.params['simSignals']['pointsource'],
+                                                    segment_offset=offset_vector)
                 psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
 
             elif self.expand_catalog_for_segments:
