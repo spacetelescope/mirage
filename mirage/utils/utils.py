@@ -259,6 +259,75 @@ def check_niriss_filter(oldfilter, oldpupil):
         newpupil = oldpupil
     return newfilter, newpupil
 
+def countrate_to_magnitude(instrument, filter_name, magsys, count_rate, photfnu=None, photflam=None,
+                           vegamag_zeropoint=None):
+    """Convert a given source countrate (ADU/sec) into magnitudes
+
+    Parameters
+    ----------
+    instrument : str
+        e.g. 'nircam'
+
+    filter_name : str
+        Filter used in the observation. Only used in the case of
+        NIRISS, where filters in the filter wheel have their
+        throughput modified.
+
+    magsys : str
+        Magnitude system of the input magnitudes. Allowed values are:
+        'abmag', 'stmag', 'vegamag'
+
+    count_rate : float or list
+        Count rate (ADU/s) to be transformed
+
+    photfnu : float
+        Photfnu value that relates count rate and flux density. Only used
+        in ABMAG conversions
+
+    photflam : float
+        Photflam value that relates count rate and flux density. Only used
+        in STMAG conversions
+
+    vegamag_zeropoint : float
+        Filter offset in the VEGAMAG (or A0V mag) system. Only used in
+        VEGAMAG conversions.
+
+
+    Returns
+    -------
+    mag : float or list
+        Magnitude value(s) corresponding to input count_rates
+    """
+    # For NIRISS filters in the filter wheel, we increase the count rate by a
+    # factor of 1/0.84. This is because the throughput of the CLEARP element
+    # in the pupil wheel (which will be used in combination with the filter)
+    # is 0.84, and is included in the PSFs produced by WebbPSF, but also in
+    # the throughput curves used by Mirage. So we need to remove one of these
+    # two factors of 0.84
+    if ((instrument.lower() == 'niriss') and (filter_name.upper() in NIRISS_FILTER_WHEEL_FILTERS)):
+        count_scale = 1. / 0.84
+    else:
+        count_scale = 1.0
+
+    if magsys.lower() == 'abmag':
+        try:
+            return -2.5 * np.log10(photfnu * count_rate / count_scale) - 48.599934378
+        except:
+            raise ValueError(("Count rate to AB mag conversion failed."
+                              "count rate = {}, photfnu = {}".format(count_rate, photfnu)))
+    if magsys.lower() == 'vegamag':
+        try:
+            return vegamag_zeropoint - 2.5 * np.log10(count_rate / count_scale)
+        except:
+            raise ValueError(("Count rate to Vega mag conversion failed."
+                              "count rate = {}".format(count_rate)))
+    if magsys.lower() == 'stmag':
+        try:
+            return -2.5 * np.log10(count_rate * photflam / count_scale) - 21.099934378
+        except:
+            raise ValueError(("Count rate to ST mag conversion failed."
+                              "count rate = {}, photflam = {}".format(count_rate, photflam)))
+
 
 def crop_to_subarray(data, bounds):
     """
