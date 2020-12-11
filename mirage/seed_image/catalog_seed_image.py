@@ -2595,7 +2595,7 @@ class Catalog_seed():
         V2ref_arcsec = self.siaf.V2Ref
         V3ref_arcsec = self.siaf.V3Ref
         position_angle = self.params['Telescope']['rotation']
-        self.logger.info('    Position angle = ', position_angle)
+#        self.logger.info('    Position angle = ', position_angle)
         attitude_ref = pysiaf.utils.rotations.attitude(V2ref_arcsec, V3ref_arcsec, self.ra, self.dec, position_angle)
 
         # Shift every source by the appropriate offset
