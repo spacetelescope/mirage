@@ -57,7 +57,7 @@ def determine_ghost_stamp_filename(row, source_type):
             raise ValueError(('Attempting to add a ghost source corresponding to a {} source '
                               'source, but no niriss_ghost_stamp column is present in the source catalog, '
                               'and the default ghost stamp image file is None. Unable to create ghost source.'
-                              .fomat(source_type)))
+                              .format(source_type)))
     return ghost_stamp_filename
 
 
