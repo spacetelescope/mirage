@@ -25,8 +25,7 @@ Use
     ::
         from mirage.reference_files import crds_tools
         params = {'INSTRUME': 'NIRCAM', 'DETECTOR': 'NRCA1'}
-        reftypes =
-        reffiles = crds_tools.get_reffiles(params, reftypes)
+        reffiles = crds_tools.get_reffiles(params, None)
 """
 
 import datetime
