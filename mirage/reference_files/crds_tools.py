@@ -23,9 +23,10 @@ Use
 
     This module can be used as such:
     ::
-        from mirage.reference_files import crds
+        from mirage.reference_files import crds_tools
         params = {'INSTRUME': 'NIRCAM', 'DETECTOR': 'NRCA1'}
-        reffiles = crds.get_reffiles(params)
+        reftypes =
+        reffiles = crds_tools.get_reffiles(params, reftypes)
 """
 
 import datetime
