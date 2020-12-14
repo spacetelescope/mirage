@@ -56,7 +56,7 @@ warnings.simplefilter('ignore')
 
 SUB_SLICE = {'SUBSTRIP96': slice(1792, 1888), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
 SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048, 2048)}
-
+REF_PARAMS = {"INSTRUME": "NIRISS", "READPATT": "NIS", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
 
 def check_psf_files():
     """Function to run on import to verify that the PSF files have been precomputed"""
@@ -165,26 +165,13 @@ class SossSim():
         self.ngrps = ngrps
         self.nints = nints
         self.total_groups = self.ngrps * self.nints
-
+        self.ref_params = REF_PARAMS
         self.orders = orders
         self.filter = filter
         self.header = ''
         self.snr = snr
         self.model_grid = 'ACES'
         self.subarray = subarray
-
-        # Get correct reference files
-        params = {"INSTRUME": "NIRISS",
-                  "READPATT": "NIS",
-                  "EXP_TYPE": "NIS_SOSS",
-                  "DETECTOR": "NIS",
-                  "PUPIL": "GR700XD",
-                  "DATE-OBS": "2020-07-28",
-                  "TIME-OBS": "00:00:00",
-                  "INSTRUMENT": "NIRISS",
-                  "FILTER": self.filter,
-                  "SUBARRAY": self.subarray}
-        self.refs = crds_tools.get_reffiles(params, ['photom'])
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -745,7 +732,7 @@ class SossSim():
                 wave = self.avg_wave[order - 1]
 
                 # Get relative spectral response for the order
-                photom = fits.getdata(self.refs['photom'])
+                photom = fits.getdata(crds_tools.get_reffiles(self.ref_params, ['photom'])['photom'])
                 throughput = photom[(photom['order'] == order) & (photom['filter'] == self.filter) & (photom['pupil'] == 'GR700XD')]
                 ph_wave = throughput.wavelength[throughput.wavelength > 0][1:-2]
                 ph_resp = throughput.relresponse[throughput.wavelength > 0][1:-2]
@@ -1051,6 +1038,9 @@ class SossSim():
         self.wave = hu.wave_solutions(subarr)
         self.avg_wave = np.mean(self.wave, axis=1)
         self.coeffs = locate_trace.trace_polynomial(subarray=subarr)
+
+        # Get correct reference files
+        self.ref_params['SUBARRAY'] = subarr
 
         # Reset the data and time arrays
         self._reset_data()
