@@ -50,7 +50,7 @@ def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength
     kw = {}
     kw['xcenter'] = xcent_fov
     kw['ycenter'] = ycent_fov
-    kw['units'] = units
+    kw['units'] = kw['UNITS'] = units
     kw['TGROUP'] = tgroup
     if parameters['Readout']['pupil'][0].upper() == 'F':
         usefilt = 'pupil'

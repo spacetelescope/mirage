@@ -5,7 +5,7 @@ Create a final simulated exposure.
 
 This module contains code that will combine a seed image and a
 dark current exposure into a final simulated exposure. Cosmic rays,
-Poisson noise, and other detector effects are addded. This is the
+Poisson noise, and other detector effects are added. This is the
 final step when creating simulated data with Mirage. It can be run
 after catalog_Seed_image.py and dark_prep.py
 
@@ -60,7 +60,7 @@ from mirage.utils.timer import Timer
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_grism"],
-         "niriss": ["imaging", "ami", "pom", "wfss"],
+         "niriss": ["imaging", "ami", "pom", "wfss", "soss"],
          "fgs": ["imaging"]}
 
 classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))

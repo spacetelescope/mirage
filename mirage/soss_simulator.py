@@ -12,10 +12,12 @@ from functools import partial, wraps
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
 from pkg_resources import resource_filename
+import logging
 import time
 import warnings
 import os
 import datetime
+import yaml
 
 import astropy.units as q
 import astropy.constants as ac
@@ -34,7 +36,7 @@ import numpy as np
 
 from mirage import wfss_simulator
 from mirage.catalogs import model_atmospheres
-from mirage.seed_image import catalog_seed_image
+from mirage.seed_image import save_seed, segmentation_map
 from mirage.dark import dark_prep
 from mirage.logging import logging_functions
 from mirage.ramp_generator import obs_generator
@@ -56,7 +58,7 @@ warnings.simplefilter('ignore')
 
 SUB_SLICE = {'SUBSTRIP96': slice(1792, 1888), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
 SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048, 2048)}
-REF_PARAMS = {"INSTRUME": "NIRISS", "READPATT": "NIS", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
+
 
 def check_psf_files():
     """Function to run on import to verify that the PSF files have been precomputed"""
@@ -71,6 +73,11 @@ def check_psf_files():
                 soss_trace.nuke_psfs(mprocessing=True)
             else:
                 soss_trace.nuke_psfs(mprocessing=False)
+
+
+def create_param_file(**kwargs):
+    """Generate a parameter file from a set of keyword arguments"""
+    pass
 
 
 def run_required(func):
@@ -90,7 +97,6 @@ def run_required(func):
 # TODO: Generate NIRISS SOSS PSFs the same way the other instruments do it,
 #  with `mirage.psf.psf_selection.get_gridded_psf_library`. Right now it's just
 #  pointing to awesimsoss/files directory
-# TODO: Enable YAML paramfile as input in addition to args
 
 check_psf_files()
 
@@ -99,8 +105,8 @@ class SossSim():
     """
     Generate NIRISS SOSS time series observations
     """
-    def __init__(self, ngrps, nints, star=None, planet=None, tmodel=None, snr=700,
-                 filter='CLEAR', subarray='SUBSTRIP256', orders=[1, 2],
+    def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None,
+                 filter='CLEAR', subarray='SUBSTRIP256', orders=[1, 2], paramfile=None,
                  obs_date=None, target='New Target', title=None, verbose=True):
         """
         Initialize the TSO object and do all pre-calculations
@@ -115,14 +121,14 @@ class SossSim():
             The wavelength and flux of the star
         planet: sequence
             The wavelength and transmission of the planet
-        snr: float
-            The signal-to-noise
         filter: str
             The name of the filter to use, ['CLEAR', 'F277W']
         subarray: str
             The name of the subarray to use, ['SUBSTRIP256', 'SUBSTRIP96', 'FULL']
         orders: int, list
             The orders to simulate, [1], [1, 2], [1, 2, 3]
+        paramfile: str
+            The path to a parameter file for the observation
         obs_date: str, datetime.datetime, astropy.time.Time
             The datetime of the start of the observation
         target: str (optional)
@@ -134,44 +140,46 @@ class SossSim():
 
         Example
         -------
-        # Imports
-        import numpy as np
-        from awesimsoss import TSO, STAR_DATA
-        import astropy.units as q
-        from pkg_resources import resource_filename
-        star = np.genfromtxt(resource_filename('awesimsoss', 'files/scaled_spectrum.txt'), unpack=True)
-        star1D = [star[0]*q.um, (star[1]*q.W/q.m**2/q.um).to(q.erg/q.s/q.cm**2/q.AA)]
-
-        # Initialize simulation
-        tso = TSO(ngrps=3, nints=10, star=star1D)
+        from mirage.soss_simulator import SossModelSim
+        tso = SossModelSim(teff=3500, ngrps=2, nints=2)
         """
         # Metadata
         self.verbose = verbose
         self.target = target
         self.title = title or '{} Simulation'.format(self.target)
 
-        # Set static values
+        # Set default reference file parameters
         self._star = None
+        self.ref_params = {"INSTRUME": "NIRISS", "READPATT": "NIS", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
 
-        # Set NISRAPID values from PRD Datamodes
-        self.readpatt = 'NISRAPID'
+        # Additional parmeters
+        self.orders = orders
         self.groupgap = 0
         self.nframes = self.nsample = 1
         self.nresets = self.nresets1 = self.nresets2 = 1
         self.dropframes1 = self.dropframes3 = 0
-
-        # Set instance attributes for the exposure
-        self.obs_date = obs_date or Time.now()
-        self.ngrps = ngrps
-        self.nints = nints
-        self.total_groups = self.ngrps * self.nints
-        self.ref_params = REF_PARAMS
-        self.orders = orders
-        self.filter = filter
-        self.header = ''
-        self.snr = snr
         self.model_grid = 'ACES'
-        self.subarray = subarray
+
+        # Use parameter file if available...
+        if paramfile is not None:
+
+            self.paramfile = paramfile
+            self.override_dark = None
+            self.offline = False
+
+        # ...or set exposure parameters from args
+        else:
+
+            self.obs_datetime = obs_date or Time.now()
+            self.ngrps = ngrps
+            self.nints = nints
+            self.filter = filter
+            self.subarray = subarray
+            self.readpatt = 'NISRAPID'
+            self.groupgap = 0
+            self.nframes = self.nsample = 1
+            self.nresets = self.nresets1 = self.nresets2 = 1
+            self.dropframes1 = self.dropframes3 = 0
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -233,573 +241,54 @@ class SossSim():
         self.lines.add_row([name, profile, x_0, amplitude, fwhm, line])
 
     @run_required
-    def add_noise(self, c_pink=9.6, u_pink=3.2, bias_amp=5358.87, bias_offset=20944.06, acn=2.0, pca0_amp=0., rd_noise=12.95, pedestal_drift=18.3, gain=1.612, dc_seed=914075, noise_seed=2879328, zodi_scale=1., skip=[]):
+    def add_noise(self):
         """
         Run the signal data through the ramp generator
         """
-        self.message('Adding noise to TSO...')
+        self.message("Starting noise generator...")
         start = time.time()
 
-        # Run signal through the ramp generator here:
-        tso = self.tso_ideal.copy()
+        # Generate segmentation map
+        self.segmap = segmentation_map.SegMap()
 
-        # Put into 4D
-        self.tso = tso.reshape(self.dims)
+        # Prepare dark current exposure if needed.
+        if self.override_dark is None:
+            self.logger.info('Running dark prep')
+            d = dark_prep.DarkPrep()
+            d.paramfile = self.paramfile
+            d.prepare()
+            use_darks = d.dark_files
+        else:
+            self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
+            use_darks = self.override_dark
+        print(self.segmap.shape)
+        # Combine into final observation
+        self.logger.info('Running observation generator')
+        obs = obs_generator.Observation()
+        obs.linDark = use_darks
+        obs.seed = self.tso_ideal
+        obs.segmap = self.segmap
+        obs.seedheader = self.seedinfo
+        obs.paramfile = self.paramfile
+        obs.create()
+
+        self.logger.info('\nSOSS simulator complete')
 
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def export(self, outfile):
+    def create(self, n_jobs=-1, params=None, supersample_factor=None, **kwargs):
         """
-        Export the simulated data to a JWST pipeline ingestible FITS file
+        Create the simulated 4D ramp data given the initialized TSO object
 
         Parameters
         ----------
-        outfile: str
-            The path of the output file
-        """
-        if not outfile.endswith('_uncal.fits'):
-            raise ValueError("Filename must end with '_uncal.fits'")
-
-        # Make a RampModel
-        data = copy(self.tso) if self.tso is not None else np.ones((1, 1, self.nrows, self.ncols))
-        mod = ju.jwst_ramp_model(data=data, groupdq=np.zeros_like(data), pixeldq=np.zeros((self.nrows, self.ncols)), err=np.zeros_like(data))
-        pix = hu.subarray_specs(self.subarray)
-
-        # Set meta data values for header keywords
-        mod.meta.telescope = 'JWST'
-        mod.meta.instrument.name = 'NIRISS'
-        mod.meta.instrument.detector = 'NIS'
-        mod.meta.instrument.filter = self.filter
-        mod.meta.instrument.pupil = 'GR700XD'
-        mod.meta.exposure.type = 'NIS_SOSS'
-        mod.meta.exposure.nints = self.nints
-        mod.meta.exposure.ngroups = self.ngrps
-        mod.meta.exposure.nframes = self.nframes
-        mod.meta.exposure.readpatt = self.readpatt
-        mod.meta.exposure.groupgap = self.groupgap
-        mod.meta.exposure.frame_time = self.frame_time
-        mod.meta.exposure.group_time = self.group_time
-        mod.meta.exposure.exposure_time = self.exposure_time
-        mod.meta.exposure.duration = self.duration
-        mod.meta.exposure.nresets_at_start = self.nresets1
-        mod.meta.exposure.nresets_between_ints = self.nresets2
-        mod.meta.subarray.name = self.subarray
-        mod.meta.subarray.xsize = data.shape[3]
-        mod.meta.subarray.ysize = data.shape[2]
-        mod.meta.subarray.xstart = pix.get('xloc', 1)
-        mod.meta.subarray.ystart = pix.get('yloc', 1)
-        mod.meta.subarray.fastaxis = -2
-        mod.meta.subarray.slowaxis = -1
-        mod.meta.observation.date = self.obs_date.iso.split()[0]
-        mod.meta.observation.time = self.obs_date.iso.split()[1]
-        mod.meta.target.ra = self.ra
-        mod.meta.target.dec = self.dec
-        mod.meta.target.source_type = 'POINT'
-
-        # Save the file
-        mod.save(outfile, overwrite=True)
-
-        # Save input data
-        with fits.open(outfile) as hdul:
-
-            # Save input star data
-            hdul.append(fits.ImageHDU(data=np.array([i.value for i in self.star], dtype=np.float64), name='STAR'))
-            hdul['STAR'].header.set('FUNITS', str(self.star[1].unit))
-            hdul['STAR'].header.set('WUNITS', str(self.star[0].unit))
-
-            # Save input planet data
-            if self.planet is not None:
-                hdul.append(fits.ImageHDU(data=np.asarray(self.planet, dtype=np.float64), name='PLANET'))
-                for param, val in self.tmodel.__dict__.items():
-                    if isinstance(val, (float, int, str)):
-                        hdul['PLANET'].header.set(param.upper()[:8], val)
-                    elif isinstance(val, np.ndarray) and len(val) == 1:
-                        hdul['PLANET'].header.set(param.upper(), val[0])
-                    elif isinstance(val, type(None)):
-                        hdul['PLANET'].header.set(param.upper(), '')
-                    elif param == 'u':
-                        for n, v in enumerate(val):
-                            hdul['PLANET'].header.set('U{}'.format(n + 1), v)
-                    else:
-                        print(param, val, type(val))
-
-            # Write to file
-            hdul.writeto(outfile, overwrite=True)
-
-        print('File saved as', outfile)
-
-    @property
-    def filter(self):
-        """Getter for the filter"""
-        return self._filter
-
-    @filter.setter
-    def filter(self, filt):
-        """Setter for the filter
-
-        Properties
-        ----------
-        filt: str
-            The name of the filter to use,
-            ['CLEAR', 'F277W']
-        """
-        # Valid filters
-        filts = ['CLEAR', 'F277W']
-
-        # Check the value
-        if not isinstance(filt, str) or filt.upper() not in filts:
-            raise ValueError("'{}' not a supported filter. Try {}".format(filt, filts))
-
-        # Set it
-        filt = filt.upper()
-        self._filter = filt
-
-        # If F277W, set orders to 1 to speed up calculation
-        if filt == 'F277W':
-            self.orders = [1]
-
-        # Update the results
-        self._reset_data()
-
-    @property
-    def info(self):
-        """Summary table for the observation settings"""
-        # Pull out relevant attributes
-        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_date', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec']
-        settings = {key.strip('_'): val for key, val in self.__dict__.items() if key in track}
-        return settings
-
-    def message(self, message_text):
-        """
-        Print message
-
-        Parameters
-        ----------
-        message_text: str
-            The message to print
-        """
-        if self.verbose:
-            print(message_text)
-
-    @property
-    def ncols(self):
-        """Getter for the number of columns"""
-        return self._ncols
-
-    @ncols.setter
-    def ncols(self, err):
-        """Error when trying to change the number of columns
-        """
-        raise TypeError("The number of columns is fixed by setting the 'subarray' attribute.")
-
-    @property
-    def ngrps(self):
-        """Getter for the number of groups"""
-        return self._ngrps
-
-    @ngrps.setter
-    def ngrps(self, ngrp_val):
-        """Setter for the number of groups
-
-        Properties
-        ----------
-        ngrp_val: int
-            The number of groups
-        """
-        # Check the value
-        if not isinstance(ngrp_val, int):
-            raise TypeError("The number of groups must be an integer")
-
-        # Set it
-        self._ngrps = ngrp_val
-
-        # Update the results
-        self._reset_data()
-        self._reset_time()
-
-    @property
-    def nints(self):
-        """Getter for the number of integrations"""
-        return self._nints
-
-    @nints.setter
-    def nints(self, nint_val):
-        """Setter for the number of integrations
-
-        Properties
-        ----------
-        nint_val: int
-            The number of integrations
-        """
-        # Check the value
-        if not isinstance(nint_val, int):
-            raise TypeError("The number of integrations must be an integer")
-
-        # Set it
-        self._nints = nint_val
-
-        # Update the results
-        self._reset_data()
-        self._reset_time()
-
-    def noise_report(self, plot=True, exclude=[]):
-        """
-        Table and plot of contributions from different noise sources
-
-        Parameters
-        ----------
-        plot: bool
-            Plot a figure of the noise contributions
-        exclude: list
-            A list of the sources to exclude from the plot
-        """
-        # Make empty table of inventory
-        inv = at.Table()
-        inv['nint'] = [int(i) for j in (np.ones((self.ngrps, self.nints)) * np.arange(1, self.nints + 1)).T for i in j]
-        inv['ngrp'] = [int(i) for j in np.ones((self.nints, self.ngrps)) * np.arange(1, self.ngrps + 1) for i in j]
-
-        # Add signal
-        self.noise_model.noise_sources['signal'] = list(np.nanmean(self.tso_ideal, axis=(2, 3)))
-
-        # Add the data
-        cols = []
-        for col, data in self.noise_model.noise_sources.items():
-            inv[col] = [i for j in data for i in j]
-            cols.append(col)
-
-        # Print the table
-        inv.pprint(max_width=-1, max_lines=-1)
-
-        # Plot it
-        if plot:
-            fig = figure(x_axis_label='Group', y_axis_label='Electrons/ADU', width=1000, height=500)
-            palette = pal.viridis(len(inv.colnames) - 2)
-            x = np.arange(self.ngrps * self.nints) + 1
-            for n, col in enumerate(cols):
-                if col not in exclude:
-                    fig.line(x, inv[col], color=palette[n], line_width=2, legend=col)
-
-            # Legend
-            fig.legend.click_policy = 'hide'
-
-            show(fig)
-
-    @property
-    def nresets(self):
-        """Getter for the number of resets"""
-        return self._nresets
-
-    @nresets.setter
-    def nresets(self, nreset_val):
-        """Setter for the number of resets
-
-        Properties
-        ----------
-        nreset_val: int
-            The number of resets
-        """
-        # Check the value
-        if not isinstance(nreset_val, int) or nreset_val < 1:
-            raise TypeError("The number of resets must be an integer greater than 0")
-
-        # Set it
-        self._nresets = nreset_val
-
-        # Update the time (data shape doesn't change)
-        self._reset_time()
-
-    @property
-    def nrows(self):
-        """Getter for the number of rows"""
-        return self._nrows
-
-    @nrows.setter
-    def nrows(self, err):
-        """Error when trying to change the number of rows
-        """
-        raise TypeError("The number of rows is fixed by setting the 'subarray' attribute.")
-
-    @property
-    def obs_date(self):
-        """Getter for observation start date"""
-        return self._obs_date
-
-    @obs_date.setter
-    def obs_date(self, obsdate):
-        """Setter for observation start date
-
-        Properties
-        ----------
-        obsdate: str, datetime.datetime, astropy.time.Time
-            The datetime of the start of the observation
-        """
-        # Acceptible time formats
-        good_dtypes = str, datetime.datetime, Time
-
-        # Try to make an astropy.time object
-        if not isinstance(obsdate, good_dtypes):
-            raise ValueError("'{}' not a supported obs_date. Try a dtype of {}".format(obsdate, good_dtypes))
-
-        # Set the transit midpoint
-        self._obs_date = Time(obsdate)
-
-        # Reset the data and time arrays
-        self._reset_data()
-        self._reset_time()
-
-    @property
-    def orders(self):
-        """Getter for the orders"""
-        return self._orders
-
-    @orders.setter
-    def orders(self, ords):
-        """Setter for the orders
-
-        Properties
-        ----------
-        ords: list
-            The orders to simulate, [1, 2, 3]
-        """
-        # Valid order lists
-        orderlist = [[1], [1, 2], [1, 2, 3]]
-
-        # Check the value and set single order to list
-        if isinstance(ords, int):
-            ords = [ords]
-        if not all([o in [1, 2, 3] for o in ords]):
-            raise ValueError("'{}' is not a valid list of orders. Try {}".format(ords, orderlist))
-
-        # Set it
-        self._orders = ords
-
-        # Update the results
-        self._reset_data()
-
-    @property
-    def planet(self):
-        """Getter for the stellar data"""
-        return self._planet
-
-    @planet.setter
-    def planet(self, spectrum):
-        """Setter for the planetary data
-
-        Parameters
-        ----------
-        spectrum: sequence
-            The [W, F] or [W, F, E] of the planet to simulate
-        """
-        # Check if the planet has been set
-        if spectrum is None:
-            self._planet = None
-
-        else:
-
-            # Check planet is a sequence of length 2 or 3
-            if not isinstance(spectrum, (list, tuple)) or not len(spectrum) in [2, 3]:
-                raise ValueError(type(spectrum), ': Planet input must be a sequence of [W, F] or [W, F, E]')
-
-            # Check the units
-            if not spectrum[0].unit.is_equivalent(q.um):
-                raise ValueError(spectrum[0].unit, ': Wavelength must be in units of distance')
-
-            # Check the transmission spectrum is less than 1
-            if not all(spectrum[1] < 1):
-                raise ValueError('{} - {}: Transmission must be between 0 and 1'.format(min(spectrum[1]), max(spectrum[1])))
-
-            # Check the wavelength range
-            spec_min = np.nanmin(spectrum[0][spectrum[0] > 0.])
-            spec_max = np.nanmax(spectrum[0][spectrum[0] > 0.])
-            sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
-            sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
-            if spec_min > sim_min or spec_max < sim_max:
-                print("Wavelength range of input spectrum ({} - {} um) does not cover the {} - {} um range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
-
-            # Good to go
-            self._planet = spectrum
-
-    @run_required
-    def plot(self, idx=0, scale='linear', order=None, noise=True, traces=False, saturation=0.8, draw=True):
-        """
-        Plot a TSO frame
-
-        Parameters
-        ----------
-        idx: int
-            The frame index to plot
-        scale: str
-            Plot scale, ['linear', 'log']
-        order: int (optional)
-            The order to isolate
-        noise: bool
-            Plot with the noise model
-        traces: bool
-            Plot the traces used to generate the frame
-        saturation: float
-            The fraction of full well defined as saturation
-        draw: bool
-            Render the figure instead of returning it
-        """
-        # Get the data cube
-        tso = self._select_data(order, noise)
-
-        # Set the plot args
-        wavecal = self.wave
-        title = '{} - Frame {}'.format(self.title, idx)
-        coeffs = locate_trace.trace_polynomial() if traces else None
-
-        # Plot the frame
-        fig = plotting.plot_frames(data=tso, idx=idx, scale=scale, trace_coeffs=coeffs, saturation=saturation, title=title, wavecal=wavecal)
-
-        if draw:
-            show(fig)
-        else:
-            return fig
-
-    @run_required
-    def plot_ramp(self, order=None, noise=True, draw=True):
-        """
-        Plot the total flux on each frame to display the ramp
-
-        Parameters
-        ----------
-        order: sequence
-            The order to isolate
-        noise: bool
-            Plot with the noise model
-        draw: bool
-            Render the figure instead of returning it
-        """
-        # Get the data cube
-        tso = self._select_data(order, noise)
-
-        # Make the figure
-        fig = plotting.plot_ramp(tso)
-
-        if draw:
-            show(fig)
-        else:
-            return fig
-
-    def _reset_data(self):
-        """Reset the results to all zeros"""
-        # Check that all the appropriate values have been initialized
-        if all([i in self.info for i in ['nints', 'ngrps', 'nrows', 'ncols']]):
-
-            # Update the dimensions
-            self.dims = (self.nints, self.ngrps, self.nrows, self.ncols)
-            self.dims3 = (self.nints * self.ngrps, self.nrows, self.ncols)
-
-            # Reset the results
-            for arr in ['tso'] + ['tso_order{}_ideal'.format(n) for n in self.orders]:
-                setattr(self, arr, None)
-
-    def _reset_time(self):
-        """Reset the time axis based on the observation settings"""
-        # Check that all the appropriate values have been initialized
-        if all([i in self.info for i in ['subarray', 'nints', 'ngrps', 'obs_date', 'nresets']]):
-
-            # Get frame time based on the subarray
-            self.frame_time = self.subarray_specs.get('tfrm')
-            self.group_time = (self.groupgap + self.nframes) * self.frame_time
-
-            # The indexes of valid groups, skipping resets
-            grp_idx = np.concatenate([np.arange(self.nresets, self.nresets + self.ngrps) + n * (self.nresets + self.ngrps) for n in range(self.nints)])
-
-            # The time increments
-            dt = TimeDelta(self.frame_time, format='sec')
-
-            # Integration time of each frame in seconds
-            self.inttime = np.tile((dt * grp_idx).sec[:self.ngrps], self.nints)
-
-            # Datetime of each frame
-            self.time = self.obs_date + (dt * grp_idx)
-
-            # Exposure duration
-            # self.duration = TimeDelta(self.time.max() - self.obs_date, format='sec')
-            self.exposure_time = self.frame_time * ( (self.ngrps * self.nframes + (self.ngrps - 1) * self.groupgap + self.dropframes1) * self.nints)
-            self.duration = self.exposure_time + self.frame_time * (self.dropframes3 * self.nints + self.nresets1 + self.nresets2 * (self.nints - 1))
-
-    def _reset_psfs(self):
-        """Scale the psf for each detector column to the flux from the 1D spectrum"""
-        # Check that all the appropriate values have been initialized
-        if all([i in self.info for i in ['filter', 'subarray']]) and self.star is not None:
-
-            for order in self.orders:
-
-                # Get the wavelength map
-                wave = self.avg_wave[order - 1]
-
-                # Get relative spectral response for the order
-                photom = fits.getdata(crds_tools.get_reffiles(self.ref_params, ['photom'])['photom'])
-                throughput = photom[(photom['order'] == order) & (photom['filter'] == self.filter) & (photom['pupil'] == 'GR700XD')]
-                ph_wave = throughput.wavelength[throughput.wavelength > 0][1:-2]
-                ph_resp = throughput.relresponse[throughput.wavelength > 0][1:-2]
-                response = np.interp(wave, ph_wave, ph_resp)
-
-                # Add spectral lines if necessary
-                for line in self.lines:
-                    self.star[1] += line['flux']
-
-                # Convert response in [mJy/ADU/s] to [Flam/ADU/s] then invert so
-                # that we can convert the flux at each wavelegth into [ADU/s]
-                response = self.frame_time / (response * q.mJy * ac.c / (wave * q.um)**2).to(self.star[1].unit)
-                flux = np.interp(wave, self.star[0].value, self.star[1].value, left=0, right=0) * self.star[1].unit * response
-                cube = soss_trace.SOSS_psf_cube(filt=self.filter, order=order, subarray=self.subarray) * flux[:, None, None]
-                setattr(self, 'order{}_response'.format(order), response)
-                setattr(self, 'order{}_psfs'.format(order), cube)
-
-    @run_required
-    def _select_data(self, order, noise, reshape=True):
-        """
-        Select the data given the order and noise args
-
-        Parameters
-        ----------
-        order: int (optional)
-            The order to use, [1, 2, 3]
-        noise: bool
-            Include noise model
-        reshape: bool
-            Reshape to 3 dimensions
-
-        Returns
-        -------
-        np.ndarray
-            The selected data
-        """
-        if order in [1, 2]:
-            tso = copy(getattr(self, 'tso_order{}_ideal'.format(order)))
-        else:
-            if noise:
-                tso = copy(self.tso)
-            else:
-                tso = copy(self.tso_ideal)
-
-        # Reshape data
-        if reshape:
-            tso.shape = self.dims3
-
-        return tso
-
-    def simulate(self, ld_coeffs=None, n_jobs=-1, params=None, supersample_factor=None, **kwargs):
-        """
-        Generate the simulated 4D ramp data given the initialized TSO object
-
-        Parameters
-        ----------
-        ld_coeffs: array-like (optional)
-            A 3D array that assigns limb darkening coefficients to each pixel, i.e. wavelength
-        ld_profile: str (optional)
-            The limb darkening profile to use
         n_jobs: int
             The number of cores to use in multiprocessing
 
         Example
         -------
         # Run simulation of star only
-        tso.simulate()
+        tso.create()
 
         # Simulate star with transiting exoplanet by including transmission spectrum and orbital params
         import batman
@@ -818,7 +307,7 @@ class SossSim():
         tmodel.teff = 3500                                  # effective temperature of the host star
         tmodel.logg = 5                                     # log surface gravity of the host star
         tmodel.feh = 0                                      # metallicity of the host star
-        tso.simulate(planet=PLANET_DATA, tmodel=tmodel)
+        tso.create(planet=PLANET_DATA, tmodel=tmodel)
         """
         # Check that there is star data
         if self.star is None:
@@ -838,7 +327,11 @@ class SossSim():
         # Get correct reference files
         # self.refs = ju.get_references(self.subarray, self.filter)
 
-        # Start timer
+        # Logging
+        self.logger = logging.getLogger('mirage.soss_simulator')
+        self.logger.info('\n\nRunning soss_simulator....\n')
+        self.logger.info('Using parameter file: ')
+        self.logger.info('{}'.format(self.paramfile))
         begin = time.time()
 
         # Set the number of cores for multiprocessing
@@ -950,13 +443,605 @@ class SossSim():
             order_name = 'tso_order{}_ideal'.format(order)
             setattr(self, order_name, getattr(self, order_name).reshape(self.dims).astype(np.float64))
 
+        # Save the raw signal as a seed image
+        self.seedfile, self.seedinfo = save_seed.save(self.tso_ideal, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
+
         # Make ramps and add noise to the observations
         self.add_noise(**kwargs)
 
-        # Simulate reference pixels
-        # self.tso = ju.add_refpix(self.tso)
-
         self.message('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
+
+    # def export(self, outfile):
+    #     """
+    #     Export the simulated data to a JWST pipeline ingestible FITS file
+    # 
+    #     Parameters
+    #     ----------
+    #     outfile: str
+    #         The path of the output file
+    #     """
+    #     if not outfile.endswith('_uncal.fits'):
+    #         raise ValueError("Filename must end with '_uncal.fits'")
+    # 
+    #     # Make a RampModel
+    #     data = copy(self.tso) if self.tso is not None else np.ones((1, 1, self.nrows, self.ncols))
+    #     mod = ju.jwst_ramp_model(data=data, groupdq=np.zeros_like(data), pixeldq=np.zeros((self.nrows, self.ncols)), err=np.zeros_like(data))
+    #     pix = hu.subarray_specs(self.subarray)
+    # 
+    #     # Set meta data values for header keywords
+    #     mod.meta.telescope = 'JWST'
+    #     mod.meta.instrument.name = 'NIRISS'
+    #     mod.meta.instrument.detector = 'NIS'
+    #     mod.meta.instrument.filter = self.filter
+    #     mod.meta.instrument.pupil = 'GR700XD'
+    #     mod.meta.exposure.type = 'NIS_SOSS'
+    #     mod.meta.exposure.nints = self.nints
+    #     mod.meta.exposure.ngroups = self.ngrps
+    #     mod.meta.exposure.nframes = self.nframes
+    #     mod.meta.exposure.readpatt = self.readpatt
+    #     mod.meta.exposure.groupgap = self.groupgap
+    #     mod.meta.exposure.frame_time = self.frame_time
+    #     mod.meta.exposure.group_time = self.group_time
+    #     mod.meta.exposure.exposure_time = self.exposure_time
+    #     mod.meta.exposure.duration = self.duration
+    #     mod.meta.exposure.nresets_at_start = self.nresets1
+    #     mod.meta.exposure.nresets_between_ints = self.nresets2
+    #     mod.meta.subarray.name = self.subarray
+    #     mod.meta.subarray.xsize = data.shape[3]
+    #     mod.meta.subarray.ysize = data.shape[2]
+    #     mod.meta.subarray.xstart = pix.get('xloc', 1)
+    #     mod.meta.subarray.ystart = pix.get('yloc', 1)
+    #     mod.meta.subarray.fastaxis = -2
+    #     mod.meta.subarray.slowaxis = -1
+    #     mod.meta.observation.date = self.obs_datetime.iso.split()[0]
+    #     mod.meta.observation.time = self.obs_datetime.iso.split()[1]
+    #     mod.meta.target.ra = self.ra
+    #     mod.meta.target.dec = self.dec
+    #     mod.meta.target.source_type = 'POINT'
+    # 
+    #     # Save the file
+    #     mod.save(outfile, overwrite=True)
+    # 
+    #     # Save input data
+    #     with fits.open(outfile) as hdul:
+    # 
+    #         # Save input star data
+    #         hdul.append(fits.ImageHDU(data=np.array([i.value for i in self.star], dtype=np.float64), name='STAR'))
+    #         hdul['STAR'].header.set('FUNITS', str(self.star[1].unit))
+    #         hdul['STAR'].header.set('WUNITS', str(self.star[0].unit))
+    # 
+    #         # Save input planet data
+    #         if self.planet is not None:
+    #             hdul.append(fits.ImageHDU(data=np.asarray(self.planet, dtype=np.float64), name='PLANET'))
+    #             for param, val in self.tmodel.__dict__.items():
+    #                 if isinstance(val, (float, int, str)):
+    #                     hdul['PLANET'].header.set(param.upper()[:8], val)
+    #                 elif isinstance(val, np.ndarray) and len(val) == 1:
+    #                     hdul['PLANET'].header.set(param.upper(), val[0])
+    #                 elif isinstance(val, type(None)):
+    #                     hdul['PLANET'].header.set(param.upper(), '')
+    #                 elif param == 'u':
+    #                     for n, v in enumerate(val):
+    #                         hdul['PLANET'].header.set('U{}'.format(n + 1), v)
+    #                 else:
+    #                     print(param, val, type(val))
+    # 
+    #         # Write to file
+    #         hdul.writeto(outfile, overwrite=True)
+    # 
+    #     print('File saved as', outfile)
+
+    @property
+    def filter(self):
+        """Getter for the filter"""
+        return self._filter
+
+    @filter.setter
+    def filter(self, filt):
+        """Setter for the filter
+
+        Properties
+        ----------
+        filt: str
+            The name of the filter to use,
+            ['CLEAR', 'F277W']
+        """
+        # Valid filters
+        filts = ['CLEAR', 'F277W']
+
+        # Check the value
+        if not isinstance(filt, str) or filt.upper() not in filts:
+            raise ValueError("'{}' not a supported filter. Try {}".format(filt, filts))
+
+        # Set it
+        filt = filt.upper()
+        self._filter = filt
+
+        # If F277W, set orders to 1 to speed up calculation
+        if filt == 'F277W':
+            self.orders = [1]
+
+        # Update the results
+        self._reset_data()
+
+    @property
+    def info(self):
+        """Summary table for the observation settings"""
+        # Pull out relevant attributes
+        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_date', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec']
+        settings = {key.strip('_'): val for key, val in self.__dict__.items() if key in track}
+        return settings
+
+    def message(self, message_text):
+        """
+        Print message
+
+        Parameters
+        ----------
+        message_text: str
+            The message to print
+        """
+        if self.verbose:
+            print(message_text)
+
+    @property
+    def ncols(self):
+        """Getter for the number of columns"""
+        return self._ncols
+
+    @ncols.setter
+    def ncols(self, err):
+        """Error when trying to change the number of columns"""
+        raise TypeError("The number of columns is fixed by setting the 'subarray' attribute.")
+
+    @property
+    def ngrps(self):
+        """Getter for the number of groups"""
+        return self._ngrps
+
+    @ngrps.setter
+    def ngrps(self, ngrp_val):
+        """Setter for the number of groups
+
+        Properties
+        ----------
+        ngrp_val: int
+            The number of groups
+        """
+        # Check the value
+        if not isinstance(ngrp_val, int):
+            raise TypeError("The number of groups must be an integer")
+
+        # Set it
+        self._ngrps = ngrp_val
+
+        # Update the results
+        self._reset_data()
+        self._reset_time()
+
+    @property
+    def nints(self):
+        """Getter for the number of integrations"""
+        return self._nints
+
+    @nints.setter
+    def nints(self, nint_val):
+        """Setter for the number of integrations
+
+        Properties
+        ----------
+        nint_val: int
+            The number of integrations
+        """
+        # Check the value
+        if not isinstance(nint_val, int):
+            raise TypeError("The number of integrations must be an integer")
+
+        # Set it
+        self._nints = nint_val
+
+        # Update the results
+        self._reset_data()
+        self._reset_time()
+
+    # def noise_report(self, plot=True, exclude=[]):
+    #     """
+    #     Table and plot of contributions from different noise sources
+    #
+    #     Parameters
+    #     ----------
+    #     plot: bool
+    #         Plot a figure of the noise contributions
+    #     exclude: list
+    #         A list of the sources to exclude from the plot
+    #     """
+    #     # Make empty table of inventory
+    #     inv = at.Table()
+    #     inv['nint'] = [int(i) for j in (np.ones((self.ngrps, self.nints)) * np.arange(1, self.nints + 1)).T for i in j]
+    #     inv['ngrp'] = [int(i) for j in np.ones((self.nints, self.ngrps)) * np.arange(1, self.ngrps + 1) for i in j]
+    #
+    #     # Add signal
+    #     self.noise_model.noise_sources['signal'] = list(np.nanmean(self.tso_ideal, axis=(2, 3)))
+    #
+    #     # Add the data
+    #     cols = []
+    #     for col, data in self.noise_model.noise_sources.items():
+    #         inv[col] = [i for j in data for i in j]
+    #         cols.append(col)
+    #
+    #     # Print the table
+    #     inv.pprint(max_width=-1, max_lines=-1)
+    #
+    #     # Plot it
+    #     if plot:
+    #         fig = figure(x_axis_label='Group', y_axis_label='Electrons/ADU', width=1000, height=500)
+    #         palette = pal.viridis(len(inv.colnames) - 2)
+    #         x = np.arange(self.ngrps * self.nints) + 1
+    #         for n, col in enumerate(cols):
+    #             if col not in exclude:
+    #                 fig.line(x, inv[col], color=palette[n], line_width=2, legend=col)
+    #
+    #         # Legend
+    #         fig.legend.click_policy = 'hide'
+    #
+    #         show(fig)
+
+    @property
+    def nresets(self):
+        """Getter for the number of resets"""
+        return self._nresets
+
+    @nresets.setter
+    def nresets(self, nreset_val):
+        """Setter for the number of resets
+
+        Properties
+        ----------
+        nreset_val: int
+            The number of resets
+        """
+        # Check the value
+        if not isinstance(nreset_val, int) or nreset_val < 1:
+            raise TypeError("The number of resets must be an integer greater than 0")
+
+        # Set it
+        self._nresets = nreset_val
+
+        # Update the time (data shape doesn't change)
+        self._reset_time()
+
+    @property
+    def nrows(self):
+        """Getter for the number of rows"""
+        return self._nrows
+
+    @nrows.setter
+    def nrows(self, err):
+        """Error when trying to change the number of rows"""
+        raise TypeError("The number of rows is fixed by setting the 'subarray' attribute.")
+
+    @property
+    def obs_datetime(self):
+        """Getter for observation start date"""
+        return self._obs_datetime
+
+    @obs_datetime.setter
+    def obs_datetime(self, obsdate):
+        """Setter for observation start date
+
+        Properties
+        ----------
+        obsdate: str, datetime.datetime, astropy.time.Time
+            The datetime of the start of the observation
+        """
+        # Acceptible time formats
+        good_dtypes = str, datetime.datetime, Time
+
+        # Try to make an astropy.time object
+        if not isinstance(obsdate, good_dtypes):
+            raise ValueError("'{}' not a supported obs_date. Try a dtype of {}".format(obsdate, good_dtypes))
+
+        # Set the transit midpoint
+        self._obs_datetime = Time(obsdate)
+
+        # Reset the data and time arrays
+        self._reset_data()
+        self._reset_time()
+
+    @property
+    def orders(self):
+        """Getter for the orders"""
+        return self._orders
+
+    @orders.setter
+    def orders(self, ords):
+        """Setter for the orders
+
+        Properties
+        ----------
+        ords: list
+            The orders to simulate, [1, 2, 3]
+        """
+        # Valid order lists
+        orderlist = [[1], [1, 2], [1, 2, 3]]
+
+        # Check the value and set single order to list
+        if isinstance(ords, int):
+            ords = [ords]
+        if not all([o in [1, 2, 3] for o in ords]):
+            raise ValueError("'{}' is not a valid list of orders. Try {}".format(ords, orderlist))
+
+        # Set it
+        self._orders = ords
+
+        # Update the results
+        self._reset_data()
+
+    @property
+    def paramfile(self):
+        """Getter for the paramfile"""
+        return self._paramfile
+
+    @paramfile.setter
+    def paramfile(self, pfile):
+        """Setter for the parameter file
+
+        Parameters
+        ----------
+        pfile: str
+            The path to the parameter file
+        """
+        # Check that it's a valid file
+        if not os.path.isfile(pfile):
+            raise IOError("{}: No such file.".format(pfile))
+
+        # Set paramfile and read contents
+        self._paramfile = pfile
+        self._read_parameter_file()
+
+        # Override observation parameters
+        self._nints = self.params['Readout']['nint']
+        self._ngrps = self.params['Readout']['ngroup']
+        self._subarray = self.params['Readout']['array_name'].replace('NIS_', '')
+        self._filter = self.params['Readout']['filter']
+        self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
+        self._readpatt = self.params['Readout']['readpatt']
+        self._nrows, self._ncols = SUB_DIMS[self.subarray]
+        self._target = self.params['Output']['target_name']
+        self.ra = self.params['Output']['target_ra']
+        self.dec = self.params['Output']['target_dec']
+        self.title = self.params['Output']['obs_id']
+
+        # Set the dependent quantities
+        self.wave = hu.wave_solutions(self.subarray)
+        self.avg_wave = np.mean(self.wave, axis=1)
+        self.coeffs = locate_trace.trace_polynomial(subarray=self.subarray)
+
+        # Reset data, time and psfs
+        self._reset_data()
+        self._reset_time()
+        self._reset_psfs()
+
+    @property
+    def total_groups(self):
+        """Getter for total groups"""
+        return self.ngrps * self.nints
+
+    @property
+    def planet(self):
+        """Getter for the stellar data"""
+        return self._planet
+
+    @planet.setter
+    def planet(self, spectrum):
+        """Setter for the planetary data
+
+        Parameters
+        ----------
+        spectrum: sequence
+            The [W, F] or [W, F, E] of the planet to simulate
+        """
+        # Check if the planet has been set
+        if spectrum is None:
+            self._planet = None
+
+        else:
+
+            # Check planet is a sequence of length 2 or 3
+            if not isinstance(spectrum, (list, tuple)) or not len(spectrum) in [2, 3]:
+                raise ValueError(type(spectrum), ': Planet input must be a sequence of [W, F] or [W, F, E]')
+
+            # Check the units
+            if not spectrum[0].unit.is_equivalent(q.um):
+                raise ValueError(spectrum[0].unit, ': Wavelength must be in units of distance')
+
+            # Check the transmission spectrum is less than 1
+            if not all(spectrum[1] < 1):
+                raise ValueError('{} - {}: Transmission must be between 0 and 1'.format(min(spectrum[1]), max(spectrum[1])))
+
+            # Check the wavelength range
+            spec_min = np.nanmin(spectrum[0][spectrum[0] > 0.])
+            spec_max = np.nanmax(spectrum[0][spectrum[0] > 0.])
+            sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
+            sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
+            if spec_min > sim_min or spec_max < sim_max:
+                print("Wavelength range of input spectrum ({} - {} um) does not cover the {} - {} um range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
+
+            # Good to go
+            self._planet = spectrum
+
+    @run_required
+    def plot(self, idx=0, scale='linear', order=None, noise=True, traces=False, saturation=0.8, draw=True):
+        """
+        Plot a TSO frame
+
+        Parameters
+        ----------
+        idx: int
+            The frame index to plot
+        scale: str
+            Plot scale, ['linear', 'log']
+        order: int (optional)
+            The order to isolate
+        noise: bool
+            Plot with the noise model
+        traces: bool
+            Plot the traces used to generate the frame
+        saturation: float
+            The fraction of full well defined as saturation
+        draw: bool
+            Render the figure instead of returning it
+        """
+        # Get the data cube
+        tso = self._select_data(order, noise)
+
+        # Set the plot args
+        wavecal = self.wave
+        title = '{} - Frame {}'.format(self.title, idx)
+        coeffs = locate_trace.trace_polynomial() if traces else None
+
+        # Plot the frame
+        fig = plotting.plot_frames(data=tso, idx=idx, scale=scale, trace_coeffs=coeffs, saturation=saturation, title=title, wavecal=wavecal)
+
+        if draw:
+            show(fig)
+        else:
+            return fig
+
+    @run_required
+    def plot_ramp(self, order=None, noise=True, draw=True):
+        """
+        Plot the total flux on each frame to display the ramp
+
+        Parameters
+        ----------
+        order: sequence
+            The order to isolate
+        noise: bool
+            Plot with the noise model
+        draw: bool
+            Render the figure instead of returning it
+        """
+        # Get the data cube
+        tso = self._select_data(order, noise)
+
+        # Make the figure
+        fig = plotting.plot_ramp(tso)
+
+        if draw:
+            show(fig)
+        else:
+            return fig
+
+    def _read_parameter_file(self):
+        """Read in the yaml parameter file"""
+        try:
+            with open(self.paramfile, 'r') as infile:
+                self.params = yaml.safe_load(infile)
+
+        except FileNotFoundError:
+            self.logger.error("Unable to open {}".format(self.paramfile))
+
+    def _reset_data(self):
+        """Reset the results to all zeros"""
+        # Check that all the appropriate values have been initialized
+        if all([i in self.info for i in ['nints', 'ngrps', 'nrows', 'ncols']]):
+
+            # Update the dimensions
+            self.dims = (self.nints, self.ngrps, self.nrows, self.ncols)
+            self.dims3 = (self.nints * self.ngrps, self.nrows, self.ncols)
+
+            # Reset the results
+            for arr in ['tso'] + ['tso_order{}_ideal'.format(n) for n in self.orders]:
+                setattr(self, arr, None)
+
+    def _reset_time(self):
+        """Reset the time axis based on the observation settings"""
+        # Check that all the appropriate values have been initialized
+        if all([i in self.info for i in ['subarray', 'nints', 'ngrps', 'obs_date', 'nresets']]):
+
+            # Get frame time based on the subarray
+            self.frame_time = utils.calc_frame_time('NIRISS', None, self.ncols, self.nrows, 1)
+            self.group_time = (self.groupgap + self.nframes) * self.frame_time
+
+            # The indexes of valid groups, skipping resets
+            grp_idx = np.concatenate([np.arange(self.nresets, self.nresets + self.ngrps) + n * (self.nresets + self.ngrps) for n in range(self.nints)])
+
+            # The time increments
+            dt = TimeDelta(self.frame_time, format='sec')
+
+            # Integration time of each frame in seconds
+            self.inttime = np.tile((dt * grp_idx).sec[:self.ngrps], self.nints)
+
+            # Datetime of each frame
+            self.time = self.obs_datetime + (dt * grp_idx)
+
+            # Exposure duration
+            # self.duration = TimeDelta(self.time.max() - self.obs_datetime, format='sec')
+            self.exposure_time = self.frame_time * ( (self.ngrps * self.nframes + (self.ngrps - 1) * self.groupgap + self.dropframes1) * self.nints)
+            self.duration = self.exposure_time + self.frame_time * (self.dropframes3 * self.nints + self.nresets1 + self.nresets2 * (self.nints - 1))
+
+    def _reset_psfs(self):
+        """Scale the psf for each detector column to the flux from the 1D spectrum"""
+        # Check that all the appropriate values have been initialized
+        if all([i in self.info for i in ['filter', 'subarray']]) and self.star is not None:
+
+            for order in self.orders:
+
+                # Get the wavelength map
+                wave = self.avg_wave[order - 1]
+
+                # Get relative spectral response for the order
+                photom = fits.getdata(crds_tools.get_reffiles(self.ref_params, ['photom'])['photom'])
+                throughput = photom[(photom['order'] == order) & (photom['filter'] == self.filter) & (photom['pupil'] == 'GR700XD')]
+                ph_wave = throughput.wavelength[throughput.wavelength > 0][1:-2]
+                ph_resp = throughput.relresponse[throughput.wavelength > 0][1:-2]
+                response = np.interp(wave, ph_wave, ph_resp)
+
+                # Add spectral lines if necessary
+                for line in self.lines:
+                    self.star[1] += line['flux']
+
+                # Convert response in [mJy/ADU/s] to [Flam/ADU/s] then invert so
+                # that we can convert the flux at each wavelegth into [ADU/s]
+                response = self.frame_time / (response * q.mJy * ac.c / (wave * q.um)**2).to(self.star[1].unit)
+                flux = np.interp(wave, self.star[0].value, self.star[1].value, left=0, right=0) * self.star[1].unit * response
+                cube = soss_trace.SOSS_psf_cube(filt=self.filter, order=order, subarray=self.subarray) * flux[:, None, None]
+                setattr(self, 'order{}_response'.format(order), response)
+                setattr(self, 'order{}_psfs'.format(order), cube)
+
+    @run_required
+    def _select_data(self, order, noise, reshape=True):
+        """
+        Select the data given the order and noise args
+
+        Parameters
+        ----------
+        order: int (optional)
+            The order to use, [1, 2, 3]
+        noise: bool
+            Include noise model
+        reshape: bool
+            Reshape to 3 dimensions
+
+        Returns
+        -------
+        np.ndarray
+            The selected data
+        """
+        if order in [1, 2]:
+            tso = copy(getattr(self, 'tso_order{}_ideal'.format(order)))
+        else:
+            if noise:
+                tso = copy(self.tso)
+            else:
+                tso = copy(self.tso_ideal)
+
+        # Reshape data
+        if reshape:
+            tso.shape = self.dims3
+
+        return tso
 
     @property
     def star(self):
@@ -1029,18 +1114,16 @@ class SossSim():
 
         # Set the subarray
         self._subarray = subarr
-        self.subarray_specs = hu.subarray_specs(subarr)
         self.row_slice = SUB_SLICE[subarr]
+        self._nrows, self._ncols = SUB_DIMS[subarr]
 
         # Set the dependent quantities
-        self._ncols = 2048
-        self._nrows = self.subarray_specs.get('y')
         self.wave = hu.wave_solutions(subarr)
         self.avg_wave = np.mean(self.wave, axis=1)
         self.coeffs = locate_trace.trace_polynomial(subarray=subarr)
 
         # Get correct reference files
-        self.ref_params['SUBARRAY'] = subarr
+        # self.ref_params['SUBARRAY'] = subarr
 
         # Reset the data and time arrays
         self._reset_data()
@@ -1171,7 +1254,7 @@ class SossSpecSim(SossSim):
 
         # Run the simulation
         if run:
-            self.simulate()
+            self.create()
 
 
 class SossBlackbodySim(SossSim):
@@ -1213,7 +1296,7 @@ class SossBlackbodySim(SossSim):
 
         # Run the simulation
         if run:
-            self.simulate()
+            self.create()
 
 
 class SossModelSim(SossSim):
@@ -1269,4 +1352,4 @@ class SossModelSim(SossSim):
 
         # Run the simulation
         if run:
-            self.simulate()
+            self.create()
