@@ -847,6 +847,13 @@ class SossSim():
 
         else:
 
+            # Read file if path is provided
+            if isinstance(spectrum, str):
+                if os.path.exists(spectrum):
+                    spectrum = file_io.read_file_spectrum(spectrum, flux_units=None)
+                else:
+                    raise IOError("{}: No file at that location.".format(spectrum))
+
             # Check planet is a sequence of length 2 or 3
             if not isinstance(spectrum, (list, tuple)) or not len(spectrum) in [2, 3]:
                 raise ValueError(type(spectrum), ': Planet input must be a sequence of [W, F] or [W, F, E]')
@@ -1054,7 +1061,7 @@ class SossSim():
 
         Parameters
         ----------
-        spectrum: sequence
+        spectrum: sequence, str
             The [W, F] or [W, F, E] of the star to simulate
         """
         # Check if the star has been set
@@ -1063,6 +1070,13 @@ class SossSim():
             self._star = None
 
         else:
+
+            # Read file if path is provided
+            if isinstance(spectrum, str):
+                if os.path.exists(spectrum):
+                    spectrum = file_io.read_file_spectrum(spectrum)
+                else:
+                    raise IOError("{}: No file at that location.".format(spectrum))
 
             # Check star is a sequence of length 2 or 3
             if not isinstance(spectrum, (list, tuple)) or not len(spectrum) in [2, 3]:
@@ -1086,7 +1100,7 @@ class SossSim():
             sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
             sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
             if spec_min > sim_min or spec_max < sim_max:
-                print("Wavelength range of input spectrum ({} - {} um) does not cover the {} - {} um range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
+                print("Wavelength range of input spectrum ({} - {}) does not cover the {} - {} range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
 
             # Good to go
             self._star = spectrum
