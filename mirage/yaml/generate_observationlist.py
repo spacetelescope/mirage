@@ -225,7 +225,7 @@ def ensure_lower_case_background_keys(dictionary):
             # nircam with it's dictionary of sw and lw doesn't necessarily
             # have to be present, if the input proposal has no nircam
             # observations
-            if isinstance(inst_data, collections.Mapping):
+            if isinstance(inst_data, collections.abc.Mapping):
                 new_dict[observation_number][instrument.lower()] = {}
                 for channel, channel_val in inst_data.items():
                     new_dict[observation_number][instrument.lower()][channel.lower()] = channel_val
@@ -259,7 +259,7 @@ def ensure_lower_case_keys(dictionary):
             # nircam with it's dictionary of sw and lw doesn't necessarily
             # have to be present, if the input proposal has no nircam
             # observations
-            if isinstance(value2, collections.Mapping):
+            if isinstance(value2, collections.abc.Mapping):
                 new_dict[key1][key2.lower()] = {}
                 for key3, value3 in value2.items():
                     new_dict[key1][key2.lower()][key3.lower()] = value3
@@ -345,7 +345,7 @@ def ensure_lower_case_catalogs_keys(dictionary):
     for target_name, targ_dict in dictionary.items():
         new_dict[target_name] = {}
         for key2, value2 in targ_dict.items():
-            if isinstance(value2, collections.Mapping):
+            if isinstance(value2, collections.abc.Mapping):
                 new_dict[target_name][key2.lower()] = {}
                 for key3, value3 in targ_dict[key2].items():
                     new_dict[target_name][key2.lower()][key3.lower()] = value3
