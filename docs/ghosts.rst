@@ -25,6 +25,10 @@ Optical ghosts can be added to simulated NIRISS imaging and WFSS observations. T
 
 If **add_ghosts** is True, Mirage will calculate, for each point source in your source catalog, the location and magnitude of the optical ghost associated with the optical elements being used. Within Mirage, once the ghost locations and magnitudes are known, the ghosts are treated as :ref:`extended sources <source_catalogs>`, which rely upon fits files containing stamp images. The stamp images are read in, scaled to the requested brightness, and added to the seed image. The location and brightness of the ghost are calculated using the "gap summary" file in the **config** directory of the Mirage repository. This file specifies the observed offsets, as well as count rate of a ghost for a given filter, pupil, and source location and count rate on the detector.
 
+.. tip::
+
+    If you wish to run Mirage with a "gap summary" file other than that in the config directory, you can either replace the file in the config directory with your own, or update the value of NIRISS_GHOST_GAP_FILE in the constants.py file of the repository to point to your file. This may be useful for testing new ghost position calibration results.
+
 Mirage currently carries one fits file in its collection of :ref:`reference files <reference_files>` that provides an image of an optical ghost from a point source on the NIRISS detector. This image was created from ground testing data. By default, this file is used when adding ghosts to the data. **NOTE that this stamp image applies to point sources only. By default, no ghosts are added for galaxy or extended sources.**
 
 Users may add ghosts associated with galaxy or extended sources (or override the default stamp image for point sources) by supplying their own stamp images and specifying which stamp images are to be associated with each source within the source catalogs. An example of this is shown in the :ref:`Specifying Ghost Stamp Images <specifying_ghost_stamp_images>` section below.

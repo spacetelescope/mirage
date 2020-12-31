@@ -30,9 +30,10 @@ def determine_ghost_stamp_filename(row, source_type):
         Name of a fits file containing a stamp image to use for the ghost source
         associated with the source in ```row```.
     """
+    logger = logging.getLogger('mirage.ghosts.niriss_ghosts.determine_ghost_stamp_filename')
     if source_type.lower() == 'point_source':
         default = DEFAULT_NIRISS_PTSRC_GHOST_FILE
-    elif source_type.lower() == 'galaxy':
+    elif source_type.lower() == 'galaxies':
         default = None
     elif source_type.lower() == 'extended':
         default = None
@@ -46,18 +47,16 @@ def determine_ghost_stamp_filename(row, source_type):
             if default is not None:
                 ghost_stamp_filename = default
             else:
-                raise ValueError(('Attempting to add a ghost source corresponding to a {} source '
-                                  'but no niriss_ghost_stamp image file is given in the source catalog, '
-                                  'and the default ghost stamp image file is None. Unable to create ghost source.'
-                                  .format(source_type)))
+                ghost_stamp_filename = None
+                logger.info(('No niriss_ghost_stamp filename for this source in the source catalog, and the default '
+                             'file is set to None. Skipping ghost addition for this source.'))
     else:
         if default is not None:
             ghost_stamp_filename = default
         else:
-            raise ValueError(('Attempting to add a ghost source corresponding to a {} source '
-                              'source, but no niriss_ghost_stamp column is present in the source catalog, '
-                              'and the default ghost stamp image file is None. Unable to create ghost source.'
-                              .format(source_type)))
+            ghost_stamp_filename = None
+            logger.info(('No niriss_ghost_stamp column in source catalog, and the default file is set to None. '
+                         'Skipping ghost addition for this source.'))
     return ghost_stamp_filename
 
 
