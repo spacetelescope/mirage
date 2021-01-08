@@ -2154,7 +2154,7 @@ class Catalog_seed():
                     if ('BSOFF_V2' in header) and ('BSOFF_V3' in header):
                         offset_vector = header['BSOFF_V2']*60., header['BSOFF_V3']*60. #convert to arcseconds
                 else:
-                    print("No PSF library matching '{}_{}_{}.fits'; ignoring boresight offset (if any)".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower()))
+                    self.logger.info("No PSF library matching '{}_{}_{}.fits'; ignoring boresight offset (if any)".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower()))
 
                         
                 # Translate the point source list into an image
