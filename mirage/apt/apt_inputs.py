@@ -318,6 +318,9 @@ class AptInput:
         # Expand the dictionary to have one entry for each detector in each exposure
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
+        # For fiducial point overrides, save the pointing aperture and actual aperture separately
+        self.check_aperture_override()
+
         # Add start times for each exposure
         # Ignore warnings as astropy.time.Time will give a warning
         # related to unknown leap seconds if the date is too far in
@@ -346,8 +349,6 @@ class AptInput:
                     temp_table['exposure'][prime_index] = ['{:05d}'.format(n+1) for n in np.arange(len(prime_index))]
                     temp_table['exposure'][parallel_index] = ['{:05d}'.format(n+1) for n in np.arange(len(parallel_index))]
         self.exposure_tab['exposure'] = list(temp_table['exposure'])
-
-        self.check_aperture_override()
 
         if verbose:
             for key in self.exposure_tab.keys():
