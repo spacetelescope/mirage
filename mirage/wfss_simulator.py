@@ -166,6 +166,11 @@ class WFSSSim():
             # find_param_info() has reordered the list such that the
             # wfss mode yaml file will be examined first.
             if self.create_continuum_seds:
+                # Be sure to include any Mirage-created source catalogs containing
+                # ghost sources in the list of catalogs whose sources will be included
+                # in the hdf5 file
+                if len(cat.ghost_catalogs) > 0:
+                    self.catalog_files.extend(cat.ghost_catalogs)
                 break
 
         # Create hdf5 file with spectra of all sources if requested.

@@ -5,9 +5,12 @@ simulations. Code originally written by Takahiro Morishita.
 """
 import logging
 import numpy as np
-from astropy.io import fits,ascii
+from astropy.io import fits, ascii
+from astropy.table import Table
 
 from mirage.utils.constants import DEFAULT_NIRISS_PTSRC_GHOST_FILE
+from mirage.utils.flux_cal import fluxcal_info
+from mirage.utils.utils import countrate_to_magnitude, magnitude_to_countrate
 
 
 def determine_ghost_stamp_filename(row, source_type):
@@ -153,3 +156,75 @@ def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0):
         flux_gs = np.zeros(len(xgap), 'float')
 
     return xgs, ygs, flux_gs
+
+
+def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_file):
+    """Works only for NIRISS. Given a row from a source catalog, create a ghost source
+    catalog containing the magnitudes of the ghost associated with the source in all
+    filters contained in the original catalog.
+
+    Parameters
+    ----------
+    row : astropy.table.Row
+        Row containing a source from a source catalog
+
+    flux_cal_file : str
+        Name of file containing the flux calibration information
+        for all filters
+
+    magnitude_system : str
+        Magnitude system of the magnitudes in the input catalog
+
+    gap_summary_file : str
+        Name of file that controls ghost locations relative to sources
+
+    Returns
+    -------
+    ghost_row : astropy.table.Table
+        Single row table containing the ghost magnitudes in all filters
+    """
+    logger = logging.getLogger('mirage.ghosts.niriss_ghosts.source_mags_to_ghost_mags')
+    mag_cols = [key for key in row.colnames if 'magnitude' in key]
+    ghost_row = Table()
+    for mag_col in mag_cols:
+
+        # Ghost magnitudes can currently be calcuated only for NIRISS
+        skipped_non_niriss_cols = False
+        if 'nircam' in mag_col.lower() or 'fgs' in mag_col.lower():
+            skipped_non_niriss_cols = True
+            continue
+
+        col_parts = mag_col.split('_')
+        if len(col_parts) == 3:
+            filt = col_parts[1]
+        else:
+            raise ValueError('Unsupported magnitude column name for ghost conversion: {}'.format(mag_col))
+
+        wave = int(filt[1:4])
+        if wave > 200:
+            filter_value = filt
+            pupil_value = 'CLEARP'
+        else:
+            filter_value = 'CLEAR'
+            pupil_value = filt
+
+        # Get basic flux calibration information for the filter
+        vegazeropoint, photflam, photfnu, pivot = \
+            fluxcal_info(flux_cal_file, 'niriss', filter_value, pupil_value, 'NIS', 'N')
+
+        # Convert source magnitude to count rate
+        mag = float(row[mag_col])
+        countrate = magnitude_to_countrate('niriss', filt, magnitude_system, mag,
+                                            photfnu=photfnu, photflam=photflam,
+                                            vegamag_zeropoint=vegazeropoint)
+
+        # Get the count rate associated with the ghost
+        _, _, ghost_countrate = get_ghost(1024, 1024, countrate, filter_value, pupil_value, gap_summary_file)
+
+        # Convert count rate to magnitude
+        ghost_mag = countrate_to_magnitude('niriss', filt, magnitude_system, ghost_countrate,
+                                            photfnu=photfnu, photflam=photflam,
+                                            vegamag_zeropoint=vegazeropoint)
+        ghost_row[mag_col] = [ghost_mag]
+    return ghost_row, skipped_non_niriss_cols
+

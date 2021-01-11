@@ -379,7 +379,7 @@ class GalaxyCatalog(PointSourceCatalog):
 
 class ExtendedCatalog(PointSourceCatalog):
     def __init__(self, filenames=[], ra=[], dec=[], x=[], y=[], position_angle=[], starting_index=1,
-                 niriss_ghost_stamp=[]):
+                 niriss_ghost_stamp=[], corresponding_source_index_for_ghost=[]):
         # Add location information
         PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, starting_index=starting_index,
                                     niriss_ghost_stamp=niriss_ghost_stamp)
@@ -387,6 +387,7 @@ class ExtendedCatalog(PointSourceCatalog):
         # Add extended source-specific information
         self._filenames = filenames
         self._pos_angle = position_angle
+        self._corresponding_source_index_for_ghost = corresponding_source_index_for_ghost
 
         if len(self._filenames) != len(self._ra):
             raise ValueError(("Lengths of stamp filenames list and RA/Dec or x/y lists are not equal!"))
@@ -407,6 +408,13 @@ class ExtendedCatalog(PointSourceCatalog):
         # Add the position angle column
         pa_col = Column(self._pos_angle, name='pos_angle')
         tab.add_column(pa_col)
+
+        # Add the column that lists the index for the original target that
+        # is the source for the ghost target. For non-ghosts, this column should
+        # have a value of 0.
+        if len(self._corresponding_source_index_for_ghost) > 0:
+            src_index_col = Column(self._corresponding_source_index_for_ghost, name='corresponding_source_index_for_ghost')
+            tab.add_column(src_index_col)
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
