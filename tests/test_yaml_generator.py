@@ -72,7 +72,7 @@ def test_user_inputs_basic():
                       }
             }
     cr = {'library': 'FLARE', 'scale': 44.0}
-    date = '2019-5-25'
+    date = '2019-05-25'
     background = {'001': 'high', '002': 'medium', '003': 22.3}
     roll_angle = 34.5
 
@@ -88,7 +88,18 @@ def test_user_inputs_basic():
     nis_obs = np.vstack([nis_obs1, nis_obs2, nis_obs3])
 
     # Check dates
-    date_match = [entry == date for entry in tab['Date']]
+    date_to_match = '{} 00:00:00'.format(date)
+    date_match = [str(entry) == date_to_match for entry in tab['Date']]
+
+    #for entry in tab['Date']:
+    #  print(date_to_match, str(entry), type(date_to_match), type(str(entry)), date_to_match == str(entry))
+
+
+
+
+
+
+
     assert all(date_match) is True
 
     # Check roll angle
@@ -197,7 +208,7 @@ def test_user_inputs_complex():
           '002': {'library': 'SUNMIN', 'scale': 5.5},
           '003': {'library': 'SUNMAX', 'scale': 4.4}}
 
-    date = {'001': '2019-05-25', '002': '2019-11-15', '003': '2020-10-14'}
+    date = {'001': '2019-05-25', '002': '2019-11-15T12:12:12.120000', '003': '2020-10-14T19:20:21'}
 
     background = {'001': {'nircam': {'sw': 0.2, 'lw': 0.3}, 'niriss': 0.4},
                   '002': {'nircam': {'sw': 'medium', 'lw': 'high'}, 'niriss': 'low'},
@@ -218,9 +229,14 @@ def test_user_inputs_complex():
 
     # Check dates
     for i, key in enumerate(date):
-        date_match = [entry == date[key] for entry in np.array(tab['Date'])[nis_obs[i, :]]]
+        if 'T' not in date[key]:
+            date_to_match = '{} 00:00:00'.format(date[key])
+        else:
+            date_to_match = date[key].replace('T', ' ')
+
+        date_match = [str(entry) == date_to_match for entry in np.array(tab['Date'])[nis_obs[i, :]]]
         assert all(date_match) is True
-        date_match = [entry == date[key] for entry in np.array(tab['Date'])[nrc_obs[i, :]]]
+        date_match = [str(entry) == date_to_match for entry in np.array(tab['Date'])[nrc_obs[i, :]]]
         assert all(date_match) is True
 
     # Check roll angle

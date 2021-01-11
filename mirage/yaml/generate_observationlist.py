@@ -225,7 +225,7 @@ def ensure_lower_case_background_keys(dictionary):
             # nircam with it's dictionary of sw and lw doesn't necessarily
             # have to be present, if the input proposal has no nircam
             # observations
-            if isinstance(inst_data, collections.Mapping):
+            if isinstance(inst_data, collections.abc.Mapping):
                 new_dict[observation_number][instrument.lower()] = {}
                 for channel, channel_val in inst_data.items():
                     new_dict[observation_number][instrument.lower()][channel.lower()] = channel_val
@@ -259,7 +259,7 @@ def ensure_lower_case_keys(dictionary):
             # nircam with it's dictionary of sw and lw doesn't necessarily
             # have to be present, if the input proposal has no nircam
             # observations
-            if isinstance(value2, collections.Mapping):
+            if isinstance(value2, collections.abc.Mapping):
                 new_dict[key1][key2.lower()] = {}
                 for key3, value3 in value2.items():
                     new_dict[key1][key2.lower()][key3.lower()] = value3
@@ -345,7 +345,7 @@ def ensure_lower_case_catalogs_keys(dictionary):
     for target_name, targ_dict in dictionary.items():
         new_dict[target_name] = {}
         for key2, value2 in targ_dict.items():
-            if isinstance(value2, collections.Mapping):
+            if isinstance(value2, collections.abc.Mapping):
                 new_dict[target_name][key2.lower()] = {}
                 for key3, value3 in targ_dict[key2].items():
                     new_dict[target_name][key2.lower()][key3.lower()] = value3
@@ -516,8 +516,9 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # Set default values. These are overwritten if there is an appropriate
     # entry in parameter_defaults
+    default_time = '00:00:00'
     default_values = {}
-    default_values['Date'] = '2021-10-04'
+    default_values['Date'] = '2022-10-04T00:00:00'
     default_values['PAV3'] = '0.'
     default_values['PointsourceCatalog'] = 'None'
     default_values['GalaxyCatalog'] = 'None'
@@ -585,21 +586,22 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # Dates
     # dates = '2019-5-25'
-    # dates = {'001': '2019-05-25', '002': '2019-11-15'}
+    # dates = {'001': '2019-05-25', '002': '2019-11-15T12:13:14'}
     dates = parameter_overrides['dates']
     if dates is not None:
         if isinstance(dates, str):
-            default_values['Date'] = dates
+            if 'T' in dates:
+                # In the end we need dates in the format of YYYY-MM-DDTHH:MM:SS
+                default_values['Date'] = dates
+            else:
+                # If the time part is not present in the input, then add it.
+                default_values['Date'] = '{}T{}'.format(dates, default_time)
             # Now set dates to None so that it won't be used when looping
             # over observations below
             dates = None
         else:
             # Just use dates below when looping over observations
             pass
-
-    #for key in parameter_defaults.keys():
-    #    if key in default_values.keys():
-    #        default_values[key] = parameter_defaults[key]
 
     # Roll angle, aka PAV3
     # pav3 = 34.5
@@ -688,7 +690,11 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
                     date_value = default_values['Date']
                 else:
                     try:
-                        date_value = dates[observation_number]
+                        value = dates[observation_number]
+                        if 'T' in value:
+                            date_value = dates[observation_number]
+                        else:
+                            date_value = '{}T{}'.format(dates[observation_number], default_time)
                     except KeyError:
                         logger.error(("\n\nERROR: No date value specified for Observation {} in date dictionary. "
                                       "Quitting.\n\n".format(observation_number)))

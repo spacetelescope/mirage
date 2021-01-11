@@ -245,10 +245,10 @@ Observation Dates
 +++++++++++++++++
 
 You may also specify the observation date for each observation in your APT file. This may be used along with roll angle to help define epochs in your observations, or simply
-to associate a given dataset with a date. **Note that Mirage does not pay attention to dates in any way** other than to save them into the *date-obs* header keyword in the output
+to associate a given dataset with a date. Mirage saves the input dates into the *date-obs* header keyword in the output
 files. Mirage does not check that a given roll angle and pointing are physically realizable on a given date. It is up to you to provide realistic values for these paramters
 if they are important to you. The `JWST Target Visibility Tools <http://www.stsci.edu/jwst/science-planning/proposal-planning-toolbox/target-visibility-tools>`_ (TVT) are
-useful for this. Note that in all cases below, Mirage will use the entered date (along with a default time) as the starting time of the first exposure in the observation.
+useful for this. Note that in all cases below, Mirage will use the entered date (along with a default time if necessary) as the starting time of the first exposure in the observation.
 Mirage keeps track of exposure times and makes some guesses about overheads, and increments the observation time and date for each exposure.
 
 To use the Mirage default for observation date (arbitrarily set to 2021-10-04), you can either not supply any date information, or explicitly use None.
@@ -270,6 +270,11 @@ the date strings for each.
 
     dates = {'001': '2022-06-25', '002': '2022-11-15', '003': '2023-03-14'}
 
+For observations where you want to be more specific about the observation time (such as for non-sidereal targets), datetime strings can be provided:
+
+::
+
+    dates = {'001': '2022-06-25T12:00:00', '002': '2022-11-15T12:34:56', '003': '2023-03-14T18:35:42'}
 
 .. _yam_gen_cr_inputs:
 

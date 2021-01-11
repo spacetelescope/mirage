@@ -79,6 +79,53 @@ def aperture_ra_dec(siaf_instance, aperture_name, ra, dec, telescope_roll, outpu
     return aperture_pointing
 
 
+def aperture_xy_to_radec(x, y, instrument, aperture, fiducial_ra, fiducial_dec, pav3):
+    """For a given aperture and roll angle, translate a given detector
+    (x, y) location to RA, Dec
+
+    Parameters
+    ----------
+    x : float
+        X-coordinate within ```aperture```
+
+    y : float
+        Y-coordinate within ```aperture```
+
+    instrument : str
+        Name of JWST instrument (e.g. 'nircam')
+
+    aperture : str
+        Name of aperture (e.g. 'NRCA1_FULL')
+
+    fiducial_ra : float
+        Right ascention value at the reference location of the aperture,
+        in decimal degrees
+
+    fiducial_dec : float
+        Declination value at the reference location of the aperture,
+        in decimal degrees
+
+    pav3 : float
+        Telescope roll angle, in degrees
+
+    Returns
+    -------
+    ra : float
+        RA corresponding to (x, y)
+
+    dec : float
+        Dec corresponding to (x, y)
+    """
+    instrument_siaf = siaf_interface.get_instance(instrument)
+    siaf = instrument_siaf[aperture]
+    local_roll, attitude_matrix, ffsize, \
+            subarray_bounds = get_siaf_information(instrument, aperture, fiducial_ra,
+                                                   fiducial_dec, pav3)
+    loc_v2, loc_v3 = siaf.sci_to_tel(x + 1, y + 1)
+    ra, dec = pysiaf.utils.rotations.pointing(attitude_matrix, loc_v2, loc_v3)
+    return ra, dec
+
+
 def get_instance(instrument):
     """Return an instance of a pysiaf.Siaf object for the given instrument
 

@@ -1494,7 +1494,7 @@ class Catalog_seed():
             if entry['ephemeris_file'].lower() != 'none':
                 self.logger.info(("Using ephemeris file {} to find the location of source #{} in {}."
                                   .format(entry['ephemeris_file'], index, filename)))
-                ra_eph, dec_eph = self.get_ephemeris(entry['ephemeris_file'])
+                ra_eph, dec_eph = ephemeris_tools.get_ephemeris(entry['ephemeris_file'])
 
                 # Create list of positions for all frames
                 ra_frames = ra_eph(all_times)
@@ -1830,38 +1830,6 @@ class Catalog_seed():
         ra_list = np.array(ra_list)
         dec_list = np.array(dec_list)
         return ra_list, dec_list
-
-    def get_ephemeris(self, method):
-        """Wrapper function to simplify the creation of an ephemeris
-
-        Parameters
-        ----------
-        method : str
-            Method to use to create the ephemeris. Can be one of two
-            options:
-            1) Name of an ascii file containing an ephemeris.
-            2) 'create' - Horizons is queried in order to produce an ephemeris
-
-        Returns
-        -------
-        ephemeris : tup
-            Tuple of interpolation functions for (RA, Dec). Interpolation
-            functions are for RA (or Dec) in degrees as a function of
-            calendar timestamp
-        """
-        if method.lower() != 'create':
-            ephem = ephemeris_tools.read_ephemeris_file(method)
-        else:
-            start_date = datetime.datetime.strptime(self.params['Output']['date_obs'], '%Y-%m-%d')
-            earlier = start_date - datetime.timedelta(days=1)
-            later = start_date + datetime.timedelta(days=1)
-            step_size = 0.1  # days
-            ephem = ephemeris_tools.query_horizons(self.params['Output']['target_name'], earlier, later, step_size)
-            raise NotImplementedError('Horizons query not yet working')
-
-        ephemeris = ephemeris_tools.create_interpol_function(ephem)
-        return ephemeris
-
 
     def on_detector(self, xloc, yloc, stampdim, finaldim):
         """Given a set of x, y locations, stamp image dimensions,
@@ -2238,7 +2206,7 @@ class Catalog_seed():
 
         self.logger.info(('Calculating target RA, Dec at the observation time using ephemeris file: {}'
                           .format(src_catalog['ephemeris_file'][0])))
-        ra_eph, dec_eph = self.get_ephemeris(src_catalog['ephemeris_file'][0])
+        ra_eph, dec_eph = ephemeris_tools.get_ephemeris(src_catalog['ephemeris_file'][0])
 
         # If the input x_or_RA and y_or_Dec columns have values of 'none', then
         # populating them with the values calculated here results in truncated
@@ -2270,9 +2238,21 @@ class Catalog_seed():
         if self.runStep['pointsource'] is True:
             if not self.expand_catalog_for_segments:
 
+                # CHECK IN INPUT PSF FILE IF THERE'S A BORESIGHT OFFSET TO BE APPLIED:
+                offset_vector = None
+                infile = glob.glob(os.path.join(self.params['simSignals']['psfpath'], "{}_{}_{}*.fits".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower())))
+                if len(infile) > 0:
+                    header = fits.getheader(infile[0])
+                    if ('BSOFF_V2' in header) and ('BSOFF_V3' in header):
+                        offset_vector = header['BSOFF_V2']*60., header['BSOFF_V3']*60. #convert to arcseconds
+                else:
+                    self.logger.info("No PSF library matching '{}_{}_{}.fits'; ignoring boresight offset (if any)".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower()))
+
                 # Translate the point source list into an image
                 self.logger.info('Creating point source lists')
-                pslist, ps_ghosts_cat = self.get_point_source_list(self.params['simSignals']['pointsource'])
+                pslist, ps_ghosts_cat = self.get_point_source_list(self.params['simSignals']['pointsource'],
+                                                                   segment_offset=offset_vector)
+
                 psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
 
                 # If ghost sources are present, then make sure Mirage will retrieve
@@ -2818,7 +2798,7 @@ class Catalog_seed():
         V2ref_arcsec = self.siaf.V2Ref
         V3ref_arcsec = self.siaf.V3Ref
         position_angle = self.params['Telescope']['rotation']
-        self.logger.info('    Position angle = ', position_angle)
+        self.logger.info(' Position angle = {}'.format(position_angle))
         attitude_ref = pysiaf.utils.rotations.attitude(V2ref_arcsec, V3ref_arcsec, self.ra, self.dec, position_angle)
 
         # Shift every source by the appropriate offset
