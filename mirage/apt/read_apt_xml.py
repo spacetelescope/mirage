@@ -569,7 +569,7 @@ class ReadAPTXML():
                 value = field.text
                 observation_dict[key] = value
 
-             if observation_dict["PrimaryDitherType"] == "WFSC":
+            if observation_dict["PrimaryDitherType"] == "WFSC":
                 observation_dict["SubpixelDitherType"] = "WFSC"
                 
             # Determine if there is an aperture override
