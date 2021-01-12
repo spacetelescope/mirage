@@ -22,7 +22,7 @@ from mirage.utils.constants import DEFAULT_NIRISS_PTSRC_GHOST_FILE, NIRISS_GHOST
 def test_determine_ghost_stamp_filename():
     # Table with niriss_ghost_stamp column - cases that should work
     tab = Table()
-    source_types = ['point_source', 'point_source', 'galaxy', 'extended']
+    source_types = ['point_source', 'point_source', 'galaxies', 'extended']
     stamp_files = ['my_stamp.fits', None, 'my_galstamp.fits', 'my_extstamp.fits']
     tab['niriss_ghost_stamp'] = stamp_files
     expected = ['my_stamp.fits', DEFAULT_NIRISS_PTSRC_GHOST_FILE, 'my_galstamp.fits', 'my_extstamp.fits']
@@ -31,15 +31,25 @@ def test_determine_ghost_stamp_filename():
         outfile = niriss_ghosts.determine_ghost_stamp_filename(row, source)
         assert outfile == expectation
 
-    # Table with niriss_ghost_stamp column - cases that should raise exceptions
-    source_types = ['galaxy', 'extended']
+    # Table with niriss_ghost_stamp column - case that should raise exception
+    source_types = ['galaxy']
     tab = Table()
-    exception_files = [None, None]
+    exception_files = [None]
     tab['niriss_ghost_stamp'] = exception_files
 
     for row, source in zip(tab, source_types):
         with pytest.raises(ValueError):
             outfile = niriss_ghosts.determine_ghost_stamp_filename(row, source)
+
+    # Table with niriss_ghost_stamp column - case where outfile should be None
+    source_types = ['extended']
+    tab = Table()
+    exception_files = [None]
+    tab['niriss_ghost_stamp'] = exception_files
+
+    for row, source in zip(tab, source_types):
+        outfile = niriss_ghosts.determine_ghost_stamp_filename(row, source)
+        assert outfile is None
 
     # Table without niriss_ghost_stamp column - cases that should work
     tab = Table()
@@ -53,12 +63,21 @@ def test_determine_ghost_stamp_filename():
 
     # Table without niriss_ghost_stamp column - cases that should raise exceptions
     tab = Table()
-    tab['a'] = [1, 1]
-    source_types = ['galaxy', 'extended']
+    tab['a'] = [1]
+    source_types = ['galaxy']
 
     for row, source in zip(tab, source_types):
         with pytest.raises(ValueError):
             outfile = niriss_ghosts.determine_ghost_stamp_filename(row, source)
+
+    # Table without niriss_ghost_stamp column - cases where outfile should be None
+    tab = Table()
+    tab['a'] = [1]
+    source_types = ['extended']
+
+    for row, source in zip(tab, source_types):
+        outfile = niriss_ghosts.determine_ghost_stamp_filename(row, source)
+        assert outfile is None
 
 
 def test_get_gap():
