@@ -279,14 +279,21 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
         if len(flux) == 1:
             flux.append(flux[0])
 
+        # Remove any NaN entries
         sorted_fluxes = np.array(flux)[sorted_indexes]
+        finite = np.isfinite(sorted_fluxes)
+        sorted_fluxes = sorted_fluxes[finite]
+        filtered_wavelengths = wavelengths[finite]
         final_sorted_fluxes = copy.deepcopy(sorted_fluxes)
 
         # If the provided flux values don't cover the complete wavelength
         # range, extrapolate, if requested.
-        if ((np.min(wavelengths) > min_wave) or (np.max(wavelengths) < max_wave)) and extrapolate_SED:
-            interp_func = interp1d(wavelengths, sorted_fluxes, fill_value="extrapolate", bounds_error=False)
+        if ((np.min(filtered_wavelengths) > min_wave) or (np.max(filtered_wavelengths) < max_wave)) and extrapolate_SED:
+            interp_func = interp1d(filtered_wavelengths, sorted_fluxes, fill_value="extrapolate", bounds_error=False)
             final_sorted_fluxes = interp_func(final_wavelengths)
+        else:
+            final_wavelengths = filtered_wavelengths
+
         # Set any flux values that are less than zero to zero
         final_sorted_fluxes[final_sorted_fluxes < 0.] = 0.
 
@@ -509,14 +516,8 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     # sources that caused the ghosts. This needs to be done after we have
     # spectra for all real sources, so we need a separate, second loop over
     # the catalogs here.
-    print('catalog_files:', catalog_files)
-
-
     for catalog_file in ghost_catalog_files:
         ascii_catalog, mag_sys = read_catalog(catalog_file)
-
-
-        print('Adding souces to SED file using catalog: {}'.format(os.path.basename(catalog_file)))
 
         if 'corresponding_source_index_for_ghost' in ascii_catalog.colnames:
             print('Within the catalog')

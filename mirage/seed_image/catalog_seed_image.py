@@ -1551,8 +1551,6 @@ class Catalog_seed():
                         # Here the background target position is in units of RA, Dec.
                         # So we need to first convert it to x, y
 
-                        print('converting bkgd source locations to x,y')
-
                         x_frames, y_frames = self.radec_list_to_xy_list(ra_frames, dec_frames)
                         ra_frames = None
                         dec_frames = None
