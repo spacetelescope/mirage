@@ -182,14 +182,18 @@ def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_
     -------
     ghost_row : astropy.table.Table
         Single row table containing the ghost magnitudes in all filters
+
+    skipped_non_niriss_cols : bool
+        If True, non NIRISS magnitude columns were found and skipped
+
     """
     logger = logging.getLogger('mirage.ghosts.niriss_ghosts.source_mags_to_ghost_mags')
     mag_cols = [key for key in row.colnames if 'magnitude' in key]
     ghost_row = Table()
+    skipped_non_niriss_cols = False
     for mag_col in mag_cols:
 
         # Ghost magnitudes can currently be calcuated only for NIRISS
-        skipped_non_niriss_cols = False
         if 'nircam' in mag_col.lower() or 'fgs' in mag_col.lower():
             skipped_non_niriss_cols = True
             continue
