@@ -81,11 +81,11 @@ def test_determine_ghost_stamp_filename():
 
 
 def test_get_gap():
-    filts = ['CLEAR', 'F430M']
-    pupils = ['F090W', 'CLEARP']
-    expected_xs = [1168.900, -99.000]
-    expected_ys = [937.200, -99.000]
-    expected_fracs = [1.100, -99.000]
+    filts = ['CLEAR']
+    pupils = ['F090W']
+    expected_xs = [1168.900]
+    expected_ys = [937.200]
+    expected_fracs = [1.100]
 
     for filt, pup, ex_x, ex_y, ex_f in zip(filts, pupils, expected_xs, expected_ys, expected_fracs):
         x, y, f = niriss_ghosts.get_gap(filt, pup, NIRISS_GHOST_GAP_FILE)
