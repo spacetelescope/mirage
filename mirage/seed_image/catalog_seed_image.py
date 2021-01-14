@@ -2654,6 +2654,7 @@ class Catalog_seed():
         else:
             ghost_x = None
 
+        skipped_non_niriss = False
         for index, values in zip(indexes, lines):
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
@@ -3869,6 +3870,7 @@ class Catalog_seed():
             ghost_x = None
 
         # Loop over galaxy sources
+        skipped_non_niriss = False
         for index, source in zip(indexes, galaxylist):
 
             # If galaxy radii are given in units of arcseconds, translate to pixels
@@ -4525,6 +4527,7 @@ class Catalog_seed():
             ghost_x = None
 
         # Loop over input lines in the source list
+        skipped_non_niriss = False
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
             if not os.path.isfile(values['filename']):
@@ -4665,7 +4668,7 @@ class Catalog_seed():
 
         # If no good point sources were found in the requested array, alert the user
         if len(extSourceList) < 1:
-            self.logger.info("Warning: no non-sidereal extended sources within the requested array.")
+            self.logger.info("Warning: no extended sources within the requested array.")
             self.logger.info("The extended source image option is being turned off")
 
         if ghost_search and self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:

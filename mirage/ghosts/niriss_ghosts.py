@@ -63,7 +63,7 @@ def determine_ghost_stamp_filename(row, source_type):
     return ghost_stamp_filename
 
 
-def get_gap(filter_name, pupil_name, gap_file):
+def get_gap(filter_name, pupil_name, gap_file, log_skipped_filters=True):
     """Get GAP coordinates corresponding to input filter. GAP is based on CV3 data.
     We currently do not know fractional flux, tab_gap['frac_50'], i.e. there may be positional dependence too.
 
@@ -77,6 +77,10 @@ def get_gap(filter_name, pupil_name, gap_file):
 
     gap_file : str
         Name of ASCII file contianing ghost location offsets
+
+    log_skipped_filters : bool
+        If True, any filter magnitudes that are not converted because
+        the filter is not in the gap summary file will be logged.
 
     Returns
     -------
@@ -98,13 +102,14 @@ def get_gap(filter_name, pupil_name, gap_file):
         xgap, ygap = tab_gap['gapx_50'][iix[0][0]], tab_gap['gapy_50'][iix[0][0]]
         frac = tab_gap['frac_50'][iix[0][0]]
     elif len(iix[0]) == 0:
-        logger.info('Filter {} not found in the ghost gap file {}.'.format(filter_name, gap_file))
+        if log_skipped_filters:
+            logger.info('Filter {} not found in the ghost gap file {}.'.format(filter_name, gap_file))
         return np.nan, np.nan, np.nan
 
     return xgap, ygap, frac
 
 
-def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0):
+def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0, log_skipped_filters=True):
     """
     Calculates expected ghost positions given position of a source.
 
@@ -131,6 +136,10 @@ def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0):
     shift : int
         may be used, because photutils is 0-based, while ds9 is not.
 
+    log_skipped_filters : bool
+        Passed into get_gap. If True, any filter magnitudes that are not converted because
+        the filter is not in the gap summary file will be logged.
+
     Returns
     -------
     xgs : float or numpy.array
@@ -142,7 +151,7 @@ def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0):
     flux_gs : float or numpy.array
         fluxes of ghosts
     """
-    xgap, ygap, frac = get_gap(filter_name, pupil_name, gap_file)
+    xgap, ygap, frac = get_gap(filter_name, pupil_name, gap_file, log_skipped_filters=log_skipped_filters)
 
     xgap += shift
     ygap += shift
@@ -158,7 +167,7 @@ def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0):
     return xgs, ygs, flux_gs
 
 
-def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_file):
+def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_file, log_skipped_filters=False):
     """Works only for NIRISS. Given a row from a source catalog, create a ghost source
     catalog containing the magnitudes of the ghost associated with the source in all
     filters contained in the original catalog.
@@ -177,6 +186,11 @@ def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_
 
     gap_summary_file : str
         Name of file that controls ghost locations relative to sources
+
+    log_skipped_filters : bool
+        If False, notices of skipped magnitude translations will not be logged.
+        This is convenient for catalogs with lots of sources, because otherwise
+        there can be many repeats of the message.
 
     Returns
     -------
@@ -223,7 +237,8 @@ def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_
                                             vegamag_zeropoint=vegazeropoint)
 
         # Get the count rate associated with the ghost
-        _, _, ghost_countrate = get_ghost(1024, 1024, countrate, filter_value, pupil_value, gap_summary_file)
+        _, _, ghost_countrate = get_ghost(1024, 1024, countrate, filter_value, pupil_value, gap_summary_file,
+                                          log_skipped_filters=log_skipped_filters)
 
         # Convert count rate to magnitude
         ghost_mag = countrate_to_magnitude('niriss', filt, magnitude_system, ghost_countrate,
