@@ -7,11 +7,9 @@ Authors: Joe Filippazzo, Kevin Volk, Nestor Espinoza, Jonathan Fraine, Michael W
 """
 
 from copy import copy
-import datetime
 from functools import partial, wraps
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
-from pkg_resources import resource_filename
 import logging
 import time
 import warnings
@@ -29,25 +27,19 @@ from astropy.time import Time, TimeDelta
 from astropy.coordinates import SkyCoord
 from astroquery.simbad import Simbad
 import batman
-# from bokeh.plotting import figure, show
-# import bokeh.palettes as pal
+from bokeh.plotting import show
 from hotsoss import utils as hu, plotting, locate_trace
 import numpy as np
+import synphot as sphot
 
-from mirage import wfss_simulator
-from mirage.catalogs import model_atmospheres
 from mirage.seed_image import save_seed, segmentation_map
 from mirage.dark import dark_prep
 from mirage.logging import logging_functions
 from mirage.ramp_generator import obs_generator
 from mirage.reference_files import crds_tools
-from mirage.utils import read_fits
-from mirage.utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
-from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
-from mirage.utils import utils, file_io, backgrounds
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils import utils, file_io
 from mirage.psf import soss_trace
-from mirage.utils.timer import Timer
-from mirage.yaml import yaml_update
 
 
 classpath = os.path.dirname(__file__)
@@ -62,7 +54,7 @@ SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048,
 
 def check_psf_files():
     """Function to run on import to verify that the PSF files have been precomputed"""
-    if not os.path.isfile(resource_filename('awesimsoss', 'files/SOSS_CLEAR_PSF_order1_1.npy')):
+    if not os.path.isfile(os.environ['SOSS_DATA'] + 'SOSS_CLEAR_PSF_order1_1.npy'):
         print("Looks like you haven't generated the SOSS PSFs yet, which are required to produce simulations.")
         print("This takes about 10 minutes but you will only need to do it this one time.")
         compute = input("Would you like to do it now? [y] ")
@@ -248,8 +240,9 @@ class SossSim():
         self.message("Starting noise generator...")
         start = time.time()
 
-        # Generate segmentation map
+        # Generate segmentation map with correct dimensions
         self.segmap = segmentation_map.SegMap()
+        self.segmap.ydim = self.nrows
 
         # Prepare dark current exposure if needed.
         if self.override_dark is None:
@@ -261,7 +254,7 @@ class SossSim():
         else:
             self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
             use_darks = self.override_dark
-        print(self.segmap.shape)
+
         # Combine into final observation
         self.logger.info('Running observation generator')
         obs = obs_generator.Observation()
@@ -272,11 +265,14 @@ class SossSim():
         obs.paramfile = self.paramfile
         obs.create()
 
-        self.logger.info('\nSOSS simulator complete')
+        # Save ramp to tso attribute
+        self.tso = obs.raw_outramp
 
+        # Log it
+        self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, params=None, supersample_factor=None, **kwargs):
+    def create(self, n_jobs=-1, params=None, supersample_factor=None, noise=True, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -320,6 +316,9 @@ class SossSim():
 
         # Clear out old simulation
         self._reset_data()
+
+        # Reset time parameters
+        self._reset_time()
 
         # Reset relative response function
         self._reset_psfs()
@@ -447,7 +446,8 @@ class SossSim():
         self.seedfile, self.seedinfo = save_seed.save(self.tso_ideal, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
 
         # Make ramps and add noise to the observations
-        self.add_noise(**kwargs)
+        if noise:
+            self.add_noise(**kwargs)
 
         self.message('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
 
@@ -568,7 +568,7 @@ class SossSim():
     def info(self):
         """Summary table for the observation settings"""
         # Pull out relevant attributes
-        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_date', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec']
+        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_datetime', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec']
         settings = {key.strip('_'): val for key, val in self.__dict__.items() if key in track}
         return settings
 
@@ -644,48 +644,6 @@ class SossSim():
         self._reset_data()
         self._reset_time()
 
-    # def noise_report(self, plot=True, exclude=[]):
-    #     """
-    #     Table and plot of contributions from different noise sources
-    #
-    #     Parameters
-    #     ----------
-    #     plot: bool
-    #         Plot a figure of the noise contributions
-    #     exclude: list
-    #         A list of the sources to exclude from the plot
-    #     """
-    #     # Make empty table of inventory
-    #     inv = at.Table()
-    #     inv['nint'] = [int(i) for j in (np.ones((self.ngrps, self.nints)) * np.arange(1, self.nints + 1)).T for i in j]
-    #     inv['ngrp'] = [int(i) for j in np.ones((self.nints, self.ngrps)) * np.arange(1, self.ngrps + 1) for i in j]
-    #
-    #     # Add signal
-    #     self.noise_model.noise_sources['signal'] = list(np.nanmean(self.tso_ideal, axis=(2, 3)))
-    #
-    #     # Add the data
-    #     cols = []
-    #     for col, data in self.noise_model.noise_sources.items():
-    #         inv[col] = [i for j in data for i in j]
-    #         cols.append(col)
-    #
-    #     # Print the table
-    #     inv.pprint(max_width=-1, max_lines=-1)
-    #
-    #     # Plot it
-    #     if plot:
-    #         fig = figure(x_axis_label='Group', y_axis_label='Electrons/ADU', width=1000, height=500)
-    #         palette = pal.viridis(len(inv.colnames) - 2)
-    #         x = np.arange(self.ngrps * self.nints) + 1
-    #         for n, col in enumerate(cols):
-    #             if col not in exclude:
-    #                 fig.line(x, inv[col], color=palette[n], line_width=2, legend=col)
-    #
-    #         # Legend
-    #         fig.legend.click_policy = 'hide'
-    #
-    #         show(fig)
-
     @property
     def nresets(self):
         """Getter for the number of resets"""
@@ -739,7 +697,7 @@ class SossSim():
 
         # Try to make an astropy.time object
         if not isinstance(obsdate, good_dtypes):
-            raise ValueError("'{}' not a supported obs_date. Try a dtype of {}".format(obsdate, good_dtypes))
+            raise ValueError("'{}' not a supported obs_datetime. Try a dtype of {}".format(obsdate, good_dtypes))
 
         # Set the transit midpoint
         self._obs_datetime = Time(obsdate)
@@ -965,7 +923,7 @@ class SossSim():
     def _reset_time(self):
         """Reset the time axis based on the observation settings"""
         # Check that all the appropriate values have been initialized
-        if all([i in self.info for i in ['subarray', 'nints', 'ngrps', 'obs_date', 'nresets']]):
+        if all([i in self.info for i in ['subarray', 'nints', 'ngrps', 'obs_datetime', 'nresets']]):
 
             # Get frame time based on the subarray
             self.frame_time = utils.calc_frame_time('NIRISS', None, self.ncols, self.nrows, 1)
@@ -1315,7 +1273,7 @@ class SossBlackbodySim(SossSim):
 
 class SossModelSim(SossSim):
     """Generate a SossSim object with a theoretical ATLAS or PHOENIX stellar spectrum of choice"""
-    def __init__(self, ngrps=2, nints=2, teff=5700.0, logg=4.0, feh=0.0, alpha=0.0, jmag=9.0, stellar_model='ATLAS', filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
+    def __init__(self, ngrps=2, nints=2, teff=5700.0, logg=4.0, feh=0.0, alpha=0.0, jmag=9.0, models='ck04models', filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
         """Get the test data and load the object
 
         Parameters
@@ -1347,14 +1305,24 @@ class SossModelSim(SossSim):
         scale: int, float
             Scale the flux by the given factor
         """
-        # Retrieve PHOENIX or ATLAS stellar models:
-        if stellar_model.lower() == 'phoenix':
-            w, f = model_atmospheres.get_phoenix_model(feh, alpha, teff, logg)
-        elif stellar_model.lower() == 'atlas':
-            w, f = model_atmospheres.get_atlas_model(feh, teff, logg)
+        # # Retrieve PHOENIX or ATLAS stellar models:
+        # if stellar_model.lower() == 'phoenix':
+        #     w, f = model_atmospheres.get_phoenix_model(feh, alpha, teff, logg)
+        # elif stellar_model.lower() == 'atlas':
+        #     w, f = model_atmospheres.get_atlas_model(feh, teff, logg)
+        #
+        # # Now scale model spectrum to user-input J-band:
+        # f = model_atmospheres.scale_spectrum(w, f, jmag)
 
-        # Now scale model spectrum to user-input J-band:
-        f = model_atmospheres.scale_spectrum(w, f, jmag)
+        # TODO: Retrieve stellar model (https://synphot.readthedocs.io/en/latest/#id13)
+        # TODO: and trash the whole model_atmospheres.py module
+        spectrum = sphot.icat(models, teff, feh, logg) # TODO: Where is icat function?
+        bandpass = sphot.spectrum.SpectralElement.from_filter('2mass_j')
+        obs = sphot.observation.Observation(spectrum, bandpass)
+
+        sp_norm = spectrum.normalize(jmag, band=obs.bandpass)
+        w = sp_norm.waveset
+        f = sp_norm(w)
 
         # Initialize base class
         super().__init__(ngrps=ngrps, nints=nints, star=[w, f], subarray=subarray, filter=filter, **kwargs)

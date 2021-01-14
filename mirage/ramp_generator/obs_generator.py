@@ -1383,6 +1383,9 @@ class Observation():
                     self.logger.info("Final raw exposure saved to: ")
                     self.logger.info("{}".format(rawrampfile))
                     self.raw_output = rawrampfile
+
+                    # Adding this as an attribute so it can be accessed by soss_simulator.py
+                    self.raw_outramp = raw_outramp
                 else:
                     raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
                                       "with the superbias and reference pixels is not present in "
@@ -2888,14 +2891,14 @@ class Observation():
 
         # Grism TSO data have the XREF_SCI and YREF_SCI keywords populated.
         # These are used to describe the location of the source on the detector.
-        self.logger.info('\n\nPopulating xref_sci in output file:')
-        self.logger.info('{}'.format(self.seedheader['XREF_SCI']))
-
         try:
+            self.logger.info('\n\nPopulating xref_sci in output file:')
+            self.logger.info('{}'.format(self.seedheader['XREF_SCI']))
+
             outModel.meta.wcsinfo.siaf_xref_sci = self.seedheader['XREF_SCI']
             outModel.meta.wcsinfo.siaf_yref_sci = self.seedheader['YREF_SCI']
         except KeyError:
-            self.logger.warning('Unable to propagate XREF_SCI, YREF_SCI from seed image to simualted data file.')
+            self.logger.warning('Unable to propagate XREF_SCI, YREF_SCI from seed image to simulated data file.')
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         # compute pointing of V1 axis
@@ -2975,8 +2978,13 @@ class Observation():
         outModel.meta.exposure.nframes = self.params['Readout']['nframe']
         outModel.meta.exposure.ngroups = self.params['Readout']['ngroup']
         outModel.meta.exposure.nints = self.params['Readout']['nint']
-        outModel.meta.exposure.integration_start = self.seedheader['SEGINTST'] + 1
-        outModel.meta.exposure.integration_end = self.seedheader['SEGINTED'] + 1
+
+        # TODO: Putting this try/except here because SOSS mode mysteriously breaks it (Joe)
+        try:
+            outModel.meta.exposure.integration_start = self.seedheader['SEGINTST'] + 1
+            outModel.meta.exposure.integration_end = self.seedheader['SEGINTED'] + 1
+        except KeyError:
+            pass
 
         outModel.meta.exposure.sample_time = 10
         outModel.meta.exposure.frame_time = self.frametime

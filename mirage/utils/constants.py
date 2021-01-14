@@ -18,7 +18,7 @@ instrument_abbreviations = {'nircam': 'NRC',
 EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NRC_WFSS", "ts_grism": "NRC_TSGRISM"},
             "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_AMI", "pom": "NIS_IMAGE",
-                       "wfss": "NIS_WFSS"},
+                       "wfss": "NIS_WFSS", "soss": "NIS_SOSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
 
 # Number of detector resets prior to the start of an exposure

@@ -32,8 +32,7 @@ def calculate_psf_tilts():
     for order in [1, 2]:
 
         # Get the file
-        path = 'files/SOSS_PSF_tilt_order{}.npy'.format(order)
-        psf_file = resource_filename('awesimsoss', path)
+        psf_file = os.environ['SOSS_DATA'] + 'SOSS_PSF_tilt_order{}.npy'.format(order)
 
         # Dimensions
         subarray = 'SUBSTRIP256'
@@ -144,8 +143,8 @@ def generate_SOSS_ldcs(wavelengths, ld_profile, params, model_grid='ACES', subar
 
     Example
     -------
-    from awesimsoss import make_trace as mt
-    lookup = mt.generate_SOSS_ldcs(np.linspace(1., 2., 3), 'quadratic', [3300, 4.5, 0])
+    from mirage.psf import soss_trace as st
+    lookup = st.generate_SOSS_ldcs(np.linspace(1., 2., 3), 'quadratic', [3300, 4.5, 0])
     """
     try:
 
@@ -194,7 +193,7 @@ def generate_SOSS_psfs(filt):
         import webbpsf
 
         # Get the file
-        file = resource_filename('awesimsoss', 'files/SOSS_{}_PSF.fits'.format(filt))
+        file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF.fits'.format(filt)
 
         # Get the NIRISS class from webbpsf and set the filter
         ns = webbpsf.NIRISS()
@@ -281,7 +280,7 @@ def get_SOSS_psf(wavelength, filt='CLEAR', psfs=None, cutoff=0.005, plot=False):
     if psfs is None:
 
         # Get the file
-        file = resource_filename('awesimsoss', 'files/SOSS_{}_PSF.fits'.format(filt))
+        file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF.fits'.format(filt)
 
         # Load the SOSS psf cube
         cube = fits.getdata(file).swapaxes(-1, -2)
@@ -366,10 +365,10 @@ def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
     ---------
     # No planet
     import numpy as np
-    from awesimsoss.make_trace import psf_lightcurve
+    from mirage.psf import soss_trace as st
     psf = np.ones((76, 76))
     time = np.linspace(-0.2, 0.2, 200)
-    lc = psf_lightcurve(psf, None, None, time, None, plot=True)
+    lc = st.psf_lightcurve(psf, None, None, time, None, plot=True)
 
     Example 2
     ---------
@@ -377,7 +376,7 @@ def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
     import batman
     import numpy as np
     import astropy.units as q
-    from awesimsoss.make_trace import psf_lightcurve
+    from mirage.psf import soss_trace as st
     params = batman.TransitParams()
     params.t0 = 0.                                # time of inferior conjunction
     params.per = 5.7214742                        # orbital period (days)
@@ -391,7 +390,7 @@ def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
     params.limb_dark = 'quadratic'                # limb darkening profile to use
     params.u = [1, 1]                             # limb darkening coefficients
     tmodel = batman.TransitModel(params, time)
-    lc = psf_lightcurve(psf, [0.1, 0.1], 0.05, time, tmodel, plot=True)
+    lc = st.psf_lightcurve(psf, [0.1, 0.1], 0.05, time, tmodel, plot=True)
     """
     # Expand to shape of time axis
     flux = np.tile(psf, (len(time), 1, 1))
@@ -430,8 +429,7 @@ def psf_tilts(order):
         raise ValueError('Only orders 1 and 2 are supported.')
 
     # Get the file
-    path = 'files/SOSS_PSF_tilt_order{}.npy'.format(order)
-    psf_file = resource_filename('awesimsoss', path)
+    psf_file = os.environ['SOSS_DATA'] + 'SOSS_PSF_tilt_order{}.npy'.format(order)
 
     if not os.path.exists(psf_file):
         calculate_psf_tilts()
@@ -510,8 +508,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         coeffs = locate_trace.trace_polynomial(subarray)
 
         # Get the file
-        psf_path = 'files/SOSS_{}_PSF.fits'.format(filt)
-        psf_file = resource_filename('awesimsoss', psf_path)
+        psf_file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF.fits'.format(filt)
 
         # Load the SOSS psf cube
         cube = fits.getdata(psf_file).swapaxes(-1, -2)
@@ -607,8 +604,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
                     print('Finished in {} seconds.'.format(time.time()-start))
 
                     # Get the filepath
-                    filename = 'files/SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1)
-                    file = resource_filename('awesimsoss', filename)
+                    file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1)
 
                     # Delete the file if it exists
                     if os.path.isfile(file):
@@ -624,8 +620,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         # Get the chunked data and concatenate
         full_data = []
         for chunk in [1, 2, 3, 4]:
-            path = 'files/SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk)
-            file = resource_filename('awesimsoss', path)
+            file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk)
             full_data.append(np.load(file))
 
         return np.concatenate(full_data, axis=0)

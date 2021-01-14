@@ -24,9 +24,11 @@ mirage/catalogs/*.list
 
 # Log files #
 #############
+mirage_logs
 tests/mirage_logs/*
 tests/test_data/*/mirage_logs/*
 tests/test_data/*/*/mirage_logs/*
+mirage_latest.log
 
 # exceptions
 !tests/test_data/*/*.yaml
@@ -48,6 +50,8 @@ dev_scripts/*
 *config.json
 mirage.egg-info
 
+
+
 # Docs build #
 docs/_build
 docs/_static
@@ -61,3 +65,7 @@ mirage/version.py
 1068_official_version.xml
 1068_manual_redo.pointing
 1068_manual_redo.xml
+
+.eggs
+.idea
+*.DS_Store
