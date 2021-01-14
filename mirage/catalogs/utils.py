@@ -25,6 +25,9 @@ def catalog_index_check(catalogs):
     -------
     overlaps : bool
         True if there are overlapping index values
+
+    max_index : int
+        Maximum index value across all input catalogs
     """
     min_indexes = []
     max_indexes = []
@@ -59,7 +62,11 @@ def catalog_index_check(catalogs):
 
     # Check that each element of the array is less than the preceding element
     overlaps = ~np.all(indexes[1:] >= indexes[:-1])
-    return overlaps
+
+    # Also return the maximum index value
+    max_index = np.max(indexes)
+
+    return overlaps, max_index
 
 
 def determine_used_cats(obs_mode, cat_dict):

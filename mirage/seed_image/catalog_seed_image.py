@@ -30,7 +30,7 @@ import numpy as np
 from photutils import detect_sources
 from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
-from astropy.table import Table, Column
+from astropy.table import Table, Column, vstack
 from astropy.modeling.models import Shift, Sersic2D, Sersic1D, Polynomial2D, Mapping
 from astropy.stats import sigma_clipped_stats
 import astropy.units as u
@@ -39,9 +39,10 @@ import pysiaf
 from . import moving_targets
 from . import segmentation_map as segmap
 import mirage
-from mirage.catalogs.catalog_generator import TSO_GRISM_INDEX
+from mirage.catalogs.catalog_generator import ExtendedCatalog, TSO_GRISM_INDEX
 from mirage.catalogs.utils import catalog_index_check, determine_used_cats
 from mirage.seed_image import tso, ephemeris_tools
+from ..ghosts.niriss_ghosts import determine_ghost_stamp_filename, get_ghost, source_mags_to_ghost_mags
 from ..logging import logging_functions
 from ..reference_files import crds_tools
 from ..utils import backgrounds
@@ -50,11 +51,10 @@ from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
-                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
-from ..utils.constants import TSO_MODES
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
                                 get_segment_offset, get_segment_library_list)
@@ -132,6 +132,9 @@ class Catalog_seed():
         self.n_galaxies = 0
         self.n_extend = 0
 
+        # Names of Mirage-created source catalogs containing ghost sources
+        self.ghost_catalogs = []
+
         # Initialize timer
         self.timer = Timer()
 
@@ -154,7 +157,7 @@ class Catalog_seed():
         # but for WFSS sims where there is an associated hdf5 file,
         # it would mean trouble.
         used_cats = determine_used_cats(self.params['Inst']['mode'], self.params['simSignals'])
-        overlapping_indexes = catalog_index_check(used_cats)
+        overlapping_indexes, self.max_source_index = catalog_index_check(used_cats)
         if overlapping_indexes:
             error_list = [key for key in used_cats]
             raise ValueError(('At least two of the input source catalogs have overlapping index values. '
@@ -506,7 +509,7 @@ class Catalog_seed():
         # Read in the TSO catalog. This is only for TSO mode, not
         # grism TSO, which will need a different catalog format.
         if self.params['Inst']['mode'].lower() == 'ts_imaging':
-            tso_cat = self.get_point_source_list(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
+            tso_cat, _ = self.get_point_source_list(self.params['simSignals']['tso_imaging_catalog'], source_type='ts_imaging')
 
             # Create lists of seed images and segmentation maps for all
             # TSO objects
@@ -1028,6 +1031,12 @@ class Catalog_seed():
         mov_targs_ramps = []
         mov_targs_segmap = None
 
+        # Only attemp to add ghosts to NIRISS observations where the
+        # user has requested it.
+        add_ghosts = False
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            add_ghosts = True
+
         if self.params['Telescope']['tracking'].lower() != 'non-sidereal':
             tracking = False
             ra_vel = None
@@ -1046,18 +1055,15 @@ class Catalog_seed():
         if self.runStep['movingTargets']:
             self.logger.info("Adding moving point sources to seed image.")
 
-            print(ra_vel, dec_vel)
-            print(ra_interp_fncn, dec_interp_fncn)
-
-
             mov_targs_ptsrc, mt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['movingTargetList'],
-                                                                       'pointSource',
+                                                                       'point_source',
                                                                        MT_tracking=tracking,
                                                                        tracking_ra_vel=ra_vel,
                                                                        tracking_dec_vel=dec_vel,
                                                                        trackingPixVelFlag=vel_flag,
                                                                        non_sidereal_ra_interp_function=ra_interp_fncn,
-                                                                       non_sidereal_dec_interp_function=dec_interp_fncn
+                                                                       non_sidereal_dec_interp_function=dec_interp_fncn,
+                                                                       add_ghosts=add_ghosts
                                                                        )
 
             mov_targs_ramps.append(mov_targs_ptsrc)
@@ -1073,7 +1079,8 @@ class Catalog_seed():
                                                                          tracking_dec_vel=dec_vel,
                                                                          trackingPixVelFlag=vel_flag,
                                                                          non_sidereal_ra_interp_function=ra_interp_fncn,
-                                                                         non_sidereal_dec_interp_function=dec_interp_fncn
+                                                                         non_sidereal_dec_interp_function=dec_interp_fncn,
+                                                                         add_ghosts=add_ghosts
                                                                          )
 
             mov_targs_ramps.append(mov_targs_sersic)
@@ -1092,7 +1099,8 @@ class Catalog_seed():
                                                                    tracking_dec_vel=dec_vel,
                                                                    trackingPixVelFlag=vel_flag,
                                                                    non_sidereal_ra_interp_function=ra_interp_fncn,
-                                                                   non_sidereal_dec_interp_function=dec_interp_fncn
+                                                                   non_sidereal_dec_interp_function=dec_interp_fncn,
+                                                                   add_ghosts=add_ghosts
                                                                    )
 
             mov_targs_ramps.append(mov_targs_ext)
@@ -1130,6 +1138,11 @@ class Catalog_seed():
         Create a seed EXPOSURE in the case where the instrument is tracking
         a non-sidereal target
         """
+        # Only attemp to add ghosts to NIRISS observations where the
+        # user has requested it.
+        add_ghosts = False
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            add_ghosts = True
 
         # Create a count rate image containing only the non-sidereal target(s)
         # These will be stationary in the fov
@@ -1162,13 +1175,14 @@ class Catalog_seed():
             # movingTargetInputs
             self.logger.info("Adding moving background point sources to seed image.")
             mtt_ptsrc, mtt_ptsrc_segmap = self.movingTargetInputs(self.params['simSignals']['pointsource'],
-                                                                  'pointSource',
+                                                                  'point_source',
                                                                   MT_tracking=True,
                                                                   tracking_ra_vel=self.ra_vel,
                                                                   tracking_dec_vel=self.dec_vel,
                                                                   trackingPixVelFlag=self.nonsidereal_pix_vel_flag,
                                                                   non_sidereal_ra_interp_function=self.nonsidereal_ra_interp,
-                                                                  non_sidereal_dec_interp_function=self.nonsidereal_dec_interp)
+                                                                  non_sidereal_dec_interp_function=self.nonsidereal_dec_interp,
+                                                                  add_ghosts=add_ghosts)
             mtt_data_list.append(mtt_ptsrc)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ptsrc_segmap)
@@ -1185,8 +1199,9 @@ class Catalog_seed():
                                                                         tracking_ra_vel=self.ra_vel,
                                                                         tracking_dec_vel=self.dec_vel,
                                                                         trackingPixVelFlag=self.nonsidereal_pix_vel_flag,
-                                                                        non_sidereal_ra_interp_function=ra_interp,
-                                                                        non_sidereal_dec_interp_function=dec_interp)
+                                                                        non_sidereal_ra_interp_function=self.nonsidereal_ra_interp,
+                                                                        non_sidereal_dec_interp_function=self.nonsidereal_dec_interp,
+                                                                        add_ghosts=add_ghosts)
             mtt_data_list.append(mtt_galaxies)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_galaxies_segmap)
@@ -1204,8 +1219,9 @@ class Catalog_seed():
                                                               tracking_ra_vel=self.ra_vel,
                                                               tracking_dec_vel=self.dec_vel,
                                                               trackingPixVelFlag=self.nonsidereal_pix_vel_flag,
-                                                              non_sidereal_ra_interp_function=ra_interp,
-                                                              non_sidereal_dec_interp_function=dec_interp)
+                                                              non_sidereal_ra_interp_function=self.nonsidereal_ra_interp,
+                                                              non_sidereal_dec_interp_function=self.nonsidereal_dec_interp,
+                                                              add_ghosts=add_ghosts)
             mtt_data_list.append(mtt_ext)
             if mtt_data_segmap is None:
                 mtt_data_segmap = np.copy(mtt_ext_segmap)
@@ -1293,7 +1309,7 @@ class Catalog_seed():
     def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False, non_sidereal_ra_interp_function=None,
-                           non_sidereal_dec_interp_function=None):
+                           non_sidereal_dec_interp_function=None, add_ghosts=True):
         """Read in listfile of moving targets and perform needed
         calculations to get inputs for moving_targets.py. Note that for non-sidereal
         exposures (MT_tracking == True), we potentially flip the coordinate system, and
@@ -1308,7 +1324,7 @@ class Catalog_seed():
             Name of catalog contining moving target sources
 
         input_type : str
-            Specifies type of sources. Can be 'pointSource','galaxies', or 'extended'
+            Specifies type of sources. Can be 'point_source','galaxies', or 'extended'
 
         MT_tracking : bool
             If True, observation is non-sidereal (i.e. telescope is tracking the moving target)
@@ -1333,6 +1349,9 @@ class Catalog_seed():
         non_sidereal_dec_interp_function : scipy.interpolate.interp1d
             Interpolation function giving the Dec of the non-sidereal source versus calendar
             timestamp
+
+        add_ghosts : bool
+            If True, add ghost sources corresponding to the sources in the input catalog
 
         Returns
         -------
@@ -1532,8 +1551,6 @@ class Catalog_seed():
                         # Here the background target position is in units of RA, Dec.
                         # So we need to first convert it to x, y
 
-                        print('converting bkgd source locations to x,y')
-
                         x_frames, y_frames = self.radec_list_to_xy_list(ra_frames, dec_frames)
                         ra_frames = None
                         dec_frames = None
@@ -1587,7 +1604,7 @@ class Catalog_seed():
             # we have to get the stamp image first to see if any part of
             # the stamp lands on the detector.
             status = 'on'
-            if input_type == 'pointSource':
+            if input_type == 'point_source':
 
                 status = self.on_detector(x_frames, y_frames, psf_dimensions,
                                           (newdimsx, newdimsy))
@@ -1602,7 +1619,28 @@ class Catalog_seed():
             if eval_psf is None:
                 continue
 
-            if input_type == 'pointSource':
+            # If we want to keep track of ghosts associated with the input sources,
+            # determine the ghosts' locations here. Note that ghost locations do not
+            # move in the same magnitude/direction as the actual sources, so we need
+            # to determine source locations from the real source's location in each
+            # frame individually.
+            if add_ghosts:
+                ghost_x_frames, ghost_y_frames, ghost_mags, ghost_countrate, ghost_file = self.locate_ghost(x_frames, y_frames, rate,
+                                                                                                            magsys, entry, input_type)
+                if ghost_file is not None:
+                    ghost_stamp, ghost_header = self.basic_get_image(ghost_file)
+
+                    # Normalize the ghost stamp image to match ghost_countrate
+                    ghost_stamp = ghost_stamp / np.sum(ghost_stamp) * ghost_countrate
+
+                    # Convolve with PSF if requested
+                    if self.params['simSignals']['PSFConvolveExtended']:
+                        # eval_psf should be close to 1.0, but not exactly. For the purposes
+                        # of convolution, we want the total signal to be exactly 1.0
+                        conv_psf = eval_psf / np.sum(eval_psf)
+                        ghost_stamp = s1.fftconvolve(ghost_stamp, conv_psf, mode='same')
+
+            if input_type == 'point_source':
                 stamp = eval_psf
                 stamp *= rate
 
@@ -1638,7 +1676,7 @@ class Catalog_seed():
 
                 # First create the galaxy
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
-                                           xposang*np.pi/180., rate)
+                                           xposang*np.pi/180., rate, 0., 0.)
 
                 # If the stamp image is smaller than the PSF in either
                 # dimension, embed the stamp in an array that matches
@@ -1657,7 +1695,7 @@ class Catalog_seed():
             # sources, check to see if they overlap the detector or not.
             # NOTE: this will only catch sources that never overlap the
             # detector for any of their positions.
-            if input_type != 'pointSource':
+            if input_type != 'point_source':
                 status = self.on_detector(x_frames, y_frames, stamp.shape,
                                           (newdimsx, newdimsy))
             if status == 'off':
@@ -1694,10 +1732,31 @@ class Catalog_seed():
                 mt_source = mt.create(stamp, x_frames[framestart:frameend],
                                       y_frames[framestart:frameend],
                                       self.frametime, newdimsx, newdimsy)
+
                 mt_integration[integ, :, :, :] += mt_source
 
                 # Add object to segmentation map
                 moving_segmap.add_object_threshold(mt_source[-1, :, :], 0, 0, index, self.segmentation_threshold)
+
+                if add_ghosts and ghost_file is not None:
+                    # Check if the ghost lands on the detector
+                    ghost_status = self.on_detector(ghost_x_frames[framestart:frameend],
+                                                    ghost_y_frames[framestart:frameend],
+                                                    ghost_stamp.shape, (newdimsx, newdimsy))
+                    if ghost_status == 'off':
+                        continue
+
+                    mt = moving_targets.MovingTarget()
+                    mt.subsampx = 3
+                    mt.subsampy = 3
+                    mt_ghost_source = mt.create(ghost_stamp, ghost_x_frames[framestart:frameend],
+                                          ghost_y_frames[framestart:frameend],
+                                          self.frametime, newdimsx, newdimsy)
+
+                    mt_integration[integ, :, :, :] += mt_ghost_source
+
+                    # Add object to segmentation map
+                    moving_segmap.add_object_threshold(mt_ghost_source[-1, :, :], 0, 0, index, self.segmentation_threshold)
 
             # Check the elapsed time for creating each object
             elapsed_time = time.time() - start_time
@@ -2007,10 +2066,21 @@ class Catalog_seed():
                               "{}".format(temp_ptsrc_filename)))
             ptsrc.write(temp_ptsrc_filename, format='ascii', overwrite=True)
 
-            ptsrc_list = self.get_point_source_list(temp_ptsrc_filename)
+            ptsrc_list, ps_ghosts_file = self.get_point_source_list(temp_ptsrc_filename)
             ptsrcCRImage, ptsrcCRSegmap = self.make_point_source_image(ptsrc_list)
             totalCRList.append(ptsrcCRImage)
             totalSegList.append(ptsrcCRSegmap.segmap)
+
+            # If ghost sources are present, then create a count rate image using
+            # that extended image and add it to the list
+            if ps_ghosts_file is not None:
+                self.logger.info('Adding optical ghost from non-sidereal point source.')
+                ps_ghosts_cat, ps_ghosts_stamps, _ = self.getExtendedSourceList(ps_ghosts_file, ghost_search=False)
+                ps_ghosts_convolve = [self.params['simSignals']['PSFConvolveGhosts']] * len(ps_ghosts_cat)
+                ghost_cr_image, ghost_segmap = self.make_extended_source_image(ps_ghosts_cat, ps_ghosts_stamps, ps_ghosts_convolve)
+                totalCRList.append(ghost_cr_image)
+                totalSegList.append(ghost_segmap)
+
 
         if len(galaxy_rows) > 0:
             galaxies = targs[galaxy_rows]
@@ -2034,9 +2104,19 @@ class Catalog_seed():
                               "{}".format(temp_gal_filename)))
             galaxies.write(temp_gal_filename, format='ascii', overwrite=True)
 
-            galaxyCRImage, galaxySegmap = self.make_galaxy_image(temp_gal_filename)
+            galaxyCRImage, galaxySegmap, gal_ghosts_file = self.make_galaxy_image(temp_gal_filename)
             totalCRList.append(galaxyCRImage)
             totalSegList.append(galaxySegmap)
+
+            # If ghost sources are present, then create a count rate image using
+            # that extended image and add it to the list
+            if gal_ghosts_file is not None:
+                self.logger.info('Adding optical ghost from non-sidereal galaxy source.')
+                gal_ghosts_cat, gal_ghosts_stamps, _ = self.getExtendedSourceList(gal_ghosts_file, ghost_search=False)
+                gal_ghosts_convolve = [self.params['simSignals']['PSFConvolveGhosts']] * len(gal_ghosts_cat)
+                ghost_cr_image, ghost_segmap = self.make_extended_source_image(gal_ghosts_cat, gal_ghosts_stamps, gal_ghosts_convolve)
+                totalCRList.append(ghost_cr_image)
+                totalSegList.append(ghost_segmap)
 
         if len(extended_rows) > 0:
             extended = targs[extended_rows]
@@ -2060,11 +2140,21 @@ class Catalog_seed():
                               "{}".format(temp_ext_filename)))
             extended.write(temp_ext_filename, format='ascii', overwrite=True)
 
-            extlist, extstamps = self.getExtendedSourceList(temp_ext_filename)
+            extlist, extstamps, ext_ghosts_file = self.getExtendedSourceList(temp_ext_filename, ghost_search=True)
             extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps)
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
+
+            # If ghost sources are present, then create a count rate image using
+            # that extended image and add it to the list
+            if ext_ghosts_file is not None:
+                self.logger.info('Adding optical ghost from non-sidereal extended source.')
+                ext_ghosts_cat, ext_ghosts_stamps, _ = self.getExtendedSourceList(ext_ghosts_file, ghost_search=False)
+                ext_ghosts_convolve = [self.params['simSignals']['PSFConvolveGhosts']] * len(ext_ghosts_cat)
+                ghost_cr_image, ghost_segmap = self.make_extended_source_image(ext_ghosts_cat, ext_ghosts_stamps, ext_ghosts_convolve)
+                totalCRList.append(ghost_cr_image)
+                totalSegList.append(ghost_segmap)
 
         # Now combine into a final countrate image of non-sidereal sources (that are being tracked)
         if len(totalCRList) > 0:
@@ -2150,18 +2240,25 @@ class Catalog_seed():
                 offset_vector = None
                 infile = glob.glob(os.path.join(self.params['simSignals']['psfpath'], "{}_{}_{}*.fits".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower())))
                 if len(infile) > 0:
-                    header = fits.getheader(infile[0])                    
+                    header = fits.getheader(infile[0])
                     if ('BSOFF_V2' in header) and ('BSOFF_V3' in header):
                         offset_vector = header['BSOFF_V2']*60., header['BSOFF_V3']*60. #convert to arcseconds
                 else:
                     self.logger.info("No PSF library matching '{}_{}_{}.fits'; ignoring boresight offset (if any)".format(self.params['Inst']['instrument'].lower(), self.detector.lower(), self.psf_filter.lower()))
 
-                        
                 # Translate the point source list into an image
                 self.logger.info('Creating point source lists')
-                pslist = self.get_point_source_list(self.params['simSignals']['pointsource'],
-                                                    segment_offset=offset_vector)
+                pslist, ps_ghosts_cat = self.get_point_source_list(self.params['simSignals']['pointsource'],
+                                                                   segment_offset=offset_vector)
+
                 psfimage, ptsrc_segmap = self.make_point_source_image(pslist)
+
+                # If ghost sources are present, then make sure Mirage will retrieve
+                # sources from an extended source catalog
+                if ps_ghosts_cat is not None:
+                    self.runStep['extendedsource'] = True
+                    # Currently self.ghosts_catalogs is only used later for WFSS observations
+                    self.ghost_catalogs.append(ps_ghosts_cat)
 
             elif self.expand_catalog_for_segments:
                 # Expand the point source list for each mirror segment, and add together
@@ -2184,8 +2281,8 @@ class Catalog_seed():
                     offset_vector = get_segment_offset(i_segment, self.detector, library_list)
 
                     # need to add a new offset option to get_point_source_list:
-                    pslist = self.get_point_source_list(self.params['simSignals']['pointsource'],
-                                                        segment_offset=offset_vector)
+                    pslist, _ = self.get_point_source_list(self.params['simSignals']['pointsource'],
+                                                           segment_offset=offset_vector)
 
                     # Create a point source image, using the specific point
                     # source list and PSF for the given segment
@@ -2231,12 +2328,20 @@ class Catalog_seed():
             self.point_source_seed = None
             self.point_source_seg_map = None
             self.ptsrc_seed_filename = None
+            ps_ghosts_cat = None
 
         # Simulated galaxies
         # Read in the list of galaxy positions/magnitudes to simulate
         # and create a countrate image of those galaxies.
         if self.runStep['galaxies'] is True:
-            galaxyCRImage, galaxy_segmap = self.make_galaxy_image(self.params['simSignals']['galaxyListFile'])
+            galaxyCRImage, galaxy_segmap, gal_ghosts_cat = self.make_galaxy_image(self.params['simSignals']['galaxyListFile'])
+
+            # If ghost sources are present, then make sure Mirage will retrieve
+            # sources from an extended source catalog
+            if gal_ghosts_cat is not None:
+                self.runStep['extendedsource'] = True
+                # Currently self.ghosts_catalogs is only used later for WFSS observations
+                self.ghost_catalogs.append(gal_ghosts_cat)
 
             # To avoid problems with overlapping sources between source
             # types in observations to be dispersed, make the galaxy-
@@ -2268,13 +2373,71 @@ class Catalog_seed():
             self.galaxy_source_seed = None
             self.galaxy_source_seg_map = None
             self.galaxy_seed_filename = None
+            gal_ghosts_cat = None
 
         # read in extended signal image and add the image to the overall image
         if self.runStep['extendedsource'] is True:
-            extlist, extstamps = self.getExtendedSourceList(self.params['simSignals']['extended'])
+            # Extended sources from user-provided catalog
+            if self.params['simSignals']['extended'] != 'None':
+                extended_list, extended_stamps, ext_ghosts_cat = self.getExtendedSourceList(self.params['simSignals']['extended'])
+                extended_convolve = [self.params['simSignals']['PSFConvolveExtended']] * len(extended_list)
+            else:
+                extended_list = None
+                extended_stamps = None
+                ext_ghosts_cat = None
+                extended_convolve = None
+
+            # Currently self.ghosts_catalogs is only used later for WFSS observations
+            if ext_ghosts_cat is not None:
+                self.ghost_catalogs.append(ext_ghosts_cat)
+
+            # Ghosts associated with point source catalog
+            # Don't search for ghosts from ghosts
+            if ps_ghosts_cat is not None:
+                self.logger.info('Reading in optical ghost list from sidereal point source catalog.')
+                extlist_from_ps_ghosts, extstamps_from_ps_ghosts, _ = self.getExtendedSourceList(ps_ghosts_cat, ghost_search=False)
+                ps_ghosts_convolve = [self.params['simSignals']['PSFConvolveGhosts']] * len(extlist_from_ps_ghosts)
+            else:
+                extlist_from_ps_ghosts = None
+                extstamps_from_ps_ghosts = None
+                ps_ghosts_convolve = None
+
+            # Ghosts associated with galaxy catalog
+            # Don't search for ghosts from ghosts
+            if gal_ghosts_cat is not None:
+                self.logger.info('Reading in optical ghost list from sidereal galaxy source catalog.')
+                extlist_from_gal_ghosts, extstamps_from_gal_ghosts, _ = self.getExtendedSourceList(gal_ghosts_cat, ghost_search=False)
+                gal_ghosts_convolve = [self.params['simSignals']['PSFConvolveGhosts']] * len(extlist_from_gal_ghosts)
+            else:
+                extlist_from_gal_ghosts = None
+                extstamps_from_gal_ghosts = None
+                gal_ghosts_convolve = None
+
+            # Ghosts associated with the extended source catalog
+            # Don't search for ghosts from ghosts
+            if ext_ghosts_cat is not None:
+                self.logger.info('Reading in optical ghost list from sidereal extended source catalog.')
+                extlist_from_ext_ghosts, extstamps_from_ext_ghosts, _ = self.getExtendedSourceList(ext_ghosts_cat, ghost_search=False)
+                ext_ghosts_convolve = [self.params['simSignals']['PSFConvolveGhosts']] * len(extlist_from_ext_ghosts)
+            else:
+                extlist_from_ext_ghosts = None
+                extstamps_from_ext_ghosts = None
+                ext_ghosts_convolve = None
+
+            possible_cats = [extended_list, extlist_from_ps_ghosts, extlist_from_gal_ghosts, extlist_from_ext_ghosts]
+            extended_cats = [ele for ele in possible_cats if ele is not None]
+            extlist = vstack(extended_cats)
+
+            possible_stamps = [extended_stamps, extstamps_from_ps_ghosts, extstamps_from_gal_ghosts, extstamps_from_ext_ghosts]
+            extended_stamps = [ele for ele in possible_stamps if ele is not None]
+            extstamps = [item for ele in extended_stamps for item in ele]
+
+            possible_convolutions = [extended_convolve, ps_ghosts_convolve, gal_ghosts_convolve, ext_ghosts_convolve]
+            convolutions = [ele for ele in possible_convolutions if ele is not None]
+            convols = [item for ele in convolutions for item in ele]
 
             # translate the extended source list into an image
-            extimage, ext_segmap = self.make_extended_source_image(extlist, extstamps)
+            extimage, ext_segmap = self.make_extended_source_image(extlist, extstamps, convols)
 
             # To avoid problems with overlapping sources between source
             # types in observations to be dispersed, make the point
@@ -2393,6 +2556,10 @@ class Catalog_seed():
         -------
         pointSourceList : astropy.table.Table
             Table containing source information
+
+        ghosts_from_ptsrc : str
+            Name of a Mirage-formatted extended source catalog containing
+            ghost sources associated with the point sources in ```pointSourceList```
         """
         # Make sure that a valid PSF path has been provided
         if not os.path.isdir(self.params['simSignals']['psfpath']):
@@ -2468,12 +2635,26 @@ class Catalog_seed():
         # Check the source list and remove any sources that are well outside the
         # field of view of the detector. These sources cause the coordinate
         # conversion to hang.
+        self.logger.info('Filtering point sources to keep only those on the detector')
         indexes, lines = self.remove_outside_fov_sources(indexes, lines, pixelflag, 4096)
 
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(lines, filename)
 
-        self.logger.info('Filtering point sources to keep only those on the detector')
+        # For NIRISS observations where ghosts will be added, create a table to hold
+        # the ghost entries
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            self.logger.info("Creating a source list of optical ghosts from point sources.")
+            ghost_source_index = []  # Maps index number of original source to ghost source
+            ghost_x = []
+            ghost_y = []
+            ghost_filename = []
+            ghost_mag = []
+            ghost_mags = None
+        else:
+            ghost_x = None
+
+        skipped_non_niriss = False
         for index, values in zip(indexes, lines):
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
@@ -2484,6 +2665,25 @@ class Catalog_seed():
             countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
                                                      magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
                                                      vegamag_zeropoint=self.vegazeropoint)
+
+            # If this is a NIRISS simulation and the user wants to add ghosts,
+            # do that here.
+            if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, countrate, magsys, values, 'point_source')
+                if np.isfinite(gx) and gfile is not None:
+                    ghost_source_index.append(index)
+                    ghost_x.append(gx)
+                    ghost_y.append(gy)
+                    ghost_mag.append(gmag)
+                    ghost_filename.append(gfile)
+
+                    ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
+                                                                              magsys, NIRISS_GHOST_GAP_FILE)
+
+                    if ghost_mags is None:
+                        ghost_mags = copy.deepcopy(ghost_src)
+                    else:
+                        ghost_mags = vstack([ghost_mags, ghost_src])
 
             psf_len = self.find_psf_size(countrate)
             edgex = np.int(psf_len // 2)
@@ -2515,6 +2715,9 @@ class Catalog_seed():
                 pslist.write("%i %s %s %14.8f %14.8f %9.3f %9.3f  %9.3f  %13.6e   %13.6e  %s\n" %
                              (index, ra_str, dec_str, ra, dec, pixelx, pixely, mag, countrate, framecounts, tso_catalog))
 
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts'] and skipped_non_niriss:
+            self.logger.info("Skipped the calculation of ghost source magnitudes for the non-NIRISS magnitude columns in {}".format(filename))
+
         self.n_pointsources = len(pointSourceList)
         if self.n_pointsources > 0:
             self.logger.info("Number of point sources found within or close to the requested aperture: {}".format(self.n_pointsources))
@@ -2524,17 +2727,13 @@ class Catalog_seed():
         # close the output file
         pslist.close()
 
-        # If no good point sources were found in the requested array, alert the user
-        #if len(pointSourceList) < 1:
-        #    self.logger.info("No point sources within the requested aperture.")
-            # print("The point source image option is being turned off")
-            # self.runStep['pointsource']=False
-            # if self.runStep['extendedsource'] == False and self.runStep['cosmicray'] == False:
-            #    print("Error: no input point sources, extended image, nor cosmic rays specified")
-            #    print("Exiting...")
-            #    sys.exit()
+        # If any ghost sources were found, create an extended catalog object to hold them
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            ghosts_from_ptsrc = self.save_ghost_catalog(ghost_x, ghost_y, ghost_filename, ghost_mags, filename, ghost_source_index)
+        else:
+            ghosts_from_ptsrc = None
 
-        return pointSourceList
+        return pointSourceList, ghosts_from_ptsrc
 
     def translate_psf_table(self, magnitude_system):
         """Given a magnitude system, translate the table of PSF sizes
@@ -2713,6 +2912,7 @@ class Catalog_seed():
             if 'ephemeris_file' in source.colnames:
                 good_eph = np.array([i for i, row in enumerate(source) if row['ephemeris_file'].lower() != 'none'])
                 good = np.array(list(set(np.append(good, good_eph))))
+                good = [int(ele) for ele in good]
 
         filtered_sources = source[good]
         filtered_indexes = index[good]
@@ -2867,7 +3067,7 @@ class Catalog_seed():
         full_psf : numpy.ndarray
             2D array containing the normalized PSF image. Total signal should
             be close to 1.0 (not exactly 1.0 due to asymmetries and distortion)
-            Array will be copped based on how much falls on or off the detector
+            Array will be cropped based on how much falls on or off the detector
 
         k1 : int
             Row number on the PSF/stamp image corresponding to the bottom-most
@@ -3657,7 +3857,20 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(galaxylist, catfile)
 
+        # For NIRISS observations where ghosts will be added, create a table to hold
+        # the ghost entries
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            ghost_source_index = []
+            ghost_x = []
+            ghost_y = []
+            ghost_filename = []
+            ghost_mag = []
+            ghost_mags = None
+        else:
+            ghost_x = None
+
         # Loop over galaxy sources
+        skipped_non_niriss = False
         for index, source in zip(indexes, galaxylist):
 
             # If galaxy radii are given in units of arcseconds, translate to pixels
@@ -3680,6 +3893,31 @@ class Catalog_seed():
                                                                           source['y_or_Dec'],
                                                                           pixelflag, 4096)
 
+            # Calculate count rate
+            mag = float(source[mag_column])
+            # Convert magnitudes to countrate (ADU/sec) and counts per frame
+            rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                magsystem, mag, photfnu=self.photfnu, photflam=self.photflam,
+                                                vegamag_zeropoint=self.vegazeropoint)
+
+            # If this is a NIRISS simulation and the user wants to add ghosts,
+            # do that here.
+            if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, rate, magsystem, source, 'galaxies')
+                if np.isfinite(gx) and gfile is not None:
+                    ghost_source_index.append(index)
+                    ghost_x.append(gx)
+                    ghost_y.append(gy)
+                    ghost_mag.append(gmag)
+                    ghost_filename.append(gfile)
+
+                    ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(source, self.params['Reffiles']['flux_cal'], magsystem, NIRISS_GHOST_GAP_FILE)
+
+                    if ghost_mags is None:
+                        ghost_mags = copy.deepcopy(ghost_src)
+                    else:
+                        ghost_mags = vstack([ghost_mags, ghost_src])
+
             # only keep the source if the peak will fall within the subarray
             if pixely > outminy and pixely < outmaxy and pixelx > outminx and pixelx < outmaxx:
 
@@ -3689,13 +3927,7 @@ class Catalog_seed():
 
                 # Now look at the input magnitude of the point source
                 # append the mag and pixel position to the list of ra, dec
-                mag = float(source[mag_column])
                 entry.append(mag)
-
-                # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
-                                                    magsystem, mag, photfnu=self.photfnu, photflam=self.photflam,
-                                                    vegamag_zeropoint=self.vegazeropoint)
                 framecounts = rate * self.frametime
 
                 # add the countrate and the counts per frame to pointSourceList
@@ -3705,6 +3937,10 @@ class Catalog_seed():
 
                 # add the good point source, including location and counts, to the pointSourceList
                 filteredList.add_row(entry)
+
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts'] and skipped_non_niriss:
+            self.logger.info(("Skipped the calculation of ghost source magnitudes for the non-NIRISS magnitude columns in "
+                              "galaxy source catalog."))
 
         # Write the results to a file
         self.n_galaxies = len(filteredList)
@@ -3718,7 +3954,14 @@ class Catalog_seed():
                                           (self.ra, self.dec, self.params['Telescope']['rotation'], nx, ny))]
         filteredOut = self.basename + '_galaxySources.list'
         filteredList.write(filteredOut, format='ascii', overwrite=True)
-        return filteredList
+
+        # If any ghost sources were found, create an extended catalog object to hold them
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            ghosts_from_galaxies = self.save_ghost_catalog(ghost_x, ghost_y, ghost_filename, ghost_mags, catfile, ghost_source_index)
+        else:
+            ghosts_from_galaxies = None
+
+        return filteredList, ghosts_from_galaxies
 
     def create_galaxy(self, r_Sersic, ellipticity, sersic_index, position_angle, total_counts, subpixx, subpixy,
                       signal_matching_threshold=0.02):
@@ -3894,6 +4137,11 @@ class Catalog_seed():
 
         segmentation.segmap : numpy.ndarray
             Segmentation map corresponding to ``galimage``
+
+        ghost_sources_from_galaxies : str
+            Name of an extended source catalog file written out and
+            containing ghost sources due to the galaxies in the galaxy
+            catalog. Currently only done for NIRISS
         """
         # Read in the list of galaxies (positions and magnitides)
         glist, pixflag, radflag, magsys = self.readGalaxyFile(file)
@@ -3909,7 +4157,7 @@ class Catalog_seed():
 
         # Extract and save only the entries which will land (fully or partially) on the
         # aperture of the output
-        galaxylist = self.filterGalaxyList(glist, pixflag, radflag, magsys, file)
+        galaxylist, ghost_sources_from_galaxies = self.filterGalaxyList(glist, pixflag, radflag, magsys, file)
 
         # galaxylist is a table with columns:
         # 'pixelx', 'pixely', 'RA', 'Dec', 'RA_degrees', 'Dec_degrees', 'radius', 'ellipticity',
@@ -4032,7 +4280,7 @@ class Catalog_seed():
                     self.logger.info(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
 
-        return galimage, segmentation.segmap
+        return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
     def calc_x_position_angle(self, v2_value, v3_value, position_angle):
         """Calcuate the position angle of the source relative to the x
@@ -4061,10 +4309,163 @@ class Catalog_seed():
                          + 90. - self.params['Telescope']['rotation'])
         return x_posang
 
-    def getExtendedSourceList(self, filename):
-        # read in the list of point sources to add, and adjust the
-        # provided positions for astrometric distortion
+    def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type):
+        """Calculate the ghost location, brightness, and stamp image file name
+        for the input source.
 
+        Parameters
+        ----------
+        pixel_x : float
+            X-coordinate of the astronomical source on the detector
+
+        pixel_y : float
+            Y-coordinate of the astronomical source on the detector
+
+        count_rate : float
+            Count rate (ADU/sec) of the astronomical source
+
+        magnitude_system : str
+            Magnitude system of the sources (e.g. 'abmag')
+
+        source_row : astropy.table.row.Row
+            Row from source catalog giving information on the source
+
+        obj_type : str
+            Type of object the source is (e.g. 'point_source')
+
+        Returns
+        -------
+        ghost_pixelx : float
+            X-coordinate of the associated ghost on the detector
+
+        ghost_pixely : float
+            Y-coordinate of the associated ghost on the detector
+
+        ghost_mag : float
+            Magnitude of the associated ghost
+
+        ghost_countrate : float
+            Countrate of the associated ghost
+
+        ghost_file : str
+            Name of fits file containing the stamp image to use for the ghost source
+        """
+        allowed_types = ['point_source', 'galaxies', 'extended']
+        if obj_type not in allowed_types:
+            raise ValueError('Unknown object type: {}. Must be one of: {}'.format(obj_type, allowed_types))
+
+        # For WFSS simulations, we ignore the grism
+        search_filter = self.params['Readout']['filter']
+        if self.params['Readout']['filter'].upper() in ['GR150R', 'GR150C']:
+            search_filter = 'CLEAR'
+
+        ghost_pixelx, ghost_pixely, ghost_countrate = get_ghost(pixel_x, pixel_y,
+                                                                count_rate,
+                                                                search_filter,
+                                                                self.params['Readout']['pupil'],
+                                                                NIRISS_GHOST_GAP_FILE
+                                                                )
+        if isinstance(ghost_pixelx, np.float):
+            if not np.isfinite(ghost_pixelx):
+                return np.nan, np.nan, np.nan, np.nan, np.nan
+
+        # Convert ghost countrate back into a magnitude
+        ghost_mag = utils.countrate_to_magnitude(self.instrument, self.params['Readout']['filter'],
+                                                 magnitude_system, ghost_countrate, photfnu=self.photfnu,
+                                                 photflam=self.photflam,
+                                                 vegamag_zeropoint=self.vegazeropoint)
+
+        # Determine the name of the file containing the stamp image
+        # to use for the ghost
+        ghost_file = determine_ghost_stamp_filename(source_row, obj_type)
+
+        return ghost_pixelx, ghost_pixely, ghost_mag, ghost_countrate, ghost_file
+
+    def save_ghost_catalog(self, x_loc, y_loc, filenames, magnitudes, orig_source_catalog, orig_source_mapping):
+        """From lists of ghost source positions and magnitudes, create an extended source
+        catalog and save to a file
+
+        Parameters
+        ----------
+        x_loc : list
+            X-coordinate positions of ghost sources
+
+        y_loc : list
+            Y-coordinate positions of ghost sources
+
+        filenames : list
+            Fits file stamp images associated with the ghost sources
+
+        magnitudes : list
+            Magnitudes associated with the ghost sources
+
+        orig_source_catalog : str
+            Name of the catalog file from which the ghosts were derived.
+            The output catalog will be saved into a 'ghost_source_catalogs'
+            subdirectory under the directory of this file.
+
+        orig_source_mapping : list
+            Indexes of the real sources (in ``orig_source_catalog``) corresponding
+            to the ghosts
+
+        Returns
+        -------
+        catalog_filename : str
+            Name of ascii file to which the catalog is saved
+        """
+        if len(x_loc) == 0:
+            self.logger.info(('Ghost catalog from the catalog {} has no sources.'.format(orig_source_catalog)))
+            return None
+
+        pa = [0.] * len(x_loc)
+        ghost_sources = ExtendedCatalog(x=x_loc, y=y_loc, filenames=filenames, position_angle=pa,
+                                        starting_index=self.max_source_index+1, corresponding_source_index_for_ghost=orig_source_mapping)
+
+        for colname in magnitudes.colnames:
+            ghost_sources.add_magnitude_column(magnitudes[colname], column_name=colname)
+
+        self.max_source_index += len(ghost_sources.table['x_or_RA'])
+
+        # Write out the ghost catalog to a new file, to be used later. Let's create
+        # a subdirectory under the directory where the point source catalog is.
+        source_cat_dir, source_cat_file = os.path.split(orig_source_catalog)
+        ghost_cat_dir = os.path.join(source_cat_dir, 'ghost_source_catalogs')
+        paramfile_name_only = os.path.basename(self.paramfile).strip('.yaml')
+        utils.ensure_dir_exists(ghost_cat_dir)
+        ghost_cat_filename = 'ghosts_from_{}_for_{}.cat'.format(source_cat_file, paramfile_name_only)
+        ghosts_cat_file = os.path.join(ghost_cat_dir, ghost_cat_filename)
+
+        ghost_sources.save(ghosts_cat_file)
+        self.logger.info(('Catalog of ghost sources from the catalog {} has been saved to: {}'
+                          .format(source_cat_file, ghosts_cat_file)))
+        return ghosts_cat_file
+
+    def getExtendedSourceList(self, filename, ghost_search=True):
+        """Read in the list of extended sources from a catalog file, calculate locations
+        on the detector, and countrates. Calculate positions of associated ghosts if
+        requested
+
+        Parameters
+        ----------
+        filename : str
+            Name of ascii catalog file containing extended sources
+
+        ghost_search : bool
+            If True, positions and countrates for ghosts associated with the sources in
+            ```filename``` are calculated. This currently is only done for NIRISS
+
+        Returns
+        -------
+        extSourceList : astropy.table.Table
+            Table of extended sources
+
+        all_stamps : list
+            List of stamp files to use for the extended sources
+
+        ghost_catalog_file : str
+            Name of ascii file containing the catalog of ghost sources associated with
+            the input catalog
+        """
         extSourceList = Table(names=('index', 'pixelx', 'pixely', 'RA', 'Dec',
                                      'RA_degrees', 'Dec_degrees', 'magnitude',
                                      'countrate_e/s', 'counts_per_frame_e'),
@@ -4113,7 +4514,20 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(lines, filename)
 
+        # For NIRISS observations where ghosts will be added, create a table to hold
+        # the ghost entries
+        if ghost_search and self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            ghost_source_index = []
+            ghost_x = []
+            ghost_y = []
+            ghost_filename = []
+            ghost_mag = []
+            ghost_mags = None
+        else:
+            ghost_x = None
+
         # Loop over input lines in the source list
+        skipped_non_niriss = False
         all_stamps = []
         for indexnum, values in zip(indexes, lines):
             if not os.path.isfile(values['filename']):
@@ -4175,6 +4589,35 @@ class Catalog_seed():
             minx -= edgex
             maxx += edgex
 
+            # Calculate count rate
+            norm_factor = np.sum(ext_stamp)
+            if mag is not None:
+                countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
+                                                         magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
+                                                         vegamag_zeropoint=self.vegazeropoint)
+            else:
+                countrate = norm_factor * self.params['simSignals']['extendedscale']
+
+            # Calculate the location and brightness of any ghost, if requested
+            # This is done outside the if statement below because sources outside the
+            # detector can potentially produce ghosts on the detector
+            if ghost_search and self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, countrate, magsys, values, 'extended')
+                if np.isfinite(gx) and gfile is not None:
+                    ghost_source_index.append(indexnum)
+                    ghost_x.append(gx)
+                    ghost_y.append(gy)
+                    ghost_mag.append(gmag)
+                    ghost_filename.append(gfile)
+
+                    ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
+                                                                              magsys, NIRISS_GHOST_GAP_FILE)
+
+                    if ghost_mags is None:
+                        ghost_mags = copy.deepcopy(ghost_src)
+                    else:
+                        ghost_mags = vstack([ghost_mags, ghost_src])
+
             # Keep only sources within the appropriate bounds
             if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:
 
@@ -4182,16 +4625,12 @@ class Catalog_seed():
                 entry = [indexnum, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
 
                 # save the stamp image after normalizing to a total signal of 1.
-                norm_factor = np.sum(ext_stamp)
                 ext_stamp /= norm_factor
                 all_stamps.append(ext_stamp)
 
                 # If a magnitude is given then adjust the countrate to match it
                 if mag is not None:
                     # Convert magnitudes to countrate (ADU/sec) and counts per frame
-                    countrate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
-                                                             magsys, mag, photfnu=self.photfnu, photflam=self.photflam,
-                                                             vegamag_zeropoint=self.vegazeropoint)
                     framecounts = countrate * self.frametime
                     magwrite = mag
 
@@ -4201,7 +4640,6 @@ class Catalog_seed():
                     self.logger.warning("No magnitude given for extended source in {}.".format(values['filename']))
                     self.logger.warning("Assuming the original file is in units of counts per sec.")
                     self.logger.warning("Multiplying original file values by 'extendedscale'.")
-                    countrate = norm_factor * self.params['simSignals']['extendedscale']
                     framecounts = countrate * self.frametime
                     magwrite = 99.99999
 
@@ -4220,16 +4658,25 @@ class Catalog_seed():
                              (indexnum, ra_str, dec_str, ra, dec, pixelx, pixely, magwrite, countrate,
                               framecounts)))
 
+        if ghost_search and self.params['Inst']['instrument'].lower() == 'niriss' and \
+           self.params['simSignals']['add_ghosts'] and skipped_non_niriss:
+            self.logger.info("Skipped the calculation of ghost source magnitudes for the non-NIRISS magnitude columns in {}".format(filename))
+
         self.logger.info("Number of extended sources found within or close to the requested aperture: {}".format(len(extSourceList)))
         # close the output file
         eslist.close()
 
         # If no good point sources were found in the requested array, alert the user
         if len(extSourceList) < 1:
-            self.logger.info("Warning: no non-sidereal extended sources within the requested array.")
+            self.logger.info("Warning: no extended sources within the requested array.")
             self.logger.info("The extended source image option is being turned off")
 
-        return extSourceList, all_stamps
+        if ghost_search and self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            ghost_catalog_file = self.save_ghost_catalog(ghost_x, ghost_y, ghost_filename, ghost_mags, filename, ghost_source_index)
+        else:
+            ghost_catalog_file = None
+
+        return extSourceList, all_stamps, ghost_catalog_file
 
     def rotate_extended_image(self, stamp_image, pos_angle, right_ascention, declination):
         """Given the user-input position angle for the extended source
@@ -4272,7 +4719,7 @@ class Catalog_seed():
         rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
 
-    def make_extended_source_image(self, extSources, extStamps):
+    def make_extended_source_image(self, extSources, extStamps, extConvolutions):
         # Create the empty image
         yd, xd = self.output_dims
         extimage = np.zeros(self.output_dims)
@@ -4284,14 +4731,14 @@ class Catalog_seed():
         segmentation.initialize_map()
 
         # Loop over the entries in the source list
-        for entry, stamp in zip(extSources, extStamps):
+        for entry, stamp, convolution in zip(extSources, extStamps, extConvolutions):
             stamp_dims = stamp.shape
 
             stamp *= entry['countrate_e/s']
 
             # If the stamp needs to be convolved with the NIRCam PSF,
             # create the correct PSF  here and read it in
-            if self.params['simSignals']['PSFConvolveExtended']:
+            if convolution:
                 # If the stamp image is smaller than the PSF in either
                 # dimension, embed the stamp in an array that matches
                 # the psf size. This is so the upcoming convolution will

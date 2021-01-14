@@ -134,6 +134,7 @@ class SimInput:
                  background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
                  dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
+                 add_ghosts=True, convolve_ghosts_with_psf=False, convolve_extended_with_psf=True,
                  offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
@@ -256,6 +257,18 @@ class SimInput:
             Units corresponding to the value in ```segmap_flux_limit```. Can be
             'ADU/sec', 'e/sec', 'MJy/sr', 'ergs/cm2/A', 'ergs/cm2/Hz'
 
+        add_ghosts : bool
+            If True, optical ghosts will be added to the seed image based on
+            source locations. Currently only supported for NIRISS.
+
+        convolve_ghosts_with_psf : bool
+            If True, the stamp images used for ghost sources will be convolved
+            with the PSF prior to adding to the seed image
+
+        convolve_extended_with_psf : bool
+            If True, the stamp images used for astronomical sources will be
+            convolved with the PSF prior to adding to the seed image
+
         offline : bool
             Whether the class is being called with or without access to
             Mirage reference data. Used primarily for testing.
@@ -295,6 +308,9 @@ class SimInput:
         self.expand_catalog_for_segments = False
         self.dateobs_for_background = dateobs_for_background
         self.add_psf_wings = True
+        self.add_ghosts = add_ghosts
+        self.convolve_ghosts = convolve_ghosts_with_psf
+        self.convolve_extended = convolve_extended_with_psf
         self.offline = offline
 
         if ((segmap_flux_limit is not None) and (segmap_flux_limit_units is None)):
@@ -2074,8 +2090,8 @@ class SimInput:
             f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(ExtendedScale))
             f.write(('  extendedCenter: {}                   #x, y pixel location at which to place the extended image '
                      'if it is smaller than the output array size\n'.format(ExtendedCenter)))
-            f.write(('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output '
-                     'image (True or False)\n'))
+            f.write(('  PSFConvolveExtended: {} #Convolve the extended image with the PSF before adding to the output '
+                     'image (True or False)\n'.format(self.convolve_extended)))
             f.write(('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. '
                      'KBOs, asteroids) to add.\n'.format(MovingTargetList)))
             f.write(('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through '
@@ -2107,6 +2123,8 @@ class SimInput:
                     .format(self.segmentation_threshold))
             f.write(('  signal_low_limit_for_segmap_units: {}  # Units of signal_low_limit_for_segmap. Can be: [ADU/sec, e/sec, MJy/sr, '
                      'ergs/cm2/a, ergs/cm2/hz]\n'.format(self.segmentation_threshold_units)))
+            f.write('  add_ghosts: {}  # Add optical ghosts associated with astronomical sources\n'.format(self.add_ghosts))
+            f.write('  PSFConvolveGhosts: {}  # Convolve ghost stamp images with instrument PSF before adding\n'.format(self.convolve_ghosts))
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))

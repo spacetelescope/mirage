@@ -442,7 +442,7 @@ def test_catalog_index_check():
     # First a case where there is no overlap
     cat_list = [ptsrc_output_file, gal_output_file, mpt_output_file]
     overlap = utils.catalog_index_check(cat_list)
-    assert overlap == False
+    assert overlap == (False, 23)
 
     # Now a case where there is overlap
     gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
@@ -452,12 +452,7 @@ def test_catalog_index_check():
     gal.save(gal_output_file)
 
     overlap = utils.catalog_index_check(cat_list)
-
-    print(ptsrc.table['index'])
-    print(gal.table['index'])
-    print(mpt.table['index'])
-
-    assert overlap == True
+    assert overlap == (True, 23)
 
     # Overlap, but indexes between catalogs are out of order
     ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=25)
@@ -477,7 +472,7 @@ def test_catalog_index_check():
     mpt.save(mpt_output_file)
 
     overlap = utils.catalog_index_check(cat_list)
-    assert overlap == True
+    assert overlap == (True, 34)
 
     # No overlap, but indexes between catalogs are out of order
     ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=25)
@@ -497,7 +492,7 @@ def test_catalog_index_check():
     mpt.save(mpt_output_file)
 
     overlap = utils.catalog_index_check(cat_list)
-    assert overlap == False
+    assert overlap == (False, 38)
 
     # Clean up
     os.remove(ptsrc_output_file)

@@ -14,6 +14,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    install.rst
    reference_files.rst
    catalogs.rst
+   ghosts.rst
    catalog_creation.rst
    yaml_generator.rst
    example_yaml.rst

@@ -1,4 +1,4 @@
-#! /usr/bin.env python
+#! /usr/bin/env python
 
 """This module reads in a Mirage-formatted source catalog and for each
 source, interpolates the provided magnitudes in order to produce a
@@ -119,6 +119,22 @@ def add_flam_columns(cat, mag_sys):
         new_column_name = key.replace('magnitude', 'flam')
         cat[new_column_name] = flam_values
     return cat, parameters
+
+
+def create_ghost_seds(catalogs, sed_file):
+    """Create SED data for ghost sources using catalog index numbers. For a given
+    ghost source, get the index number of the original source that causes the ghost.
+    Get the SED of that original object and copy it over as the SED for the ghost.
+
+    Parameters
+    ----------
+    catalogs : list
+        List of Mirage-formatted source catalog files
+
+    sed_file : str
+        HDF5 file containing target SEDs
+    """
+    pass
 
 
 def convert_to_flam(instrument, filter_name, magnitudes, param_tuple, magnitude_system):
@@ -263,14 +279,21 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
         if len(flux) == 1:
             flux.append(flux[0])
 
+        # Remove any NaN entries
         sorted_fluxes = np.array(flux)[sorted_indexes]
+        finite = np.isfinite(sorted_fluxes)
+        sorted_fluxes = sorted_fluxes[finite]
+        filtered_wavelengths = wavelengths[finite]
         final_sorted_fluxes = copy.deepcopy(sorted_fluxes)
 
         # If the provided flux values don't cover the complete wavelength
         # range, extrapolate, if requested.
-        if ((np.min(wavelengths) > min_wave) or (np.max(wavelengths) < max_wave)) and extrapolate_SED:
-            interp_func = interp1d(wavelengths, sorted_fluxes, fill_value="extrapolate", bounds_error=False)
+        if ((np.min(filtered_wavelengths) > min_wave) or (np.max(filtered_wavelengths) < max_wave)) and extrapolate_SED:
+            interp_func = interp1d(filtered_wavelengths, sorted_fluxes, fill_value="extrapolate", bounds_error=False)
             final_sorted_fluxes = interp_func(final_wavelengths)
+        else:
+            final_wavelengths = filtered_wavelengths
+
         # Set any flux values that are less than zero to zero
         final_sorted_fluxes[final_sorted_fluxes < 0.] = 0.
 
@@ -347,7 +370,7 @@ def get_filter_info(column_names, magsys):
 
 def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                      extrapolate_SED=True, output_filename=None, normalizing_mag_column=None,
-                     module=None, detector=None):
+                     module=None, detector=None, ghost_catalog_files=[]):
     """Overall wrapper function
 
     Parameters
@@ -389,6 +412,10 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
     detector : str
         Name of detector (e.g. 'GUIDER1'). Only used when ``normalizing_mag_column``
         is for FGS
+
+    ghost_catalog_files : list
+        Source catalogs containing optical ghosts, based on the astrophysical
+        sources within ``catalog_files``
 
     Returns
     -------
@@ -484,6 +511,26 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
             continuum = create_spectra(ascii_catalog[indexes_to_create], filter_info,
                                        extrapolate_SED=extrapolate_SED)
             all_input_spectra = {**all_input_spectra, **continuum}
+
+    # Add entries for any ghost sources by copying the spectra for the
+    # sources that caused the ghosts. This needs to be done after we have
+    # spectra for all real sources, so we need a separate, second loop over
+    # the catalogs here.
+    for catalog_file in ghost_catalog_files:
+        ascii_catalog, mag_sys = read_catalog(catalog_file)
+
+        if 'corresponding_source_index_for_ghost' in ascii_catalog.colnames:
+            print('Within the catalog')
+            for source in ascii_catalog:
+                if source['corresponding_source_index_for_ghost'] != 0:
+                    spec = all_input_spectra[source['corresponding_source_index_for_ghost']]
+                    if source['index'] in all_input_spectra.keys():
+                        raise ValueError(("Attempting to add spectrum for ghost source {} to SED file, "
+                                          "but there is already a spectrum for that index present.".format(source['index'])))
+                    print('Found a ghost. Adding source.')
+                    all_input_spectra[source[index]] = spec
+                    logger.info(("Adding spectrum for ghost source {} to SED file. Copy spectrum from source {}. "
+                                 .format(source[index], source['corresponding_source_index_for_ghost'])))
 
     # For convenience, reorder the sources by index number
     spectra = OrderedDict({})
