@@ -10,7 +10,7 @@ Readout:
   nframe: 2
   nskip: 0
   resets_bet_ints: 1 #Number of detector resets between integrations
-  array_name: NIS_SUBSTRIP256    #Name of array from pysiaf (FULL, NIS_SUBSTRIP256, NIS_SUBSTRIP96)
+  array_name: NIS_SUBSTRIP256    #Name of array from pysiaf (NIS_SOSSFULL, NIS_SUBSTRIP256, NIS_SUBSTRIP96)
   filter: CLEAR       #Filter of simulated data (F090W, F322W2, etc)
   pupil: GR700XD        #Pupil element for simulated data (CLEAR, GRISMC, etc)
 

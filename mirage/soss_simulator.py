@@ -10,6 +10,7 @@ from copy import copy
 from functools import partial, wraps
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
+from pkg_resources import resource_filename
 import logging
 import time
 import warnings
@@ -65,11 +66,6 @@ def check_psf_files():
                 soss_trace.nuke_psfs(mprocessing=True)
             else:
                 soss_trace.nuke_psfs(mprocessing=False)
-
-
-def create_param_file(**kwargs):
-    """Generate a parameter file from a set of keyword arguments"""
-    pass
 
 
 def run_required(func):
@@ -172,6 +168,7 @@ class SossSim():
             self.nframes = self.nsample = 1
             self.nresets = self.nresets1 = self.nresets2 = 1
             self.dropframes1 = self.dropframes3 = 0
+            self.paramfile = None
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -314,6 +311,9 @@ class SossSim():
         for key, val in kwargs.items():
             setattr(self, key, val)
 
+        # Update params attr
+        self.paramfile = None
+
         # Clear out old simulation
         self._reset_data()
 
@@ -322,9 +322,6 @@ class SossSim():
 
         # Reset relative response function
         self._reset_psfs()
-
-        # Get correct reference files
-        # self.refs = ju.get_references(self.subarray, self.filter)
 
         # Logging
         self.logger = logging.getLogger('mirage.soss_simulator')
@@ -749,26 +746,48 @@ class SossSim():
         pfile: str
             The path to the parameter file
         """
-        # Check that it's a valid file
-        if not os.path.isfile(pfile):
-            raise IOError("{}: No such file.".format(pfile))
+        # Populate params attribute if no file given
+        if pfile is None:
 
-        # Set paramfile and read contents
+            # Read template file
+            self._read_parameter_file(resource_filename('mirage', 'tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml').replace('mirage/mirage', 'mirage'))
+
+            # Populate params dict
+            self.params['Readout']['nint'] = self.nints
+            self.params['Readout']['ngroup'] = self.ngrps
+            self.params['Readout']['array_name'] = 'NIS_' + self.subarray.replace('FULL', 'SOSSFULL')
+            self.params['Readout']['filter'] = self.filter
+            # self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
+            self.params['Readout']['readpatt'] = self.readpatt
+            self.params['Output']['target_name'] = self.target
+            self.params['Output']['target_ra'] = self.ra
+            self.params['Output']['target_dec'] = self.dec
+            self.params['Output']['obs_id'] = self.title
+
+        else:
+
+            # Check that it's a valid file
+            if not os.path.isfile(pfile):
+                raise IOError("{}: No such file.".format(pfile))
+
+            # Set paramfile and read contents
+            self._read_parameter_file(pfile)
+
+            # Override observation parameters
+            self._nints = self.params['Readout']['nint']
+            self._ngrps = self.params['Readout']['ngroup']
+            self._subarray = self.params['Readout']['array_name'].replace('NIS_', '').replace('SOSS', '')
+            self._filter = self.params['Readout']['filter']
+            self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
+            self._readpatt = self.params['Readout']['readpatt']
+            self._nrows, self._ncols = SUB_DIMS[self.subarray]
+            self._target = self.params['Output']['target_name']
+            self.ra = self.params['Output']['target_ra']
+            self.dec = self.params['Output']['target_dec']
+            self.title = self.params['Output']['obs_id']
+
+        # Save paramfile
         self._paramfile = pfile
-        self._read_parameter_file()
-
-        # Override observation parameters
-        self._nints = self.params['Readout']['nint']
-        self._ngrps = self.params['Readout']['ngroup']
-        self._subarray = self.params['Readout']['array_name'].replace('NIS_', '')
-        self._filter = self.params['Readout']['filter']
-        self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
-        self._readpatt = self.params['Readout']['readpatt']
-        self._nrows, self._ncols = SUB_DIMS[self.subarray]
-        self._target = self.params['Output']['target_name']
-        self.ra = self.params['Output']['target_ra']
-        self.dec = self.params['Output']['target_dec']
-        self.title = self.params['Output']['obs_id']
 
         # Set the dependent quantities
         self.wave = hu.wave_solutions(self.subarray)
@@ -898,14 +917,14 @@ class SossSim():
         else:
             return fig
 
-    def _read_parameter_file(self):
+    def _read_parameter_file(self, pfile):
         """Read in the yaml parameter file"""
         try:
-            with open(self.paramfile, 'r') as infile:
+            with open(pfile, 'r') as infile:
                 self.params = yaml.safe_load(infile)
 
         except FileNotFoundError:
-            self.logger.error("Unable to open {}".format(self.paramfile))
+            print("Unable to open {}".format(pfile))
 
     def _reset_data(self):
         """Reset the results to all zeros"""
