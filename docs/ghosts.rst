@@ -18,6 +18,9 @@ The addition of ghosts is not currently supported.
 NIRISS
 ++++++
 
+Optical ghosts in NIRISS have been observed and characterized in ground testing data. A detailed description of the ghosts is given in the `Ghosts section <https://jwst-docs.stsci.edu/near-infrared-imager-and-slitless-spectrograph/niriss-instrumentation/niriss-gr150-grisms#NIRISSGR150Grisms-Ghosts>`_ of the NIRISS GR150 Grisms Jdox page.
+
+
 Controlling the Addition of Ghosts
 ----------------------------------
 
