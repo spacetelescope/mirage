@@ -230,7 +230,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         if isinstance(jitter, float):
             inst.options['jitter'] = 'gaussian'
             inst.options['jitter_sigma'] = jitter
-            logger.info('Adding jitter', jitter)
+            logger.info('Adding jitter: {} arcsec'.format(jitter))
         elif isinstance(jitter, str):
             allowed_strings = ['PCS=Coarse_Like_ITM', 'PCS=Coarse']
             if jitter in allowed_strings:
