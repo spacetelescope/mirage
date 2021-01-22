@@ -1908,8 +1908,20 @@ class SimInput:
             # set the FilterWheel and PupilWheel for NIRISS
             if input['APTTemplate'] in ['NirissAmi']:
                 filter_name = input['Filter']
-                input[filtkey] = filter_name
-                input[pupilkey] = 'NRM'
+
+                # TA and direct images will be set to imaging mode
+                # rather than ami mode
+                if input['Mode'].lower() == 'imaging':
+                    if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                        input[pupilkey] = filter_name
+                        input[filtkey] = 'CLEAR'
+                    elif filter_name in NIRISS_FILTER_WHEEL_ELEMENTS:
+                        input[pupilkey] = 'CLEARP'
+                        input[filtkey] = filter_name
+                else:
+                    input[filtkey] = filter_name
+                    input[pupilkey] = 'NRM'
+
             elif input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
                 filter_name = input['Filter']
                 if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
