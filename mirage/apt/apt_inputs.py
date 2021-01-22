@@ -818,7 +818,8 @@ class AptInput:
                                                          or 'FGS' in elements[4]
                                                          or 'NRS' in elements[4]
                                                          or 'MIR' in elements[4])
-                            ) or (('TA' in elements[4]) & ('NRC' in elements[4])):
+                            ) or (('TA' in elements[4]) & ('NRC' in elements[4]
+                                                           or 'NIS' in elements[4])):
                             if (elements[18] == 'PARALLEL') and ('MIRI' in elements[4]):
                                 skip = True
 
@@ -837,7 +838,7 @@ class AptInput:
                             # groups. For now just keep everything in a single visit group.
                             vgrp = '01'
                             visit_grp.append(vgrp)
-                            # Parallel sequence id hard coded to 1 (Simulated instrument as prime rather than
+                            # Parallel sequence is hard coded to 1 (Simulated instrument as prime rather than
                             # parallel) at the moment. Future improvements may allow the proper sequence
                             # number to be constructed.
                             seq = '1'
