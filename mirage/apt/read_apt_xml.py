@@ -1829,7 +1829,7 @@ class ReadAPTXML():
         # Set namespace
         ncc = "{http://www.stsci.edu/JWST/APT/Template/NircamCoron}"
 
-        mod = 'A' # template.find(ns + 'Module').text
+        mod = 'A' # by policy, always mod A for coronagraphy
 
         if verbose:
             self.logger.info("Reading NIRCam Coronagraphy template")
@@ -1856,7 +1856,6 @@ class ReadAPTXML():
         FiducialPointOverride = True if override is not None else False
 
         subarray = template.find(ncc + 'Subarray').text
-        ta_subarray = 'SUBTAAMI'
 
         # Find the number of dithers
         primary_dithers = template.find(ncc + 'DitherPattern').text
@@ -1864,9 +1863,31 @@ class ReadAPTXML():
 
         coronmask = template.find(ncc + 'CoronMask').text
 
-        # Parameters to read:
-        # CoronMask, Subarray
-        # maybe PsfReferenceObservation
+        sci_detector = 'A2' if coronmask=='MASK210R' else \
+                       'A4' if coronmask=='MASKSWB' else 'A5'
+
+        # from NIRCam_subarray_definitions.list
+        # NRCA2_FSTAMASK210R              SUBFSA210R     1
+        # NRCA5_FSTAMASK335R              SUBFSA335R     1
+        # NRCA5_FSTAMASK430R              SUBFSA430R     1
+        # NRCA5_FSTAMASKLWB               SUBFSALWB      1
+        # NRCA4_FSTAMASKSWB               SUBFSASWB      1
+        # NRCA2_TAMASK210R                SUBNDA210R     1
+        # NRCA5_TAMASK335R                SUBNDA335R     1
+        # NRCA5_TAMASK430R                SUBNDA430R     1
+        # NRCA5_TAMASKLWBL                SUBNDALWBL     1
+        # NRCA5_TAMASKLWB                 SUBNDALWBS     1
+        # NRCA4_TAMASKSWB                 SUBNDASWBL     1
+        # NRCA4_TAMASKSWBS                SUBNDASWBS     1
+
+        if sci_detector=='A5':
+            # LW
+            long_pupil = 'MASKLWB' if coronmask=='MASKLWB' else 'MASKRND'
+            short_pupil = 'n/a'
+        else:
+            # SW
+            short_pupil = 'MASKSWB' if coronmask == 'MASKSWB' else 'MASKRND'
+            long_pupil = 'n/a'
 
         # Get information about any TA exposures
         ta_targ = template.find(ncc + 'AcqTargetID').text
@@ -1876,7 +1897,10 @@ class ReadAPTXML():
             ta_filter = template.find(ncc + 'AcqFilter').text
             ta_brightness = template.find(ncc + 'AcqTargetBrightness').text
             ta_dithers = 1
-            self.logger.info(f"Read TA exposure parameters {ta_readout}, {ta_groups}")
+            ta_subarray = 'SUB' + ('NDA' if ta_brightness=='BRIGHT' else 'FSA') + coronmask[4:]
+
+            if ta_subarray =='SUBNDALWB': ta_subarray = 'SUBNDALWBL'  # TBD L vs S?
+            self.logger.info(f"Read TA exposure parameters {ta_readout}, {ta_groups}; inferred subarray= {ta_subarray}")
 
         # Do not look for the text attribute yet since this keyword may not be present
         astrometric_confirmation_imaging = template.find(ncc + 'OptionalConfirmationImage').text
@@ -1891,8 +1915,7 @@ class ReadAPTXML():
             astrom_readout_pattern = template.find(ncc + 'ConfirmationReadoutPattern').text
             astrom_readout_groups = template.find(ncc + 'ConfirmationGroups').text
             astrom_readout_ints = template.find(ncc + 'ConfirmationIntegrations').text
-            astrom_readout_detector = 'NRCA2_FULL' if coronmask=='MASK210R' else \
-                                      'NRCA4_FULL' if coronmask=='MASKSWB' else 'NRCA5_FULL'
+            astrom_readout_detector = 'FULL' # f'NRC{sci_detector}_FULL'
 
         # Combine primary and subpixel dithers
         number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
@@ -1979,71 +2002,79 @@ class ReadAPTXML():
 
         # Now that we have the correct number of dithers, we can
         # begin populating the exposure dictionary
+        science_exposures = copy.deepcopy(self.empty_exposures_dictionary)
         for element in template.find(ncc+'Filters'):
             element_tag_stripped = element.tag.split(ncc)[1]
-            print(element_tag_stripped)
             # Get exposure information
             if element_tag_stripped == 'FilterConfig':
-                science_exposures = copy.deepcopy(self.empty_exposures_dictionary)
+                exposure_dict = {}
 
-                for exposure in element.findall(ncc + 'Exposure'):
-                    exposure_dict = {}
+                # Load dither information into dictionary
+                exposure_dict[dither_key_name] = np.int(number_of_dithers)
+                exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
+                exposure_dict['filter'] = element.find(ncc + 'Filter').text
+                exposure_dict['ReadoutPattern'] = element.find(ncc + 'ReadoutPattern').text
+                exposure_dict['Groups'] = element.find(ncc + 'Groups').text
+                exposure_dict['Integrations'] = element.find(ncc + 'Integrations').text
+                print(exposure_dict )
 
-                    # Load dither information into dictionary
-                    exposure_dict[dither_key_name] = np.int(number_of_dithers)
-                    exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
+                # Filter, ReadoutPattern, Groups, Integrations,
+                # set subarray also
 
-                    # Store all entries in exposure_dict as lists, so that everything
-                    # is consistent regardless of whether there is a direct image
-                    for exposure_parameter in exposure:
-                        parameter_tag_stripped = exposure_parameter.tag.split(ncc)[1]
-                        exposure_dict[parameter_tag_stripped] = exposure_parameter.text
+                # Store all entries in exposure_dict as lists, so that everything
+                # is consistent regardless of whether there is a direct image
+                #for exposure_parameter in exposure:
+                #    parameter_tag_stripped = exposure_parameter.tag.split(ncc)[1]
+                #    exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
-                    # Fill dictionary to return
-                    for key in self.APTObservationParams_keys:
-                        if key in exposure_dict.keys():
-                            value = exposure_dict[key]
-                        elif key in proposal_param_dict.keys():
-                            value = proposal_param_dict[key]
-                        elif key == 'Instrument':
-                            value = instrument
-                        elif key == 'ParallelInstrument':
-                            value = parallel_instrument
-                        elif key == 'FiducialPointOverride':
-                            value = str(FiducialPointOverride)
-                        elif key == 'APTTemplate':
-                            value = template_name
-                        elif key == 'Tracking':
-                            value = tracking
-                        elif (key == 'Mode'):
-                            value = 'ami'
-                        elif key == 'Module':
-                            value = mod
-                        elif key == 'Subarray':
-                            value = subarray
-                        elif key == 'PrimaryDithers':
-                            value = primary_dithers
-                        elif key == 'SubpixelPositions':
-                            value = subpix_dithers
-                        else:
-                            value = str(None)
-                        science_exposures[key].append(value)
+                # Fill dictionary to return
+                for key in self.APTObservationParams_keys:
+                    if key in exposure_dict.keys():
+                        value = exposure_dict[key]
+                    elif key in proposal_param_dict.keys():
+                        value = proposal_param_dict[key]
+                    elif key == 'Instrument':
+                        value = instrument
+                    elif key == 'ParallelInstrument':
+                        value = parallel_instrument
+                    elif key == 'FiducialPointOverride':
+                        value = str(FiducialPointOverride)
+                    elif key == 'APTTemplate':
+                        value = template_name
+                    elif key == 'Tracking':
+                        value = tracking
+                    elif (key == 'Mode'):
+                        value = 'coron'
+                    elif key == 'Module':
+                        value = mod
+                    elif key == 'Subarray':
+                        value = subarray
+                    elif key == 'PrimaryDithers':
+                        value = primary_dithers
+                    elif key == 'SubpixelPositions':
+                        value = subpix_dithers
+                    else:
+                        value = str(None)
+                    science_exposures[key].append(value)
 
 
-                # After collecting information for all exposures, we need to
-                # put them in the correct order. TA exposures first, followed by
-                # any astrometric confirmation images, then all science observations.
-                # This is based on the order shown in the pointing file.
-                if ta_targ.upper() != 'NONE':
-                    for key in science_exposures:
-                        exposures_dictionary[key] = list(ta_exposures[key])
+        # After collecting information for all exposures, we need to
+        # put them in the correct order. TA exposures first, followed by
+        # any astrometric confirmation images, then all science observations.
+        # This is based on the order shown in the pointing file.
+        if ta_targ.upper() != 'NONE':
+            for key in science_exposures:
+                exposures_dictionary[key] = list(ta_exposures[key])
+            print(f"Number of TA exposure specs: {len(ta_exposures[key])}")
 
-                if astrometric_confirmation_imaging.upper() == 'TRUE':
-                    for key in science_exposures:
-                        exposures_dictionary[key] = list(exposures_dictionary[key]) + list(astrometric_exposures[key])
+        if astrometric_confirmation_imaging.upper() == 'TRUE':
+            for key in science_exposures:
+                exposures_dictionary[key] = list(exposures_dictionary[key]) + list(astrometric_exposures[key])
+            print(f"Number of astrometric exposure specs: {len(astrometric_exposures[key])}")
 
-                for key in science_exposures:
-                    exposures_dictionary[key] = list(exposures_dictionary[key]) + list(science_exposures[key])
+        for key in science_exposures:
+            exposures_dictionary[key] = list(exposures_dictionary[key]) + list(science_exposures[key])
+        print(f"Number of science exposure specs: {len(science_exposures[key])}")
 
 
         self.logger.info('Number of dithers for NIRCam coron exposure: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
@@ -2061,6 +2092,7 @@ class ReadAPTXML():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
 
+        self.logger.info(f"Total number of exposures for this observation: {len(exposures_dictionary[key])}")
         return exposures_dictionary
 
 
