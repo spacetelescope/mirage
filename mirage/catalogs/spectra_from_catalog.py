@@ -643,8 +643,9 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
             match = catalog_info['index'] == dataset
 
             if not any(match):
-                raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
-                                  'number {}. Unable to rescale.').format(dataset))
+                #raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
+                #                  'number {}. Unable to rescale.').format(dataset))
+                continue
             magnitude = catalog_info[mag_colname].data[match][0]
 
             # Create a synphot source spectrum
