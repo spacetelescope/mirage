@@ -13,6 +13,7 @@ import math
 import numpy as np
 import os
 import pkg_resources
+import re
 
 from astropy.coordinates import SkyCoord, Galactic
 from astropy.io import ascii
@@ -1243,15 +1244,25 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                             # select 2MASS magnitude: first ph_qual = A or if none
                             # is of quality A the first ph_qual = B or if none is
                             # of quality A or B then the first non U value.
-                            for l3 in range(3):
-                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "A"):
-                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
-                            for l3 in range(3):
-                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "B"):
-                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
-                            for l3 in range(3):
-                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] != "U"):
-                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
+                            magval = gaia_2mass['ph_qual'][match1[l1]]
+                            if isinstance(magval, str):
+                                qual = magval[0:3]
+                            else:
+                                qual = magval.decode()[0:3]
+
+                            if (irmag < -100.):
+                                a_pos = qual.find('A')
+                                if a_pos != -1:
+                                    irmag = gaia_2mass[magkeys[a_pos]][match1[l1]]
+                                else:
+                                    b_pos = qual.find('B')
+                                    if b_pos != -1:
+                                        irmag = gaia_2mass[magkeys[b_pos]][match1[l1]]
+                                    else:
+                                        non_u_pos = re.search(r'[^U]', qual)
+                                        if non_u_pos is not None:
+                                            irmag = gaia_2mass[magkeys[non_u_pos.start()]][match1[l1]]
+
                             delm = gmag - irmag
                             if (delm > -1.2) and (delm < 30.0):
                                 if delm < mindelm:
