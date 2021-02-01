@@ -84,7 +84,14 @@ Create a python 3.6 environment using the environment file, activate the environ
     pip install .
 
 
-There is also an environment file that can be used to create a python 3.8 environment::
+There are also environment files that can be used to create python 3.7 or 3.8 environments::
+
+    cd mirage
+    conda env create -f environment_python_3.7.yml --name mirage_py3.7
+    conda activate mirage_py3.7
+    pip install .
+
+::
 
     cd mirage
     conda env create -f environment_python_3.8.yml --name mirage_py3.8
@@ -92,8 +99,9 @@ There is also an environment file that can be used to create a python 3.8 enviro
     pip install .
 
 
+
 .. tip::
-    For the python 3.6 case, most packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary. For the python 3.8 case most packages, including webbpsf, are installed via pip (astroconda does not yet support python 3.8). In this case you must `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_.
+    For the python 3.6 case, most packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary. For the python 3.7 and 3.8 cases most packages, including webbpsf, are installed via pip (astroconda does not yet support python 3.8). In this case you must `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_.
 
 
 .. _osx1014:
