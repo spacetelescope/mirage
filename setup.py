@@ -104,7 +104,7 @@ setup(
         'numpy',
         'photutils>=1.0.2',
         'pysiaf>=0.10.0',
-        'scipy>=1.6.0',
+        'scipy>=1.1.0',
         'synphot>=1.0.1',
         'webbpsf>=0.9.1',
         'pyyaml>=5.1.2'
