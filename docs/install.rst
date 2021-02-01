@@ -34,7 +34,7 @@ These are: **jwst**, which is the JWST calibration pipeline software, and two pa
     works for MacOSX 10.13 (High Sierra). If the version of healpy above does not work for your system, you may need to install a different version.
 
 .. tip::
-    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you, however conda installation is currrently only supported for python 3.7 and below.
 
 
 Install the Development Version
@@ -67,19 +67,33 @@ Create and activate a new environment. In this example we call the environment "
     works for MacOSX 10.13 (High Sierra). If the version of healpy above does not work for your system, you may need to install a different version.
 
 .. tip::
-    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you.
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you, however conda installation is currrently only supported for python 3.7 and below.
 
 .. _env_file_install:
 
-**Or, to install using the environment file, again creating an environment called "mirage"**::
+Install via Environment File
+----------------------------
+
+The Mirage repository also contains environment files, which can be used to create an environment with proper versions of all of Mirage's dependencies. After cloning the Mirage repository, the environment file (located within the top-level directory) can be used via the following commands. In both cases, the *name* keyword is used to specify that the name of the environment. You can name the environment anything you like.
+
+Create a python 3.6 environment using the environment file, activate the environment, and install mirage::
 
     cd mirage
-    conda env create -f environment.yml --name mirage python=3.6
-    conda activate mirage
+    conda env create -f environment_python_3.6.yml --name mirage_py3.6
+    conda activate mirage_py3.6
     pip install .
 
+
+There is also an environment file that can be used to create a python 3.8 environment::
+
+    cd mirage
+    conda env create -f environment_python_3.8.yml --name mirage_py3.8
+    conda activate mirage_py3.8
+    pip install .
+
+
 .. tip::
-    For this latter case, packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary.
+    For the python 3.6 case, most packages are installed via conda. For `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_, this means the data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary. For the python 3.8 case most packages, including webbpsf, are installed via pip (astroconda does not yet support python 3.8). In this case you must `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_.
 
 
 .. _osx1014:
