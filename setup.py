@@ -93,7 +93,7 @@ setup(
         'astropy>=4.0',
         'astroquery>=0.3.8',
         'batman-package',
-        'crds>=10.3.5',
+        'crds>=10.1.0',
         'gwcs>=0.11',
         'h5py>=2.8.0',
         'ipython',
