@@ -185,7 +185,7 @@ class WFSSSim():
 
         # Location of the configuration files needed for dispersion
         loc = os.path.join(self.datadir, "{}/GRISM_{}/current".format(self.instrument,
-                                                                 self.instrument.upper()))
+                                                                      self.instrument.upper()))
         if not os.path.isdir(loc):
             raise ValueError(("{} directory is not present. GRISM_NIRCAM and/or GRISM_NIRISS portion of Mirage reference "
                               "file collection is out of date or not set up correctly. See "
