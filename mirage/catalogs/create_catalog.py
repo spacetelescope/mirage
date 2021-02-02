@@ -1172,7 +1172,8 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     outcat = PointSourceCatalog(ra=raout, dec=decout, starting_index=starting_index)
     n1 = 0
     for column_value in out_filter_names:
-        outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value)
+        outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value,
+                                    magnitude_system='vegamag')
         n1 = n1+1
     return outcat
 
@@ -1691,8 +1692,10 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99., starting_index=1):
 
     # -------------Add magnitude columns-------------------------------
     mag_cols = [colname for colname in combined.colnames if 'magnitude' in colname]
+    cat1_mag_cols = [colname for colname in cat1.magnitudes.keys() if 'magnitude' in colname]
     for col in mag_cols:
-        new_cat.add_magnitude_column(combined[col].data, column_name=col)
+        new_cat.add_magnitude_column(combined[col].data, column_name=col,
+                                     magnitude_system=cat1.magnitudes[cat1_mag_cols[0]][0])
 
     return new_cat
 
