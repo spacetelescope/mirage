@@ -184,8 +184,13 @@ class WFSSSim():
                                                                   module=self.module, detector=det_name)
 
         # Location of the configuration files needed for dispersion
-        loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
-                                                               self.instrument.upper()))
+        loc = os.path.join(self.datadir, "{}/GRISM_{}/current".format(self.instrument,
+                                                                 self.instrument.upper()))
+        if not os.path.isdir(loc):
+            raise ValueError(("{} directory is not present. GRISM_NIRCAM and/or GRISM_NIRISS portion of Mirage reference "
+                              "file collection is out of date or not set up correctly. See "
+                              "https://mirage-data-simulator.readthedocs.io/en/latest/reference_files.html foe details.".format(loc)))
+        self.logger.info("Retrieving WFSS config files from: {}".format(loc))
 
         # Determine the name of the background file to use, as well as the
         # orders to disperse.

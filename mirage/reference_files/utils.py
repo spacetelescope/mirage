@@ -38,10 +38,11 @@ def get_transmission_file(parameter_dict):
     transmission_filename : str
         Full path to the transmission file
     """
+    logger = logging.getLogger('mirage.reference_files.utils.get_transmission_file')
     datadir = os.environ.get('MIRAGE_DATA')
 
     if parameter_dict['INSTRUME'].lower() == 'nircam':
-        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRCAM/V2')
+        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRCAM/current')
 
         module = parameter_dict['DETECTOR'][3]
 
@@ -64,7 +65,7 @@ def get_transmission_file(parameter_dict):
 
     # For NIRISS we search for a detector/filter/pupil-dependent file
     elif parameter_dict['INSTRUME'].lower() == 'niriss':
-        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRISS/V2')
+        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRISS/current')
         filt = parameter_dict['FILTER'].upper()
         if filt not in ['GR150R', 'GR150C']:
             transmission_filename = None
@@ -75,4 +76,5 @@ def get_transmission_file(parameter_dict):
     elif parameter_dict['INSTRUME'].lower() == 'fgs':
         transmission_filename = None
 
+    logger.info('POM Transmission filename: {}'.format(transmission_filename))
     return transmission_filename
