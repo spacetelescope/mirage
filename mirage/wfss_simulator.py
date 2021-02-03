@@ -291,7 +291,7 @@ class WFSSSim():
                                           "current version of the files and place them in the appropirate directory. "
                                           "See https://mirage-data-simulator.readthedocs.io/en/latest/reference_files.html"
                                           "#download-grism-related-reference-data for details.".format(configuration_file,
-                                                                                                       self.instrument.upper()))
+                                                                                                       self.instrument.upper())))
 
                     background_done = True
 
