@@ -55,8 +55,7 @@ For any questions about the `mirage` project or its software or documentation, p
 
 ## Current Development Team
 - Bryan Hilbert [@bhilbert4](https://github.com/bhilbert4)
-- Johannes Sahlmann [@Johannes-Sahlmann](https://github.com/johannes-sahlmann)
-- Lauren Chambers [@laurenmarietta](https://github.com/laurenmarietta)
+- Nor Pirzkal [@NorPirzkal](https://github.com/npirzkal)
 - Kevin Volk [@KevinVolkSTScI](https://github.com/KevinVolkSTScI)
 - Shannon Osborne [@shanosborne](https://github.com/shanosborne)
 - Marshall Perrin [@mperrin](https://github.com/mperrin)

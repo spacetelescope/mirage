@@ -45,11 +45,13 @@ import yaml
 
 import numpy as np
 from astropy.io import fits
+import grismconf
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 import pysiaf
 from scipy.stats import sigmaclip
 
 from .catalogs import spectra_from_catalog
+from .reference_files.utils import find_wfss_config_filename
 from .seed_image import catalog_seed_image
 from .dark import dark_prep
 from .logging import logging_functions
@@ -215,8 +217,6 @@ class WFSSSim():
 
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
-            background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
-                                                                    dmode.lower())
 
             if isinstance(self.params['simSignals']['bkgdrate'], str):
                 if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
@@ -261,6 +261,13 @@ class WFSSSim():
         # galaxies, extended objects
         disp_seed = np.zeros((cat.ffsize, cat.ffsize))
         background_done = False
+
+        # Get the configuration file name so that we can then find the
+        # correct 2d dispersed background filename
+        configuration_file = find_wfss_config_filename(loc, self.instrument, self.params['Readout']['filter'], dmode)
+        c = grismconf.Config(configuration_file)
+        background_file = c.BCK
+
         for seed_files in [ptsrc_seeds, galaxy_seeds, extended_seeds]:
             if seed_files[0] is not None:
                 dispersed_objtype_seed = Grism_seed(seed_files, self.crossing_filter,
@@ -271,40 +278,23 @@ class WFSSSim():
                 dispersed_objtype_seed.disperse(orders=orders)
                 # Only include the background in one of the object type seed images
                 if not background_done:
-                    if self.instrument == 'nircam':
-                        background_image = dispersed_objtype_seed.disperse_background_1D([back_wave, back_sig])
-                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
-                    else:
-                        # BackLevel is used as such: background / max(background) * BackLevel
-                        # So we need to either set BackLevel equal to the requested level
-                        # NOT THE RATIO OF THAT TO MEDIUM, or we need to open the background
-                        # file and multiply it by the ratio of the requested level to medium.
-                        # The former isn't quite correct because it'll be scaling the maximum
-                        # value in the image to "low" or "high", rather than the median
-                        full_background_file = os.path.join(loc, background_file)
-                        background_image = fits.getdata(full_background_file)
+                    if background_file is not None:
 
-                        # Before scaling the background image by the scaling_factor
-                        # we need to normalize by the sigma-clipped mean value. This is
-                        # because the background files were produced and scaled to the
-                        # ETC "medium" level at some arbirtrary pointing, but the
-                        # "medium" level is pointing-dependent. Current background files
-                        # are scaled such that the "medium" value from the ETC is the
-                        # sigma-clipped mean value.
-                        clip, lo, hi = sigmaclip(background_image, low=3, high=3)
-                        background_mean = np.mean(clip)
-                        background_image = background_image / background_mean * scaling_factor
-                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
+                        # If Back keyword is not given, then the disperser will go find
+                        # the appropriate background file, read it in, and scale it by
+                        # scaling_factor
+                        dispersed_objtype_seed.finalize(BackLevel=scaling_factor,
+                                                        tofits=self.background_image_filename)
+                    else:
+                        raise ValueError(("The background file listed in {} is None. This indicates that you "
+                                          "are using an old version of the GRISM_{} files. Please download the "
+                                          "current version of the files and place them in the appropirate directory. "
+                                          "See https://mirage-data-simulator.readthedocs.io/en/latest/reference_files.html"
+                                          "#download-grism-related-reference-data for details.".format(configuration_file,
+                                                                                                       self.instrument.upper()))
 
                     background_done = True
 
-                    # Save the background image to a fits file
-                    hprime = fits.PrimaryHDU()
-                    himg = fits.ImageHDU(background_image)
-                    himg.header['EXTNAME'] = 'BACKGRND'
-                    himg.header['UNITS'] = 'e/s'
-                    hlist = fits.HDUList([hprime, himg])
-                    hlist.writeto(self.background_image_filename, overwrite=True)
                 else:
                     dispersed_objtype_seed.finalize()
                 disp_seed += dispersed_objtype_seed.final
