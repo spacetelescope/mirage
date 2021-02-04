@@ -1817,9 +1817,6 @@ class ReadAPTXML():
         """
         instrument = 'NIRCam'
 
-        long_filter = 'N/A'
-        long_pupil = 'N/A'
-
         if verbose:
             print(f"Reading template {template_name}")
 
@@ -1836,16 +1833,8 @@ class ReadAPTXML():
 
         parallel_instrument = False
 
-        DitherPatternType = None
         dither_key_name = 'DitherPattern'
 
-        # number of dithers defaults to 1
-        number_of_dithers = 1
-        number_of_subpixel_positions = 1
-
-        number_of_primary_dithers = 1
-        number_of_subpixel_dithers = 1
-        number_of_astrometric_dithers = 0
 
         # Check the target type in order to decide whether the tracking should be
         # sidereal or non-sidereal
@@ -1858,60 +1847,82 @@ class ReadAPTXML():
         subarray = template.find(ncc + 'Subarray').text
 
         # Find the number of dithers
-        primary_dithers = template.find(ncc + 'DitherPattern').text
-        subpix_dithers = 'NONE'  # Does it matter for coronagraphy if we treat dithers as primary or subpixel?
+        # We treat the coronagraphy dithers as subpixel dithers, with 1 primary dither.
+        primary_dithers_pattern = 'NONE'
+        number_of_primary_dithers = 1
+        subpix_dithers_pattern = template.find(ncc + 'DitherPattern').text
+        if subpix_dithers_pattern.upper() != 'NONE':
+            # first character of the dither pattern name is the number of points in it, so:
+            number_of_subpixel_dithers = int(subpix_dithers_pattern[0])
+        else:
+            number_of_subpixel_dithers = 1
+        number_of_astrometric_dithers = 0 # it's optional, and off by default
 
         coronmask = template.find(ncc + 'CoronMask').text
 
-        sci_detector = 'A2' if coronmask=='MASK210R' else \
+
+        coron_sci_detector = 'A2' if coronmask=='MASK210R' else \
                        'A4' if coronmask=='MASKSWB' else 'A5'
+        using_lw = coron_sci_detector =='A5'
 
-        # from NIRCam_subarray_definitions.list
-        # NRCA2_FSTAMASK210R              SUBFSA210R     1
-        # NRCA5_FSTAMASK335R              SUBFSA335R     1
-        # NRCA5_FSTAMASK430R              SUBFSA430R     1
-        # NRCA5_FSTAMASKLWB               SUBFSALWB      1
-        # NRCA4_FSTAMASKSWB               SUBFSASWB      1
-        # NRCA2_TAMASK210R                SUBNDA210R     1
-        # NRCA5_TAMASK335R                SUBNDA335R     1
-        # NRCA5_TAMASK430R                SUBNDA430R     1
-        # NRCA5_TAMASKLWBL                SUBNDALWBL     1
-        # NRCA5_TAMASKLWB                 SUBNDALWBS     1
-        # NRCA4_TAMASKSWB                 SUBNDASWBL     1
-        # NRCA4_TAMASKSWBS                SUBNDASWBS     1
 
-        if sci_detector=='A5':
-            # LW
+        if using_lw: # Long wave channel is being used
             long_pupil = 'MASKLWB' if coronmask=='MASKLWB' else 'MASKRND'
-            short_pupil = 'n/a'
-        else:
-            # SW
+            short_pupil = 'n/a'    # not even read out, no data downloaded
+            filter_key_name = 'LongFilter'
+        else: # Short wave channel
             short_pupil = 'MASKSWB' if coronmask == 'MASKSWB' else 'MASKRND'
             long_pupil = 'n/a'
+            filter_key_name = 'ShortFilter'
 
         # Get information about any TA exposures
+
         ta_targ = template.find(ncc + 'AcqTargetID').text
         if ta_targ.upper() != 'NONE':
             ta_readout = template.find(ncc + 'AcqReadoutPattern').text
             ta_groups = template.find(ncc + 'AcqGroups').text
             ta_filter = template.find(ncc + 'AcqFilter').text
             ta_brightness = template.find(ncc + 'AcqTargetBrightness').text
-            ta_dithers = 1
+            ta_dithers_pattern = 'NONE'
+
+            # TA uses subarrays
+            #   from NIRCam_subarray_definitions.list we have:
+            # NRCA2_FSTAMASK210R              SUBFSA210R     1
+            # NRCA5_FSTAMASK335R              SUBFSA335R     1
+            # NRCA5_FSTAMASK430R              SUBFSA430R     1
+            # NRCA5_FSTAMASKLWB               SUBFSALWB      1
+            # NRCA4_FSTAMASKSWB               SUBFSASWB      1
+            # NRCA2_TAMASK210R                SUBNDA210R     1
+            # NRCA5_TAMASK335R                SUBNDA335R     1
+            # NRCA5_TAMASK430R                SUBNDA430R     1
+            # NRCA5_TAMASKLWBL                SUBNDALWBL     1
+            # NRCA5_TAMASKLWB                 SUBNDALWBS     1
+            # NRCA4_TAMASKSWB                 SUBNDASWBL     1
+            # NRCA4_TAMASKSWBS                SUBNDASWBS     1
             ta_subarray = 'SUB' + ('NDA' if ta_brightness=='BRIGHT' else 'FSA') + coronmask[4:]
 
-            if ta_subarray =='SUBNDALWB': ta_subarray = 'SUBNDALWBL'  # TBD L vs S?
+            # For the bar occulters, which have L and S (long and short) side TA subarrays,
+            # it turns out that which aperture gets used for TA depends on the science filter in a non-obvious way
+            # See table 7-7 of NIRCam OSS docs, as provided by Stansberry to Perrin
+            # For MIRAGE at this point we haven't yet parsed the first science filter, and for now it's not critical
+            # enough to get this right, so let's just pick reasonable defaults.
+            # TODO improve later, if we decide it's important
+            if ta_subarray =='SUBNDASWB':
+                # ta_side should be S for F182M, F187M,F210M otherwise it's L.  Default for now can be L for F200W
+                ta_aperture_side = 'L'
+                ta_subarray += ta_aperture_side
+            elif ta_subarray == 'SUBNDALWB':
+                # ta_side should be L for F460M,F480M otherwise it's S.  Default for now can be S
+                ta_aperture_side = 'S'
+                ta_subarray += ta_aperture_side
+
             self.logger.info(f"Read TA exposure parameters {ta_readout}, {ta_groups}; inferred subarray= {ta_subarray}")
 
         # Do not look for the text attribute yet since this keyword may not be present
         astrometric_confirmation_imaging = template.find(ncc + 'OptionalConfirmationImage').text
 
-        if primary_dithers.upper() != 'NONE':
-            # first character of the dither pattern name is the number of points
-            number_of_primary_dithers = int(primary_dithers[0])
-        if subpix_dithers.upper() != 'NONE':
-            number_of_subpixel_dithers = np.int(subpix_dithers)
         if astrometric_confirmation_imaging.upper() == 'TRUE':
-            number_of_astrometric_dithers = 2  # at the initial position for TA, and after move to the occulter
+            number_of_astrometric_dithers = 2 # at the initial position for TA, and after move to the occulter
             astrom_readout_pattern = template.find(ncc + 'ConfirmationReadoutPattern').text
             astrom_readout_groups = template.find(ncc + 'ConfirmationGroups').text
             astrom_readout_ints = template.find(ncc + 'ConfirmationIntegrations').text
@@ -1926,10 +1937,12 @@ class ReadAPTXML():
             ta_dict['ReadoutPattern'] = ta_readout
             ta_dict['Groups'] = ta_groups
             ta_dict['Integrations'] = 1
-            ta_dict['Filter'] = ta_filter
+            ta_dict[filter_key_name] = ta_filter
             ta_dict['TABrightness'] = ta_brightness
-            ta_dict[dither_key_name] = ta_dithers
-            ta_dict['number_of_dithers'] = ta_dict[dither_key_name]
+            ta_dict[dither_key_name] = ta_dithers_pattern
+            ta_dict['number_of_dithers'] = 1  # TA is never dithered
+            ta_dict['ShortPupil'] = short_pupil
+            ta_dict['LongPupil'] = long_pupil
 
             for key in self.APTObservationParams_keys:
                 if key in ta_dict.keys():
@@ -1953,7 +1966,7 @@ class ReadAPTXML():
                 elif key == 'Subarray':
                     value = ta_subarray
                 elif key == 'PrimaryDithers':
-                    value = ta_dithers
+                    value = ta_dithers_pattern
                 else:
                     value = str(None)
                 ta_exposures[key].append(value)
@@ -1967,12 +1980,15 @@ class ReadAPTXML():
 
             astrometric_exp_dict[dither_key_name] = np.int(number_of_astrometric_dithers)
             astrometric_exp_dict['number_of_dithers'] = astrometric_exp_dict[dither_key_name]
-            astrometric_exp_dict['Filter'] = ta_filter
+            astrometric_exp_dict[filter_key_name] = ta_filter
             astrometric_exp_dict['ReadoutPattern'] = astrom_readout_pattern
             astrometric_exp_dict['Groups'] = astrom_readout_groups
             astrometric_exp_dict['Integrations'] = astrom_readout_ints
             astrometric_exp_dict['ImageDithers'] = number_of_astrometric_dithers
             astrometric_exp_dict['EtcId'] = '-1'
+            astrometric_exp_dict['ShortPupil'] = short_pupil
+            astrometric_exp_dict['LongPupil'] = long_pupil
+
             for key in self.APTObservationParams_keys:
                 if key in astrometric_exp_dict.keys():
                     dir_value = astrometric_exp_dict[key]
@@ -2012,10 +2028,14 @@ class ReadAPTXML():
                 # Load dither information into dictionary
                 exposure_dict[dither_key_name] = np.int(number_of_dithers)
                 exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
-                exposure_dict['filter'] = element.find(ncc + 'Filter').text
                 exposure_dict['ReadoutPattern'] = element.find(ncc + 'ReadoutPattern').text
                 exposure_dict['Groups'] = element.find(ncc + 'Groups').text
                 exposure_dict['Integrations'] = element.find(ncc + 'Integrations').text
+
+                exposure_dict[filter_key_name] = element.find(ncc + 'Filter').text
+                exposure_dict['ShortPupil'] = short_pupil
+                exposure_dict['LongPupil'] = long_pupil
+
                 print(exposure_dict )
 
                 # Filter, ReadoutPattern, Groups, Integrations,
@@ -2050,9 +2070,9 @@ class ReadAPTXML():
                     elif key == 'Subarray':
                         value = subarray
                     elif key == 'PrimaryDithers':
-                        value = primary_dithers
+                        value = primary_dithers_pattern
                     elif key == 'SubpixelPositions':
-                        value = subpix_dithers
+                        value = subpix_dithers_pattern
                     else:
                         value = str(None)
                     science_exposures[key].append(value)
