@@ -816,6 +816,19 @@ class SimInput:
             if instrument not in 'fgs nircam niriss'.split():
                 # do not write files for MIRI and NIRSpec
                 continue
+            elif instrument=='nircam':
+                # special case for coronagraphy:
+                # only 1 detector at a time is returned to the ground, depending on selected mask.
+                # do not write files for the detectors that are not downloaded.
+                if self.info['APTTemplate'][i]=='NircamCoron':
+                    # do not write files for detectors not read out
+                    # the ones not used are tagged with 'n/a' in ReadAPTXML.read_nircam_coronagraphy_template
+                    # and recall NIRCam coronagraphy always uses module A
+                    if ((self.info['LongPupil'][i]=='n/a' and self.info['detector'][i]=='A5') or
+                        (self.info['ShortPupil'][i]=='n/a' and self.info['detector'][i] in ['A1','A2','A3','A4'])):
+                        print(f"Skipping {self.info['yamlfile'][i]} because this coronagraphy obs does not use that detector")
+                        continue
+
             file_dict = {}
             for key in self.info:
                 file_dict[key] = self.info[key][i]
