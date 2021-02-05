@@ -461,8 +461,7 @@ class AptInput:
                     mode = input_dictionary['Mode'][index]
                     template = input_dictionary['APTTemplate'][index]
                     if (sub == 'FULL'):
-
-                        if mode in ['imaging', 'ts_imaging', 'wfss']:
+                        if mode in ['imaging', 'ts_imaging', 'wfss', 'coron']:
                             # This block should catch full-frame observations
                             # in either imaging (including TS imaging) or
                             # wfss mode
