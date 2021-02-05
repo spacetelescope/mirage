@@ -276,6 +276,10 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
         If False (default), download the requested PSF libraries.
         If True, do not download the libraries.
     """
+    # Expand env variables and tildes in direcotry, and make sure it is
+    # an absolute path
+    directory = os.path.abspath(os.path.expanduser(os.path.expandvars(directory)))
+
     # Be sure the input instrument is a list
     file_list = get_file_list(instrument.lower(), dark_type.lower(),
                               skip_darks=skip_darks,
