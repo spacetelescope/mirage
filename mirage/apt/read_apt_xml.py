@@ -1870,9 +1870,6 @@ class ReadAPTXML():
         return exp_dictionary
 
 
-
-
-
     def read_niriss_ami_template(self, template, template_name, obs, proposal_param_dict, parallel=False,
                                  verbose=False):
         """Parse a NIRISS AMI observation template from an APT xml file. Produce an exposure dictionary
@@ -1931,8 +1928,6 @@ class ReadAPTXML():
 
         # number of dithers defaults to 1
         number_of_dithers = 1
-        number_of_subpixel_positions = 1
-
         number_of_primary_dithers = 1
         number_of_subpixel_dithers = 1
         number_of_direct_dithers = 0
@@ -1950,22 +1945,22 @@ class ReadAPTXML():
 
         # Find the number of primary, subpixel, and optionally, direct image dithers
         primary_dithers = template.find(ns + 'PrimaryDithers').text
+        if primary_dithers.upper() == 'NONE':
+            primary_dithers = 1
+
         subpix_dithers = template.find(ns + 'SubpixelPositions').text
+        if subpix_dithers.upper() == 'NONE':
+            subpix_dithers = 1
 
-        # Get information about any TA exposures
-        ta_targ = template.find(ns + 'AcqTarget').text
-        if ta_targ.upper() != 'NONE':
-            ta_readout = template.find(ns + 'AcqReadoutPattern').text
-            ta_groups = template.find(ns + 'AcqGroups').text
-            ta_dithers = 4
+        number_of_primary_dithers = np.int(primary_dithers)
+        number_of_subpixel_dithers = np.int(subpix_dithers)
 
-        # Do not look for the text attribute yet since this keyword may not be present
+        # Combine primary and subpixel dithers
+        number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
+
+        # Check if there is a direct image
         direct_imaging = template.find(ns + 'DirectImaging').text
 
-        if primary_dithers.upper() != 'NONE':
-            number_of_primary_dithers = int(primary_dithers)
-        if subpix_dithers.upper() != 'NONE':
-            number_of_subpixel_dithers = np.int(subpix_dithers)
         if direct_imaging.upper() == 'TRUE':
             image_dithers = template.find(ns + 'ImageDithers').text
             if image_dithers.upper() != 'NONE':
@@ -1973,8 +1968,13 @@ class ReadAPTXML():
             else:
                 number_of_direct_dithers = 1
 
-        # Combine primary and subpixel dithers
-        number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
+        # Get information about any TA exposures
+        ta_targ = template.find(ns + 'AcqTarget').text
+        if ta_targ.upper() != 'NONE':
+            ta_readout = template.find(ns + 'AcqReadoutPattern').text
+            ta_groups = template.find(ns + 'AcqGroups').text
+            ta_mode = template.find(ns + 'AcqMode').text
+            ta_dithers = 4
 
         ta_dict = {}
         ta_exposures = copy.deepcopy(self.empty_exposures_dictionary)
@@ -1982,7 +1982,11 @@ class ReadAPTXML():
             ta_dict['ReadoutPattern'] = ta_readout
             ta_dict['Groups'] = ta_groups
             ta_dict['Integrations'] = 1
-            ta_dict['Filter'] = 'F480M'
+            if ta_mode == 'AMIBRIGHT':
+                ta_dict['FilterWheel'] = 'F480M'
+            elif ta_mode == 'AMIFAINT':
+                ta_dict['FilterWheel'] = 'CLEAR'
+            ta_dict['PupilWheel'] = 'NRM'
             ta_dict[dither_key_name] = ta_dithers
             ta_dict['number_of_dithers'] = ta_dict[dither_key_name]
 
