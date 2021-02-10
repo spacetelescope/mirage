@@ -858,9 +858,17 @@ class GrismTSO():
         # Only finalize and/or add the background if requested.
         if finalize:
             if add_background:
+                # Generate the name of a file to save the dispersed background into.
+                # We can put this here because this function is called with add_background=True
+                # only once in the grism_tso_simulator
+                bkgd_output_file = '{}_background_image.fits'.format(params['Output']['file'].split('.fits')[0])
+                background_image_filename = os.path.join(params['Output']['directory'], bkgd_output_file)
+
+                # Create a 2D background image and find the maximum value. Then apply this
+                # as the scaling when using the pre-computed 2D background image
                 background_image = disp_seed.disperse_background_1D([background_waves, background_fluxes])
                 scaling_factor = np.max(background_image)
-                disp_seed.finalize(BackLevel=scaling_factor, tofits=self.background_image_filename)
+                disp_seed.finalize(BackLevel=scaling_factor, tofits=background_image_filename)
             else:
                 disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
