@@ -197,22 +197,8 @@ class WFSSSim():
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
 
-        if self.params['simSignals']['use_dateobs_for_background']:
-            self.logger.info("Generating background spectrum for observation date: {}".format(self.params['Output']['date_obs']))
-            back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
-                                                                              self.params['Telescope']['dec'],
-                                                                              self.params['Output']['date_obs'])
-        else:
-            if isinstance(self.params['simSignals']['bkgdrate'], str):
-                if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                    self.logger.info("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
-                    back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
-                                                                                       self.module)
-                else:
-                    raise ValueError("ERROR: Unrecognized background rate. Must be one of 'low', 'medium', 'high'")
-            else:
-                raise ValueError(("ERROR: WFSS background rates must be one of 'low', 'medium', 'high', "
-                                  "or use_dateobs_for_background must be True "))
+        # Find the 1d spectrum of the background, based on date or 'low', 'medium', 'high'
+        back_wave, back_sig = backgrounds.get_1d_backgound_spectrum(self.params, self.detector, self.module)
 
         # Default to extracting all orders
         orders = None

@@ -230,7 +230,7 @@ class GrismTSO():
                                                                     output_filename=self.final_SED_file,
                                                                     normalizing_mag_column=self.SED_normalizing_catalog_column)
 
-        bkgd_waves, bkgd_fluxes = backgrounds.nircam_background_spectrum(orig_parameters,
+        bkgd_waves, bkgd_fluxes = backgrounds.get_1d_background_spectrum(orig_parameters,
                                                                          self.detector, self.module)
 
         # Run the catalog_seed_generator on the non-TSO (background) sources. Even if
@@ -858,32 +858,9 @@ class GrismTSO():
         # Only finalize and/or add the background if requested.
         if finalize:
             if add_background:
-                # Get the configuration file name so that we can then find the
-                # correct 2d dispersed background filename
-                configuration_file = find_wfss_config_filename(loc, self.instrument, self.crossing_filter, dmode)
-                c = grismconf.Config(configuration_file)
-                background_file = c.BCK
-
-                if background_file is not None:
-
-                    # If Back keyword is not given, then the disperser will go find
-                    # the appropriate background file, read it in, and scale it by
-                    # scaling_factor
-                    disp_seed.finalize(BackLevel=scaling_factor, tofits=self.background_image_filename)
-                else:
-                    raise ValueError(("The background file listed in {} is None. This indicates that you "
-                                      "are using an old version of the GRISM_{} files. Please download the "
-                                      "current version of the files and place them in the appropirate directory. "
-                                      "See https://mirage-data-simulator.readthedocs.io/en/latest/reference_files.html"
-                                      "#download-grism-related-reference-data for details.".format(configuration_file,
-                                                                                                       self.instrument.upper())))
-
-
-
-
-
                 background_image = disp_seed.disperse_background_1D([background_waves, background_fluxes])
-                disp_seed.finalize(Back=background_image, BackLevel=None)
+                scaling_factor = np.max(background_image)
+                disp_seed.finalize(BackLevel=scaling_factor, tofits=self.background_image_filename)
             else:
                 disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed
