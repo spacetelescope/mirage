@@ -36,7 +36,7 @@ For example:
 Download Grism-related Reference Data
 -------------------------------------
 
-In order to create dispersed images, using WFSS or grism TSO modes, a set of reference files describing the performance of the grisms are necessary. These files include sensitivity curves and dispersion information. These files are currently stored on GitHub in two repositories: one for `NIRCam <https://github.com/npirzkal/GRISM_NIRCAM>`_ and one for `NIRISS <https://github.com/npirzkal/GRISM_NIRISS>`_. To retrieve these files, clone the repositories from GitHub, and then move the files into the appropriate directory within the reference file directory structure. For NIRCam, copy the files in the "V2" folder of the github repository into $MIRAGE_DATA/nircam/GRISM_NIRCAM/current/. For NIRISS, copy the files into the $MIRAGE_DATA/niriss/GRISM_NIRISS/current directory.
+In order to create dispersed images, using WFSS or grism TSO modes, a set of reference files describing the performance of the grisms are necessary. These files include sensitivity curves and dispersion information. These files are currently stored on GitHub in two repositories: one for `NIRCam <https://github.com/npirzkal/GRISM_NIRCAM>`_ and one for `NIRISS <https://github.com/npirzkal/GRISM_NIRISS>`_. To retrieve these files, clone the repositories from GitHub, and then move the files into the appropriate directory within the reference file directory structure. For NIRCam, copy the files from the folder with the latest version number (e.g. "V2") into $MIRAGE_DATA/nircam/GRISM_NIRCAM/current/. For NIRISS, copy the files into the $MIRAGE_DATA/niriss/GRISM_NIRISS/current directory.
 
 
 CRDS Environment Variables
