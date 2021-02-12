@@ -230,7 +230,7 @@ class GrismTSO():
                                                                     output_filename=self.final_SED_file,
                                                                     normalizing_mag_column=self.SED_normalizing_catalog_column)
 
-        bkgd_waves, bkgd_fluxes = backgrounds.nircam_background_spectrum(orig_parameters,
+        bkgd_waves, bkgd_fluxes = backgrounds.get_1d_background_spectrum(orig_parameters,
                                                                          self.detector, self.module)
 
         # Run the catalog_seed_generator on the non-TSO (background) sources. Even if
@@ -253,11 +253,17 @@ class GrismTSO():
         for seed_file in background_seed_files:
             if seed_file is not None:
                 self.logger.info("Dispersing seed image: {}".format(seed_file))
+
+                # Generate the name of a file to save the dispersed background into.
+                # We can put this here because this function is called with add_background=True
+                # only once in the grism_tso_simulator
+                bkgd_output_file = '{}_background_image.fits'.format(orig_parameters['Output']['file'].split('.fits')[0])
+                background_image_filename = os.path.join(orig_parameters['Output']['directory'], bkgd_output_file)
                 disp = self.run_disperser(seed_file, orders=self.orders,
                                           add_background=not background_done,
                                           background_waves=bkgd_waves,
                                           background_fluxes=bkgd_fluxes,
-                                          finalize=True)
+                                          finalize=True, background_image_output=background_image_filename)
                 if not background_done:
                     # Background is added at the first opportunity. At this
                     # point, create an array to hold the final combined
@@ -790,7 +796,8 @@ class GrismTSO():
 
 
     def run_disperser(self, direct_file, orders=["+1", "+2"], add_background=True,
-                      background_waves=None, background_fluxes=None, cache=False, finalize=False):
+                      background_waves=None, background_fluxes=None, cache=False, finalize=False,
+                      background_image_output='dispersed_background.fits'):
         """Run the disperser on the given direct seed image.
 
         Parameters
@@ -821,14 +828,23 @@ class GrismTSO():
             If True, call the finalize function of the disperser in order to
             create the final dispersed image of the object
 
+        background_image_output : str
+            Name of a fits file to which the final dispersed background image
+            will be saved.
+
         Returns
         -------
         disp_seed : numpy.ndarray
             2D array containing the dispersed seed image
         """
         # Location of the configuration files needed for dispersion
-        loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
-                                                               self.instrument.upper()))
+        loc = os.path.join(self.datadir, "{}/GRISM_{}/current/".format(self.instrument,
+                                                                       self.instrument.upper()))
+        if not os.path.isdir(loc):
+            raise ValueError(("{} directory is not present. GRISM_NIRCAM and/or GRISM_NIRISS portion of Mirage reference "
+                              "file collection is out of date or not set up correctly. See "
+                              "https://mirage-data-simulator.readthedocs.io/en/latest/reference_files.html foe details.".format(loc)))
+        self.logger.info("Retrieving grism-related config files from: {}".format(loc))
 
         # Determine the name of the background file to use, as well as the
         # orders to disperse.
@@ -853,8 +869,11 @@ class GrismTSO():
         # Only finalize and/or add the background if requested.
         if finalize:
             if add_background:
+                # Create a 2D background image and find the maximum value. Then apply this
+                # as the scaling when using the pre-computed 2D background image
                 background_image = disp_seed.disperse_background_1D([background_waves, background_fluxes])
-                disp_seed.finalize(Back=background_image, BackLevel=None)
+                scaling_factor = np.max(background_image)
+                disp_seed.finalize(BackLevel=scaling_factor, tofits=background_image_output)
             else:
                 disp_seed.finalize(Back=None, BackLevel=None)
         return disp_seed

@@ -72,5 +72,8 @@ Similar to the case for imaging mode simulations, if you have dark current produ
     c = WFSSSim(yfile, override_dark=darks)
     c.create()
 
+Backgrounds in WFSS simulations
++++++++++++++++++++++++++++++++
 
+Dispersed background signals in WFSS exposures are created from pre-computed background images. First, Mirage will take the user-input date or low/medium/high values, and calculate a 1D background spectrum. (Mirage uses the observation date to determine the background only if the :ref:`use_dateobs_for_background <example_yaml>` parameter in the input yaml file is set to True). This 1D background spectrum is then transformed into a 2D dispersed background image using the **disperse_background_1d** function in `NIRCAM_Gsim <https://github.com/npirzkal/NIRCAM_Gsim/blob/master/NIRCAM_Gsim/observations/observations.py#L333>`_ . The 2D background image that will actually be used is then read in from the appropriate pre-computed file, and scaled by the maximum value in the 2D background image that was created from the 1D spectrum.
 
