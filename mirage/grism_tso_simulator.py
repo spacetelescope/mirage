@@ -86,7 +86,8 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 class GrismTSO():
     def __init__(self, parameter_file, SED_file=None, SED_normalizing_catalog_column=None,
                  final_SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
-                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"]):
+                 extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"],
+                 lightcurves=None, lightcurve_times=None, lightcurve_wavelegnths=None):
         """
         Parameters
         ----------
@@ -132,6 +133,22 @@ class GrismTSO():
         orders : list
             List of spectral orders to create during dispersion. Default
             for NIRCam is ["+1", "+2"]
+
+        lightcurves : numpy.darray
+            2D array containing lightcurves. If this is provided, the call to
+            batman will be skipped. Array dimensions should be lightcurves[times, wavelengths]
+            where the time values match the units/scale of the Start_time and End_time
+            entries in the Mirage-formatted TSO source catalog.
+
+        lightcurve_times : numpy.array
+            1D array of times associated with ```lightcurves```. Times should match
+            the units/scale of the Start_time and End_time entries in the Mirage-formatted
+            TSO source catalog.
+
+        lightcurve_wavelegnths : numpy.array
+            1D array of wavelengths associated with ```lightcurves```. Wavelengths should
+            be in the same units as that of the transmission spectrum referenced in the
+            Transmission_spectrum column of the TSO source catalog.
         """
 
         # Use the MIRAGE_DATA environment variable
@@ -298,8 +315,36 @@ class GrismTSO():
         # are enough to cover the length of the exposure.
         tso_catalog = self.tso_catalog_check(tso_catalog, total_exposure_time)
 
-        # Use batman to create lightcurves from the transmission spectrum
-        lightcurves, times = self.make_lightcurves(tso_catalog, self.frametime, transmission_spectrum)
+        if lightcurves is None:
+            # If the user does not provide a 2D array of lightcurves, use
+            # batman to create lightcurves from the transmission spectrum
+            self.logger.info("Creating 2D array of lightcurves using batman package")
+            lightcurves, times = self.make_lightcurves(tso_catalog, self.frametime, transmission_spectrum)
+        else:
+            if lightcurve_times is None:
+                raise ValueError(("User-provided lightcurves are present, but associated times are not (using "
+                                  "the 'lightcurve_times' keyword. Unable to continue."))
+
+            if lightcurve_wavelegnths is None:
+                raise ValueError(("User-provided lightcurves are present, but associated wavelengths are not (using "
+                                  "the 'lightcurve_wavelegnths' keyword. Unable to continue."))
+
+            if len(lightcurves.shape) != 2:
+                raise ValueError(("User-provided lightcurves needs to be a 2D numpy array with dimensions."))
+
+            # Calculate the times associated with all frames of the exposure
+            times = self.make_frame_times(tso_catalog)
+
+            # Add check for input wavelength and time units here
+
+            # If the user has provided a 2D array of lightcurves, plus associated 1D arrays of
+            # times and wavelengths, then interpolate those lightcurves onto the grid of frame
+            # times and transmission spectrum wavelengths.
+            self.logger.info(("User-input 2D array of lightcurves, lightcurve times, and wavelengths "
+                              "will be used to create the data."))
+            lc_function = interp2d(lightcurve_times, lightcurve_wavelegnths, lightcurves)
+            interp_lightcurves = lc_function(times, transmission_spectrum['Wavelength'])
+            lightcurves = interp_lightcurves
 
         # Determine which frames of the exposure will take place with the unaltered stellar
         # spectrum. This will be all frames where the associated lightcurve is 1.0 everywhere.
@@ -699,7 +744,7 @@ class GrismTSO():
         Returns
         -------
         lightcurves : numpy.ndarray
-            2D array containing the light curve at each wavelengthin the
+            2D array containing the light curve at each wavelength in the
             transmission spectrum
         """
         params = batman.TransitParams()
@@ -719,19 +764,11 @@ class GrismTSO():
 
         # Get the time units from the catalog
         time_units = u.Unit(catalog['Time_units'][0])
-        start_time = catalog['Start_time'][0] * time_units
-        end_time = catalog['End_time'][0] * time_units
+        time = self.make_frame_times(catalog)
 
-        # Convert times to units of seconds to make working
-        # with frametimes later easier
-        start_time = start_time.to(u.second).value
-        end_time = end_time.to(u.second).value
         params.t0 = (catalog['Time_of_inferior_conjunction'][0] * time_units).to(u.second).value  # time of inferior conjunction
         params.per = (catalog['Orbital_period'][0] * time_units).to(u.second).value       # orbital period
 
-        # The time resolution must be one frametime since we will need one
-        # lightcurve for each frame later
-        time = np.arange(start_time, end_time, frame_time)  # times at which to calculate light curve
         model = batman.TransitModel(params, time)
 
         # Step along the transmission spectrum in wavelength space and
@@ -750,6 +787,36 @@ class GrismTSO():
         self.logger.info('2D array of lightcurves vs time saved to: {}'.format(outfile))
 
         return lightcurves, time
+
+
+    def make_frame_times(self, catalog):
+        """Create an array of times associated with all frames
+
+        Parameters
+        ----------
+        catalog : astropy.table.Table
+            Table containing info from the TSO source catalog
+
+        Returns
+        -------
+        time : numpy.array
+            Array of times corresponding to each frame
+        """
+        # Get the time units from the catalog
+        time_units = u.Unit(catalog['Time_units'][0])
+        start_time = catalog['Start_time'][0] * time_units
+        end_time = catalog['End_time'][0] * time_units
+
+        # Convert times to units of seconds to make working
+        # with frametimes later easier
+        start_time = start_time.to(u.second).value
+        end_time = end_time.to(u.second).value
+
+        # The time resolution must be one frametime since we will need one
+        # lightcurve for each frame later
+        time = np.arange(start_time, end_time, frame_time)  # times at which to calculate light curve
+        return time
+
 
     def param_checks(self):
         """Check validity of inputs
