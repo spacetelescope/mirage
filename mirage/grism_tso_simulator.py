@@ -55,6 +55,7 @@ import yaml
 
 from astropy.io import ascii, fits
 import astropy.units as u
+from astropy.units.quantity import Quantity
 import batman
 import numpy as np
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
@@ -197,6 +198,33 @@ class GrismTSO():
                                                self.seed_dimensions[0], self.namps)
         return self.frametime * self.total_frames
 
+    def check_units(data, expected_unit):
+        """Check the units of the input data. Convert to the expected_unit if possible
+
+        Parameters
+        ----------
+        data : numpy.array or astropy.units.quantity.Quantity
+            Data to be checked. If a numpy array, then the data
+            are returned unchanged. If an astropy quantity, data
+            are converted to the expected_unit, if possible
+
+        expected_unit : astropy.units.unit
+            Units expected for the input data.
+
+        Returns
+        -------
+        data : numpy.array
+            Data, converted to the expected units (or untouched).
+            Only the data values are returned.
+        """
+        if isinstance(data, Quantity):
+
+
+        else:
+            self.logger.info()
+            return data
+
+
     def create(self):
         """MAIN FUNCTION"""
         # Initialize the log using dictionary from the yaml file
@@ -332,16 +360,26 @@ class GrismTSO():
             if len(lightcurves.shape) != 2:
                 raise ValueError(("User-provided lightcurves needs to be a 2D numpy array with dimensions."))
 
+            self.logger.info(("User-input 2D array of lightcurves, lightcurve times, and wavelengths "
+                              "will be used to create the data."))
+
             # Calculate the times associated with all frames of the exposure
             times = self.make_frame_times(tso_catalog)
 
-            # Add check for input wavelength and time units here
+            # Units checks for lightcurve times and wavelengths
+            if isinstance(lightcurve_times, Quantity):
+                lightcurve_times = lightcurve_times.to(u.second)
+            else:
+                self.logger.info('No units associated with lightcurve_times. Assuming seconds.')
+
+            if isinstance(lightcurve_wavelegnths, Quantity):
+                lightcurve_wavelegnths = lightcurve_wavelegnths.to(u.micron)
+            else:
+                self.logger.info("No units associated with lightcurve_wavelegnths. Assuming microns.")
 
             # If the user has provided a 2D array of lightcurves, plus associated 1D arrays of
             # times and wavelengths, then interpolate those lightcurves onto the grid of frame
             # times and transmission spectrum wavelengths.
-            self.logger.info(("User-input 2D array of lightcurves, lightcurve times, and wavelengths "
-                              "will be used to create the data."))
             lc_function = interp2d(lightcurve_times, lightcurve_wavelegnths, lightcurves)
             interp_lightcurves = lc_function(times, transmission_spectrum['Wavelength'])
             lightcurves = interp_lightcurves
