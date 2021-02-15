@@ -828,6 +828,16 @@ class SimInput:
                         (self.info['ShortPupil'][i]=='n/a' and self.info['detector'][i] in ['A1','A2','A3','A4'])):
                         print(f"Skipping {self.info['yamlfile'][i]} because this coronagraphy obs does not use that detector")
                         continue
+                              
+                    # SW coronagraphy exposures that use MASKRND collect data from A2 only
+                    if (self.info['ShortPupil'][i] == 'MASKRND' and self.info['detector'][i] != 'A2'):
+                        print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
+                        continue
+
+                    # SW coronagraphy exposures that use MASKSWB collect data from A4 only
+                    if (self.info['ShortPupil'][i] == 'MASKSWB' and self.info['detector'][i] != 'A4'):
+                        print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
+                        continue          
 
             file_dict = {}
             for key in self.info:
