@@ -51,11 +51,12 @@ warnings.simplefilter('ignore')
 
 SUB_SLICE = {'SUBSTRIP96': slice(1792, 1888), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
 SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048, 2048)}
+PSF_DIR = resource_filename('mirage', 'mirage/psf/soss_psfs/').replace('mirage/mirage', 'mirage')
 
 
 def check_psf_files():
     """Function to run on import to verify that the PSF files have been precomputed"""
-    if not os.path.isfile(os.environ['SOSS_DATA'] + 'SOSS_CLEAR_PSF_order1_1.npy'):
+    if not os.path.isfile(os.path.join(PSF_DIR, 'SOSS_CLEAR_PSF_order1_1.npy')):
         print("Looks like you haven't generated the SOSS PSFs yet, which are required to produce simulations.")
         print("This takes about 10 minutes but you will only need to do it this one time.")
         compute = input("Would you like to do it now? [y] ")
@@ -82,9 +83,7 @@ def run_required(func):
     return _run_required
 
 
-# TODO: Generate NIRISS SOSS PSFs the same way the other instruments do it,
-#  with `mirage.psf.psf_selection.get_gridded_psf_library`. Right now it's just
-#  pointing to awesimsoss/files directory
+# TODO: Generate NIRISS SOSS PSFs the same way the other instruments do it, with `mirage.psf.psf_selection.get_gridded_psf_library`.
 
 check_psf_files()
 
@@ -147,13 +146,13 @@ class SossSim():
         self.nresets = self.nresets1 = self.nresets2 = 1
         self.dropframes1 = self.dropframes3 = 0
         self.model_grid = 'ACES'
+        self.override_dark = None
+        self.offline = True
 
         # Use parameter file if available...
         if paramfile is not None:
 
             self.paramfile = paramfile
-            self.override_dark = None
-            self.offline = False
 
         # ...or set exposure parameters from args
         else:
@@ -246,7 +245,7 @@ class SossSim():
             self.logger.info('Running dark prep')
             d = dark_prep.DarkPrep()
             d.paramfile = self.paramfile
-            d.prepare()
+            d.prepare(self.params)
             use_darks = d.dark_files
         else:
             self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
@@ -445,88 +444,10 @@ class SossSim():
         # Make ramps and add noise to the observations
         if noise:
             self.add_noise(**kwargs)
+        else:
+            self.tso = self.tso_ideal
 
         self.message('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
-
-    # def export(self, outfile):
-    #     """
-    #     Export the simulated data to a JWST pipeline ingestible FITS file
-    # 
-    #     Parameters
-    #     ----------
-    #     outfile: str
-    #         The path of the output file
-    #     """
-    #     if not outfile.endswith('_uncal.fits'):
-    #         raise ValueError("Filename must end with '_uncal.fits'")
-    # 
-    #     # Make a RampModel
-    #     data = copy(self.tso) if self.tso is not None else np.ones((1, 1, self.nrows, self.ncols))
-    #     mod = ju.jwst_ramp_model(data=data, groupdq=np.zeros_like(data), pixeldq=np.zeros((self.nrows, self.ncols)), err=np.zeros_like(data))
-    #     pix = hu.subarray_specs(self.subarray)
-    # 
-    #     # Set meta data values for header keywords
-    #     mod.meta.telescope = 'JWST'
-    #     mod.meta.instrument.name = 'NIRISS'
-    #     mod.meta.instrument.detector = 'NIS'
-    #     mod.meta.instrument.filter = self.filter
-    #     mod.meta.instrument.pupil = 'GR700XD'
-    #     mod.meta.exposure.type = 'NIS_SOSS'
-    #     mod.meta.exposure.nints = self.nints
-    #     mod.meta.exposure.ngroups = self.ngrps
-    #     mod.meta.exposure.nframes = self.nframes
-    #     mod.meta.exposure.readpatt = self.readpatt
-    #     mod.meta.exposure.groupgap = self.groupgap
-    #     mod.meta.exposure.frame_time = self.frame_time
-    #     mod.meta.exposure.group_time = self.group_time
-    #     mod.meta.exposure.exposure_time = self.exposure_time
-    #     mod.meta.exposure.duration = self.duration
-    #     mod.meta.exposure.nresets_at_start = self.nresets1
-    #     mod.meta.exposure.nresets_between_ints = self.nresets2
-    #     mod.meta.subarray.name = self.subarray
-    #     mod.meta.subarray.xsize = data.shape[3]
-    #     mod.meta.subarray.ysize = data.shape[2]
-    #     mod.meta.subarray.xstart = pix.get('xloc', 1)
-    #     mod.meta.subarray.ystart = pix.get('yloc', 1)
-    #     mod.meta.subarray.fastaxis = -2
-    #     mod.meta.subarray.slowaxis = -1
-    #     mod.meta.observation.date = self.obs_datetime.iso.split()[0]
-    #     mod.meta.observation.time = self.obs_datetime.iso.split()[1]
-    #     mod.meta.target.ra = self.ra
-    #     mod.meta.target.dec = self.dec
-    #     mod.meta.target.source_type = 'POINT'
-    # 
-    #     # Save the file
-    #     mod.save(outfile, overwrite=True)
-    # 
-    #     # Save input data
-    #     with fits.open(outfile) as hdul:
-    # 
-    #         # Save input star data
-    #         hdul.append(fits.ImageHDU(data=np.array([i.value for i in self.star], dtype=np.float64), name='STAR'))
-    #         hdul['STAR'].header.set('FUNITS', str(self.star[1].unit))
-    #         hdul['STAR'].header.set('WUNITS', str(self.star[0].unit))
-    # 
-    #         # Save input planet data
-    #         if self.planet is not None:
-    #             hdul.append(fits.ImageHDU(data=np.asarray(self.planet, dtype=np.float64), name='PLANET'))
-    #             for param, val in self.tmodel.__dict__.items():
-    #                 if isinstance(val, (float, int, str)):
-    #                     hdul['PLANET'].header.set(param.upper()[:8], val)
-    #                 elif isinstance(val, np.ndarray) and len(val) == 1:
-    #                     hdul['PLANET'].header.set(param.upper(), val[0])
-    #                 elif isinstance(val, type(None)):
-    #                     hdul['PLANET'].header.set(param.upper(), '')
-    #                 elif param == 'u':
-    #                     for n, v in enumerate(val):
-    #                         hdul['PLANET'].header.set('U{}'.format(n + 1), v)
-    #                 else:
-    #                     print(param, val, type(val))
-    # 
-    #         # Write to file
-    #         hdul.writeto(outfile, overwrite=True)
-    # 
-    #     print('File saved as', outfile)
 
     @property
     def filter(self):
@@ -759,6 +680,7 @@ class SossSim():
             self.params['Readout']['filter'] = self.filter
             # self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
             self.params['Readout']['readpatt'] = self.readpatt
+            self.params['Readout']['nframe'] = self.nints * self.ngrps
             self.params['Output']['target_name'] = self.target
             self.params['Output']['target_ra'] = self.ra
             self.params['Output']['target_dec'] = self.dec

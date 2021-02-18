@@ -22,6 +22,8 @@ from scipy.interpolate import interp2d, RectBivariateSpline
 
 warnings.simplefilter('ignore')
 
+PSF_DIR = resource_filename('mirage', 'mirage/psf/soss_psfs/').replace('mirage/mirage', 'mirage')
+
 
 def calculate_psf_tilts():
     """
@@ -32,7 +34,7 @@ def calculate_psf_tilts():
     for order in [1, 2]:
 
         # Get the file
-        psf_file = os.environ['SOSS_DATA'] + 'SOSS_PSF_tilt_order{}.npy'.format(order)
+        psf_file = os.path.join(PSF_DIR, 'SOSS_PSF_tilt_order{}.npy'.format(order))
 
         # Dimensions
         subarray = 'SUBSTRIP256'
@@ -193,7 +195,7 @@ def generate_SOSS_psfs(filt):
         import webbpsf
 
         # Get the file
-        file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF.fits'.format(filt)
+        file = os.path.join(PSF_DIR, 'SOSS_{}_PSF.fits'.format(filt))
 
         # Get the NIRISS class from webbpsf and set the filter
         ns = webbpsf.NIRISS()
@@ -280,7 +282,7 @@ def get_SOSS_psf(wavelength, filt='CLEAR', psfs=None, cutoff=0.005, plot=False):
     if psfs is None:
 
         # Get the file
-        file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF.fits'.format(filt)
+        file = os.path.join(PSF_DIR, 'SOSS_{}_PSF.fits'.format(filt))
 
         # Load the SOSS psf cube
         cube = fits.getdata(file).swapaxes(-1, -2)
@@ -429,7 +431,7 @@ def psf_tilts(order):
         raise ValueError('Only orders 1 and 2 are supported.')
 
     # Get the file
-    psf_file = os.environ['SOSS_DATA'] + 'SOSS_PSF_tilt_order{}.npy'.format(order)
+    psf_file = os.path.join(PSF_DIR, 'SOSS_PSF_tilt_order{}.npy'.format(order))
 
     if not os.path.exists(psf_file):
         calculate_psf_tilts()
@@ -508,7 +510,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         coeffs = locate_trace.trace_polynomial(subarray)
 
         # Get the file
-        psf_file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF.fits'.format(filt)
+        psf_file = os.path.join(PSF_DIR, 'SOSS_{}_PSF.fits'.format(filt))
 
         # Load the SOSS psf cube
         cube = fits.getdata(psf_file).swapaxes(-1, -2)
@@ -604,7 +606,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
                     print('Finished in {} seconds.'.format(time.time()-start))
 
                     # Get the filepath
-                    file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1)
+                    file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
 
                     # Delete the file if it exists
                     if os.path.isfile(file):
@@ -620,7 +622,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         # Get the chunked data and concatenate
         full_data = []
         for chunk in [1, 2, 3, 4]:
-            file = os.environ['SOSS_DATA'] + 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk)
+            file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
             full_data.append(np.load(file))
 
         return np.concatenate(full_data, axis=0)
