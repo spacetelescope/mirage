@@ -40,16 +40,11 @@ APT_NAMESPACE = '{http://www.stsci.edu/JWST/APT}'
 
 TESTS_DIR = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-# Determine if tests are being run on Travis
-
-print('HOMEDIR: ', os.path.expanduser('~'))
-
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
-
-if not ON_TRAVIS:
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
-
 
 # @pytest.mark.xfail
 def RunAllAPTTemplates(instrument):
@@ -117,8 +112,8 @@ def RunAllAPTTemplates(instrument):
     #         'or the reference yaml is out of date.'
 
 
-@pytest.mark.skipif(ON_TRAVIS,
-                    reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                    reason="Cannot access mirage data in the central storage directory from Github CI.")
 def test_environment_variable():
     '''Ensure the MIRAGE_DATA environment variable has been set
     '''
@@ -143,7 +138,7 @@ def test_RunNIRCamAPTTemplates():
 
 # Return environment variable to original value. This is helpful when
 # calling many tests at once, some of which need the real value.
-if not ON_TRAVIS:
+if not ON_GITHUB:
     os.environ['MIRAGE_DATA'] = orig_mirage_data
 
 # for debugging
