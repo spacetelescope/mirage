@@ -61,7 +61,7 @@ import numpy as np
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 import pkg_resources
 import pysiaf
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interp2d
 
 from mirage import wfss_simulator
 from mirage.catalogs import catalog_generator, spectra_from_catalog
@@ -88,7 +88,7 @@ class GrismTSO():
     def __init__(self, parameter_file, SED_file=None, SED_normalizing_catalog_column=None,
                  final_SED_file=None, save_dispersed_seed=True, source_stamps_file=None,
                  extrapolate_SED=True, override_dark=None, disp_seed_filename=None, orders=["+1", "+2"],
-                 lightcurves=None, lightcurve_times=None, lightcurve_wavelegnths=None):
+                 lightcurves=None, lightcurve_times=None, lightcurve_wavelengths=None):
         """
         Parameters
         ----------
@@ -146,7 +146,7 @@ class GrismTSO():
             the units/scale of the Start_time and End_time entries in the Mirage-formatted
             TSO source catalog.
 
-        lightcurve_wavelegnths : numpy.array
+        lightcurve_wavelengths : numpy.array
             1D array of wavelengths associated with ```lightcurves```. Wavelengths should
             be in the same units as that of the transmission spectrum referenced in the
             Transmission_spectrum column of the TSO source catalog.
@@ -176,6 +176,9 @@ class GrismTSO():
         self.orders = orders
         self.fullframe_apertures = ["NRCA5_FULL", "NRCB5_FULL", "NIS_CEN"]
         self.override_dark = override_dark
+        self.lightcurves = lightcurves
+        self.lightcurve_times = lightcurve_times
+        self.lightcurve_wavelengths = lightcurve_wavelengths
 
         # Make sure the right combination of parameter files and SED file
         # are given
@@ -197,33 +200,6 @@ class GrismTSO():
         self.frametime = utils.calc_frame_time(self.instrument, self.aperture, self.seed_dimensions[1],
                                                self.seed_dimensions[0], self.namps)
         return self.frametime * self.total_frames
-
-    def check_units(data, expected_unit):
-        """Check the units of the input data. Convert to the expected_unit if possible
-
-        Parameters
-        ----------
-        data : numpy.array or astropy.units.quantity.Quantity
-            Data to be checked. If a numpy array, then the data
-            are returned unchanged. If an astropy quantity, data
-            are converted to the expected_unit, if possible
-
-        expected_unit : astropy.units.unit
-            Units expected for the input data.
-
-        Returns
-        -------
-        data : numpy.array
-            Data, converted to the expected units (or untouched).
-            Only the data values are returned.
-        """
-        if isinstance(data, Quantity):
-
-
-        else:
-            self.logger.info()
-            return data
-
 
     def create(self):
         """MAIN FUNCTION"""
@@ -343,21 +319,21 @@ class GrismTSO():
         # are enough to cover the length of the exposure.
         tso_catalog = self.tso_catalog_check(tso_catalog, total_exposure_time)
 
-        if lightcurves is None:
+        if self.lightcurves is None:
             # If the user does not provide a 2D array of lightcurves, use
             # batman to create lightcurves from the transmission spectrum
             self.logger.info("Creating 2D array of lightcurves using batman package")
             lightcurves, times = self.make_lightcurves(tso_catalog, self.frametime, transmission_spectrum)
         else:
-            if lightcurve_times is None:
+            if self.lightcurve_times is None:
                 raise ValueError(("User-provided lightcurves are present, but associated times are not (using "
                                   "the 'lightcurve_times' keyword. Unable to continue."))
 
-            if lightcurve_wavelegnths is None:
+            if self.lightcurve_wavelengths is None:
                 raise ValueError(("User-provided lightcurves are present, but associated wavelengths are not (using "
-                                  "the 'lightcurve_wavelegnths' keyword. Unable to continue."))
+                                  "the 'lightcurve_wavelengths' keyword. Unable to continue."))
 
-            if len(lightcurves.shape) != 2:
+            if len(self.lightcurves.shape) != 2:
                 raise ValueError(("User-provided lightcurves needs to be a 2D numpy array with dimensions."))
 
             self.logger.info(("User-input 2D array of lightcurves, lightcurve times, and wavelengths "
@@ -367,22 +343,26 @@ class GrismTSO():
             times = self.make_frame_times(tso_catalog)
 
             # Units checks for lightcurve times and wavelengths
-            if isinstance(lightcurve_times, Quantity):
-                lightcurve_times = lightcurve_times.to(u.second)
+            if isinstance(self.lightcurve_times, Quantity):
+                lightcurve_times = self.lightcurve_times.to(u.second)
             else:
                 self.logger.info('No units associated with lightcurve_times. Assuming seconds.')
+                lightcurve_times = self.lightcurve_times
 
-            if isinstance(lightcurve_wavelegnths, Quantity):
-                lightcurve_wavelegnths = lightcurve_wavelegnths.to(u.micron)
+            if isinstance(self.lightcurve_wavelengths, Quantity):
+                lightcurve_wavelengths = self.lightcurve_wavelengths.to(u.micron)
             else:
-                self.logger.info("No units associated with lightcurve_wavelegnths. Assuming microns.")
+                self.logger.info("No units associated with lightcurve_wavelengths. Assuming microns.")
+                lightcurve_wavelengths = self.lightcurve_wavelengths
 
             # If the user has provided a 2D array of lightcurves, plus associated 1D arrays of
             # times and wavelengths, then interpolate those lightcurves onto the grid of frame
             # times and transmission spectrum wavelengths.
-            lc_function = interp2d(lightcurve_times, lightcurve_wavelegnths, lightcurves)
-            interp_lightcurves = lc_function(times, transmission_spectrum['Wavelength'])
-            lightcurves = interp_lightcurves
+            print(len(lightcurve_wavelengths), len(lightcurve_times), self.lightcurves.shape)
+
+
+            lc_function = interp2d(lightcurve_wavelengths, lightcurve_times, self.lightcurves)
+            lightcurves = lc_function(transmission_spectrum['Wavelength'], times)
 
         # Determine which frames of the exposure will take place with the unaltered stellar
         # spectrum. This will be all frames where the associated lightcurve is 1.0 everywhere.
@@ -852,7 +832,7 @@ class GrismTSO():
 
         # The time resolution must be one frametime since we will need one
         # lightcurve for each frame later
-        time = np.arange(start_time, end_time, frame_time)  # times at which to calculate light curve
+        time = np.arange(start_time, end_time, self.frametime)  # times at which to calculate light curve
         return time
 
 
