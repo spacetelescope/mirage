@@ -952,10 +952,16 @@ def sigma_clipped_mean_value_of_image(array, sigma_value):
     return meanval
 
 
-def organize_config_files():
+def organize_config_files(offline=False):
     """Organize the names of the various config files for each instrument
+
+    Parameters
+    ----------
+    offline : bool
+        Whether the class is being called with or without access to
+        Mirage reference data. Used primarily for testing.
     """
-    data_dir = expand_environment_variable('MIRAGE_DATA')
+    data_dir = expand_environment_variable('MIRAGE_DATA', offline=offline)
     modpath = pkg_resources.resource_filename('mirage', '')
 
     config_info = {}

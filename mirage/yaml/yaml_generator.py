@@ -330,7 +330,7 @@ class SimInput:
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
-        self.config_information = utils.organize_config_files()
+        self.config_information = utils.organize_config_files(offline=self.offline)
 
         self.path_defs()
 
@@ -662,7 +662,7 @@ class SimInput:
 
             # Read XML file and make observation table
             apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file,
-                                      output_dir=self.output_dir)
+                                      output_dir=self.output_dir, offline=self.offline)
             # apt.input_xml = self.input_xml
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
