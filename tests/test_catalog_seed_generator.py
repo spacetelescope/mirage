@@ -24,9 +24,9 @@ import webbpsf
 from mirage.seed_image import catalog_seed_image
 from mirage.catalogs.catalog_generator import PointSourceCatalog
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
-if ON_TRAVIS:
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+if ON_GITHUB:
     env_path = os.path.expandvars('$CONDA_PREFIX')
     os.environ["WEBBPSF_PATH"] = os.path.join(env_path, 'share/webbpsf-data')
 

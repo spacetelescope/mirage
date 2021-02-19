@@ -27,10 +27,10 @@ from mirage.utils.utils import ensure_dir_exists
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 TEMPORARY_DIR = os.path.join(os.path.dirname(__file__), 'temp_data')
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
 
-if not ON_TRAVIS:
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
 
@@ -78,8 +78,8 @@ def test_observation_list_generation_minimal(temporary_directory):
     assert os.path.isfile(observation_list_file)
 
 
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github actions CI.")
 def test_complete_input_generation(temporary_directory):
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
 
@@ -242,5 +242,5 @@ def test_xml_reader():
 
 # Return environment variable to original value. This is helpful when
 # calling many tests at once, some of which need the real value.
-if not ON_TRAVIS:
+if not ON_GITHUB:
     os.environ['MIRAGE_DATA'] = orig_mirage_data
