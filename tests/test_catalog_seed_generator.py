@@ -28,7 +28,7 @@ from mirage.catalogs.catalog_generator import PointSourceCatalog
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 if ON_GITHUB:
     #env_path = os.path.expandvars('$CONDA_PREFIX')
-    env_path = '/home/runner/work/mirage/mirage/'
+    env_path = os.path.expandvars('$GITHUB_WORKSPACE')
     os.environ["WEBBPSF_PATH"] = os.path.join(env_path, 'share/webbpsf-data')
 
 
