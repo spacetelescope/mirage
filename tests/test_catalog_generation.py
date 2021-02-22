@@ -25,10 +25,10 @@ from mirage.catalogs import create_catalog, utils
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
+# Determine if tests are being run on Github actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
-if not ON_TRAVIS:
+if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
 
@@ -142,7 +142,7 @@ def test_moving_point_source_catalog_generation():
         assert np.all(comparison[colname] == mpt.table[colname])
 
 
-@pytest.mark.skip(reason='Travis and astroquery not getting along')
+#@pytest.mark.skip(reason='Travis and astroquery not getting along')
 def test_2mass_catalog_generation():
     """Test the generation of a catalog from a 2MASS query
     """
@@ -277,7 +277,7 @@ def test_for_proposal():
             pass
 
 
-@pytest.mark.skip(reason="Repeated HTML response errors.")
+#@pytest.mark.skip(reason="Repeated HTML response errors.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
@@ -302,7 +302,7 @@ def test_get_all_catalogs():
             assert False, "Retrieved catalog does not match expected."
 
 
-@pytest.mark.skip(reason="Repeated HTML response errors.")
+#@pytest.mark.skip(reason="Repeated HTML response errors.")
 def test_gaia_query():
     """Test the GAIA query and transformation into a Mirage-format catalog"""
     ra = 80.4
@@ -349,7 +349,7 @@ def test_cat_from_file():
         cat_object = catalog_generator.cat_from_file(cat_path, catalogs[cat_name][0])
         assert isinstance(cat_object, catalogs[cat_name][1])
 
-if not ON_TRAVIS:
+if not ON_GITHUB:
     os.environ['MIRAGE_DATA'] = orig_mirage_data
 
 

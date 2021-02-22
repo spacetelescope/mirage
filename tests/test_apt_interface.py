@@ -112,7 +112,7 @@ def test_complete_input_generation(temporary_directory):
             catalogs = None
 
             # For the moment, skip tests that contain NirissImaging observations
-            # or that take too long for Travis
+            # or that take too long on CI
             skip_for_now = ['DeepField', 'NCam010', '1071']
             skip_bool = any([True if prop in apt_file_seed else False for prop in skip_for_now])
             if skip_bool:
