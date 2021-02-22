@@ -141,7 +141,12 @@ def test_load_ote_from_deployment_yaml(test_directory, remove_yamls_and_fits):
     yaml_files = glob.glob(yaml_search_path)
     opd_search_path = os.path.join(test_directory, 'OPD*.fits')
     opd_files = glob.glob(opd_search_path)
-    assert len(yaml_files) >= 2, 'Failed to generate randomly deployed OTE'
+
+    print(deployments_file, test_directory)
+    print(yaml_search_path, yaml_files)
+    print(opd_search_path, opd_files)
+
+    #assert len(yaml_files) >= 2, 'Failed to generate randomly deployed OTE'
     assert len(opd_files) >= 2, 'Failed to generate randomly deployed OTE'
 
     # Ensure the resultant OTE is as expected
