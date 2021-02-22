@@ -26,10 +26,6 @@ from mirage.catalogs.catalog_generator import PointSourceCatalog
 
 # Determine if tests are being run on Github Actions CI
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
-if ON_GITHUB:
-    #env_path = os.path.expandvars('$CONDA_PREFIX')
-    env_path = os.path.expandvars('$GITHUB_WORKSPACE')
-    os.environ["WEBBPSF_PATH"] = os.path.join(env_path, 'share/webbpsf-data')
 
 
 def create_dummy_psf_grid():
@@ -72,7 +68,7 @@ def test_select_magnitude_column():
         col = sim.select_magnitude_column(catalog.table, 'junk.cat')
         assert col == truth
 
-
+@pytest.mark.skipif(ON_GITHUB, reason='Webbpsf data files cannot be downloaded via pip')
 def test_overlap_coordinates_full_frame():
     """Test the function that calculates the coordinates for the
     overlap between two stamp images
@@ -160,6 +156,7 @@ def test_overlap_coordinates_full_frame():
         assert (i1, i2, j1, j2, k1, k2, l1, l2) == expected_k1l1[index]
 
 
+@pytest.mark.skipif(ON_GITHUB, reason='Webbpsf data files cannot be downloaded via pip')
 def test_overlap_coordinates_subarray():
     """Test the function that calculates the coordinates for the
     overlap between two stamp images
