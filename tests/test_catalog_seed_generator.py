@@ -29,6 +29,7 @@ ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 if ON_GITHUB:
     env_path = os.path.expandvars('$CONDA_PREFIX')
     os.environ["WEBBPSF_PATH"] = os.path.join(env_path, 'share/webbpsf-data')
+    print(f'\n\n\nWEBBPSF_PATH is {os.environ["WEBBPSF_PATH"]}\n\n\n')
 
 
 def create_dummy_psf_grid():
