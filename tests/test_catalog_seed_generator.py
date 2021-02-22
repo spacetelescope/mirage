@@ -27,9 +27,9 @@ from mirage.catalogs.catalog_generator import PointSourceCatalog
 # Determine if tests are being run on Github Actions CI
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 if ON_GITHUB:
-    env_path = os.path.expandvars('$CONDA_PREFIX')
+    #env_path = os.path.expandvars('$CONDA_PREFIX')
+    env_path = '/home/runner/work/mirage/mirage/'
     os.environ["WEBBPSF_PATH"] = os.path.join(env_path, 'share/webbpsf-data')
-    print(f'\n\n\nWEBBPSF_PATH is {os.environ["WEBBPSF_PATH"]}\n\n\n')
 
 
 def create_dummy_psf_grid():
