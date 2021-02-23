@@ -19,13 +19,25 @@ Use
 from astropy.table import Table
 import numpy as np
 import os
+import sys
 import webbpsf
 
 from mirage.seed_image import catalog_seed_image
 from mirage.catalogs.catalog_generator import PointSourceCatalog
 
 # Determine if tests are being run on Github Actions CI
-ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+#ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+
+# Determine the version of python used. For python 3.8 and above
+# webbpsf is installed via pip, which means the data files will not
+# be accessible and any test that relies on webbpsf should be skipped
+python_version = sys.version[0:3]
+testable_versions = ['3.6', '3.7']
+skip_versions = ['3.8', '3.9']
+if python_version in skip_versions:
+    SKIP_WEBBPSF = True
+else:
+    SKIP_WEBBPSF = False
 
 
 def create_dummy_psf_grid():
@@ -68,7 +80,7 @@ def test_select_magnitude_column():
         col = sim.select_magnitude_column(catalog.table, 'junk.cat')
         assert col == truth
 
-@pytest.mark.skipif(ON_GITHUB, reason='Webbpsf data files cannot be downloaded via pip')
+@pytest.mark.skipif(SKIP_WEBBPSF, reason='Webbpsf data files cannot be downloaded via pip')
 def test_overlap_coordinates_full_frame():
     """Test the function that calculates the coordinates for the
     overlap between two stamp images
@@ -156,7 +168,7 @@ def test_overlap_coordinates_full_frame():
         assert (i1, i2, j1, j2, k1, k2, l1, l2) == expected_k1l1[index]
 
 
-@pytest.mark.skipif(ON_GITHUB, reason='Webbpsf data files cannot be downloaded via pip')
+@pytest.mark.skipif(SKIP_WEBBPSF, reason='Webbpsf data files cannot be downloaded via pip')
 def test_overlap_coordinates_subarray():
     """Test the function that calculates the coordinates for the
     overlap between two stamp images
