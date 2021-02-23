@@ -4,7 +4,7 @@ There are two aspects to Mirage installation. First, the software itself must be
 must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`, as this is the latest stable version of the software.
 
 .. tip::
-    Mirage is currently supports python 3.6, 3.7, 3.8, and 3.9. Support for 3.6 will be removed shortly, as the `jwst <https://github.com/spacetelescope/jwst>`_ package, which contains the JWST calibration pipeline, no longer supports 3.6.
+    Mirage currently supports python 3.6, 3.7, 3.8, and 3.9. Support for 3.6 will be removed shortly, as the `jwst <https://github.com/spacetelescope/jwst>`_ package, which contains the JWST calibration pipeline, no longer supports 3.6.
 
 .. attention::
     **For those running Mac OSX 10.14:**
