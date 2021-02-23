@@ -153,6 +153,11 @@ def test_load_ote_from_deployment_yaml(test_directory, remove_yamls_and_fits):
                                   err_msg='Segment tilts were not removed.')
     assert not np.array_equiv(ote.segment_state[:-1, 3:], 0.), \
         'Segment tilts were not applied.'
+
+    print('\n\n')
+    print(np.mean(ote.opd), 2.1281183145894698e-08)
+
+
     assert np.isclose(np.mean(ote.opd), 2.1281183145894698e-08), \
         'OTE was not loaded correctly from file.'
     np.testing.assert_allclose(ote.segment_state[:-1, 3:],
