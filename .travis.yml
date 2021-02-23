@@ -10,7 +10,7 @@ sudo: false
 
 env:
     global:
-        - PYTHON_VERSION=3.6
+        - PYTHON_VERSION=3.7
         - EVENT_TYPE='push pull_request'
 
 matrix:
@@ -32,7 +32,7 @@ install:
     # Remove WebbPSF conda install
     # - sed '/webbpsf/d' environment.yml
     # Install MIRaGe dependencies
-    - conda env update -f=environment.yml
+    - conda env update -f=environment_python_3.7.yml
     # Install development versions of webbpsf and poppy
     # - git clone git://github.com/spacetelescope/poppy.git
     # - git clone git://github.com/spacetelescope/webbpsf.git
