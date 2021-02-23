@@ -154,11 +154,7 @@ def test_load_ote_from_deployment_yaml(test_directory, remove_yamls_and_fits):
     assert not np.array_equiv(ote.segment_state[:-1, 3:], 0.), \
         'Segment tilts were not applied.'
 
-    print('\n\n')
-    print(np.mean(ote.opd), 2.1281183145894698e-08)
-
-
-    assert np.isclose(np.mean(ote.opd), 2.1281183145894698e-08), \
+    assert np.isclose(np.mean(ote.opd), -2.1281188008526972e-08), \
         'OTE was not loaded correctly from file.'
     np.testing.assert_allclose(ote.segment_state[:-1, 3:],
                                np.array(test_data['segment_state_no_tilts']),
@@ -175,5 +171,5 @@ def test_load_ote_from_deployment_yaml(test_directory, remove_yamls_and_fits):
     # Ensure the OTE array with tilts preserved is as expected
     assert ote_opd_with_tilts.shape == (1024, 1024), 'Invalid format for OTE.'
     assert not np.array_equal(ote_opd_with_tilts, ote.opd), 'Segment tilts were not removed.'
-    assert np.isclose(np.mean(ote_opd_with_tilts), -1.709744233280506e-05), \
+    assert np.isclose(np.mean(ote_opd_with_tilts), 1.7097442327942417e-05), \
         'OTE was not loaded correctly from file.'
