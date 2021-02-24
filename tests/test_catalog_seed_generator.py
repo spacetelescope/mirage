@@ -19,6 +19,7 @@ Use
 from astropy.table import Table
 import numpy as np
 import os
+import pytest
 import sys
 import webbpsf
 
