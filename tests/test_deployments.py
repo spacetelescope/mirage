@@ -11,6 +11,7 @@ Use
 import glob
 import os
 import shutil
+import sys
 
 import numpy as np
 import pytest
