@@ -12,6 +12,7 @@ from ast import literal_eval
 import glob
 import os
 import shutil
+import sys
 
 from astropy.io import fits
 import numpy as np
@@ -37,6 +38,17 @@ SUCCESS_GENERATE_SEGMENT_PSF = None
 
 # Determine if tests are being run on Github Actions CI
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+
+# Determine the version of python used. For python 3.8 and above
+# webbpsf is installed via pip, which means the data files will not
+# be accessible and any test that relies on webbpsf should be skipped
+python_version = sys.version[0:3]
+testable_versions = ['3.6', '3.7']
+skip_versions = ['3.8', '3.9']
+if python_version in skip_versions:
+    SKIP_WEBBPSF = True
+else:
+    SKIP_WEBBPSF = False
 
 # Define default inputs
 INSTRUMENT = 'NIRCam'
@@ -86,6 +98,7 @@ def test_library_file(test_directory):
         yield test_lib_filename
 
 
+@pytest.mark.skipif((ON_GITHUB and SKIP_WEBBPSF), reason='Webbpsf data files cannot be downloaded via pip')
 def test_generate_segment_psfs(test_directory):
     """Test the generation of 18 segment PSFs with a randomly-perturbed
     mirror state.

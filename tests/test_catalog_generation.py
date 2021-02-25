@@ -277,7 +277,6 @@ def test_for_proposal():
             pass
 
 
-#@pytest.mark.skip(reason="Repeated HTML response errors.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
@@ -292,14 +291,11 @@ def test_get_all_catalogs():
     comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/get_all_catalogs_truth.cat')
     comparison_data = ascii.read(comparison_file)
 
-    # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
-    # fail without there being a problem with Mirage.
-    for col in cat.table.colnames:
-        try:
-            assert all(cat.table[col].data == comparison_data[col].data), \
-                "Retrieved catalog does not match expected."
-        except TypeError:
-            assert False, "Retrieved catalog does not match expected."
+    # Don't check the detailed results, since any changes to Besancon/WISE/GAIA/2MASS queries
+    # could cause the test to fail without there being a problem with Mirage. Instead check that
+    # all the expected columns are present.
+    for col in comparison_data.colnames:
+        assert col in cat.table.colnames, f"{col} column not in the returned catalog."
 
 
 #@pytest.mark.skip(reason="Repeated HTML response errors.")
@@ -309,7 +305,6 @@ def test_gaia_query():
     dec = -69.8
     box_width = 200.
     cat, query, gaia_2mass_cross, gaia_wise_cross = create_catalog.get_gaia_ptsrc_catalog(ra, dec, box_width)
-    assert len(cat.table) == 1153
     assert cat.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'gaia_phot_g_mean_mag_magnitude',
                                   'gaia_phot_bp_mean_mag_magnitude', 'gaia_phot_rp_mean_mag_magnitude']
 
