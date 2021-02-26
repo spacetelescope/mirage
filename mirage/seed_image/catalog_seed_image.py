@@ -2655,7 +2655,15 @@ class Catalog_seed():
             ghost_x = None
 
         skipped_non_niriss = False
+        ghost_i = 0
         for index, values in zip(indexes, lines):
+            # If the filter/pupil pair are not in the ghost summary file, log that only
+            # for the first source, so that it's not repeated for all sources.
+            if ghost_i == 0:
+                log_ghost_err = True
+            else:
+                log_ghost_err = False
+
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
                                                                           pixelflag, 4096)
@@ -2678,7 +2686,8 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE)
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=log_ghost_err)
+                    ghost_i += 1
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -3871,7 +3880,15 @@ class Catalog_seed():
 
         # Loop over galaxy sources
         skipped_non_niriss = False
+        ghost_i = 0
         for index, source in zip(indexes, galaxylist):
+
+            # If the filter/pupil combination does not have an entry
+            # in the ghost summary file, log that only for the first
+            # source. No need to repeat for all sources.
+            log_ghost_err = True
+            if ghost_i > 0:
+                log_ghost_err = False
 
             # If galaxy radii are given in units of arcseconds, translate to pixels
             if radiusflag is False:
@@ -3911,7 +3928,9 @@ class Catalog_seed():
                     ghost_mag.append(gmag)
                     ghost_filename.append(gfile)
 
-                    ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(source, self.params['Reffiles']['flux_cal'], magsystem, NIRISS_GHOST_GAP_FILE)
+                    ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(source, self.params['Reffiles']['flux_cal'], magsystem,
+                                                                              NIRISS_GHOST_GAP_FILE, log_skipped_filters=log_ghost_err)
+                    ghost_i += 1
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -4529,9 +4548,17 @@ class Catalog_seed():
         # Loop over input lines in the source list
         skipped_non_niriss = False
         all_stamps = []
+        ghost_i = 0
         for indexnum, values in zip(indexes, lines):
             if not os.path.isfile(values['filename']):
                 raise FileNotFoundError('{} from extended source catalog does not exist.'.format(values['filename']))
+
+            # If the filter/pupil pair is not in the ghost summary file, log that only for the
+            # first source. No need to repeat for all sources.
+            if ghost_i == 0:
+                log_ghost_err = True
+            else:
+                log_ghost_err = False
 
             pixelx, pixely, ra, dec, ra_str, dec_str = self.get_positions(values['x_or_RA'],
                                                                           values['y_or_Dec'],
@@ -4611,7 +4638,8 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE)
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=log_ghost_err)
+                    ghost_i += 1
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)

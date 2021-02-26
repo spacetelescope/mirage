@@ -103,7 +103,7 @@ def get_gap(filter_name, pupil_name, gap_file, log_skipped_filters=True):
         frac = tab_gap['frac_50'][iix[0][0]]
     elif len(iix[0]) == 0:
         if log_skipped_filters:
-            logger.info('Filter {} not found in the ghost gap file {}.'.format(filter_name, gap_file))
+            logger.info('Filter/Pupil {}/{} not found in the ghost gap file {}. Unable to add ghosts.'.format(filter_name, pupil_name, gap_file))
         return np.nan, np.nan, np.nan
 
     return xgap, ygap, frac
