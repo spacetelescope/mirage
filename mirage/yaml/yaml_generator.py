@@ -330,7 +330,7 @@ class SimInput:
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
-        self.config_information = utils.organize_config_files()
+        self.config_information = utils.organize_config_files(offline=self.offline)
 
         self.path_defs()
 
@@ -662,7 +662,7 @@ class SimInput:
 
             # Read XML file and make observation table
             apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file,
-                                      output_dir=self.output_dir)
+                                      output_dir=self.output_dir, offline=self.offline)
             # apt.input_xml = self.input_xml
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
@@ -1424,47 +1424,40 @@ class SimInput:
         users, allow the input keys to be case insensitive. Take the user
         input dictionary and translate all the keys to be lower case.
         """
-        for key in self.reffile_overrides:
-            if key.lower() != key:
-                newkey = key.lower()
-                self.reffile_overrides[newkey] = self.reffile_overrides.pop(key)
-            else:
-                newkey = key
-            if isinstance(self.reffile_overrides[newkey], dict):
-                for key2 in self.reffile_overrides[newkey]:
-                    if (key2.lower() != key2):
-                        newkey2 = key2.lower()
-                        self.reffile_overrides[newkey][newkey2] = self.reffile_overrides[newkey].pop(key2)
-                    else:
-                        newkey2 = key2
-                    if isinstance(self.reffile_overrides[newkey][newkey2], dict):
-                        for key3 in self.reffile_overrides[newkey][newkey2]:
-                            if (key3.lower() != key3):
-                                newkey3 = key3.lower()
-                                self.reffile_overrides[newkey][newkey2][newkey3] = self.reffile_overrides[newkey][newkey2].pop(key3)
-                            else:
-                                newkey3 = key3
-                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3], dict):
-                                for key4 in self.reffile_overrides[newkey][newkey2][newkey3]:
-                                    if (key4.lower() != key4):
-                                        newkey4 = key4.lower()
-                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4] = self.reffile_overrides[newkey][newkey2][newkey3].pop(key4)
-                                    else:
-                                        newkey4 = key4
-                                    if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4], dict):
-                                        for key5 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4]:
-                                            if (key5.lower() != key5):
-                                                newkey5 = key5.lower()
-                                                self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4].pop(key5)
+        lower1 = {}
+        for key1, val1 in self.reffile_overrides.items():
+            if isinstance(val1, dict):
+                lower2 = {}
+                for key2, val2 in val1.items():
+                    if isinstance(val2, dict):
+                        lower3 = {}
+                        for key3, val3 in val2.items():
+                            if isinstance(val3, dict):
+                                lower4 = {}
+                                for key4, val4 in val3.items():
+                                    if isinstance(val4, dict):
+                                        lower5 = {}
+                                        for key5, val5 in val4.items():
+                                            if isinstance(val5, dict):
+                                                lower6 = {}
+                                                for key6, val6 in val5.items():
+                                                    lower6[key6.lower()] = val6
+                                                lower5[key5.lower()] = deepcopy(lower6)
                                             else:
-                                                newkey5 = key5
-                                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5], dict):
-                                                for key6 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5]:
-                                                    if (key6.lower() != key6):
-                                                        newkey6 = key6.lower()
-                                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5][newkey6] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5].pop(key6)
-                                                    else:
-                                                        newkey6 = key6
+                                                lower5[key5.lower()] = val5
+                                        lower4[key4.lower()] = deepcopy(lower5)
+                                    else:
+                                        lower4[key4.lower()] = val4
+                                lower3[key3.lower()] = deepcopy(lower4)
+                            else:
+                                lower3[key3.lower()] = val3
+                        lower2[key2.lower()] = deepcopy(lower3)
+                    else:
+                        lower2[key2.lower()] = val2
+                lower1[key1.lower()] = deepcopy(lower2)
+            else:
+                lower1[key1.lower()] = val1
+        self.reffile_overrides = lower1
 
     def multiple_catalog_match(self, filter, cattype, matchlist):
         """

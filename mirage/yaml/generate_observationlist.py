@@ -878,7 +878,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # If the directory to hold the observation file does not yet exist, create it
     obs_dir = os.path.dirname(yaml_file)
-    if obs_dir is not '' and os.path.isdir(obs_dir) is False:
+    if obs_dir != '' and os.path.isdir(obs_dir) is False:
         try:
             os.mkdir(obs_dir)
         except OSError:

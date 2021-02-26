@@ -12,6 +12,7 @@ from ast import literal_eval
 import glob
 import os
 import shutil
+import sys
 
 from astropy.io import fits
 import numpy as np
@@ -35,8 +36,19 @@ TEST_DATA_DIR = os.path.expandvars("$MIRAGE_DATA/test_data/test_segment_psfs")
 PARAMETRIZED_DATA = parametrized_data()['test_segment_psfs']
 SUCCESS_GENERATE_SEGMENT_PSF = None
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+
+# Determine the version of python used. For python 3.8 and above
+# webbpsf is installed via pip, which means the data files will not
+# be accessible and any test that relies on webbpsf should be skipped
+python_version = sys.version[0:3]
+testable_versions = ['3.6', '3.7']
+skip_versions = ['3.8', '3.9']
+if python_version in skip_versions:
+    SKIP_WEBBPSF = True
+else:
+    SKIP_WEBBPSF = False
 
 # Define default inputs
 INSTRUMENT = 'NIRCam'
@@ -86,6 +98,7 @@ def test_library_file(test_directory):
         yield test_lib_filename
 
 
+@pytest.mark.skipif((ON_GITHUB and SKIP_WEBBPSF), reason='Webbpsf data files cannot be downloaded via pip')
 def test_generate_segment_psfs(test_directory):
     """Test the generation of 18 segment PSFs with a randomly-perturbed
     mirror state.
@@ -131,8 +144,8 @@ def test_generate_segment_psfs(test_directory):
         assert lib_success, 'Failed to create file: {}'.format(os.path.join(test_directory, name))
 
 
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_get_segment_library_list_remote():
     """Test construction of segment PSF libraries using data on the central
     storage directory.
@@ -176,8 +189,8 @@ for i, tuple_string in enumerate(test_data):
     offset_tuple =   literal_eval(tuple_string)
     get_segment_offset_remote_parameters.append([i+1, offset_tuple])
 @pytest.mark.parametrize('segment_number, correct_offset', get_segment_offset_remote_parameters)
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_get_segment_offset_remote(segment_number, correct_offset):
     """Test the extraction of segment offsets from segment PSF libraries on the
     central storage directory.
@@ -245,8 +258,8 @@ def test_get_segment_offset_local_stored(test_library_file):
         'Incorrect conversion of segment offsets'
 
 
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_get_gridded_segment_psf_library_list_remote():
     """Test the loading of segment PSF libraries as a GriddedPSFModel on the
     central storage directory.

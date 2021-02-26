@@ -3,7 +3,7 @@
 """Test the locations of sources in various apertures using RADec_To_XY
 Note that the truth values in this case were calculated using the
 distortion reference files, which are not part of the repo and not
-available to Travis
+available to Github Actions CI
 Values were calculated using run_all_apertures.py in
 the test_mirage_subarray_source_location subdirectory
 """
@@ -283,7 +283,7 @@ def test_locations():
     translation using pysiaf. This is the truth case we will
     compare against the version translated via distortion
     reference file, which is in ``reference_file_values``. We have to
-    test like this because Travis does not have access to the
+    test like this because Github Actions CI does not have access to the
     distortion reference file itself.
     """
     # Apertures to skip for this testing. These apertures don't use the

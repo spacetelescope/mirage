@@ -78,7 +78,7 @@ class AptInput:
     """
 
     def __init__(self, input_xml=None, pointing_file=None, output_dir=None, output_csv=None,
-                 observation_list_file=None):
+                 observation_list_file=None, offline=False):
         self.logger = logging.getLogger('mirage.apt.apt_inputs')
 
         self.input_xml = input_xml
@@ -86,6 +86,7 @@ class AptInput:
         self.output_dir = output_dir
         self.output_csv = output_csv
         self.observation_list_file = observation_list_file
+        self.offline = offline
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
@@ -327,7 +328,7 @@ class AptInput:
         # the future.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.exposure_tab = make_start_times(self.exposure_tab)
+            self.exposure_tab = make_start_times(self.exposure_tab, offline=self.offline)
 
         # Fix data for filename generation
         # Set parallel seq id
@@ -1080,7 +1081,7 @@ def get_filters(pointing_info):
     return filters
 
 
-def make_start_times(obs_info):
+def make_start_times(obs_info, offline=False):
     """Create exposure start times for each entry in the observation dictionary.
 
     Parameters
@@ -1089,6 +1090,10 @@ def make_start_times(obs_info):
         Dictionary of exposures. Development was around a dictionary containing
         APT xml-derived properties as well as pointing file properties. Should
         be before expanding to have one entry for each detector in each exposure.
+
+    offline : bool
+        Whether the class is being called with or without access to
+        Mirage reference data. Used primarily for testing.
 
     Returns
     -------
@@ -1105,7 +1110,7 @@ def make_start_times(obs_info):
     namp = []
 
     # Read in file containing subarray definitions
-    config_information = utils.organize_config_files()
+    config_information = utils.organize_config_files(offline=offline)
 
     if 'epoch_start_date' in obs_info.keys():
         epoch_base_date = obs_info['epoch_start_date'][0]

@@ -31,12 +31,12 @@ from mirage import imaging_simulator
 
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
 
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_niriss_imaging():
     nis = imaging_simulator.ImgSim(offline=True)
     nis.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_test.yaml')
