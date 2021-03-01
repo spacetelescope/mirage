@@ -226,7 +226,7 @@ class ReadAPTXML():
                                    'NircamEngineeringImaging', 'WfscGlobalAlignment',
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
                                    'NircamGrismTimeSeries', 'NircamTimeSeries',
-                                   'NirissExternalCalibration', 'NirissWfss', 'NirissAmi',  # NIRISS
+                                   'NirissExternalCalibration', 'NirissWfss', 'NirissAmi', 'NirissImaging', # NIRISS
                                    'NirspecImaging', 'NirspecInternalLamp',  # NIRSpec
                                    'MiriMRS', 'MiriImaging', # MIRI
                                    'FgsExternalCalibration',  # FGS
@@ -301,7 +301,7 @@ class ReadAPTXML():
                                              'TargetDec': self.target_info[targ_name][1]
                                              }
 
-            if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration',
+            if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirissImaging',
                                  'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
                 exposures_dictionary = self.read_generic_imaging_template(template, template_name, obs,
                                                                           proposal_parameter_dictionary,
@@ -1965,7 +1965,7 @@ class ReadAPTXML():
         # Determine what template is used for the parallel observation
         template = obs.find(self.apt + 'FirstCoordinatedTemplate')[0]
         template_name = etree.QName(template).localname
-        if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration',
+        if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirissImaging',
                              'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
             parallel_exposures_dictionary = self.read_generic_imaging_template(template,
                                                                                template_name, obs,
