@@ -391,6 +391,20 @@ class ReadAPTXML():
             elif template_name == 'NircamWfss':
                 exposures_dictionary = self.read_nircam_wfss_template(template, template_name, obs,
                                                                       proposal_parameter_dictionary)
+                if coordparallel == 'true':
+                    parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
+                    if parallel_template_name in ['MiriImaging']:
+                        pass
+                    elif parallel_template_name in ['NirissImaging']:
+                        parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary,
+                                                                                     proposal_parameter_dictionary,
+                                                                                     prime_exposure_dict=exposures_dictionary,
+                                                                                     verbose=verbose)
+                        exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
+
+                    else:
+                        raise ValueError('Parallel template {} (with primary template {}) not supported.'
+                                         .format(parallel_template_name, template_name))
 
             elif template_name == 'NirissWfss':
                 exposures_dictionary = self.read_niriss_wfss_template(template, template_name, obs,
@@ -530,7 +544,7 @@ class ReadAPTXML():
         return dictionary
 
     def read_generic_imaging_template(self, template, template_name, obs, proposal_parameter_dictionary,
-                                      verbose=False, parallel=False):
+                                      prime_exposure_dict=None, verbose=False, parallel=False):
         """Read imaging template content regardless of instrument.
 
         Save content to object attributes. Support for coordinated parallels is included.
@@ -539,12 +553,21 @@ class ReadAPTXML():
         ----------
         template : etree xml element
             xml content of template
+
         template_name : str
             name of the template
+
         obs : etree xml element
             xml content of observation
+
         proposal_parameter_dictionary : dict
             Dictionary of proposal parameters to extract from template
+
+        prime_exposure_dict : dict
+            In the case of a parallel observation, dictionary of exposure
+            information from the prime instrument. Used primarily to communicate
+            the complex dither information from prime WFSS observations to parallel
+            imaging observations
 
         Returns
         -------
@@ -673,7 +696,7 @@ class ReadAPTXML():
                     number_of_subpixel_dithers = 1
 
             # Combine primary and subpixel dithers
-            number_of_dithers = str(np.int(number_of_primary_dithers) * number_of_subpixel_dithers)
+            number_of_dithers = str(int(number_of_primary_dithers) * int(number_of_subpixel_dithers))
             if not parallel:
                 self.logger.info('Number of dithers: {} primary * {} subpixel = {}'.format(number_of_primary_dithers,
                                                                                            number_of_subpixel_dithers,
@@ -779,7 +802,6 @@ class ReadAPTXML():
                     if element.text is not None:
                         number_of_subpixel_dithers = int(element.text)
 
-
                 # handle the NIRISS AMI case
                 if number_of_subpixel_positions > number_of_subpixel_dithers:
                     number_of_subpixel_dithers = np.copy(number_of_subpixel_positions)
@@ -796,8 +818,7 @@ class ReadAPTXML():
                     number_of_subpixel_dithers = 0
 
                 # Combine primary and subpixel dithers
-                number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
-
+                number_of_dithers = str(int(number_of_primary_dithers) * int(number_of_subpixel_dithers))
 
                 # Different SI conventions of how to list exposure parameters
                 if ((instrument.lower() == 'niriss') and (element_tag_stripped == 'ExposureList')) | \
@@ -875,6 +896,37 @@ class ReadAPTXML():
         for key, item in exposures_dictionary.items():
             if len(item) == 0:
                 exposures_dictionary[key] = [0] * len(exposures_dictionary['Instrument'])
+
+        # If we have a NIRISS imaging template that is parallel while NIRCam WFSS is prime, we need
+        # to manually separate the NIRISS observations that match up with the NIRCam out of field
+        # exposures in order to get the lengths of the dictionaries to match
+        if prime_template_name.lower() == 'nircamwfss' and template_name.lower() == 'nirissimaging':
+
+            # Strip out the second True value from each pair
+            outoffield_parallel_mapping = []
+            for i in range(len(prime_exposure_dict['OutOfField'][0:-1])):
+                if not prime_exposure_dict['OutOfField'][i]:
+                    outoffield_parallel_mapping.append(prime_exposure_dict['OutOfField'][i])
+                if prime_exposure_dict['OutOfField'][i] and prime_exposure_dict['OutOfField'][i+1]:
+                    outoffield_parallel_mapping.append(prime_exposure_dict['OutOfField'][i])
+
+            outoffield = np.where(np.array(outoffield_parallel_mapping) == True)[0]
+
+            for key, value in exposures_dictionary.items():
+                val_arr = np.array(value)
+                new_val = np.array([])
+
+                if isinstance(val_arr[0], np.int64):
+                    new_val = np.array([]).astype(int)
+                for i, ele in enumerate(val_arr):
+                    if i in outoffield:
+                        tmp = np.repeat(ele, 2)
+                        new_val = np.append(new_val,tmp)
+                    else:
+                        new_val = np.append(new_val,ele)
+
+                exposures_dictionary[key] = list(new_val)
+            exposures_dictionary['OutOfField'] = [False] * len(exposures_dictionary['Filter'])
 
         return exposures_dictionary
 
@@ -1762,6 +1814,9 @@ class ReadAPTXML():
         module = template.find(ns + 'Module').text
         subarr = template.find(ns + 'Subarray').text
 
+        # Check if this observation has parallels
+        coordinated_parallel = obs.find(self.apt + 'CoordinatedParallel').text
+
         # Check the target type in order to decide whether the tracking should be
         # sidereal or non-sidereal
         tracking = self.get_tracking_type(obs)
@@ -1858,7 +1913,7 @@ class ReadAPTXML():
                     exp_seq_dict['PrimaryDithers'] = [primary_dither_grism, primary_dither_direct]
                     exp_seq_dict['SubpixelPositions'] = [subpix_dither_grism, subpix_dither_direct]
                     exp_seq_dict['SubpixelDitherType'] = [subpix_dither_type_grism, subpix_dither_type_direct]
-                    exp_seq_dict['CoordinatedParallel'] = ['false'] * 2
+                    exp_seq_dict['CoordinatedParallel'] = [coordinated_parallel] * 2
                     exp_seq_dict['Instrument'] = [instrument] * 2
                     exp_seq_dict['ParallelInstrument'] = [False] * 2
                     exp_seq_dict['ShortFilter'] = [grism_short_filter, direct_short_filter]
@@ -1878,6 +1933,7 @@ class ReadAPTXML():
                     exp_seq_dict['PupilWheel'] = ['none'] * 2  # used for NIRISS
                     exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride] * 2
                     exp_seq_dict['Tracking'] = [tracking] * 2
+                    exp_seq_dict['OutOfField'] = [False] * 2
                 else:
                     exp_seq_dict['Mode'] = [grism_typeflag]
                     exp_seq_dict['Module'] = [module]
@@ -1886,7 +1942,7 @@ class ReadAPTXML():
                     exp_seq_dict['PrimaryDithers'] = [primary_dither_grism]
                     exp_seq_dict['SubpixelPositions'] = [subpix_dither_grism]
                     exp_seq_dict['SubpixelDitherType'] = [subpix_dither_type_grism]
-                    exp_seq_dict['CoordinatedParallel'] = ['false']
+                    exp_seq_dict['CoordinatedParallel'] = [coordinated_parallel]
                     exp_seq_dict['Instrument'] = [instrument]
                     exp_seq_dict['ParallelInstrument'] = [False]
                     exp_seq_dict['ShortFilter'] = [grism_short_filter]
@@ -1906,6 +1962,7 @@ class ReadAPTXML():
                     exp_seq_dict['PupilWheel'] = ['none']  # used for NIRISS
                     exp_seq_dict['FiducialPointOverride'] = [FiducialPointOverride]
                     exp_seq_dict['Tracking'] = [tracking]
+                    exp_seq_dict['OutOfField'] = [False]
 
                 # Add exp_seq_dict to the exposures_dictionary
                 exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
@@ -1924,7 +1981,7 @@ class ReadAPTXML():
             out_of_field_dict['PrimaryDithers'] = [primary_dither_direct] * 2
             out_of_field_dict['SubpixelPositions'] = [subpix_dither_direct] * 2
             out_of_field_dict['SubpixelDitherType'] = [subpix_dither_type_direct] * 2
-            out_of_field_dict['CoordinatedParallel'] = ['false'] * 2
+            out_of_field_dict['CoordinatedParallel'] = [coordinated_parallel] * 2
             out_of_field_dict['Instrument'] = [instrument] * 2
             out_of_field_dict['ParallelInstrument'] = [False] * 2
             out_of_field_dict['ShortFilter'] = [direct_short_filter] * 2
@@ -1944,6 +2001,7 @@ class ReadAPTXML():
             out_of_field_dict['PupilWheel'] = ['none'] * 2  # used for NIRISS
             out_of_field_dict['FiducialPointOverride'] = [FiducialPointOverride] * 2
             out_of_field_dict['Tracking'] = [tracking] * 2
+            out_of_field_dict['OutOfField'] = [True] * 2
 
             # Add out_of_field_dict to the exposures_dictionary
             exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
@@ -2074,7 +2132,8 @@ class ReadAPTXML():
 
         return exposures_dictionary
 
-    def read_parallel_exposures(self, obs, exposures_dictionary, proposal_parameter_dictionary, prime_template=None, verbose=False):
+    def read_parallel_exposures(self, obs, exposures_dictionary, proposal_parameter_dictionary, prime_template=None,
+                                prime_exposure_dict=None, verbose=False):
         """Read the exposures of the parallel instrument.
 
         Parameters
@@ -2090,6 +2149,10 @@ class ReadAPTXML():
 
         prime_template : str
             Name of the template of the primary observation
+
+        prime_exposure_dict : dict
+            Dictionary of exposure information for the observation from the prime
+            instrument
 
         verbose : bool
             Verbosity
@@ -2109,6 +2172,7 @@ class ReadAPTXML():
                                                                                template_name, obs,
                                                                                proposal_parameter_dictionary,
                                                                                parallel=True,
+                                                                               prime_exposure_dict=prime_exposure_dict,
                                                                                verbose=verbose)
         elif template_name == 'NirissWfss':
             parallel_exposures_dictionary = self.read_niriss_wfss_template(template, template_name, obs,
@@ -2120,7 +2184,6 @@ class ReadAPTXML():
         # Find length of the exposures dictionary to compare
         parallel_length = len(parallel_exposures_dictionary['number_of_dithers'])
         exposures_dictionary_length = len(exposures_dictionary['number_of_dithers'])
-
 
         if parallel_length != exposures_dictionary_length and prime_template != 'NirspecMOS':
             raise RuntimeError('Mismatch in the number of parallel observations.')
@@ -2169,10 +2232,16 @@ class ReadAPTXML():
                 # if key not yet present, create entry
                 if key not in exp_dictionary.keys():
                     self.logger.info('Key {} not present in APTObservationParams nor exposures_dictionary'.format(key))
-                    exp_dictionary[key] = [str(exposure_seq_dict[key])]
+                    if isinstance(exposure_seq_dict[key], list):
+                        exp_dictionary[key] = copy.deepcopy(exposure_seq_dict[key])
+                    else:
+                        exp_dictionary[key] = [exposure_seq_dict[key]]
                 else:
                     self.logger.info('Key {} not present in APTObservationParams'.format(key))
-                    exp_dictionary[key].append(str(exposure_seq_dict[key]))
+                    if isinstance(exposure_seq_dict[key], list):
+                        exp_dictionary[key].extend(exposure_seq_dict[key])
+                    else:
+                        exp_dictionary[key].append(exposure_seq_dict[key])
         return exp_dictionary
 
 
