@@ -209,6 +209,10 @@ class ReadAPTXML():
         observation_data = tree.find(self.apt + 'DataRequests')
         observation_list = observation_data.findall('.//' + self.apt + 'Observation')
 
+        # Maintain a list of skipped observations, by number
+        self.skipped_observations = []
+        all_skipped = True
+
         # Loop through observations, get parameters
         for i_obs, obs in enumerate(observation_list):
             observation_number = obs.find(self.apt + 'Number').text.zfill(3)
@@ -230,11 +234,16 @@ class ReadAPTXML():
                                    'NirspecImaging', 'NirspecInternalLamp', 'NirspecMOS', # NIRSpec
                                    'MiriMRS', 'MiriImaging', # MIRI
                                    'FgsExternalCalibration',  # FGS
-                                   'NircamDark', 'NirissDark'  # Darks
                                    ]
             if template_name not in known_APT_templates:
+            #if template_name not in ALLOWED_PRIMARY_APT_TEMPLATES:
                 # If not, turn back now.
-                raise ValueError('No protocol written to read {} template.'.format(template_name))
+                self.logger.info('No protocol written to read {} template in observation {}. Skipping.'.format(template_name, observation_number))
+                self.skipped_observations.append(observation_number)
+                continue
+
+            # If we make it here, then there is a valid observation to read in
+            all_skipped = False
 
             # Get observation label
             label_ele = obs.find(self.apt + 'Label')
@@ -321,7 +330,7 @@ class ReadAPTXML():
                                                                     proposal_parameter_dictionary)
                 if coordparallel == 'true':
                     parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
-                    if parallel_template_name in ['NircamImaging']:
+                    if parallel_template_name in ['NircamImaging', 'NirissWfss']:
                         parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary,
                                                                                      proposal_parameter_dictionary,
                                                                                      verbose=verbose)
@@ -446,6 +455,9 @@ class ReadAPTXML():
                 number_of_entries_after = len(self.APTObservationParams['Instrument'])
                 self.logger.info('APTObservationParams Dictionary holds {} entries after reading template ({:+d} entries)'
                                  .format(number_of_entries_after, number_of_entries_after-number_of_entries))
+
+        if all_skipped:
+            raise ValueError('No supported observation templates in this proposal.')
 
         if verbose:
             self.logger.info('Finished reading APT xml file.')
@@ -1398,20 +1410,20 @@ class ReadAPTXML():
                 config_dict['number_of_dithers'] = config_dict['NumberOfPoints']
                 config_dict['PrimaryDithers'] = config_dict['NumberOfPoints']
                 config_dict['SubpixelPositions'] = 1
-            elif config_dict['DitherType'] == 'REULEAUX':
+            elif config_dict['DitherType'].upper() == 'REULEAUX':
                 config_dict['number_of_dithers'] = 12
                 config_dict['PrimaryDithers'] = 12
                 config_dict['SubpixelPositions'] = 1
-            elif '4-Point' in config_dict['DitherType']:
+            elif '4-POINT' in config_dict['DitherType'].upper():
                 config_dict['SubpixelDitherType'] = 'NumberOfSets'
                 config_dict['number_of_dithers'] = 4 * int(config_dict['NumberOfSets'])
                 config_dict['PrimaryDithers'] = 4
                 config_dict['SubpixelPositions'] = int(config_dict['NumberOfSets'])
-            elif '3-POINT' in config_dict['DitherType']:
+            elif '3-POINT' in config_dict['DitherType'].upper():
                 config_dict['number_of_dithers'] = 3
                 config_dict['PrimaryDithers'] = 3
                 config_dict['SubpixelPositions'] = 1
-            elif '2-Point' in config_dict['DitherType']:
+            elif '2-POINT' in config_dict['DitherType'].upper():
                 config_dict['number_of_dithers'] = 2
                 config_dict['PrimaryDithers'] = 2
                 config_dict['SubpixelPositions'] = 1
@@ -2503,14 +2515,22 @@ class ReadAPTXML():
             prime_instrument = obs.find(self.apt + 'Instrument').text
             if verbose:
                 self.logger.info('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
-            pdither_grism = prime_template.find(prime_ns + 'PrimaryDithers').text
-            pdither_type_grism = prime_template.find(prime_ns + 'PrimaryDitherType').text
-            dither_direct = prime_template.find(prime_ns + 'DitherNirissWfssDirectImages').text
-            sdither_type_grism = prime_template.find(prime_ns + 'CoordinatedParallelSubpixelPositions').text
-            try:
-                sdither_grism = str(np.int(sdither_type_grism[0]))
-            except ValueError:
-                sdither_grism = prime_template.find(prime_ns + 'SubpixelPositions').text
+
+
+            if prime_instrument.upper() == 'NIRCAM':
+                # NIRCam imaging mode as prime
+                pdither_grism = prime_template.find(prime_ns + 'PrimaryDithers').text
+                pdither_type_grism = prime_template.find(prime_ns + 'PrimaryDitherType').text
+                dither_direct = prime_template.find(prime_ns + 'DitherNirissWfssDirectImages').text
+                sdither_type_grism = prime_template.find(prime_ns + 'CoordinatedParallelSubpixelPositions').text
+                try:
+                    sdither_grism = str(np.int(sdither_type_grism[0]))
+                except ValueError:
+                    sdither_grism = prime_template.find(prime_ns + 'SubpixelPositions').text
+            elif prime_instrument.upper() == 'MIRI':
+                # MIRI imaging as prime
+                raise ValueError("Not yet supported. Need to figure out mapping of multiple miri dithers")
+                pdither_grism = something
         else:
             parallel_instrument = False
             prime_instrument = instrument

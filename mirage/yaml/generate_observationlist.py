@@ -482,6 +482,10 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     xml_dict : dict
         Expanded dictionary that holds exposure information
 
+    skipped_obs_numbers : list
+        List of observation numbers with unsupported observation templates. These observations
+        were not added to the dictionary.
+
     TODO
     ----
         Read default values from configuration file
@@ -892,4 +896,4 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     f.close()
     logger.info('Wrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number, yaml_file))
 
-    return return_dict
+    return return_dict, readxml_obj.skipped_observations

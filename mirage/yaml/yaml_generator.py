@@ -337,9 +337,9 @@ class SimInput:
         if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
-                                                     verbose=self.verbose,
-                                                     parameter_overrides=parameter_overrides)
+            self.apt_xml_dict, self.xml_skipped_observations = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
+                                                                                    verbose=self.verbose,
+                                                                                    parameter_overrides=parameter_overrides)
         else:
             self.logger.error('No input xml file provided. Observation dictionary not constructed.')
 
@@ -669,7 +669,7 @@ class SimInput:
             apt.apt_xml_dict = self.apt_xml_dict
 
             apt.output_dir = self.output_dir
-            apt.create_input_table()
+            apt.create_input_table(skip_observations=self.xml_skipped_observations)
             self.info = apt.exposure_tab
 
             # If we have a non-sidereal observation, then we need to
@@ -2327,7 +2327,7 @@ def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=Fals
     """
 
     if pointing_table is None:
-        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
     for i in range(len(pointing_table['obs_num'])):
         if pointing_table['obs_num'][i] == f"{obs_num:03d}":
             ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
@@ -2362,7 +2362,7 @@ def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
 
     """
     results = {}
-    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
     obsnums = sorted(list(set(pointing_table['obs_num'])))
     for obs_num in obsnums:
         results[obs_num] = default_obs_v3pa_on_date(pointing_filename, int(obs_num), date=date, verbose=verbose,
