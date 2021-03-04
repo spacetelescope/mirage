@@ -333,6 +333,7 @@ class ReadAPTXML():
                     if parallel_template_name in ['NircamImaging', 'NirissWfss']:
                         parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary,
                                                                                      proposal_parameter_dictionary,
+                                                                                     prime_exposure_dict=exposures_dictionary,
                                                                                      verbose=verbose)
                         exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
 
@@ -2177,6 +2178,7 @@ class ReadAPTXML():
         elif template_name == 'NirissWfss':
             parallel_exposures_dictionary = self.read_niriss_wfss_template(template, template_name, obs,
                                                                            proposal_parameter_dictionary,
+                                                                           prime_exposure_dict=prime_exposure_dict,
                                                                            parallel=True)
         else:
             raise ValueError('Parallel observation template {} not supported.'.format(template_name))
@@ -2521,7 +2523,7 @@ class ReadAPTXML():
 
 
     def read_niriss_wfss_template(self, template, template_name, obs, proposal_param_dict, parallel=False,
-                                  verbose=False):
+                                  prime_exposure_dict=None, verbose=False):
         """Parse a NIRISS WFSS observation template from an APT xml file. Produce an exposure dictionary
         that lists all exposures (excluding dithers) from the template.
 
@@ -2543,6 +2545,10 @@ class ReadAPTXML():
         parallel : bool
             If True, template should be for parallel observations. If False, NIRISS WFSS
             observation is assumed to be prime
+
+        prime_exposure_dict : dict
+            Exposure dictionary from prime observation in the case of a parallel observation.
+            Currently used only in the case of MIRI imaging as prime.
 
         Returns
         -------
@@ -2585,7 +2591,6 @@ class ReadAPTXML():
             if verbose:
                 self.logger.info('Prime: {}   Parallel: {}'.format(prime_instrument, instrument))
 
-
             if prime_instrument.upper() == 'NIRCAM':
                 # NIRCam imaging mode as prime
                 pdither_grism = prime_template.find(prime_ns + 'PrimaryDithers').text
@@ -2598,8 +2603,12 @@ class ReadAPTXML():
                     sdither_grism = prime_template.find(prime_ns + 'SubpixelPositions').text
             elif prime_instrument.upper() == 'MIRI':
                 # MIRI imaging as prime
-                raise ValueError("Not yet supported. Need to figure out mapping of multiple miri dithers")
-                pdither_grism = something
+                dither_direct = 'NO_DITHERING'
+                pdither_grism = 0
+                sdither_grism = 0
+                pdither_type_grism = 'PLACEHOLDER'
+                sdither_type_grism = 'PLACEHOLDER'
+
         else:
             parallel_instrument = False
             prime_instrument = instrument
@@ -2793,6 +2802,14 @@ class ReadAPTXML():
                 exposures_dictionary = self.append_to_exposures_dictionary(exposures_dictionary,
                                                                            exp_seq_dict,
                                                                            proposal_param_dict)
+
+        if parallel and prime_instrument.upper() == 'MIRI':
+            exposures_dictionary['PrimaryDitherType'] = prime_exposure_dict['PrimaryDitherType']
+            exposures_dictionary['SubpixelDitherType'] = prime_exposure_dict['SubpixelDitherType']
+            exposures_dictionary['number_of_dithers'] = [0] * len(exposures_dictionary['Instrument'])
+            exposures_dictionary['PrimaryDithers'] = [0] * len(exposures_dictionary['Instrument'])
+            exposures_dictionary['SubpixelPositions'] = [1] * len(exposures_dictionary['Instrument'])
+
         # Make sure all entries are lists
         for key in exposures_dictionary.keys():
             if type(exposures_dictionary[key]) is not list:
