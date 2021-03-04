@@ -1,0 +1,14 @@
+# APT Output Product
+# 
+# APT Version: Version 2020.5  JWST PRD: PRDOPSSOC-032 
+# Date: Thu Mar 04 15:03:58 GMT 2021
+
+JWST Pointing Report for JWST Submitted Proposal 90909 (niriss_img.aptx)
+
+========================================
+* niriss_img (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NIS_CEN                   1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.000 -291.219 -698.181   +0.000   +0.000 TARGET     SCIENCE        0      0  0.000 (base)
+
+

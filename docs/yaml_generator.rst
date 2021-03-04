@@ -10,7 +10,7 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
 
 .. important::
 
-    Currently Mirage is able to parse the following APT templates. Mirage will fail if your APT file contains observations using a template not on this list.
+    Currently Mirage is able to parse APT files containing any observation template, including all JWST-supported coordinated parallel combinations. However, it will only generate yaml input files for the observation templates listed below. It will silently skip over all other templates.
 
     +--------------------------------+
     |         NIRCAM                 |
@@ -18,34 +18,25 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
     |  - NircamImaging               |
     |  - NircamWfss                  |
     |  - NircamEngineeringImaging    |
-    |  - NircamDark                  |
     |  - NircamTimeSeries            |
     |  - NircamGrismTimeSeries       |
     +--------------------------------+
 
-    +-------------------------------+
-    |         NIRISS                |
-    +===============================+
-    |  - NirissExternalCalibration  |
-    |  - NirissWfss                 |
-    |  - NirissAmi                  |
-    |  - NirissDark                 |
-    +-------------------------------+
+    +--------------------------------+
+    |         NIRISS                 |
+    +================================+
+    |  - NirissImaging               |
+    |  - NirissExternalCalibration   |
+    |  - NirissWfss                  |
+    |  - NirissAmi                   |
+    |                                |
+    +--------------------------------+
 
-    +-------------------------------+
-    |          FGS                  |
-    +===============================+
-    |  - FgsExternalCalibration     |
-    +-------------------------------+
-
-    +-------------------------------+
-    |     Other Instruments         |
-    | (for parallel observations)   |
-    +===============================+
-    |  - NirspecImaging             |
-    |  - NirspecInternalLamp        |
-    |  - MiriMRS                    |
-    +-------------------------------+
+    +--------------------------------+
+    |          FGS                   |
+    +================================+
+    |  - FgsExternalCalibration      |
+    +--------------------------------+
 
     +-------------------------------+
     | Wavefront Sensing and Control |
@@ -55,7 +46,6 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
     |  - WfscCoarsePhasing          |
     |  - WfscFinePhasing            |
     +-------------------------------+
-
 
 Export XML and Pointing files from APT
 --------------------------------------

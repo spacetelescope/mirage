@@ -268,16 +268,21 @@ class AptInput:
         combined.update(dict2)
         return combined
 
-    def create_input_table(self, verbose=False):
+    def create_input_table(self, skip_observations=None, verbose=False):
         """
         Main function for creating a table of parameters for each
         exposure
 
         Parameters
         ----------
+        skip_observations : list
+            List of observation numbers to be skipped when reading in pointing file
+
         verbose : bool
             If True, extra information is printed to the log
         """
+        self.skip_observations = skip_observations
+
         # Expand paths to full paths
         # self.input_xml = os.path.abspath(self.input_xml)
         # self.pointing_file = os.path.abspath(self.pointing_file)
@@ -292,7 +297,8 @@ class AptInput:
             raise RuntimeError('self.apt_xml_dict is not defined')
 
         # Read in the pointing file and produce dictionary
-        pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
+        pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0],
+                                                     skipped_obs_from_xml=self.skip_observations)
 
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
@@ -667,6 +673,38 @@ class AptInput:
         lt = line.find('<', gt)
         return line[gt + 1:lt]
 
+    def filter_unsuppoted_obs_numbers(self, pointing_dict, skipped_obs):
+        """Remove observations from the pointing dictionary that are for
+        unsupported observing modes
+
+        Parameters
+        ----------
+        pointing_dict : dict
+            Dictionary of pointing information
+
+        skipped_obs : list
+            List of observation numbers that should be removed
+
+        Returns
+        -------
+        pointing_dict : dict
+            Dictionary with the appropriate entries removed
+        """
+        if skipped_obs is None:
+            return pointing_dict
+
+        for obnum in skipped_obs:
+            #matches = pointing_dict['obs_num'] != obnum
+            matches = [True if obnum != o else False for o in pointing_dict['obs_num']]
+
+            for key in pointing_dict:
+                values = np.array(pointing_dict[key])
+                values = values[matches]
+                pointing_dict[key] = list(values)
+
+        return pointing_dict
+
+
     def full_path(self, in_path):
         """
         If the input path is not None, expand
@@ -688,16 +726,20 @@ class AptInput:
         else:
             return os.path.abspath(os.path.expandvars(in_path))
 
-    def get_pointing_info(self, file, propid=0, verbose=False):
+    def get_pointing_info(self, file, propid=0, skipped_obs_from_xml=None, verbose=False):
         """Read in information from APT's pointing file.
 
         Parameters
         ----------
         file : str
             Name of APT-exported pointing file to be read
+
         propid : int
             Proposal ID number (integer). This is used to
             create various ID fields
+
+        skipped_obs_from_xml : list
+            List of observation numbers to be removed
 
         Returns
         -------
@@ -892,6 +934,8 @@ class AptInput:
                     'obs_num': observation_number, 'visit_num': visit_number,
                     'act_id': activity_id, 'visit_id': visit_id, 'visit_group': visit_grp,
                     'sequence_id': seq_id, 'observation_id': observation_id}
+
+        pointing = self.filter_unsuppoted_obs_numbers(pointing, skipped_obs_from_xml)
         return pointing
 
 
