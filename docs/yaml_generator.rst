@@ -12,25 +12,40 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
 
     Currently Mirage is able to parse APT files containing any observation template, including all JWST-supported coordinated parallel combinations. However, it will only generate yaml input files for the observation templates listed below. It will silently skip over all other templates.
 
-    +--------------------------------+   +-------------------------------+
-    |         NIRCAM                 |   |         NIRISS                |
-    +================================+   +===============================+
-    |  - NircamImaging               |   |  - NirissImaging              |
-    |  - NircamWfss                  |   |  - NirissExternalCalibration  |
-    |  - NircamEngineeringImaging    |   |  - NirissWfss                 |
-    |  - NircamTimeSeries            |   |  - NirissAmi                  |
-    |  - NircamGrismTimeSeries       |   |                               |
-    +--------------------------------+   +-------------------------------+
+    +--------------------------------+
+    |         NIRCAM                 |
+    +================================+
+    |  - NircamImaging               |
+    |  - NircamWfss                  |
+    |  - NircamEngineeringImaging    |
+    |  - NircamTimeSeries            |
+    |  - NircamGrismTimeSeries       |
+    +--------------------------------+
 
-    +--------------------------------+   +-------------------------------+
-    |          FGS                   |   | Wavefront Sensing and Control |
-    +================================+   +===============================+
-    |  - FgsExternalCalibration      |   |  - WfscCommissioning          |
-    +--------------------------------+   |  - WfscGlobalAlignment        |
-                                         |  - WfscCoarsePhasing          |
-                                         |  - WfscFinePhasing            |
-                                         +-------------------------------+
+    +--------------------------------+
+    |         NIRISS                 |
+    +================================+
+    |  - NirissImaging               |
+    |  - NirissExternalCalibration   |
+    |  - NirissWfss                  |
+    |  - NirissAmi                   |
+    |                                |
+    +--------------------------------+
 
+    +--------------------------------+
+    |          FGS                   |
+    +================================+
+    |  - FgsExternalCalibration      |
+    +--------------------------------+
+
+    +-------------------------------+
+    | Wavefront Sensing and Control |
+    +===============================+
+    |  - WfscCommissioning          |
+    |  - WfscGlobalAlignment        |
+    |  - WfscCoarsePhasing          |
+    |  - WfscFinePhasing            |
+    +-------------------------------+
 
 Export XML and Pointing files from APT
 --------------------------------------
