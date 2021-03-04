@@ -1,0 +1,17 @@
+# APT Output Product
+# 
+# APT Version: Version 2020.5  JWST PRD: PRDOPSSOC-032 
+# Date: Thu Mar 04 15:05:55 GMT 2021
+
+JWST Pointing Report for JWST Submitted Proposal 34567 (fgs_external.aptx)
+
+========================================
+* fgs_external_cal (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 FGS1_FULL                 1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.000 +206.464 -697.970   +0.000   +0.000 TARGET     SCIENCE      160    160  0.000 (base)
+** Visit 2:2
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    2 FGS1_FULL                 1 TARGONE   +12.00000  +12.00000   +0.000   +0.000  +32.760  +32.760 +172.997 -665.933  +32.760  +32.760 DITHER     SCIENCE      160    160  0.000 (base)
+
+
