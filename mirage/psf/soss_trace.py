@@ -13,7 +13,6 @@ import warnings
 
 import numpy as np
 from astropy.io import fits
-import astropy.units as q
 from bokeh.plotting import figure, show
 from hotsoss import utils, locate_trace
 from scipy.interpolate import interp1d
@@ -22,7 +21,7 @@ from scipy.interpolate import interp2d, RectBivariateSpline
 
 warnings.simplefilter('ignore')
 
-PSF_DIR = resource_filename('mirage', 'mirage/psf/soss_psfs/').replace('mirage/mirage', 'mirage')
+PSF_DIR = os.path.join(os.environ.get('MIRAGE_DATA'), 'niriss/soss_psfs/')
 
 
 def calculate_psf_tilts():

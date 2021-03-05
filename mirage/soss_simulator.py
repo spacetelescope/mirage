@@ -51,7 +51,7 @@ warnings.simplefilter('ignore')
 
 SUB_SLICE = {'SUBSTRIP96': slice(1792, 1888), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
 SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048, 2048)}
-PSF_DIR = resource_filename('mirage', 'mirage/psf/soss_psfs/').replace('mirage/mirage', 'mirage')
+PSF_DIR = os.path.join(os.environ.get('MIRAGE_DATA'), 'niriss/soss_psfs/')
 
 
 def check_psf_files():
