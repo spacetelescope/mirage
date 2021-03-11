@@ -3218,6 +3218,9 @@ class Observation():
             outModel[0].header['FWCPOS'] = self.filter_wheel_position
             outModel[0].header['PWCPOS'] = self.pupil_wheel_position
 
+        if self.instrument.upper() in ['NIRISS', 'FGS']:
+            outModel[0].header['FOCUSPOS'] = 'DEFAULT' #Placeholder, required by WSS; will be float in flight.
+
         # Specify whether the exposure is part of a TSO observation
         if self.params['Inst']['mode'].lower() not in ['ts_imaging', 'ts_grism']:
             outModel[0].header['TSOVISIT'] = False
