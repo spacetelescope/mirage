@@ -2835,7 +2835,7 @@ class Observation():
             outModel.meta.instrument.channel = channel
 
         if self.instrument.upper() in ['NIRISS', 'FGS']:
-            outModel.meta.instrument.focus_position = 'DEFAULT' #Placeholder, required by WSS; will be float in flight.
+            outModel.meta.instrument.focus_position = 0.0 #Placeholder, required by WSS; will be float in flight.
 
         outModel.meta.instrument.detector = self.detector
         outModel.meta.coordinates.reference_frame = 'ICRS'
