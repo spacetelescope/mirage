@@ -198,7 +198,7 @@ class WFSSSim():
             dmode = 'GR150{}'.format(self.dispersion_direction)
 
         # Find the 1d spectrum of the background, based on date or 'low', 'medium', 'high'
-        back_wave, back_sig = backgrounds.get_1d_backgound_spectrum(self.params, self.detector, self.module)
+        back_wave, back_sig = backgrounds.get_1d_background_spectrum(self.params, self.detector, self.module)
 
         # Default to extracting all orders
         orders = None
