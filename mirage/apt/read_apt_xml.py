@@ -3212,11 +3212,6 @@ class ReadAPTXML():
             if dither_pattern_type == 'WFSS':
                 dither_size = template.find(ns + 'DitherSize').text
 
-            # TEST - pointing file shows 1 dither for PARALLEL dither type
-            # even when I choose other numbers in APT??!!
-            if dither_pattern_type == 'PARALLEL':
-                primary_dithers = 1
-
         number_of_dithers = int(primary_dithers) * int(subpixel_positions)
 
         # Now that we have the correct number of dithers, we can
