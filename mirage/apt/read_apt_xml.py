@@ -2735,7 +2735,7 @@ class ReadAPTXML():
         # Determine what template is used for the parallel observation
         template = obs.find(self.apt + 'FirstCoordinatedTemplate')[0]
         template_name = etree.QName(template).localname
-        if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissExternalCalibration', 'NirissImaging',
+        if template_name in ['NircamImaging', 'NircamEngineeringImaging', 'NirissImaging',
                              'NirspecImaging', 'MiriMRS', 'FgsExternalCalibration']:
             parallel_exposures_dictionary = self.read_generic_imaging_template(template,
                                                                                template_name, obs,
