@@ -74,7 +74,7 @@ def create_basic_exposure_list(xml_file, pointing_file):
 def for_proposal(xml_filename, pointing_filename, point_source=True, extragalactic=True,
                  catalog_splitting_threshold=0.12, besancon_catalog_file=None,
                  ra_column_name='RAJ2000', dec_column_name='DECJ2000', out_dir=None,
-                 save_catalogs=True, galaxy_seed=None):
+                 save_catalogs=True, galaxy_seed=None, wise_catalog='allwise'):
     """
     Given a pointing dictionary from an APT file, generate source catalogs
     that cover all of the coordinates specifired.
@@ -124,6 +124,11 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
     galaxy_seed : int
         Seed to use in the random number generator used in galaxy_background
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
 
     Returns
     -------
@@ -257,7 +262,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                                                         besancon_catalog_file=besancon_catalog_file,
                                                         instrument=instrument, filters=filter_list,
                                                         ra_column_name=ra_column_name, dec_column_name=dec_column_name,
-                                                        starting_index=starting_index)
+                                                        starting_index=starting_index, wise_catalog=wise_catalog)
                 if i == 0:
                     ptsrc_cat = copy.deepcopy(tmp_cat)
                 else:
@@ -364,7 +369,7 @@ def query_2MASS_ptsrc_catalog(ra, dec, box_width):
     return query_table, magnitude_column_names
 
 
-def get_wise_ptsrc_catalog(ra, dec, box_width):
+def get_wise_ptsrc_catalog(ra, dec, box_width, wise_catalog='allwise'):
     """Wrapper around WISE query and creation of mirage-formatted catalog
 
     Parameters
@@ -376,13 +381,18 @@ def get_wise_ptsrc_catalog(ra, dec, box_width):
     dec : float or str
         Declination of the center of the catalog. Can be decimal degrees of
         DMS string
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'ALLWISE' (default), which searches the ALLWISE source catalog, or
+        'WISE_all_sky', which searches the older WISE All-Sky catalog.
     """
-    wise_cat, wise_mag_cols = query_WISE_ptsrc_catalog(ra, dec, box_width)
+    wise_cat, wise_mag_cols = query_WISE_ptsrc_catalog(ra, dec, box_width, wise_catalog=wise_catalog)
     wise_mirage = mirage_ptsrc_catalog_from_table(wise_cat, 'WISE', wise_mag_cols)
     return wise_mirage, wise_cat
 
 
-def query_WISE_ptsrc_catalog(ra, dec, box_width):
+def query_WISE_ptsrc_catalog(ra, dec, box_width, wise_catalog='ALLWISE'):
     """Query the WISE All-Sky Point Source Catalog in a square region around the RA and Dec
     provided. Box width must be in units of arcseconds
 
@@ -399,6 +409,11 @@ def query_WISE_ptsrc_catalog(ra, dec, box_width):
     box_width : float
         Width of the box in arcseconds containing the catalog.
 
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'ALLWISE' (default), which searches the ALLWISE source catalog, or
+        'WISE_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     query_table : astropy.table.Table
@@ -407,12 +422,26 @@ def query_WISE_ptsrc_catalog(ra, dec, box_width):
     magnitude_column_names : list
         List of column header names corresponding to columns containing source magnitude
     """
+    # List of columns to be retrieved from the WISE catalog. For the case of the ALLWISE
+    # catalog, the 2mass columns we need are not returned by default, so we need to explicitly
+    # list all of the columns we want.
+    cols = 'ra,dec,w1mpro,w2mpro,w3mpro,w4mpro,w1sigmpro,w2sigmpro,w3sigmpro,w4sigmpro,j_m_2mass,h_m_2mass,k_m_2mass'
+
+    # Determine which WISE catalog will be searched
+    if wise_catalog.lower() == 'allwise':
+        search_cat = 'allwise_p3as_psd'
+    elif wise_catalog.lower() == 'wise_all_sky':
+        search_cat = 'allsky_4band_p3as_psd'
+    else:
+        raise ValueError(('{}: Unrecognized WISE catalog version to be searched. wise_catalog should '
+                          'be "allwise" or "wise_all_sky".'.format(wise_catalog)))
+
     # Don't artificially limit how many sources are returned
     Irsa.ROW_LIMIT = -1
 
     ra_dec_string = "{}  {}".format(ra, dec)
-    query_table = Irsa.query_region(ra_dec_string, catalog='allsky_4band_p3as_psd', spatial='Box',
-                                    width=box_width * u.arcsec)
+    query_table = Irsa.query_region(ra_dec_string, catalog=search_cat, spatial='Box',
+                                    width=box_width * u.arcsec, selcols=cols)
 
     # Exclude any entries with missing RA or Dec values
     radec_mask = filter_bad_ra_dec(query_table)
@@ -514,7 +543,7 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', 
 
 
 def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument='NIRISS', filters=[],
-                     ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
+                     ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1, wise_catalog='allwise'):
     """
     This is a driver function to query the GAIA/2MASS/WISE catalogues
     plus the Besancon model and combine these into a single JWST source list.
@@ -533,50 +562,55 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
 
     Parameters
     ----------
-        ra : float or str
-            Right ascension of the target field in degrees or HMS
+    ra : float or str
+        Right ascension of the target field in degrees or HMS
 
-        dec : float or str
-            Declination of the target field in degrees or DMS
+    dec : float or str
+        Declination of the target field in degrees or DMS
 
-        box_width : float
-            Size of the (square) target field in arc-seconds
+    box_width : float
+        Size of the (square) target field in arc-seconds
 
-        besancon_catalog_file : str
-            Name of ascii catalog containing background stars. The code was
-            developed around this being a catalog output by the Besaoncon
-            model (via ``besancon()``), but it can be any ascii catalog
-            of sources as long as it contains the columns specified in
-            the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
-            If None, the Besancon step will be skipped and a catalog will be
-            built using only GAIA/2MASS/WISE
+    besancon_catalog_file : str
+        Name of ascii catalog containing background stars. The code was
+        developed around this being a catalog output by the Besaoncon
+        model (via ``besancon()``), but it can be any ascii catalog
+        of sources as long as it contains the columns specified in
+        the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+        If None, the Besancon step will be skipped and a catalog will be
+        built using only GAIA/2MASS/WISE
 
-        instrument : str
-            One of "all", "NIRISS", "NIRCam", or "Guider"
+    instrument : str
+        One of "all", "NIRISS", "NIRCam", or "Guider"
 
-        filters : list
-            Either an empty list (which gives all filters) or a list
-            of filter names (i.e. F090W) to be calculated.
+    filters : list
+        Either an empty list (which gives all filters) or a list
+        of filter names (i.e. F090W) to be calculated.
 
-        ra_column_name : str
-            Name of the column within ``besancon_catalog_file`` containing the
-            right ascension of the sources.
+    ra_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        right ascension of the sources.
 
-        dec_column_name : str
-            Name of the column within ``besancon_catalog_file`` containing the
-            declination of the sources
+    dec_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        declination of the sources
 
-        starting_index : int
-            Beginning value to use for the 'index' column of the catalog. Default is 1.
+    starting_index : int
+        Beginning value to use for the 'index' column of the catalog. Default is 1.
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
 
     Returns
     -------
-        source_list : mirage.catalogs.create_catalogs.PointSourceCatalog
-            A table with the filter magnitudes
+    source_list : mirage.catalogs.create_catalogs.PointSourceCatalog
+        A table with the filter magnitudes
 
-        filter_names : list
-            A list of the filter name header strings for writing to
-            an output file.
+    filter_names : list
+        A list of the filter name header strings for writing to
+        an output file.
     """
     logger = logging.getLogger('mirage.catalogs.create_catalog.get_all_catalogs')
 
@@ -596,7 +630,7 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
     gaia_cat, gaia_mag_cols, gaia_2mass, gaia_2mass_crossref, gaia_wise, \
         gaia_wise_crossref = query_GAIA_ptsrc_catalog(outra, outdec, box_width)
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
-    wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width)
+    wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width, wise_catalog=wise_catalog)
 
     if besancon_catalog_file is not None:
         filter_dict = {instrument: filters}
@@ -2013,7 +2047,8 @@ def crop_besancon(ra, dec, box_width, catalog_file, ra_column_name='RAJ2000', de
 
 
 def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
-                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1,
+                   wise_catalog='allwise'):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function.
 
@@ -2048,6 +2083,11 @@ def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
     starting_index : int
         Beginning value to use for the 'index' column of the catalog. Default is 1.
 
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2060,12 +2100,14 @@ def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name, starting_index=starting_index)
+                                               dec_column_name=dec_column_name, starting_index=starting_index,
+                                               wise_catalog=wise_catalog)
     return cat
 
 
 def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
-                          ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
+                          ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1,
+                          wise_catalog='allwise'):
     """Convenience function to create typical scene looking out of the plane of
     the Milky Way by querying the Besancon model
 
@@ -2100,6 +2142,11 @@ def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_f
     starting_index : int
             Beginning value to use for the 'index' column of the catalog. Default is 1.
 
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2112,12 +2159,13 @@ def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_f
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name, starting_index=starting_index)
+                                               dec_column_name=dec_column_name, starting_index=starting_index,
+                                               wise_catalog=wise_catalog)
     return cat
 
 
 def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
-                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1):
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1, wise_catalog='allwise'):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
 
@@ -2152,6 +2200,11 @@ def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
     starting_index : int
             Beginning value to use for the 'index' column of the catalog. Default is 1.
 
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2164,7 +2217,8 @@ def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name, starting_index=starting_index)
+                                               dec_column_name=dec_column_name, starting_index=starting_index,
+                                               wise_catalog=wise_catalog)
     return cat
 
 
