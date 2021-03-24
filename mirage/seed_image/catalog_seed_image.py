@@ -3600,14 +3600,14 @@ class Catalog_seed():
                 elif actual_pupil_name in ['wlp8', 'wlm8']:
                     # Weak lenses were not supported with the old column
                     # name format, so if the new format column name is not
-                    # present, then we can only fall back to looking for
-                    # a generic 'magnitude' column.
-
-                    # The weak lenses do not have much effect on throughput, so
-                    # to first order, we can fall back to use a column for the
-                    # same filter but without the weak lenses
-                    specific_mag_col = "nircam_{}_magnitude".format(actual_filter_name)
-
+                    # present, then we raise an exception here. While WLP4
+                    # has a very small effect on throughput, WLP8 and WLM8
+                    # do, so falling back to looking for a <filter>+CLEAR
+                    # column seems like the wrong thing to do.
+                    raise ValueError(("WARNING: Catalog {} has no magnitude column for {} specifically called {}. "
+                                      "Unable to continue.".format(os.path.split(catalog_file_name)[1],
+                                                                   self.params['Inst']['instrument'],
+                                                                   specific_mag_col)))
         elif self.params['Inst']['instrument'].lower() == 'niriss':
             if self.params['Readout']['pupil'][0].upper() == 'F':
                 specific_mag_col = "{}_{}_magnitude".format('niriss', self.params['Readout']['pupil'].lower())
