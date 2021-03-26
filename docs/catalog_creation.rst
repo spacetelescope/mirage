@@ -102,6 +102,8 @@ The functions in this module use `astroquery <https://astroquery.readthedocs.io/
 
 The **get_all_catalogs** function takes the RA and Dec of a particular pointing along with the width in arcseconds of the area for which to produce the catalog, and queries multiple databases to produce a point source catalog. An example call to create a 120 x 120 arcsecond catalog is shown below. The resulting point source catalog can then be placed in the :ref:`pointSource <pointsource>` entry of the :ref:`yaml input file <example_yaml>`. The *besancon_catalog_file* in the command below is the result from a query of the `Besancon model <https://model.obs-besancon.fr/modele_home.php>`_. Details of how to query the model and download the result are shown in the :ref:`Background Stars <background_stars>` section below. Note that starting_index is also an optional keyword here, so that users can control the index values of the sources. See the :ref:`Source Index Numbers <source_index_numbers>` section for more details.
 
+By default, Mirage will query the ALLWISE source catalog as part of the call to get_all_catalogs(). However, in certain cases (e.g. for very bright sources), it may be better to query the WISE All-Sky source catalog. If you wish to switch to the WISE All-Sky source catalog, simply add the keyword: **wise_catalog='wise_all_sky'** to the call below.
+
 ::
 
     from mirage.catalogs import create_catalogs
