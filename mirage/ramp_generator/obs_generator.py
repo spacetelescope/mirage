@@ -88,6 +88,7 @@ class Observation():
         self.seedunits = 'ADU/sec'
         self.offline = offline
         self.paramfile = 'None'
+        self.params = None
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
