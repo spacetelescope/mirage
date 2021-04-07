@@ -87,6 +87,7 @@ class Observation():
         self.seedheader = None
         self.seedunits = 'ADU/sec'
         self.offline = offline
+        self.paramfile = 'None'
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -1047,10 +1048,14 @@ class Observation():
         return crhits, crs_perframe
 
     @logging_functions.log_fail
-    def create(self):
+    def create(self, params=None):
         """MAIN FUNCTION"""
         # Read in the parameter file
-        self.read_parameter_file()
+        if params is not None:
+            self.params = params
+
+        if self.params is None:
+            self.read_parameter_file()
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
@@ -1066,7 +1071,6 @@ class Observation():
 
         # Expand param entries to full paths where appropriate
         self.params = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
-
         self.file_check()
 
         #print('self.linDark:', self.linDark)

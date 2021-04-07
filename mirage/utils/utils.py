@@ -438,6 +438,10 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                     logger.info('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
                     params[key1][key2] = 'crds'
 
+            # Change NoneType to str
+            if params[key1][key2] is None:
+                params[key1][key2] = 'None'
+
             if params[key1][key2].lower() not in ['none', 'config', 'crds']:
                 params[key1][key2] = os.path.abspath(os.path.expandvars(params[key1][key2]))
             elif params[key1][key2].lower() == 'config':

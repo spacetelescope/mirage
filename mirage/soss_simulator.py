@@ -144,7 +144,7 @@ class SossSim():
         self.groupgap = 0
         self.nframes = self.nsample = 1
         self.nresets = self.nresets1 = self.nresets2 = 1
-        self.dropframes1 = self.dropframes3 = 0
+        self.dropframes1 = self.dropframes3 = self.nskip = 0
         self.model_grid = 'ACES'
         self.override_dark = None
         self.offline = True
@@ -245,7 +245,7 @@ class SossSim():
             self.logger.info('Running dark prep')
             d = dark_prep.DarkPrep()
             d.paramfile = self.paramfile
-            d.prepare(self.params)
+            d.prepare(params=self.params)
             use_darks = d.dark_files
         else:
             self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
@@ -268,7 +268,7 @@ class SossSim():
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, params=None, supersample_factor=None, noise=True, **kwargs):
+    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -276,6 +276,10 @@ class SossSim():
         ----------
         n_jobs: int
             The number of cores to use in multiprocessing
+        tparams: dict
+            The transit parameters of the system
+        supersample_factor: int
+            The
 
         Example
         -------
@@ -285,21 +289,17 @@ class SossSim():
         # Simulate star with transiting exoplanet by including transmission spectrum and orbital params
         import batman
         from hotsoss import PLANET_DATA
-        params = batman.TransitParams()
-        params.t0 = 0.                                      # time of inferior conjunction
-        params.per = 5.7214742                              # orbital period (days)
-        params.a = 3.5                                      # semi-major axis (in units of stellar radii)
-        params.inc = 89.8                                   # orbital inclination (in degrees)
-        params.ecc = 0.                                     # eccentricity
-        params.w = 90.                                      # longitude of periastron (in degrees)
-        params.limb_dark = 'quadratic'                      # limb darkening profile to use
-        params.u = [0.1, 0.1]                               # limb darkening coefficients
-        params.rp = 1.                                      # planet radius (placeholder)
-        tmodel = batman.TransitModel(params, tso.time.jd)
-        tmodel.teff = 3500                                  # effective temperature of the host star
-        tmodel.logg = 5                                     # log surface gravity of the host star
-        tmodel.feh = 0                                      # metallicity of the host star
-        tso.create(planet=PLANET_DATA, tmodel=tmodel)
+        tparams = batman.TransitParams()
+        tparams.t0 = 0.                                      # time of inferior conjunction
+        tparams.per = 5.7214742                              # orbital period (days)
+        tparams.a = 3.5                                      # semi-major axis (in units of stellar radii)
+        tparams.inc = 89.8                                   # orbital inclination (in degrees)
+        tparams.ecc = 0.                                     # eccentricity
+        tparams.w = 90.                                      # longitude of periastron (in degrees)
+        tparams.limb_dark = 'quadratic'                      # limb darkening profile to use
+        tparams.u = [0.1, 0.1]                               # limb darkening coefficients
+        tparams.rp = 1.                                      # planet radius (placeholder)
+        tso.create(planet=PLANET_DATA, tparams=tparams)
         """
         # Check that there is star data
         if self.star is None:
@@ -309,9 +309,6 @@ class SossSim():
         # Check kwargs for updated attrs
         for key, val in kwargs.items():
             setattr(self, key, val)
-
-        # Update params attr
-        self.paramfile = None
 
         # Clear out old simulation
         self._reset_data()
@@ -353,12 +350,12 @@ class SossSim():
             start = time.time()
 
             # Re-define lightcurve model for the current chunk
-            if params is not None:
+            if tparams is not None:
                 if supersample_factor is None:
-                    c_tmodel = batman.TransitModel(params, time_chunk.jd)
+                    c_tmodel = batman.TransitModel(tparams, time_chunk.jd)
                 else:
                     frame_days = (self.frame_time * q.s).to(q.d).value
-                    c_tmodel = batman.TransitModel(params, time_chunk.jd, supersample_factor=supersample_factor, exp_time=frame_days)
+                    c_tmodel = batman.TransitModel(tparams, time_chunk.jd, supersample_factor=supersample_factor, exp_time=frame_days)
             else:
                 c_tmodel = self.tmodel
 
@@ -668,10 +665,12 @@ class SossSim():
             The path to the parameter file
         """
         # Populate params attribute if no file given
+        # TODO: This is clunky. Have yaml_generator.py just make a paramfile file from the attributes
         if pfile is None:
 
             # Read template file
-            self._read_parameter_file(resource_filename('mirage', 'tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml').replace('mirage/mirage', 'mirage'))
+            pfile = resource_filename('mirage', 'tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml').replace('mirage/mirage', 'mirage')
+            self._read_parameter_file(pfile)
 
             # Populate params dict
             self.params['Readout']['nint'] = self.nints
@@ -680,11 +679,14 @@ class SossSim():
             self.params['Readout']['filter'] = self.filter
             # self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
             self.params['Readout']['readpatt'] = self.readpatt
-            self.params['Readout']['nframe'] = self.nints * self.ngrps
+            self.params['Readout']['nframe'] = self.nframes
+            self.params['Readout']['nskip'] = self.nskip
             self.params['Output']['target_name'] = self.target
             self.params['Output']['target_ra'] = self.ra
             self.params['Output']['target_dec'] = self.dec
             self.params['Output']['obs_id'] = self.title
+            self.params['Output']['directory'] = '.'
+            self.params['Output']['paramfile'] = pfile
 
         else:
 
@@ -694,6 +696,7 @@ class SossSim():
 
             # Set paramfile and read contents
             self._read_parameter_file(pfile)
+            self.params['Output']['paramfile'] = pfile
 
             # Override observation parameters
             self._nints = self.params['Readout']['nint']
