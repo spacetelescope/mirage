@@ -10,4 +10,5 @@ include mirage/config/saturation.cfg
 include mirage/config/superbias.cfg
 include mirage/config/xtalk20150303g0.errorcut.txt
 include tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml
+include examples/niriss_soss_example_data/*
 exclude mirage/version.py
