@@ -94,7 +94,7 @@ class SossSim():
     """
     def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None,
                  filter='CLEAR', subarray='SUBSTRIP256', orders=[1, 2], paramfile=None,
-                 obs_date=None, target='New Target', title=None, verbose=True):
+                 obs_date=None, target='New Target', title=None, offline=True, verbose=True):
         """
         Initialize the TSO object and do all pre-calculations
 
@@ -122,6 +122,8 @@ class SossSim():
             The name of the target
         title: str (optionl)
             A title for the simulation
+        offline: bool
+            Offline mode
         verbose: bool
             Print status updates throughout calculation
 
@@ -147,7 +149,7 @@ class SossSim():
         self.dropframes1 = self.dropframes3 = self.nskip = 0
         self.model_grid = 'ACES'
         self.override_dark = None
-        self.offline = True
+        self.offline = offline
 
         # Use parameter file if available...
         if paramfile is not None:
