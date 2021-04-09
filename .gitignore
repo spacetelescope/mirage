@@ -37,6 +37,7 @@ mirage_latest.log
 #########
 .ipynb_checkpoints/*
 examples/.ipynb_checkpoints/*
+examples/WASP43*.fits
 htmlcov/*
 *.aptbackup
 *.aptx
