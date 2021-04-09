@@ -26,6 +26,7 @@ dependencies:
 - pyyaml>=5.1.2
 - pip:
     - jwst-backgrounds>=1.1.1
+    - bokeh>=2.2.3
     - pysiaf>=0.6.1
     - hotsoss==0.1.7
     - git+https://github.com/spacetelescope/jwst@0.16.2
