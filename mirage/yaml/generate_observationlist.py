@@ -225,7 +225,7 @@ def ensure_lower_case_background_keys(dictionary):
             # nircam with it's dictionary of sw and lw doesn't necessarily
             # have to be present, if the input proposal has no nircam
             # observations
-            if isinstance(inst_data, collections.Mapping):
+            if isinstance(inst_data, collections.abc.Mapping):
                 new_dict[observation_number][instrument.lower()] = {}
                 for channel, channel_val in inst_data.items():
                     new_dict[observation_number][instrument.lower()][channel.lower()] = channel_val
@@ -259,7 +259,7 @@ def ensure_lower_case_keys(dictionary):
             # nircam with it's dictionary of sw and lw doesn't necessarily
             # have to be present, if the input proposal has no nircam
             # observations
-            if isinstance(value2, collections.Mapping):
+            if isinstance(value2, collections.abc.Mapping):
                 new_dict[key1][key2.lower()] = {}
                 for key3, value3 in value2.items():
                     new_dict[key1][key2.lower()][key3.lower()] = value3
@@ -345,7 +345,7 @@ def ensure_lower_case_catalogs_keys(dictionary):
     for target_name, targ_dict in dictionary.items():
         new_dict[target_name] = {}
         for key2, value2 in targ_dict.items():
-            if isinstance(value2, collections.Mapping):
+            if isinstance(value2, collections.abc.Mapping):
                 new_dict[target_name][key2.lower()] = {}
                 for key3, value3 in targ_dict[key2].items():
                     new_dict[target_name][key2.lower()][key3.lower()] = value3
@@ -481,6 +481,10 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     -------
     xml_dict : dict
         Expanded dictionary that holds exposure information
+
+    skipped_obs_numbers : list
+        List of observation numbers with unsupported observation templates. These observations
+        were not added to the dictionary.
 
     TODO
     ----
@@ -878,7 +882,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
 
     # If the directory to hold the observation file does not yet exist, create it
     obs_dir = os.path.dirname(yaml_file)
-    if obs_dir is not '' and os.path.isdir(obs_dir) is False:
+    if obs_dir != '' and os.path.isdir(obs_dir) is False:
         try:
             os.mkdir(obs_dir)
         except OSError:
@@ -892,4 +896,4 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
     f.close()
     logger.info('Wrote {} observations and {} entries to {}'.format(len(observation_numbers), entry_number, yaml_file))
 
-    return return_dict
+    return return_dict, readxml_obj.skipped_observations

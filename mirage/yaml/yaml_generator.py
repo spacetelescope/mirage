@@ -134,6 +134,7 @@ class SimInput:
                  background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
                  dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
+                 add_ghosts=True, convolve_ghosts_with_psf=False, convolve_extended_with_psf=True,
                  offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
@@ -256,6 +257,18 @@ class SimInput:
             Units corresponding to the value in ```segmap_flux_limit```. Can be
             'ADU/sec', 'e/sec', 'MJy/sr', 'ergs/cm2/A', 'ergs/cm2/Hz'
 
+        add_ghosts : bool
+            If True, optical ghosts will be added to the seed image based on
+            source locations. Currently only supported for NIRISS.
+
+        convolve_ghosts_with_psf : bool
+            If True, the stamp images used for ghost sources will be convolved
+            with the PSF prior to adding to the seed image
+
+        convolve_extended_with_psf : bool
+            If True, the stamp images used for astronomical sources will be
+            convolved with the PSF prior to adding to the seed image
+
         offline : bool
             Whether the class is being called with or without access to
             Mirage reference data. Used primarily for testing.
@@ -295,6 +308,9 @@ class SimInput:
         self.expand_catalog_for_segments = False
         self.dateobs_for_background = dateobs_for_background
         self.add_psf_wings = True
+        self.add_ghosts = add_ghosts
+        self.convolve_ghosts = convolve_ghosts_with_psf
+        self.convolve_extended = convolve_extended_with_psf
         self.offline = offline
 
         if ((segmap_flux_limit is not None) and (segmap_flux_limit_units is None)):
@@ -314,16 +330,16 @@ class SimInput:
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
-        self.config_information = utils.organize_config_files()
+        self.config_information = utils.organize_config_files(offline=self.offline)
 
         self.path_defs()
 
         if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
-                                                     verbose=self.verbose,
-                                                     parameter_overrides=parameter_overrides)
+            self.apt_xml_dict, self.xml_skipped_observations = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
+                                                                                    verbose=self.verbose,
+                                                                                    parameter_overrides=parameter_overrides)
         else:
             self.logger.error('No input xml file provided. Observation dictionary not constructed.')
 
@@ -646,14 +662,14 @@ class SimInput:
 
             # Read XML file and make observation table
             apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file,
-                                      output_dir=self.output_dir)
+                                      output_dir=self.output_dir, offline=self.offline)
             # apt.input_xml = self.input_xml
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
             apt.apt_xml_dict = self.apt_xml_dict
 
             apt.output_dir = self.output_dir
-            apt.create_input_table()
+            apt.create_input_table(skip_observations=self.xml_skipped_observations)
             self.info = apt.exposure_tab
 
             # If we have a non-sidereal observation, then we need to
@@ -800,6 +816,29 @@ class SimInput:
             if instrument not in 'fgs nircam niriss'.split():
                 # do not write files for MIRI and NIRSpec
                 continue
+            elif instrument=='nircam':
+                # special case for coronagraphy:
+                # only 1 detector at a time is returned to the ground, depending on selected mask.
+                # do not write files for the detectors that are not downloaded.
+                if self.info['APTTemplate'][i]=='NircamCoron':
+                    # do not write files for detectors not read out
+                    # the ones not used are tagged with 'n/a' in ReadAPTXML.read_nircam_coronagraphy_template
+                    # and recall NIRCam coronagraphy always uses module A
+                    if ((self.info['LongPupil'][i]=='n/a' and self.info['detector'][i]=='A5') or
+                        (self.info['ShortPupil'][i]=='n/a' and self.info['detector'][i] in ['A1','A2','A3','A4'])):
+                        print(f"Skipping {self.info['yamlfile'][i]} because this coronagraphy obs does not use that detector")
+                        continue
+                              
+                    # SW coronagraphy exposures that use MASKRND collect data from A2 only
+                    if (self.info['ShortPupil'][i] == 'MASKRND' and self.info['detector'][i] != 'A2'):
+                        print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
+                        continue
+
+                    # SW coronagraphy exposures that use MASKSWB collect data from A4 only
+                    if (self.info['ShortPupil'][i] == 'MASKSWB' and self.info['detector'][i] != 'A4'):
+                        print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
+                        continue          
+
             file_dict = {}
             for key in self.info:
                 file_dict[key] = self.info[key][i]
@@ -1408,47 +1447,40 @@ class SimInput:
         users, allow the input keys to be case insensitive. Take the user
         input dictionary and translate all the keys to be lower case.
         """
-        for key in self.reffile_overrides:
-            if key.lower() != key:
-                newkey = key.lower()
-                self.reffile_overrides[newkey] = self.reffile_overrides.pop(key)
-            else:
-                newkey = key
-            if isinstance(self.reffile_overrides[newkey], dict):
-                for key2 in self.reffile_overrides[newkey]:
-                    if (key2.lower() != key2):
-                        newkey2 = key2.lower()
-                        self.reffile_overrides[newkey][newkey2] = self.reffile_overrides[newkey].pop(key2)
-                    else:
-                        newkey2 = key2
-                    if isinstance(self.reffile_overrides[newkey][newkey2], dict):
-                        for key3 in self.reffile_overrides[newkey][newkey2]:
-                            if (key3.lower() != key3):
-                                newkey3 = key3.lower()
-                                self.reffile_overrides[newkey][newkey2][newkey3] = self.reffile_overrides[newkey][newkey2].pop(key3)
-                            else:
-                                newkey3 = key3
-                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3], dict):
-                                for key4 in self.reffile_overrides[newkey][newkey2][newkey3]:
-                                    if (key4.lower() != key4):
-                                        newkey4 = key4.lower()
-                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4] = self.reffile_overrides[newkey][newkey2][newkey3].pop(key4)
-                                    else:
-                                        newkey4 = key4
-                                    if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4], dict):
-                                        for key5 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4]:
-                                            if (key5.lower() != key5):
-                                                newkey5 = key5.lower()
-                                                self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4].pop(key5)
+        lower1 = {}
+        for key1, val1 in self.reffile_overrides.items():
+            if isinstance(val1, dict):
+                lower2 = {}
+                for key2, val2 in val1.items():
+                    if isinstance(val2, dict):
+                        lower3 = {}
+                        for key3, val3 in val2.items():
+                            if isinstance(val3, dict):
+                                lower4 = {}
+                                for key4, val4 in val3.items():
+                                    if isinstance(val4, dict):
+                                        lower5 = {}
+                                        for key5, val5 in val4.items():
+                                            if isinstance(val5, dict):
+                                                lower6 = {}
+                                                for key6, val6 in val5.items():
+                                                    lower6[key6.lower()] = val6
+                                                lower5[key5.lower()] = deepcopy(lower6)
                                             else:
-                                                newkey5 = key5
-                                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5], dict):
-                                                for key6 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5]:
-                                                    if (key6.lower() != key6):
-                                                        newkey6 = key6.lower()
-                                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5][newkey6] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5].pop(key6)
-                                                    else:
-                                                        newkey6 = key6
+                                                lower5[key5.lower()] = val5
+                                        lower4[key4.lower()] = deepcopy(lower5)
+                                    else:
+                                        lower4[key4.lower()] = val4
+                                lower3[key3.lower()] = deepcopy(lower4)
+                            else:
+                                lower3[key3.lower()] = val3
+                        lower2[key2.lower()] = deepcopy(lower3)
+                    else:
+                        lower2[key2.lower()] = val2
+                lower1[key1.lower()] = deepcopy(lower2)
+            else:
+                lower1[key1.lower()] = val1
+        self.reffile_overrides = lower1
 
     def multiple_catalog_match(self, filter, cattype, matchlist):
         """
@@ -1892,8 +1924,20 @@ class SimInput:
             # set the FilterWheel and PupilWheel for NIRISS
             if input['APTTemplate'] in ['NirissAmi']:
                 filter_name = input['Filter']
-                input[filtkey] = filter_name
-                input[pupilkey] = 'NRM'
+
+                # TA and direct images will be set to imaging mode
+                # rather than ami mode
+                if input['Mode'].lower() == 'imaging':
+                    if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                        input[pupilkey] = filter_name
+                        input[filtkey] = 'CLEAR'
+                    elif filter_name in NIRISS_FILTER_WHEEL_ELEMENTS:
+                        input[pupilkey] = 'CLEARP'
+                        input[filtkey] = filter_name
+                else:
+                    input[filtkey] = filter_name
+                    input[pupilkey] = 'NRM'
+
             elif input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
                 filter_name = input['Filter']
                 if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
@@ -2074,8 +2118,8 @@ class SimInput:
             f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(ExtendedScale))
             f.write(('  extendedCenter: {}                   #x, y pixel location at which to place the extended image '
                      'if it is smaller than the output array size\n'.format(ExtendedCenter)))
-            f.write(('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output '
-                     'image (True or False)\n'))
+            f.write(('  PSFConvolveExtended: {} #Convolve the extended image with the PSF before adding to the output '
+                     'image (True or False)\n'.format(self.convolve_extended)))
             f.write(('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. '
                      'KBOs, asteroids) to add.\n'.format(MovingTargetList)))
             f.write(('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through '
@@ -2107,6 +2151,8 @@ class SimInput:
                     .format(self.segmentation_threshold))
             f.write(('  signal_low_limit_for_segmap_units: {}  # Units of signal_low_limit_for_segmap. Can be: [ADU/sec, e/sec, MJy/sr, '
                      'ergs/cm2/a, ergs/cm2/hz]\n'.format(self.segmentation_threshold_units)))
+            f.write('  add_ghosts: {}  # Add optical ghosts associated with astronomical sources\n'.format(self.add_ghosts))
+            f.write('  PSFConvolveGhosts: {}  # Convolve ghost stamp images with instrument PSF before adding\n'.format(self.convolve_ghosts))
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
@@ -2304,7 +2350,7 @@ def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=Fals
     """
 
     if pointing_table is None:
-        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
     for i in range(len(pointing_table['obs_num'])):
         if pointing_table['obs_num'][i] == f"{obs_num:03d}":
             ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
@@ -2339,7 +2385,7 @@ def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
 
     """
     results = {}
-    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
+    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
     obsnums = sorted(list(set(pointing_table['obs_num'])))
     for obs_num in obsnums:
         results[obs_num] = default_obs_v3pa_on_date(pointing_filename, int(obs_num), date=date, verbose=verbose,

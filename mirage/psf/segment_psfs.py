@@ -230,7 +230,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         if isinstance(jitter, float):
             inst.options['jitter'] = 'gaussian'
             inst.options['jitter_sigma'] = jitter
-            logger.info('Adding jitter', jitter)
+            logger.info('Adding jitter: {} arcsec'.format(jitter))
         elif isinstance(jitter, str):
             allowed_strings = ['PCS=Coarse_Like_ITM', 'PCS=Coarse']
             if jitter in allowed_strings:
@@ -443,6 +443,18 @@ def get_segment_offset(segment_number, detector, library_list):
 
     x_arcsec += x_boresight_offset
     y_arcsec += y_boresight_offset
+
+    # Optionally, for more recent versions of webbpsf, the FITS header may simply contain the
+    # Hexike tilt coefficient that we want to use. If so, use that instead of all of the above!
+    # This method is superior, because it more correctly (and more simply) book-keeps the cross terms
+    # between different OTE pose terms into optical tip and tilt. In particular, this is needed for
+    # accurate modeling of radial translation corrections when using incoherent PSF calculations.
+    if f'S{segment_number:02d}XTILT' in header:
+        hexike_to_arcsec = 206265/webbpsf.constants.JWST_SEGMENT_RADIUS
+        # recall that Hexike tilt _around the X axis_ produces an offset _into Y_, and vice versa.
+        x_arcsec =  header[f'S{segment_number:02d}YTILT'] * hexike_to_arcsec
+        # also recall coord flip of Y axis from OTE L.O.M in entrance pupil to exit pupil
+        y_arcsec = -header[f'S{segment_number:02d}XTILT'] * hexike_to_arcsec
 
     # Optionally, arbitrary boresight offset may also be present in the FITS header metadata.
     # If so, include that in the PSF too. Be careful about coordinate sign for the V2 axis!

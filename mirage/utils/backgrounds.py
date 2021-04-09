@@ -321,7 +321,7 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
     return value
 
 
-def nircam_background_spectrum(parameters, detector, module):
+def get_1d_background_spectrum(parameters, detector, module):
     """Generate a background spectrum by calling jwst_backgrounds and
     returning wavelengths and flux density values based on observation
     date or low/medium/high

@@ -20,9 +20,10 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 
 # Reset the MIRAGE_DATA env variable to be a real location so yaml_generator
 # doesn't croak
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
-if not ON_TRAVIS:
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+
+if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
 
 os.environ["MIRAGE_DATA"] = __location__
@@ -90,15 +91,6 @@ def test_user_inputs_basic():
     # Check dates
     date_to_match = '{} 00:00:00'.format(date)
     date_match = [str(entry) == date_to_match for entry in tab['Date']]
-
-    #for entry in tab['Date']:
-    #  print(date_to_match, str(entry), type(date_to_match), type(str(entry)), date_to_match == str(entry))
-
-
-
-
-
-
 
     assert all(date_match) is True
 
@@ -558,5 +550,5 @@ def test_reffile_crds_full_name():
 
 # Return environment variable to original value. This is helpful when
 # calling many tests at once, some of which need the real value.
-if not ON_TRAVIS:
+if not ON_GITHUB:
     os.environ['MIRAGE_DATA'] = orig_mirage_data

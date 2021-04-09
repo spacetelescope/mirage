@@ -19,7 +19,40 @@ Use
         reffiles = utils.get_transmission_file(params)
 """
 from glob import glob
+import logging
 import os
+
+import grismconf
+
+
+def find_wfss_config_filename(pathname, instrument, filtername, mode):
+    """Construct the name of the WFSS configuration file given instrument parameters
+
+    Parameters
+    ----------
+    pathname : str
+        Path where the configuration files are located
+
+    instrument : str
+        Instrument name (e.g. 'nircam')
+
+    filtername : str
+        Name of the crossing filter (e.g. 'f444w')
+
+    mode : str
+        String containing dispersion direction ('R' or 'C') as well as
+        module name (for NIRCam). e.g. for NIRCam - modA_R and
+        for NIRISS GR150R
+
+    Returns
+    -------
+    config : str
+        Full path and filename of the appropriate configuation file
+    """
+    config = os.path.join(pathname,"{}_{}_{}.conf".format(instrument.upper(),
+                                                          filtername.upper(),
+                                                          mode))
+    return config
 
 
 def get_transmission_file(parameter_dict):
@@ -38,41 +71,53 @@ def get_transmission_file(parameter_dict):
     transmission_filename : str
         Full path to the transmission file
     """
+    logger = logging.getLogger('mirage.reference_files.utils.get_transmission_file')
     datadir = os.environ.get('MIRAGE_DATA')
 
     if parameter_dict['INSTRUME'].lower() == 'nircam':
-        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRCAM/V2')
-
-        module = parameter_dict['DETECTOR'][3]
-
-        # Assume that detector names in the transmission file names will
-        # use 'NRCA5' rather than 'NRCALONG'
-        #if 'LONG' in parameter_dict['DETECTOR']:
-        #    parameter_dict['DETECTOR'] = parameter_dict['DETECTOR'].replace('LONG', '5')
-
         if parameter_dict['DETECTOR'] not in ['NRCA5', 'NRCB5', 'NRCALONG', 'NRCBLONG']:
-            # For NIRCam SW, we use the same file for all detectors/filters/pupils
+            # For NIRCam SW, we don't use a transmission file
             transmission_filename = None
         elif parameter_dict['PUPIL'] not in ['GRISMR', 'GRISMC']:
-            # For LW imaging, we use the same file for all detectors/filters/pupils
+            # For LW imaging, also don't use a transmission file
             transmission_filename = None
         else:
-            if module == 'A':
-                transmission_filename = os.path.join(dirname, 'NIRCAM_LW_POM_ModA.fits')
-            elif module == 'B':
-                transmission_filename = os.path.join(dirname, 'NIRCAM_LW_POM_ModB.fits')
+            module = parameter_dict['DETECTOR'][3]
+            instrument = parameter_dict['INSTRUME'].lower()
+
+            # POM transmission file is not grism orientation dependent. The file is the
+            # same for GRISMR as GRISMC, so we can just use R here
+            dmode = 'mod{}_R'.format(module)
+            filt = parameter_dict['FILTER'].upper()
+
+            loc = os.path.join(datadir, "{}/GRISM_{}/current".format(instrument.lower(),
+                                                                     instrument.upper()))
+            configuration_file = find_wfss_config_filename(loc, 'nircam', filt, dmode)
+            c = grismconf.Config(configuration_file)
+            transmission_filename = c.POM
 
     # For NIRISS we search for a detector/filter/pupil-dependent file
     elif parameter_dict['INSTRUME'].lower() == 'niriss':
-        dirname = os.path.join(datadir, parameter_dict['INSTRUME'].lower(), 'GRISM_NIRISS/V2')
-        filt = parameter_dict['FILTER'].upper()
-        if filt not in ['GR150R', 'GR150C']:
+        if parameter_dict['FILTER'] not in ['GR150R', 'GR150C']:
+            # Imaging mode - no transmission file necessary
             transmission_filename = None
         else:
-            transmission_filename = os.path.join(dirname, 'jwst_niriss_cv3_pomtransmission_{}_{}.fits'.format(filt, parameter_dict['PUPIL']))
+            # POM transmission file is not grism orientation dependent. The file is the
+            # same for GR150R as GR150C, so we can just use R here
+            instrument = parameter_dict['INSTRUME'].lower()
+            dmode = 'GR150R'
+            filt = parameter_dict['PUPIL'].upper()
+
+            loc = os.path.join(datadir, "{}/GRISM_{}/current".format(instrument.lower(),
+                                                                     instrument.upper()))
+
+            configuration_file = find_wfss_config_filename(loc, 'niriss', filt, dmode)
+            c = grismconf.Config(configuration_file)
+            transmission_filename = c.POM
 
     # For FGS we don't need to worry about a transmission file
     elif parameter_dict['INSTRUME'].lower() == 'fgs':
         transmission_filename = None
 
+    logger.info('POM Transmission filename: {}'.format(transmission_filename))
     return transmission_filename

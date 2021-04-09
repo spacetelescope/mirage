@@ -188,6 +188,8 @@ FGS_LINEARIZED_DARK_URLS = ['https://data.science.stsci.edu/redirect/JWST/jwst-s
                             'https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/fgs/darks/linearized/30749_1x88_FGSF03881-PAR-5347043800_1_497_SE_2015-12-13T09h02m01_dms_uncal_linearized.fits.gz',
                             'https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/fgs/darks/linearized/30829_1x88_FGSF037111-G1NRNC-5347151640_1_497_SE_2015-12-13T16h28m38_dms_uncal_linearized.fits.gz']
 
+NIRISS_PSF_GHOST_STAMP = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/niriss/ghosts/niriss_ghost_stamps.tar.gz']
+
 TEMP_DISTORTION_REFERENCE_FILES = ['https://data.science.stsci.edu/redirect/JWST/jwst-simulations/mirage_reference_files/nircam/reference_files/nircam_distortion_files.tar.gz']
 
 DISK_USAGE = {'nircam': {'crs': 1.1, 'psfs': 23, 'raw_darks': 79, 'lin_darks': 319},
@@ -274,6 +276,10 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
         If False (default), download the requested PSF libraries.
         If True, do not download the libraries.
     """
+    # Expand env variables and tildes in direcotry, and make sure it is
+    # an absolute path
+    directory = os.path.abspath(os.path.expanduser(os.path.expandvars(directory)))
+
     # Be sure the input instrument is a list
     file_list = get_file_list(instrument.lower(), dark_type.lower(),
                               skip_darks=skip_darks,
@@ -477,6 +483,9 @@ def get_file_list(instruments, dark_current, skip_darks=False, single_dark=False
                         added_size = DISK_USAGE['niriss']['raw_darks'] / len(NIRISS_RAW_DARK_URLS)
                         total_download_size += added_size
                         print('Size of NIRISS raw dark file: {} Gb'.format(added_size))
+
+            # Ghost stamp image for PSF sources
+            urls.extend(NIRISS_PSF_GHOST_STAMP)
 
         # FGS
         elif instrument_name.lower() == 'fgs':

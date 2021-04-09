@@ -47,7 +47,6 @@ import numpy as np
 from astropy.io import fits
 from NIRCAM_Gsim.grism_seed_disperser import Grism_seed
 import pysiaf
-from scipy.stats import sigmaclip
 
 from .catalogs import spectra_from_catalog
 from .seed_image import catalog_seed_image
@@ -55,10 +54,9 @@ from .dark import dark_prep
 from .logging import logging_functions
 from .ramp_generator import obs_generator
 from .utils import backgrounds, read_fits
-from .utils.flux_cal import fluxcal_info
-from .utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, NIRISS_GRISM_THROUGHPUT_FACTOR, \
+from .utils.constants import CATALOG_YAML_ENTRIES, MEAN_GAIN_VALUES, \
                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
-from .utils.utils import expand_environment_variable, get_filter_throughput_file
+from .utils.utils import expand_environment_variable
 
 from .yaml import yaml_update
 
@@ -166,6 +164,11 @@ class WFSSSim():
             # find_param_info() has reordered the list such that the
             # wfss mode yaml file will be examined first.
             if self.create_continuum_seds:
+                # Be sure to include any Mirage-created source catalogs containing
+                # ghost sources in the list of catalogs whose sources will be included
+                # in the hdf5 file
+                if len(cat.ghost_catalogs) > 0:
+                    self.catalog_files.extend(cat.ghost_catalogs)
                 break
 
         # Create hdf5 file with spectra of all sources if requested.
@@ -179,70 +182,23 @@ class WFSSSim():
                                                                   module=self.module, detector=det_name)
 
         # Location of the configuration files needed for dispersion
-        loc = os.path.join(self.datadir, "{}/GRISM_{}/".format(self.instrument,
-                                                               self.instrument.upper()))
+        loc = os.path.join(self.datadir, "{}/GRISM_{}/current".format(self.instrument,
+                                                                      self.instrument.upper()))
+        if not os.path.isdir(loc):
+            raise ValueError(("{} directory is not present. GRISM_NIRCAM and/or GRISM_NIRISS portion of Mirage reference "
+                              "file collection is out of date or not set up correctly. See "
+                              "https://mirage-data-simulator.readthedocs.io/en/latest/reference_files.html foe details.".format(loc)))
+        self.logger.info("Retrieving WFSS config files from: {}".format(loc))
 
         # Determine the name of the background file to use, as well as the
         # orders to disperse.
         if self.instrument == 'nircam':
             dmode = 'mod{}_{}'.format(self.module, self.dispersion_direction)
-            if self.params['simSignals']['use_dateobs_for_background']:
-                self.logger.info("Generating background spectrum for observation date: {}".format(self.params['Output']['date_obs']))
-                back_wave, back_sig = backgrounds.day_of_year_background_spectrum(self.params['Telescope']['ra'],
-                                                                                  self.params['Telescope']['dec'],
-                                                                                  self.params['Output']['date_obs'])
-            else:
-                if isinstance(self.params['simSignals']['bkgdrate'], str):
-                    if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                        self.logger.info("Generating background spectrum based on requested level of: {}".format(self.params['simSignals']['bkgdrate']))
-                        back_wave, back_sig = backgrounds.low_med_high_background_spectrum(self.params, self.detector,
-                                                                                           self.module)
-                    else:
-                        raise ValueError("ERROR: Unrecognized background rate. Must be one of 'low', 'medium', 'high'")
-                else:
-                    raise ValueError(("ERROR: WFSS background rates must be one of 'low', 'medium', 'high', "
-                                      "or use_dateobs_for_background must be True "))
-
         elif self.instrument == 'niriss':
             dmode = 'GR150{}'.format(self.dispersion_direction)
-            background_file = "{}_{}_medium_background.fits".format(self.crossing_filter.lower(),
-                                                                    dmode.lower())
 
-            if isinstance(self.params['simSignals']['bkgdrate'], str):
-                if self.params['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                    siaf_instance = pysiaf.Siaf('niriss')[self.params['Readout']['array_name']]
-                    vegazp, photflam, photfnu, pivot_wavelength = fluxcal_info(self.params['Reffiles']['flux_cal'], self.instrument,
-                                                                               self.params['Readout']['filter'], self.params['Readout']['pupil'],
-                                                                               self.detector, self.module)
-
-                    if os.path.split(self.params['Reffiles']['filter_throughput'])[1] == 'placeholder.txt' or self.params['Reffiles']['filter_throughput'] == 'config':
-                        filter_file = get_filter_throughput_file(self.instrument, 'CLEAR', self.params['Readout']['pupil'])
-                    else:
-                        filter_file = self.params['Reffiles']['filter_throughput']
-
-                    scaling_factor = backgrounds.calculate_background(self.params['Telescope']['ra'],
-                                                                      self.params['Telescope']['dec'],
-                                                                      filter_file,
-                                                                      self.params['simSignals']['use_dateobs_for_background'],
-                                                                      MEAN_GAIN_VALUES['niriss'], siaf_instance,
-                                                                      level=self.params['simSignals']['bkgdrate'])
-
-                    # Having the grism in the beam reduces the throughput by 20%.
-                    # Mulitply that into the scaling factor
-                    scaling_factor *= NIRISS_GRISM_THROUGHPUT_FACTOR
-
-                    # Translate from ADU/sec/pix to e-/sec/pix since that is
-                    # what the disperser works with
-                    scaling_factor *= MEAN_GAIN_VALUES['niriss']
-
-                else:
-                    raise ValueError("ERROR: Unrecognized background rate. String value must be one of 'low', 'medium', 'high'")
-            elif np.isreal(self.params['simSignals']['bkgdrate']):
-                # The bkgdrate entry in the input yaml file is described as
-                # the desired signal in ADU/sec/pixel IN A DIRECT IMAGE
-                # Since we want e-/sec/pixel here for the disperser, multiply
-                # by the gain as well as the throughput factor for the grism.
-                scaling_factor = self.params['simSignals']['bkgdrate'] * MEAN_GAIN_VALUES['niriss'] * NIRISS_GRISM_THROUGHPUT_FACTOR
+        # Find the 1d spectrum of the background, based on date or 'low', 'medium', 'high'
+        back_wave, back_sig = backgrounds.get_1d_background_spectrum(self.params, self.detector, self.module)
 
         # Default to extracting all orders
         orders = None
@@ -251,6 +207,7 @@ class WFSSSim():
         # galaxies, extended objects
         disp_seed = np.zeros((cat.ffsize, cat.ffsize))
         background_done = False
+
         for seed_files in [ptsrc_seeds, galaxy_seeds, extended_seeds]:
             if seed_files[0] is not None:
                 dispersed_objtype_seed = Grism_seed(seed_files, self.crossing_filter,
@@ -261,40 +218,10 @@ class WFSSSim():
                 dispersed_objtype_seed.disperse(orders=orders)
                 # Only include the background in one of the object type seed images
                 if not background_done:
-                    if self.instrument == 'nircam':
-                        background_image = dispersed_objtype_seed.disperse_background_1D([back_wave, back_sig])
-                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
-                    else:
-                        # BackLevel is used as such: background / max(background) * BackLevel
-                        # So we need to either set BackLevel equal to the requested level
-                        # NOT THE RATIO OF THAT TO MEDIUM, or we need to open the background
-                        # file and multiply it by the ratio of the requested level to medium.
-                        # The former isn't quite correct because it'll be scaling the maximum
-                        # value in the image to "low" or "high", rather than the median
-                        full_background_file = os.path.join(loc, background_file)
-                        background_image = fits.getdata(full_background_file)
-
-                        # Before scaling the background image by the scaling_factor
-                        # we need to normalize by the sigma-clipped mean value. This is
-                        # because the background files were produced and scaled to the
-                        # ETC "medium" level at some arbirtrary pointing, but the
-                        # "medium" level is pointing-dependent. Current background files
-                        # are scaled such that the "medium" value from the ETC is the
-                        # sigma-clipped mean value.
-                        clip, lo, hi = sigmaclip(background_image, low=3, high=3)
-                        background_mean = np.mean(clip)
-                        background_image = background_image / background_mean * scaling_factor
-                        dispersed_objtype_seed.finalize(Back=background_image, BackLevel=None)
-
+                    background_image = dispersed_objtype_seed.disperse_background_1D([back_wave, back_sig])
+                    scaling_factor = np.max(background_image)
+                    dispersed_objtype_seed.finalize(BackLevel=scaling_factor, tofits=self.background_image_filename)
                     background_done = True
-
-                    # Save the background image to a fits file
-                    hprime = fits.PrimaryHDU()
-                    himg = fits.ImageHDU(background_image)
-                    himg.header['EXTNAME'] = 'BACKGRND'
-                    himg.header['UNITS'] = 'e/s'
-                    hlist = fits.HDUList([hprime, himg])
-                    hlist.writeto(self.background_image_filename, overwrite=True)
                 else:
                     dispersed_objtype_seed.finalize()
                 disp_seed += dispersed_objtype_seed.final

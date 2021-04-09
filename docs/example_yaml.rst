@@ -103,6 +103,8 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  use_dateobs_for_background_: False              # Use date_obs value to determine background. If False, bkgdrate is used.
 	  signal_low_limit_for_segmap_: 0.031             # Lower signal limit for a pixel to be included in the segmentation map
 	  signal_low_limit_for_segmap_units_: ADU/sec     # Units of signal_low_limit_for_segmap_. Can be: ADU/sec, e/sec, MJy/sr, ergs/cm2/a, ergs/cm2/hz
+	  add_ghosts_: True                               # Add optical ghosts to simulation
+	  PSFConvolveGhosts_: False                       # Convolve ghost sources with instrument PSF before adding
 
 	Telescope_:
 	  ra_: 53.1                     #RA of simulated pointing
@@ -968,6 +970,25 @@ Units for the Lower Signal Limit for the Segmentation Map
 *simSignals:signal_low_limit_for_segmap_units*
 
 This field gives the units associated with the value in the :ref: `signal_low_limit_for_segmap <signal_low_limit_for_segmap>` value above. Supported units include: ADU/sec, ADU/s, e/sec, e/s, MJy/sr, ergs/cm2/a, ergs/cm2/hz. Note that this field is case insensitive. If the signal limit is given in units other than ADU/sec, Mirage will convert the value to ADU/sec before comparing source signal levels and adding pixels to the segmentation map.
+
+.. _add_ghosts:
+
+Add ghosts
+++++++++++
+
+*simSignals:add_ghosts*
+
+If True, Mirage will add :ref:`optical ghosts <ghosts>` to the simulated data. Currently this is only supported for NIRISS F090W, F115W, F140M, F150W, and F200W. In simulations using other instruments or filters, this keyword will be ignored.
+
+.. _PSFConvolveGhosts:
+
+Convolve ghosts with PSF
+++++++++++++++++++++++++
+
+*simSignals:PSFConvolveGhosts*
+
+If True, optical ghosts sources will be convolved with the instrumental PSF before adding them to the simulation
+
 
 
 .. _Telescope:

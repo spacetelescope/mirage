@@ -1,6 +1,6 @@
 # MIRaGe = Multi Instrument Ramp Generator
 
-[![Build Status](https://travis-ci.org/spacetelescope/mirage.svg?branch=master)](https://travis-ci.org/spacetelescope/mirage)
+[![Build Status](https://github.com/spacetelescope/mirage/workflows/CI/badge.svg)](https://github.com/spacetelescope/mirage/actions)
 [![License](https://img.shields.io/pypi/l/Django.svg)](https://github.com/spacetelescope/mirage/blob/master/LICENSE.txt)
 [![Python](https://img.shields.io/badge/Python-3.6-blue.svg)](https://www.python.org/)
 [![STScI](https://img.shields.io/badge/powered%20by-STScI-blue.svg?colorA=707170&colorB=3e8ddd&style=flat)](http://www.stsci.edu)
@@ -55,8 +55,7 @@ For any questions about the `mirage` project or its software or documentation, p
 
 ## Current Development Team
 - Bryan Hilbert [@bhilbert4](https://github.com/bhilbert4)
-- Johannes Sahlmann [@Johannes-Sahlmann](https://github.com/johannes-sahlmann)
-- Lauren Chambers [@laurenmarietta](https://github.com/laurenmarietta)
+- Nor Pirzkal [@NorPirzkal](https://github.com/npirzkal)
 - Kevin Volk [@KevinVolkSTScI](https://github.com/KevinVolkSTScI)
 - Shannon Osborne [@shanosborne](https://github.com/shanosborne)
 - Marshall Perrin [@mperrin](https://github.com/mperrin)

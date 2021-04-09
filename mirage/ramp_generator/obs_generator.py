@@ -2842,6 +2842,9 @@ class Observation():
                 channel = 'LONG'
             outModel.meta.instrument.channel = channel
 
+        if self.instrument.upper() in ['NIRISS', 'FGS']:
+            outModel.meta.instrument.focus_position = 0.0 #Placeholder, required by WSS; will be float in flight.
+
         outModel.meta.instrument.detector = self.detector
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
@@ -3230,6 +3233,9 @@ class Observation():
         if self.instrument.upper() == 'NIRISS':
             outModel[0].header['FWCPOS'] = self.filter_wheel_position
             outModel[0].header['PWCPOS'] = self.pupil_wheel_position
+
+        if self.instrument.upper() in ['NIRISS', 'FGS']:
+            outModel[0].header['FOCUSPOS'] = 'DEFAULT' #Placeholder, required by WSS; will be float in flight.
 
         # Specify whether the exposure is part of a TSO observation
         if self.params['Inst']['mode'].lower() not in ['ts_imaging', 'ts_grism']:

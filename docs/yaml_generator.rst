@@ -10,7 +10,7 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
 
 .. important::
 
-    Currently Mirage is able to parse the following APT templates. Mirage will fail if your APT file contains observations using a template not on this list.
+    Currently Mirage is able to parse APT files containing any observation template, including all JWST-supported coordinated parallel combinations. However, it will only generate yaml input files for the observation templates listed below. It will silently skip over all other templates.
 
     +--------------------------------+
     |         NIRCAM                 |
@@ -18,34 +18,25 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
     |  - NircamImaging               |
     |  - NircamWfss                  |
     |  - NircamEngineeringImaging    |
-    |  - NircamDark                  |
     |  - NircamTimeSeries            |
     |  - NircamGrismTimeSeries       |
     +--------------------------------+
 
-    +-------------------------------+
-    |         NIRISS                |
-    +===============================+
-    |  - NirissExternalCalibration  |
-    |  - NirissWfss                 |
-    |  - NirissAmi                  |
-    |  - NirissDark                 |
-    +-------------------------------+
+    +--------------------------------+
+    |         NIRISS                 |
+    +================================+
+    |  - NirissImaging               |
+    |  - NirissExternalCalibration   |
+    |  - NirissWfss                  |
+    |  - NirissAmi                   |
+    |                                |
+    +--------------------------------+
 
-    +-------------------------------+
-    |          FGS                  |
-    +===============================+
-    |  - FgsExternalCalibration     |
-    +-------------------------------+
-
-    +-------------------------------+
-    |     Other Instruments         |
-    | (for parallel observations)   |
-    +===============================+
-    |  - NirspecImaging             |
-    |  - NirspecInternalLamp        |
-    |  - MiriMRS                    |
-    +-------------------------------+
+    +--------------------------------+
+    |          FGS                   |
+    +================================+
+    |  - FgsExternalCalibration      |
+    +--------------------------------+
 
     +-------------------------------+
     | Wavefront Sensing and Control |
@@ -55,7 +46,6 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
     |  - WfscCoarsePhasing          |
     |  - WfscFinePhasing            |
     +-------------------------------+
-
 
 Export XML and Pointing files from APT
 --------------------------------------
@@ -461,6 +451,19 @@ The allowed units for the threshold value are: ADU/sec, e/sec, MJy/sr, erg/cm2/A
 Note that these are case insensitive.
 
 
+.. _add_ghosts:
+
+Add Optical Ghosts to NIRISS Observations
++++++++++++++++++++++++++++++++++++++++++
+
+If you will be creating NIRISS simulations and have point sources, you can instruct Mirage to add optical ghosts corresponding to your astronomical sources. This is controlled using the **add_ghosts** and **convolve_ghosts_with_psf** keywords. **add_ghosts** is a boolean parameter describing whether or not to add ghosts to the simulation. The default for this is True. **convolve_ghosts_with_psf** is also a boolean. This parameter describes whether a stamp image containing the ghost should be convolved with the instrumental PSF prior to adding the ghost to the data. The default for this parameter is False. Details on how the ghosts are added and their morphology are given on the :ref:`ghosts <ghosts>` page.
+
+::
+
+    ghosts = True
+    convolve_ghosts = False
+
+
 .. _yaml_generator:
 
 Run the Yaml Generator
@@ -491,7 +494,8 @@ Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
                                   cosmic_rays=crs, background=background, roll_angle=pav3,
                                   dates=dates, datatype='raw', dateobs_for_background=False,
                                   reffile_defaults='crds', reffile_overrides=reffile_overrides,
-                                  segmap_flux_limit=minmum_signal, segmap_flux_limit_units=minimum_signal_units
+                                  segmap_flux_limit=minmum_signal, segmap_flux_limit_units=minimum_signal_units,
+                                  add_ghosts=ghosts, convolve_ghosts_with_psf=convolve_ghosts
                                   )
     yam.use_linearized_darks = True
     yam.create_inputs()

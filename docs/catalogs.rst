@@ -110,6 +110,14 @@ When using Mirage's catalog_generator.py to create source catalogs, the left-mos
     gal.save('my_galaxies.cat')
 
 
+.. _ghost_stamps:
+
+Stamp Images for Optical Ghosts
++++++++++++++++++++++++++++++++
+
+Users may also optionally provide a list of fits files containing images to be used when creating optical ghosts. See the :ref:`Addition of Ghosts to Mirage Simulations <ghosts>` page for details on adding this column to a source catalog and how Mirage's behavior will change if this column is present.
+
+
 .. _point_source:
 
 Point Sources
