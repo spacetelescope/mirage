@@ -51,22 +51,6 @@ warnings.simplefilter('ignore')
 
 SUB_SLICE = {'SUBSTRIP96': slice(1792, 1888), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
 SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048, 2048)}
-PSF_DIR = os.path.join(os.environ.get('MIRAGE_DATA'), 'niriss/soss_psfs/')
-
-
-def check_psf_files():
-    """Function to run on import to verify that the PSF files have been precomputed"""
-    if not os.path.isfile(os.path.join(PSF_DIR, 'SOSS_CLEAR_PSF_order1_1.npy')):
-        print("Looks like you haven't generated the SOSS PSFs yet, which are required to produce simulations.")
-        print("This takes about 10 minutes but you will only need to do it this one time.")
-        compute = input("Would you like to do it now? [y] ")
-
-        if compute is None or compute.lower() in ['y', 'yes']:
-            multip = input("Do you want to run this using multiprocessing? [y]")
-            if multip is None or multip.lower() in ['y', 'yes']:
-                soss_trace.nuke_psfs(mprocessing=True)
-            else:
-                soss_trace.nuke_psfs(mprocessing=False)
 
 
 def run_required(func):
@@ -81,11 +65,6 @@ def run_required(func):
             return func(*args, **kwargs)
 
     return _run_required
-
-
-# TODO: Generate NIRISS SOSS PSFs the same way the other instruments do it, with `mirage.psf.psf_selection.get_gridded_psf_library`.
-
-check_psf_files()
 
 
 class SossSim():
@@ -136,6 +115,7 @@ class SossSim():
         self.verbose = verbose
         self.target = target
         self.title = title or '{} Simulation'.format(self.target)
+        self.offline = offline
 
         # Set default reference file parameters
         self._star = None
@@ -149,7 +129,6 @@ class SossSim():
         self.dropframes1 = self.dropframes3 = self.nskip = 0
         self.model_grid = 'ACES'
         self.override_dark = None
-        self.offline = offline
 
         # Use parameter file if available...
         if paramfile is not None:
@@ -245,7 +224,7 @@ class SossSim():
         # Prepare dark current exposure if needed.
         if self.override_dark is None:
             self.logger.info('Running dark prep')
-            d = dark_prep.DarkPrep()
+            d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfile
             d.prepare(params=self.params)
             use_darks = d.dark_files
@@ -255,7 +234,7 @@ class SossSim():
 
         # Combine into final observation
         self.logger.info('Running observation generator')
-        obs = obs_generator.Observation()
+        obs = obs_generator.Observation(offline=self.offline)
         obs.linDark = use_darks
         obs.seed = self.tso_ideal
         obs.segmap = self.segmap

@@ -21,7 +21,11 @@ from scipy.interpolate import interp2d, RectBivariateSpline
 
 warnings.simplefilter('ignore')
 
-PSF_DIR = os.path.join(os.environ.get('MIRAGE_DATA'), 'niriss/soss_psfs/')
+# Set the MIRAGE_DATA environment variable
+if os.environ.get('MIRAGE_DATA') is None:
+    PSF_DIR = None
+else:
+    PSF_DIR = os.path.join(os.environ['MIRAGE_DATA'], 'niriss/soss_psfs/')
 
 
 def calculate_psf_tilts():
@@ -618,10 +622,17 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
 
     else:
 
-        # Get the chunked data and concatenate
-        full_data = []
-        for chunk in [1, 2, 3, 4]:
-            file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
-            full_data.append(np.load(file))
+        if PSF_DIR is None:
+            print("No PSF files detected. Using all ones.")
+            subarr = 256 if subarray == 'SUBSTRIP256' else 96 if subarray == 'SUBSTRIP256' else 2048
+            return np.ones((2048, subarr, 76))
 
-        return np.concatenate(full_data, axis=0)
+        else:
+
+            # Get the chunked data and concatenate
+            full_data = []
+            for chunk in [1, 2, 3, 4]:
+                file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
+                full_data.append(np.load(file))
+
+            return np.concatenate(full_data, axis=0)
