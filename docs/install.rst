@@ -42,6 +42,27 @@ These are: **jwst**, which is the JWST calibration pipeline software, and two pa
 Install the Development Version
 -------------------------------
 
+For those wishing to use the most up-to-date version of Mirage, you can install directly from github. In general, the version in the master branch should work, although that is not guaranteed. By installing this version, you will have access to updates made since the latest release on Pypi.
+
+The installation procedure is nearly identical to the case of installing from Pypi above. The only difference is that the install command points to github.
+
+::
+
+    conda create -n mirage python=3.7 -y
+    conda activate mirage
+    pip install git+https://github.com/spacetelescope/mirage
+
+.. tip::
+    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
+    works for MacOSX 10.13 (High Sierra) and 1.14.0 works for MacOSX 10.15 (Catalina). If the version of healpy above does not work for your system, you may need to install a different version.
+
+.. tip::
+    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you, however conda installation is currrently only supported for python 3.7 and below.
+
+
+Installation for Developers
+---------------------------
+
 For those wishing to contribute to the code base, you can install Mirage by cloning and installing the repository. This is only
 recommended for those looking to help with development. In general, those wishing only to use Mirage should install the latest stable version from :ref:`Pypi <pypi>`.
 
