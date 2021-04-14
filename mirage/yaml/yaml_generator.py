@@ -318,8 +318,12 @@ class SimInput:
 
         if segmap_flux_limit is None:
             self.segmentation_threshold = SEGMENTATION_MIN_SIGNAL_RATE
+        else:
+            self.segmentation_threshold = segmap_flux_limit
         if segmap_flux_limit_units is None:
             self.segmentation_threshold_units = 'ADU/sec'
+        else:
+            self.segmentation_threshold_units = segmap_flux_limit_units
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=self.offline)
