@@ -21,6 +21,7 @@ Dependencies
 import copy
 import json
 import os
+import logging
 import pkg_resources
 import re
 import yaml
@@ -29,10 +30,17 @@ from astropy.io import ascii as asc
 import numpy as np
 from scipy.stats import sigmaclip
 
+from mirage.reference_files.utils import get_transmission_file
+from mirage.logging import logging_functions
 from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
                                    NIRCAM_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
                                    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, NIRCAM_FILTERS, \
-                                   NIRISS_FILTERS, FGS_FILTERS
+                                   NIRISS_FILTERS, FGS_FILTERS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def append_dictionary(base_dictionary, added_dictionary, braid=False):
@@ -251,6 +259,75 @@ def check_niriss_filter(oldfilter, oldpupil):
         newpupil = oldpupil
     return newfilter, newpupil
 
+def countrate_to_magnitude(instrument, filter_name, magsys, count_rate, photfnu=None, photflam=None,
+                           vegamag_zeropoint=None):
+    """Convert a given source countrate (ADU/sec) into magnitudes
+
+    Parameters
+    ----------
+    instrument : str
+        e.g. 'nircam'
+
+    filter_name : str
+        Filter used in the observation. Only used in the case of
+        NIRISS, where filters in the filter wheel have their
+        throughput modified.
+
+    magsys : str
+        Magnitude system of the input magnitudes. Allowed values are:
+        'abmag', 'stmag', 'vegamag'
+
+    count_rate : float or list
+        Count rate (ADU/s) to be transformed
+
+    photfnu : float
+        Photfnu value that relates count rate and flux density. Only used
+        in ABMAG conversions
+
+    photflam : float
+        Photflam value that relates count rate and flux density. Only used
+        in STMAG conversions
+
+    vegamag_zeropoint : float
+        Filter offset in the VEGAMAG (or A0V mag) system. Only used in
+        VEGAMAG conversions.
+
+
+    Returns
+    -------
+    mag : float or list
+        Magnitude value(s) corresponding to input count_rates
+    """
+    # For NIRISS filters in the filter wheel, we increase the count rate by a
+    # factor of 1/0.84. This is because the throughput of the CLEARP element
+    # in the pupil wheel (which will be used in combination with the filter)
+    # is 0.84, and is included in the PSFs produced by WebbPSF, but also in
+    # the throughput curves used by Mirage. So we need to remove one of these
+    # two factors of 0.84
+    if ((instrument.lower() == 'niriss') and (filter_name.upper() in NIRISS_FILTER_WHEEL_FILTERS)):
+        count_scale = 1. / 0.84
+    else:
+        count_scale = 1.0
+
+    if magsys.lower() == 'abmag':
+        try:
+            return -2.5 * np.log10(photfnu * count_rate / count_scale) - 48.599934378
+        except:
+            raise ValueError(("Count rate to AB mag conversion failed."
+                              "count rate = {}, photfnu = {}".format(count_rate, photfnu)))
+    if magsys.lower() == 'vegamag':
+        try:
+            return vegamag_zeropoint - 2.5 * np.log10(count_rate / count_scale)
+        except:
+            raise ValueError(("Count rate to Vega mag conversion failed."
+                              "count rate = {}".format(count_rate)))
+    if magsys.lower() == 'stmag':
+        try:
+            return -2.5 * np.log10(count_rate * photflam / count_scale) - 21.099934378
+        except:
+            raise ValueError(("Count rate to ST mag conversion failed."
+                              "count rate = {}, photflam = {}".format(count_rate, photflam)))
+
 
 def crop_to_subarray(data, bounds):
     """
@@ -360,10 +437,13 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
     # Place import statement here in order to avoid circular import
     # with crd_tools
     from mirage.reference_files import crds_tools
+
+    logger = logging.getLogger('mirage.utils.utils.full_paths')
+
     pathdict = {'Reffiles': ['dark', 'linearized_darkfile', 'badpixmask',
                              'superbias', 'linearity', 'saturation', 'gain',
                              'pixelflat', 'illumflat', 'ipc', 'astrometric',
-                             'crosstalk', 'occult', 'pixelAreaMap',
+                             'crosstalk', 'occult', 'pixelAreaMap', 'transmission',
                              'subarray_defs', 'filtpupilcombo',
                              'flux_cal', 'readpattdefs', 'filter_throughput',
                              'filter_wheel_positions', 'photom'],
@@ -424,8 +504,12 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
             # CRDS keywords are missing, create them and set equal to 'crds'.
             if key2 not in params[key1].keys():
                 if key2 in CRDS_FILE_TYPES.keys():
-                    print('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
+                    logger.info('{}:{} field not present in input. Setting equal to "crds"'.format(key1, key2))
                     params[key1][key2] = 'crds'
+
+            # Change NoneType to str
+            if params[key1][key2] is None:
+                params[key1][key2] = 'None'
 
             if params[key1][key2].lower() not in ['none', 'config', 'crds']:
                 params[key1][key2] = os.path.abspath(os.path.expandvars(params[key1][key2]))
@@ -433,15 +517,39 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                 cfile = config_files['{}-{}'.format(key1, key2)]
                 fpath = os.path.join(module_path, 'config', cfile)
                 params[key1][key2] = fpath
-                print("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
+                logger.info("'config' specified: Using {} for {}:{} input file".format(fpath, key1, key2))
             elif key2 in CRDS_FILE_TYPES.keys() and params[key1][key2].lower() == 'crds':
                 # 'crds' set for one of the reference files means to
                 # search for the best reference file currently in CRDS
                 # and download if it is not already present in
                 # self.crds_datadir
-                mapping = crds_tools.get_reffiles(crds_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
-                params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
-                print("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                query_dictionary = crds_dictionary
+
+                # For NIRCam WFSS and grism time series simluations we need to get the
+                # imaging mode flat for the crossing filter. This is because the grism-
+                # specific flat in CRDS is all 1.0's, because most people apply a wavelength-
+                # dependent flat to the data after they have a 1D sepctrum (according to Pirzkal).
+                # So when introducing flat field effects into the data, we use the imaging mode
+                # flat. This assumes no wavelength-dependence to the flat field
+                if ((params['Inst']['instrument'].lower() == 'nircam') and (params['Inst']['mode'] in ['wfss', 'ts_grism'])
+                   and (key2 == 'pixelflat')):
+                    img_dict = copy.deepcopy(crds_dictionary)
+                    if img_dict['PUPIL'] in ['GRISMR', 'GRISMC']:
+                        img_dict['PUPIL'] = 'CLEAR'
+                    else:
+                        raise ValueError('WFSS or GrismTSO sim, but Pupil is not set to one of the grisms.')
+                    query_dictionary = img_dict
+
+                if key2 != 'transmission':
+                    mapping = crds_tools.get_reffiles(query_dictionary, [CRDS_FILE_TYPES[key2]], download=not offline)
+                    params[key1][key2] = mapping[CRDS_FILE_TYPES[key2]]
+                    logger.info("From CRDS, found {} as the {} reference file.".format(mapping[CRDS_FILE_TYPES[key2]], key2))
+                else:
+                    # For the moment, the transmission files are stored in the GRISM_NIRCAM and
+                    # GRISM_NIRISS repos. Longer-term they will become CRDS files and this else
+                    # statement can be deleted.
+                    params[key1][key2] = get_transmission_file(query_dictionary)
+                    logger.info("From grism library, found {} as the POM transmission file.".format(params[key1][key2]))
 
                 # If we grab the IPC reference file from CRDS, then we need to invert it prior to use
                 if key2 == 'ipc':
@@ -450,11 +558,11 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                     # Check to see if the version of the IPC file with an
                     # inverted kernel already exists.
                     if os.path.isfile(inverted_kernel_file):
-                        print("Found an existing inverted kernel for this IPC file: {}".format(inverted_kernel_file))
+                        logger.info("Found an existing inverted kernel for this IPC file: {}".format(inverted_kernel_file))
                         params[key1][key2] = inverted_kernel_file
                         params['Reffiles']['invertIPC'] = False
                     else:
-                        print("No inverted IPC kernel file found. Kernel will be inverted prior to use.")
+                        logger.info("No inverted IPC kernel file found. Kernel will be inverted prior to use.")
                         params['Reffiles']['invertIPC'] = True
     return params
 
@@ -601,6 +709,11 @@ def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_modul
         # only throughput files for WLP8
         if pupil_name.upper() == 'WLM8':
             pupil_name = 'WLP8'
+        # For WFSC team practice purposes, the throughput of the DHS grisms is
+        # tracked outside of MIRAGE, so we can safely ignore that here
+        if pupil_name.upper() == 'GDHS0' or pupil_name.upper() == 'GDHS60':
+            pupil_name = 'CLEAR'
+
         tp_file = '{}_{}_nircam_plus_ote_throughput_mod{}_sorted.txt'.format(filter_name.upper(),
                                                                              pupil_name.upper(),
                                                                              nircam_module.lower())
@@ -638,6 +751,8 @@ def get_subarray_info(params, subarray_table):
     params : dict
         Updated nested dictionary
     """
+    logger = logging.getLogger('mirage.utils.utils.get_subarray_info')
+
     if params['Readout']['array_name'] in subarray_table['AperName']:
         mtch = params['Readout']['array_name'] == subarray_table['AperName']
         namps = subarray_table['num_amps'].data[mtch][0]
@@ -647,11 +762,10 @@ def get_subarray_info(params, subarray_table):
             try:
                 if ((params['Readout']['namp'] == 1) or
                    (params['Readout']['namp'] == 4)):
-                    print(("CAUTION: Aperture {} can be used with either "
-                           "a 1-amp".format(subarray_table['AperName'].data[mtch][0])))
-                    print("or a 4-amp readout. The difference is a factor of 4 in")
-                    print(("readout time. You have requested {} amps."
-                           .format(params['Readout']['namp'])))
+                    logger.info(("CAUTION: Aperture {} can be used with either "
+                                 "a 1-amp or a 4-amp readout. The difference is a factor of 4 in "
+                                 "readout time. You have requested {} amps.".format(subarray_table['AperName'].data[mtch][0],
+                                                                                    params['Readout']['namp'])))
                 else:
                     raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
                                       "'Readout':'namp' in the input yaml file to one of these values."
@@ -720,7 +834,7 @@ def magnitude_to_countrate(instrument, filter_name, magsys, mag, photfnu=None, p
     Returns
     -------
     count_rate : float or list
-        Count rate (e/s) corresponding to the input magnutude(s)
+        Count rate (ADU/s) corresponding to the input magnutude(s)
 
     """
     # For NIRISS filters in the filter wheel, we increase the count rate by a
@@ -798,7 +912,6 @@ def make_mag_column_names(instrument, filters):
 
         # Check to be sure the filter is supported
         if filter_name.upper() not in possible_filters:
-            print(possible_filters)
             raise ValueError("{} is not recognized or not supported for {}.".format(filter_name, instrument))
 
         if instrument in ['niriss', 'fgs']:
@@ -843,6 +956,83 @@ def sigma_clipped_mean_value_of_image(array, sigma_value):
     return meanval
 
 
+def organize_config_files(offline=False):
+    """Organize the names of the various config files for each instrument
+
+    Parameters
+    ----------
+    offline : bool
+        Whether the class is being called with or without access to
+        Mirage reference data. Used primarily for testing.
+    """
+    data_dir = expand_environment_variable('MIRAGE_DATA', offline=offline)
+    modpath = pkg_resources.resource_filename('mirage', '')
+
+    config_info = {}
+
+    config_info['global_subarray_definitions'] = {}
+    config_info['global_readout_patterns'] = {}
+    config_info['global_subarray_definition_files'] = {}
+    config_info['global_readout_pattern_files'] = {}
+
+    config_info['global_crosstalk_files'] = {}
+    config_info['global_filtpupilcombo_files'] = {}
+    config_info['global_filter_position_files'] = {}
+    config_info['global_flux_cal_files'] = {}
+    config_info['global_psf_wing_threshold_file'] = {}
+    config_info['global_psfpath'] = {}
+
+    for instrument in 'niriss fgs nircam miri nirspec'.split():
+        if instrument.lower() == 'niriss':
+            readout_pattern_file = 'niriss_readout_pattern.txt'
+            subarray_def_file = 'niriss_subarrays.list'
+            crosstalk_file = 'niriss_xtalk_zeros.txt'
+            filtpupilcombo_file = 'niriss_dual_wheel_list.txt'
+            filter_position_file = 'niriss_filter_and_pupil_wheel_positions.txt'
+            flux_cal_file = 'niriss_zeropoints.list'
+            psf_wing_threshold_file = 'niriss_psf_wing_rate_thresholds.txt'
+            psfpath = os.path.join(data_dir, 'niriss/gridded_psf_library')
+        elif instrument.lower() == 'fgs':
+            readout_pattern_file = 'guider_readout_pattern.txt'
+            subarray_def_file = 'guider_subarrays.list'
+            crosstalk_file = 'guider_xtalk_zeros.txt'
+            filtpupilcombo_file = 'guider_filter_dummy.list'
+            filter_position_file = 'dummy.txt'
+            flux_cal_file = 'guider_zeropoints.list'
+            psf_wing_threshold_file = 'fgs_psf_wing_rate_thresholds.txt'
+            psfpath = os.path.join(data_dir, 'fgs/gridded_psf_library')
+        elif instrument.lower() == 'nircam':
+            readout_pattern_file = 'nircam_read_pattern_definitions.list'
+            subarray_def_file = 'NIRCam_subarray_definitions.list'
+            crosstalk_file = 'xtalk20150303g0.errorcut.txt'
+            filtpupilcombo_file = 'nircam_filter_pupil_pairings.list'
+            filter_position_file = 'nircam_filter_and_pupil_wheel_positions.txt'
+            flux_cal_file = 'NIRCam_zeropoints.list'
+            psf_wing_threshold_file = 'nircam_psf_wing_rate_thresholds.txt'
+            psfpath = os.path.join(data_dir, 'nircam/gridded_psf_library')
+        else:
+            readout_pattern_file = 'N/A'
+            subarray_def_file = 'N/A'
+            crosstalk_file = 'N/A'
+            filtpupilcombo_file = 'N/A'
+            filter_position_file = 'N/A'
+            flux_cal_file = 'N/A'
+            psf_wing_threshold_file = 'N/A'
+            psfpath = 'N/A'
+        if instrument in 'niriss fgs nircam'.split():
+            config_info['global_subarray_definitions'][instrument] = asc.read(os.path.join(modpath, 'config', subarray_def_file))
+            config_info['global_readout_patterns'][instrument] = asc.read(os.path.join(modpath, 'config', readout_pattern_file))
+        config_info['global_subarray_definition_files'][instrument] = os.path.join(modpath, 'config', subarray_def_file)
+        config_info['global_readout_pattern_files'][instrument] = os.path.join(modpath, 'config', readout_pattern_file)
+        config_info['global_crosstalk_files'][instrument] = os.path.join(modpath, 'config', crosstalk_file)
+        config_info['global_filtpupilcombo_files'][instrument] = os.path.join(modpath, 'config', filtpupilcombo_file)
+        config_info['global_filter_position_files'][instrument] = os.path.join(modpath, 'config', filter_position_file)
+        config_info['global_flux_cal_files'][instrument] = os.path.join(modpath, 'config', flux_cal_file)
+        config_info['global_psf_wing_threshold_file'][instrument] = os.path.join(modpath, 'config', psf_wing_threshold_file)
+        config_info['global_psfpath'][instrument] = psfpath
+    return config_info
+
+
 def parse_RA_Dec(ra_string, dec_string):
     """Convert input RA and Dec strings to floats
 
@@ -866,6 +1056,14 @@ def parse_RA_Dec(ra_string, dec_string):
     dec_degrees : float
         Declination value in degrees
     """
+    # First, a quick check to see if the inputs are in
+    # decimal degrees already.
+    try:
+        return np.float(ra_string), np.float(dec_string)
+    except ValueError:
+        pass
+
+    # Convert from HMS or ::: to decimal degrees
     try:
         ra_string = ra_string.lower()
         ra_string = ra_string.replace("h", ":")
@@ -897,6 +1095,7 @@ def parse_RA_Dec(ra_string, dec_string):
 def read_pattern_check(parameters):
     # Check the readout pattern that's entered and set nframe and nskip
     # accordingly
+    logger = logging.getLogger('mirage.utils.utils.read_pattern_check')
     parameters['Readout']['readpatt'] = parameters['Readout']['readpatt'].upper()
 
     # Read in readout pattern definition file
@@ -910,11 +1109,11 @@ def read_pattern_check(parameters):
         mtch = parameters['Readout']['readpatt'] == readpatterns['name']
         parameters['Readout']['nframe'] = int(readpatterns['nframe'][mtch].data[0])
         parameters['Readout']['nskip'] = int(readpatterns['nskip'][mtch].data[0])
-        print(('Requested readout pattern {} is valid. '
-               'Using the nframe = {} and nskip = {}'
-               .format(parameters['Readout']['readpatt'],
-                       parameters['Readout']['nframe'],
-                       parameters['Readout']['nskip'])))
+        logger.info(('Requested readout pattern {} is valid. '
+                     'Using the nframe = {} and nskip = {}'
+                     .format(parameters['Readout']['readpatt'],
+                             parameters['Readout']['nframe'],
+                             parameters['Readout']['nskip'])))
     else:
         # If the read pattern is not present in the definition file
         # then quit.
@@ -958,11 +1157,13 @@ def read_yaml(filename):
     data : dict
         Nested dictionary of file contents
     """
+    logger = logging.getLogger('mirage.utils.utils.read_yaml')
+
     try:
         with open(filename, 'r') as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
     except FileNotFoundError as e:
-            print(e)
+            logging.error(e)
     return data
 
 
@@ -993,7 +1194,7 @@ def standardize_filters(instrument, filter_values):
     if instrument.lower() == 'fgs':
         return filter_values
     elif instrument.lower() == 'nircam':
-        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC']
+        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC', 'GDHS0', 'GDHS60']
         reverse_nircam_2_filter_crosses = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in NIRCAM_2_FILTER_CROSSES]
         wlp8_combinations = ['{}/WLP8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
         wlm8_combinations = ['{}/WLM8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]

@@ -1,0 +1,134 @@
+Inst:
+  instrument: NIRISS         #Instrument name
+  mode: soss   #Observation mode (e.g. imaging, WFSS, SOSS, moving_target)
+  use_JWST_pipeline: True   #Use pipeline in data transformations
+
+Readout:
+  readpatt: NISRAPID      #Readout pattern (RAPID, BRIGHT2, etc)
+  ngroup: 2             #Number of groups in integration
+  nint: 1          #Number of integrations per exposure
+  nframe: 2
+  nskip: 0
+  resets_bet_ints: 1 #Number of detector resets between integrations
+  array_name: NIS_SUBSTRIP96    #Name of array from pysiaf (NIS_SOSSFULL, NIS_SUBSTRIP256, NIS_SUBSTRIP96)
+  filter: CLEAR       #Filter of simulated data (F090W, F322W2, etc)
+  pupil: GR700XD        #Pupil element for simulated data (CLEAR, GRISMC, etc)
+
+Reffiles:                                 #Set to None or leave blank if you wish to skip that step
+  dark: $MIRAGE_DATA/niriss/darks/raw/NISNIRISSDARK-172500017_15_496_SE_2017-09-07T05h28m22_dms_uncal.fits   #Dark current integration used as the base
+  linearized_darkfile: None # Linearized dark ramp to use as input. Supercedes dark above
+  badpixmask: crds # If linearized dark is used, populate output DQ extensions using this file
+  superbias: crds #Superbias file. Set to None or leave blank if not using
+  linearity: crds #linearity correction coefficients
+  saturation: crds #well depth reference files
+  gain: crds
+  pixelflat: crds
+  illumflat: None                               #Illumination flat field file
+  astrometric: crds #Astrometric distortion file (asdf)
+  ipc: crds  #File containing IPC kernel to apply
+  invertIPC: True      #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
+  occult: None                                    #Occulting spots correction image
+  pixelAreaMap: crds  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+  subarray_defs:   config   #File that contains a list of all possible subarray names and coordinates
+  readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
+  crosstalk:       config   #File containing crosstalk coefficients
+  filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
+  filter_wheel_positions: /Users/jfilippazzo/Documents/Modules/mirage/mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
+  flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
+  filter_throughput: config #File containing filter throughput curve
+
+nonlin:
+  limit: 60000.0                           #Upper singal limit to which nonlinearity is applied (ADU)
+  accuracy: 0.000001                        #Non-linearity accuracy threshold
+  maxiter: 10                              #Maximum number of iterations to use when applying non-linearity
+  robberto:  False                         #Use Massimo Robberto type non-linearity coefficients
+
+cosmicRay:
+  path: $MIRAGE_DATA/niriss/cosmic_ray_library/         #Path to CR library
+  library: SUNMIN    #Type of cosmic rayenvironment (SUNMAX, SUNMIN, FLARE)
+  scale: 1.5     #Cosmic ray scaling factor
+  suffix: IPC_NIRISS_NIS    #Suffix of library file names
+  seed: 2956411739      #Seed for random number generator
+
+simSignals:
+  pointsource: None
+  psfpath: $MIRAGE_DATA/niriss/gridded_psf_library/  #Path to PSF library
+  gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
+  add_psf_wings: True   # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding
+  psf_wing_threshold_file: config
+  psfbasename: niriss                        #Basename of the files in the psf library
+  psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
+  psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
+  psfwfegroup: 0      #WFE realization group (0 to 4)
+  galaxyListFile: None
+  extended: None          #Extended emission count rate image file name
+  extendedscale: 1.0         #Scaling factor for extended emission image
+  extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size
+  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output image (True or False)
+  movingTargetList: None   #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.
+  movingTargetSersic: None  #ascii file containing a list of 2D sersic profiles to have moving through the field
+  movingTargetExtended: None      #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
+  movingTargetConvolveExtended: True       #convolve the extended moving targets with PSF before adding.
+  movingTargetToTrack: None #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+  expand_catalog_for_segments: False
+  zodiacal:  None                          #Zodiacal light count rate image file
+  zodiscale:  1.0                            #Zodi scaling factor
+  scattered:  None                          #Scattered light count rate image file
+  scatteredscale: 1.0                        #Scattered light scaling factor
+  bkgdrate: medium                         #Constant background count rate. Number (ADU/sec/pixel) or 'high','medium','low' similar to what is used in the ETC
+  poissonseed: 2012872553                  #Random number generator seed for Poisson simulation)
+  photonyield: True                         #Apply photon yield in simulation
+  pymethod: True                            #Use double Poisson simulation for photon yield
+  expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
+  use_dateobs_for_background: False          # Use date_obs below to deternine background. If False, bkgdrate is used.
+
+Telescope:
+  ra: 53.1                     #RA of simulated pointing
+  dec: -27.8                   #Dec of simulated pointing
+  rotation: 0.0                #y axis rotation (degrees E of N)
+  tracking: sidereal   #Telescope tracking. Can be sidereal or non-sidereal
+
+newRamp:
+  dq_configfile: config
+  sat_configfile: config
+  superbias_configfile: config
+  refpix_configfile: config
+  linear_configfile: config
+
+Output:
+  file: V88888024002P000000000112o_NIS_SOSS_CLEAR_uncal.fits   #Output filename
+  directory: /Users/jfilippazzo/Desktop/   # Directory in which to place output files
+  datatype: linear,raw # Type of data to save. 'linear' for linearized ramp. 'raw' for raw ramp. 'linear,raw' for both
+  format: DMS          #Output file format Options: DMS, SSR(not yet implemented)
+  save_intermediates: False   #Save intermediate products separately (point source image, etc)
+  grism_source_image: False   # Create an image to be dispersed?
+  unsigned: True   #Output unsigned integers? (0-65535 if true. -32768 to 32768 if false)
+  dmsOrient: True    #Output in DMS orientation (vs. fitswriter orientation).
+  program_number: 42424    #Program Number
+  title: Black Holes at the Restaurant at the End of the Universe   #Program title
+  PI_Name: D. Adams  #Proposal PI Name
+  Proposal_category: GO  #Proposal category
+  Science_category: Cosmology  #Science category
+  observation_number: '002'    #Observation Number
+  observation_label: Obs1    #User-generated observation Label
+  visit_number: '024'    #Visit Number
+  visit_group: '01'    #Visit Group
+  visit_id: '88888024002'    #Visit ID
+  sequence_id: '2'    #Sequence ID
+  activity_id: '2o'    #Activity ID. Increment with each exposure.
+  exposure_number: '00001'    #Exposure Number
+  obs_id: 'V88888024002P000000000112o'   #Observation ID number
+  target_name: T3500_G50_M00  # Name of target
+  target_ra: 53.12  # RA of the target, from APT file.
+  target_dec: -27.82 # Dec of the target, from APT file.
+  date_obs: '2019-10-15'  #Date of observation
+  time_obs: '06:29:11.852'  #Time of observation
+  obs_template: 'NIRISS SOSS'  #Observation template
+  primary_dither_type: NONE  #Primary dither pattern name
+  total_primary_dither_positions: 1  #Total number of primary dither positions
+  primary_dither_position: 1  #Primary dither position number
+  subpix_dither_type: 2-POINT-MEDIUM-WITH-NIRISS  #Subpixel dither pattern name
+  total_subpix_dither_positions: 2  #Total number of subpixel dither positions
+  subpix_dither_position: 2  #Subpixel dither position number
+  xoffset: 344.284  #Dither pointing offset in x (arcsec)
+  yoffset: 466.768  #Dither pointing offset in y (arcsec)

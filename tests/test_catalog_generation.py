@@ -21,14 +21,14 @@ from astropy.table import Table
 import pytest
 
 from mirage.catalogs import catalog_generator
-from mirage.catalogs import create_catalog
+from mirage.catalogs import create_catalog, utils
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/')
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
+# Determine if tests are being run on Github actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
-if not ON_TRAVIS:
+if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
 os.environ['MIRAGE_DATA'] = '/test/'
 
@@ -54,6 +54,7 @@ def test_ptsrc_catalog_creation():
 def test_galaxy_catalog_creation():
     """Test the creation of a basic galaxy object catalog
     """
+    indexes = np.arange(10, 20)
     ra = np.zeros(10) + 80.0
     dec = np.zeros(10) - 69.8
     mags = np.zeros(10) + 19.
@@ -64,7 +65,8 @@ def test_galaxy_catalog_creation():
 
     output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/galaxy_test.cat')
     gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
-                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec')
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=10)
     gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
     gal.save(output_file)
     as_read_in = ascii.read(output_file)
@@ -75,10 +77,72 @@ def test_galaxy_catalog_creation():
     assert all(gal.ellipticity == ellip)
     assert all(gal.position_angle == posang)
     assert all(gal.sersic_index == sersic)
+    assert all(gal.table['index'].data == indexes)
     assert all(gal.table == as_read_in)
     os.remove(output_file)
 
-@pytest.mark.skip(reason='Travis and astroquery not getting along')
+
+def test_moving_point_source_catalog_generation():
+    """Look specifically at the position and location columns
+    in the case where an ephemeris file is provided.
+    """
+    mags = [15, 16, 17]
+    ra_list = [10., 11., 12.]
+    dec_list = [34., 35., 36.]
+
+    ra_vel_list = [0.2, 0.3, 0.4]
+    dec_vel_list = [1.0, 1.1, 1.2]
+
+    ephemeris_list = ['e1.txt', 'e2.txt', 'e3.txt']
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra_list, dec=dec_list, ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list)
+    mpt.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+
+    comparison = Table()
+    comparison['index'] = [1, 2, 3]
+    comparison['x_or_RA'] = [np.nan, np.nan, np.nan]
+    comparison['y_or_Dec'] = [np.nan, np.nan, np.nan]
+    comparison['x_or_RA_velocity'] = [np.nan, np.nan, np.nan]
+    comparison['y_or_Dec_velocity'] = [np.nan, np.nan, np.nan]
+    comparison['ephemeris_file'] = [ephemeris_list]
+    comparison['nircam_f444w_clear_magnidute'] = mags
+
+    nan_cols = ['x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity']
+    for colname in nan_cols:
+        print()
+        assert np.all(np.isnan(comparison[colname]) == np.isnan(mpt.table[colname]))
+    assert np.all(comparison['ephemeris_file'] == mpt.table['ephemeris_file'])
+
+    mixed_ephemeris_list = ['e1.txt', 'None', 'ex3.txt']
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra_list, dec=dec_list, ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                     ephemeris_file=mixed_ephemeris_list)
+    mpt.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+
+    comparison['x_or_RA'] = [np.nan, 11., np.nan]
+    comparison['y_or_Dec'] = [np.nan, 35., np.nan]
+    comparison['x_or_RA_velocity'] = [np.nan, 0.3, np.nan]
+    comparison['y_or_Dec_velocity'] = [np.nan, 1.1, np.nan]
+    comparison['ephemeris_file'] = mixed_ephemeris_list
+
+    for colname in nan_cols:
+        assert np.all(np.isnan(comparison[colname]) == np.isnan(mpt.table[colname]))
+    assert np.all(comparison['ephemeris_file'] == mpt.table['ephemeris_file'])
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra_list, dec=dec_list, ra_velocity=ra_vel_list, dec_velocity=dec_vel_list)
+    mpt.add_magnitude_column(mags, magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+
+    comparison['x_or_RA'] = ra_list
+    comparison['y_or_Dec'] = dec_list
+    comparison['x_or_RA_velocity'] = ra_vel_list
+    comparison['y_or_Dec_velocity'] = dec_vel_list
+    comparison['ephemeris_file'] = ['None'] * 3
+
+    for colname in nan_cols + ['ephemeris_file']:
+        assert np.all(comparison[colname] == mpt.table[colname])
+
+
+#@pytest.mark.skip(reason='Travis and astroquery not getting along')
 def test_2mass_catalog_generation():
     """Test the generation of a catalog from a 2MASS query
     """
@@ -213,7 +277,6 @@ def test_for_proposal():
             pass
 
 
-@pytest.mark.skip(reason="Bug with the Besancon model in astroquery.")
 def test_get_all_catalogs():
     """Test the wrapper that queries anc combines catalogs from all sources"""
     ra = 80.4
@@ -221,31 +284,27 @@ def test_get_all_catalogs():
     width = 120.
     ins = 'NIRCAM'
     filters = ['F150W', 'F356W', 'F444W', 'F480M']
+    besancon_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/besancon_example.cat')
 
-    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, kmag_limits=(13, 29),
-                                                   email='hilbert@stsci.edu', instrument=ins, filters=filters,
-                                                   besancon_seed=1234)
-    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/get_all_catalogs.cat')
+    cat, headers = create_catalog.get_all_catalogs(ra, dec, width, instrument=ins, filters=filters,
+                                                   besancon_catalog_file=besancon_file)
+    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/get_all_catalogs_truth.cat')
     comparison_data = ascii.read(comparison_file)
 
-    # Note that if Besancon/WISE/GAIA/2MASS query results change, this will
-    # fail without there being a problem with Mirage.
-    for col in cat.table.colnames:
-        try:
-            assert all(cat.table[col].data == comparison_data[col].data), \
-                "Retrieved catalog does not match expected."
-        except TypeError:
-            assert False, "Retrieved catalog does not match expected."
+    # Don't check the detailed results, since any changes to Besancon/WISE/GAIA/2MASS queries
+    # could cause the test to fail without there being a problem with Mirage. Instead check that
+    # all the expected columns are present.
+    for col in comparison_data.colnames:
+        assert col in cat.table.colnames, f"{col} column not in the returned catalog."
 
 
-@pytest.mark.skip(reason="Repeated HTML response errors.")
+#@pytest.mark.skip(reason="Repeated HTML response errors.")
 def test_gaia_query():
     """Test the GAIA query and transformation into a Mirage-format catalog"""
     ra = 80.4
     dec = -69.8
     box_width = 200.
     cat, query, gaia_2mass_cross, gaia_wise_cross = create_catalog.get_gaia_ptsrc_catalog(ra, dec, box_width)
-    assert len(cat.table) == 1153
     assert cat.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', 'gaia_phot_g_mean_mag_magnitude',
                                   'gaia_phot_bp_mean_mag_magnitude', 'gaia_phot_rp_mean_mag_magnitude']
 
@@ -285,7 +344,7 @@ def test_cat_from_file():
         cat_object = catalog_generator.cat_from_file(cat_path, catalogs[cat_name][0])
         assert isinstance(cat_object, catalogs[cat_name][1])
 
-if not ON_TRAVIS:
+if not ON_GITHUB:
     os.environ['MIRAGE_DATA'] = orig_mirage_data
 
 
@@ -336,4 +395,134 @@ def test_johnson_catalog_to_mirage_catalog():
         assert np.allclose(truth.table[col].data, transformed.table[col].data)
 
 
+def test_catalog_index_check():
+    """Test the code that assures no overlap of source indexes
+    """
+    #Make point source catalog
+    ra = np.zeros(10) + 80.0
+    dec = np.zeros(10) - 69.8
+    mags = np.zeros(10) + 19.
+
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=1)
+    ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    ptsrc_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/ptsrc_test.cat')
+    ptsrc.save(ptsrc_output_file)
+
+    # Make galaxy catalog
+    indexes = np.arange(10, 20)
+    radius = np.zeros(10) + 0.5
+    ellip = np.zeros(10) + 0.45
+    posang = np.zeros(10) + 27.
+    sersic = np.zeros(10) + 3.3
+
+    gal_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/galaxy_test.cat')
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=11)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    # Make moving point source catalog
+    ra_vel_list = [0.2, 0.3, 0.4]
+    dec_vel_list = [1.0, 1.1, 1.2]
+    ephemeris_list = ['e1.txt', 'e2.txt', 'e3.txt']
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra[0:3], dec=dec[0:3], ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list, starting_index=21)
+    mpt.add_magnitude_column(mags[0:3], magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+    mpt_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/moving_ptsrc_test.cat')
+    mpt.save(mpt_output_file)
+
+
+    # First a case where there is no overlap
+    cat_list = [ptsrc_output_file, gal_output_file, mpt_output_file]
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == (False, 23)
+
+    # Now a case where there is overlap
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=4)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == (True, 23)
+
+    # Overlap, but indexes between catalogs are out of order
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=25)
+    ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    ptsrc.save(ptsrc_output_file)
+
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=1)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra[0:3], dec=dec[0:3], ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list, starting_index=29)
+    mpt.add_magnitude_column(mags[0:3], magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+    mpt_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/moving_ptsrc_test.cat')
+    mpt.save(mpt_output_file)
+
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == (True, 34)
+
+    # No overlap, but indexes between catalogs are out of order
+    ptsrc = catalog_generator.PointSourceCatalog(ra=ra, dec=dec, starting_index=25)
+    ptsrc.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    ptsrc.save(ptsrc_output_file)
+
+    gal = catalog_generator.GalaxyCatalog(ra=ra, dec=dec, ellipticity=ellip, radius=radius,
+                                          sersic_index=sersic, position_angle=posang, radius_units='arcsec',
+                                          starting_index=1)
+    gal.add_magnitude_column(mags, instrument='nircam', filter_name='f090w')
+    gal.save(gal_output_file)
+
+    mpt = catalog_generator.MovingPointSourceCatalog(ra=ra[0:3], dec=dec[0:3], ra_velocity=ra_vel_list, dec_velocity=dec_vel_list,
+                                                 ephemeris_file=ephemeris_list, starting_index=36)
+    mpt.add_magnitude_column(mags[0:3], magnitude_system='abmag', instrument='nircam', filter_name='f444w')
+    mpt_output_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/moving_ptsrc_test.cat')
+    mpt.save(mpt_output_file)
+
+    overlap = utils.catalog_index_check(cat_list)
+    assert overlap == (False, 38)
+
+    # Clean up
+    os.remove(ptsrc_output_file)
+    os.remove(gal_output_file)
+    os.remove(mpt_output_file)
+
+
+def test_determine_used_cats():
+    """Test the evaluation of which source catalogs are used for an obs mode
+    """
+    catalogs = {}
+    catalogs['pointsource'] = 'ptsrc.cat'
+    catalogs['galaxyListFile'] = 'galaxies.cat'
+    catalogs['extended'] = 'extended.cat'
+    catalogs['movingTargetList'] = 'moving_ptsrc.cat'
+    catalogs['movingTargetSersic'] = 'moving_galaxies.cat'
+    catalogs['movingTargetExtended'] = 'moving_extended.cat'
+    catalogs['movingTargetToTrack'] = 'nonsidereal.cat'
+    catalogs['tso_imaging_catalog'] = 'img_tso.cat'
+    catalogs['tso_grism_catalog'] = 'grism_tso.cat'
+
+    img_cats = utils.determine_used_cats('imaging', catalogs)
+    img_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'moving_ptsrc.cat',
+                 'moving_galaxies.cat', 'moving_extended.cat', 'nonsidereal.cat']
+    assert img_cats == img_truth
+
+    wfss_cats = utils.determine_used_cats('wfss', catalogs)
+    wfss_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat']
+    assert wfss_cats == wfss_truth
+
+    tsoimg_cats = utils.determine_used_cats('ts_imaging', catalogs)
+    tsoimg_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'img_tso.cat']
+    assert tsoimg_cats == tsoimg_truth
+
+    tsogrism_cats = utils.determine_used_cats('ts_grism', catalogs)
+    tsogrism_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'grism_tso.cat']
+    assert tsogrism_cats == tsogrism_truth
 

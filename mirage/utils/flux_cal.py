@@ -96,7 +96,7 @@ def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, 
             matching_pupil = 'WLP8'
 
         # For entries that include the grism, substitute CLEAR for the GRISM
-        if matching_pupil in ['GRISMR', 'GRISMC']:
+        if matching_pupil in ['GRISMR', 'GRISMC', 'GDHS0', 'GDHS60']:
             matching_pupil = 'CLEAR'
 
         mtch = ((zps['Detector'] == detector) &
@@ -105,9 +105,9 @@ def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, 
                 (zps['Module'] == module))
 
     elif instrument.lower() in ['niriss', 'fgs']:
-        matching_filter = filter_value
+        matching_filter = filter_value.upper()
         if filter_value.upper() in ['CLEAR', 'CLEARP', 'GR150R', 'GR150C']:
-            matching_filter = pupil_value
+            matching_filter = pupil_value.upper()
 
         mtch = ((zps['Detector'] == detector) &
                 (zps['Filter'] == matching_filter) &

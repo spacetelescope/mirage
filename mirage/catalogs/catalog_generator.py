@@ -22,25 +22,60 @@ tab.save()
 """
 
 import copy
+import logging
 import os
 
 from astropy.io import ascii
 from astropy.table import Table, Column
 import numpy as np
 
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.utils import standardize_filters, make_mag_column_names
 
 TSO_GRISM_INDEX = 99999
 
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
+
 class PointSourceCatalog():
-    def __init__(self, ra=[], dec=[], x=[], y=[]):
+    def __init__(self, ra=[], dec=[], x=[], y=[], starting_index=1, niriss_ghost_stamp=[]):
         """Initialize the point source catalog. Users can enter lists of RA and Dec values
         or x and y values for source potisions
 
         Parameters
         ----------
-        something
+        ra : list
+            List of RA values. Provide ra and dec or x and y.
+
+        dec : list
+            List of Dec values. Provide ra and dec or x and y.
+
+        x : list
+            List of detector x position values. Provide ra and dec or
+            x and y.
+
+        y : list
+            List of detector y position values. Provide ra and dec or
+            x and y.
+
+        starting_index : int
+            Index number to use for the first source in the catalog.
+            Source indexes will increase from this value. If you are
+            creating multiple catalogs, this parameter can be used to
+            assure that each source in all catalogs has a unique source
+            number.
+
+        niriss_ghost_stamp : list
+            List of fits files to use for ghost sources to be added.
+            If left empty but ghost sources are to be added, Mirage will
+            fall back to using the default fits files.
         """
+        self._starting_index = starting_index
+        self._niriss_ghost_stamp = niriss_ghost_stamp
+
         # Make sure we are working with numpy arrays
         ra = np.array(ra)
         dec = np.array(dec)
@@ -73,6 +108,8 @@ class PointSourceCatalog():
         """Add a catalog to the current catalog instance"""
         # If the the source positions in the two catalogs have different units, then the catalogs
         # can't be combined.
+        logger = logging.getLogger('mirage.catalogs.catalog_generator.add_catalog')
+
         if self._location_units != catalog_to_add.location_units:
             raise ValueError("WARNING: Sources in the catalogs do not have matching units (RA/Dec or x/y)")
 
@@ -81,7 +118,7 @@ class PointSourceCatalog():
         new_mag_labels = list(catalog_to_add.magnitudes.keys())
         mag_sys = self.magnitudes[current_mag_labels[0]][0]
         if mag_sys != catalog_to_add.magnitudes[new_mag_labels[0]][0]:
-            print("WARNING: Magnitude systems of the two catalogs do not match. Cannot combine.")
+            logger.error("Magnitude systems of the two catalogs do not match. Cannot combine.")
 
         # Get the length of the two catalogs
         current_length = len(self._ra)
@@ -198,25 +235,20 @@ class PointSourceCatalog():
         if inst_name not in ['nircam', 'niriss', 'fgs']:
             raise ValueError("WARNING: {} is not a valid instrument.".format(inst_name))
 
-    @property
-    def dec(self):
-        """Return Dec values from catalog"""
-        if self._location_units == 'position_RA_Dec':
-            return self._dec
-        else:
-            return []
-
     def get_magnitudes(self, key):
         """Return the magnitude list (but not mag_sys) associated with the given key
 
         Parameters
         ----------
-        justone
+        key : str
+            Column name in the catalog (e.g. 'nircam_f090w_magnitudes')
         """
+        logger = logging.getLogger('mirage.catalogs.catalog_generator.get_magnitudes')
+
         try:
             return self.magnitudes[key][1]
         except KeyError:
-            print("WARNING: No {} magnitude column present.".format(key))
+            logger.error("WARNING: No {} magnitude column present.".format(key))
 
     @property
     def location_units(self):
@@ -228,6 +260,14 @@ class PointSourceCatalog():
         """Return RA values from catalog"""
         if self._location_units == 'position_RA_Dec':
             return self._ra
+        else:
+            return []
+
+    @property
+    def dec(self):
+        """Return Dec values from catalog"""
+        if self._location_units == 'position_RA_Dec':
+            return self._dec
         else:
             return []
 
@@ -250,7 +290,8 @@ class PointSourceCatalog():
     def create_table(self):
         """Create an astropy table containing the catalog
         """
-        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self._location_units)
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self._location_units,
+                                 minimum_index=self._starting_index, niriss_ghost_stamp=self._niriss_ghost_stamp)
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
@@ -267,11 +308,11 @@ class PointSourceCatalog():
 
 class GalaxyCatalog(PointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ellipticity=[], radius=[], sersic_index=[],
-                 position_angle=[], radius_units='arcsec'):
+                 position_angle=[], radius_units='arcsec', starting_index=1, niriss_ghost_stamp=[]):
         """Create instance of a galaxy catalog
         """
         # Add location information
-        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, starting_index=starting_index)
 
         # Add galaxy-specific information
         self._morphology = {'radius': radius, 'ellipticity': ellipticity, 'sersic_index': sersic_index,
@@ -281,6 +322,7 @@ class GalaxyCatalog(PointSourceCatalog):
         self._pos_angle = position_angle
         self._radius = radius
         self._sersic_index = sersic_index
+        self._niriss_ghost_stamp = niriss_ghost_stamp
 
         if radius_units not in ['arcsec', 'pixels']:
             raise ValueError("WARNING: Galaxy radii must be in units of 'arcsec' or 'pixels'.")
@@ -289,7 +331,8 @@ class GalaxyCatalog(PointSourceCatalog):
     def create_table(self):
         """Create an astropy table containing the catalog
         """
-        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units)
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units,
+                                 minimum_index=self._starting_index, niriss_ghost_stamp=self._niriss_ghost_stamp)
 
         # Add morphology columns
         for key in self._morphology:
@@ -335,18 +378,28 @@ class GalaxyCatalog(PointSourceCatalog):
 
 
 class ExtendedCatalog(PointSourceCatalog):
-    def __init__(self, filenames=[], ra=[], dec=[], x=[], y=[], position_angle=[]):
+    def __init__(self, filenames=[], ra=[], dec=[], x=[], y=[], position_angle=[], starting_index=1,
+                 niriss_ghost_stamp=[], corresponding_source_index_for_ghost=[]):
         # Add location information
-        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, starting_index=starting_index,
+                                    niriss_ghost_stamp=niriss_ghost_stamp)
 
         # Add extended source-specific information
         self._filenames = filenames
         self._pos_angle = position_angle
+        self._corresponding_source_index_for_ghost = corresponding_source_index_for_ghost
+
+        if len(self._filenames) != len(self._ra):
+            raise ValueError(("Lengths of stamp filenames list and RA/Dec or x/y lists are not equal!"))
+
+        if len(self._pos_angle) != len(self._ra):
+            raise ValueError(("Lengths of position angle list and RA/Dec or x/y lists are not equal!"))
 
     def create_table(self):
         """Create an astropy table containing the catalog
         """
-        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self._location_units)
+        tab = create_basic_table(self._ra, self._dec, self.magnitudes, self._location_units,
+                                 minimum_index=self._starting_index, niriss_ghost_stamp=self._niriss_ghost_stamp)
 
         # Add the filename column
         file_col = Column(self._filenames, name='filename')
@@ -355,6 +408,13 @@ class ExtendedCatalog(PointSourceCatalog):
         # Add the position angle column
         pa_col = Column(self._pos_angle, name='pos_angle')
         tab.add_column(pa_col)
+
+        # Add the column that lists the index for the original target that
+        # is the source for the ghost target. For non-ghosts, this column should
+        # have a value of 0.
+        if len(self._corresponding_source_index_for_ghost) > 0:
+            src_index_col = Column(self._corresponding_source_index_for_ghost, name='corresponding_source_index_for_ghost')
+            tab.add_column(src_index_col)
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
@@ -372,26 +432,77 @@ class ExtendedCatalog(PointSourceCatalog):
 
 class MovingPointSourceCatalog(PointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[]):
+                 y_velocity=[], ephemeris_file=[], starting_index=1, niriss_ghost_stamp=[]):
+
+        # If ephemeris files are provided, ra/dec/x/y as well as velocities are not needed
+        if len(ra) == 0 and len(x) == 0:
+            if len(ephemeris_file) > 0:
+                ra = [None] * len(ephemeris_file)
+                dec = [None] * len(ephemeris_file)
+            else:
+                raise ValueError("Object location must be provided via ra/dec, x/y, or ephemeris_file keywords.")
+
+        # If the user provides ephemeris files, they shouldn't need to provide any
+        # other position or velocity information.
+        if len(ephemeris_file) > 0:
+            if len(ra) == 0 and len(x) == 0:
+                ra = [None] * len(ephemeris_file)
+                dec = [None] * len(ephemeris_file)
+            if len(ra_velocity) == 0 and len(x_velocity) == 0:
+                ra_velocity = [None] * len(ephemeris_file)
+                dec_velocity = [None] * len(ephemeris_file)
+
         # Add location information
-        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y)
+        PointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, starting_index=starting_index,
+                                    niriss_ghost_stamp=niriss_ghost_stamp)
 
         if len(ra_velocity) > 0 and len(x_velocity) > 0:
             raise ValueError(("WARNING: Provide either RA and Dec velocities, or x and y "
                               "velocities, but not both."))
-        # Object velocities
+
+        if len(ra_velocity) == 0 and len(x_velocity) == 0 and len(ephemeris_file) == 0:
+            raise ValueError(("Object velocities must be specified using either ra/dec_velocity, x/y_velocity "
+                              "or ephemeris_file keywords."))
+
         if len(ra_velocity) > 0:
-            self._ra_velocity = ra_velocity
-            self._dec_velocity = dec_velocity
+            self._ra_velocity = np.array(ra_velocity)
+            self._dec_velocity = np.array(dec_velocity)
             self._velocity_units = 'velocity_RA_Dec'
-        else:
-            self._ra_velocity = x_velocity
-            self._dec_velocity = y_velocity
+        elif len(x_velocity) > 0:
+            self._ra_velocity = np.array(x_velocity)
+            self._dec_velocity = np.array(y_velocity)
             self._velocity_units = 'velocity_pixels'
+        else:
+            self._ra_velocity = np.repeat(None, len(self._ra))
+            self._dec_velocity = np.repeat(None, len(self._ra))
+            self._velocity_units = 'velocity_RA_Dec'
+
+        if len(ephemeris_file) > 0:
+            self._ephemeris_file = np.array(ephemeris_file)
+        else:
+            self._ephemeris_file = np.repeat('None', len(self._ra_velocity))
+
+        # If ephemeris files are given, modify the position and velocity
+        # values such that they are None in rows where there is an ephemeris file
+        eph_set = set(self._ephemeris_file)
+
+        if eph_set != set(['None']):
+            print(("Ephemeris information overrides provided source positions and velocities. "
+                  "Setting these to NaN in cases where an ephemeris file is given, in order "
+                  "to avoid confusion."))
+            eph_files = self._ephemeris_file != 'None'
+
+            self._ra[eph_files] = None
+            self._dec[eph_files] = None
+            self._ra_velocity[eph_files] = None
+            self._dec_velocity[eph_files] = None
+
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file, minimum_index=self._starting_index,
+                                          niriss_ghost_stamp=self._niriss_ghost_stamp)
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
@@ -415,18 +526,22 @@ class MovingPointSourceCatalog(PointSourceCatalog):
 class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
                  y_velocity=[], ellipticity=[], radius=[], sersic_index=[], position_angle=[],
-                 radius_units='arcsec'):
+                 radius_units='arcsec', ephemeris_file=[], starting_index=1, niriss_ghost_stamp=[]):
         # Add location information
-        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
-                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity)
         GalaxyCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ellipticity=ellipticity, radius=radius,
                                sersic_index=sersic_index, position_angle=position_angle,
-                               radius_units='arcsec')
+                               radius_units='arcsec', starting_index=starting_index,
+                               niriss_ghost_stamp=niriss_ghost_stamp)
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file,
+                                          starting_index=starting_index)
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file, minimum_index=self._starting_index,
+                                          niriss_ghost_stamp=self._niriss_ghost_stamp)
         # Add morphology columns
         for key in self._morphology:
             values = self._morphology[key]
@@ -442,17 +557,22 @@ class MovingSersicCatalog(GalaxyCatalog, MovingPointSourceCatalog):
 
 class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[], filenames=[], position_angle=[]):
+                 y_velocity=[], filenames=[], position_angle=[], ephemeris_file=[], starting_index=1,
+                 niriss_ghost_stamp=[]):
         # Add location information
+        ExtendedCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, filenames=filenames,
+                                 position_angle=position_angle, starting_index=starting_index,
+                                 niriss_ghost_stamp=niriss_ghost_stamp)
         MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
                                           dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity)
-        ExtendedCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, filenames=filenames,
-                                 position_angle=position_angle)
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file,
+                                          starting_index=starting_index)
 
     def create_table(self):
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file, minimum_index=self._starting_index,
+                                          niriss_ghost_stamp=self._niriss_ghost_stamp)
         # Add filename column
         file_col = Column(self._filenames, name='filename')
         tab.add_column(file_col, index=1)
@@ -467,11 +587,12 @@ class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
 
 class NonSiderealCatalog(MovingPointSourceCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[], object_type=[]):
+                 y_velocity=[], object_type=[], ephemeris_file=[], starting_index=1, niriss_ghost_stamp=[]):
         # Add location information
         MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
                                           dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity)
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file,
+                                          niriss_ghost_stamp=niriss_ghost_stamp)
 
         # List of the type of sources in the non-sidereal catalog
         valid_objects = ['pointSource', 'galaxies', 'extended']
@@ -485,7 +606,9 @@ class NonSiderealCatalog(MovingPointSourceCatalog):
         """Create an astropy table containing the catalog
         """
         tab = create_basic_velocity_table(self._ra, self._dec, self.magnitudes, self._location_units,
-                                          self._ra_velocity, self._dec_velocity, self._velocity_units)
+                                          self._ra_velocity, self._dec_velocity, self._velocity_units,
+                                          self._ephemeris_file, minimum_index=self._starting_index,
+                                          niriss_ghost_stamp=self._niriss_ghost_stamp)
         obj_col = Column(self.object_type, name='object')
         tab.add_column(obj_col, index=1)
 
@@ -556,7 +679,7 @@ class GrismTSOCatalog(PointSourceCatalog):
         """Create an astropy table containing the catalog
         """
         tab = create_basic_table(self._ra, self._dec, self.magnitudes, self.location_units,
-                                 minimum_index=TSO_GRISM_INDEX)
+                                 minimum_index=TSO_GRISM_INDEX, niriss_ghost_stamp=self._niriss_ghost_stamp)
 
         # Add the lightcurve filename column
         semimajor_col = Column(self._semimajor_axis, name='Semimajor_axis_in_stellar_radii')
@@ -647,9 +770,49 @@ class GrismTSOCatalog(PointSourceCatalog):
         return self._transmission_spectrum
 
 
-def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_units):
+def add_ephemeris_column(input_table, ephemeris_files):
+    """Add a column containing ephemeris filenames
+
+    Arguments
+    ---------
+    input_table : astropy.table.Table
+        Input catalog
+
+    ephemeris_files : list
+        Ephemeris filenames to be added
+
+    Returns
+    -------
+    input_table : astropy.table.Table
+        Input catalog with ephemeris_file column added
     """
-    DO IT
+    eph_col = Column(ephemeris_files, name='ephemeris_file')
+    input_table.add_column(eph_col, index=6)
+    return input_table
+
+
+def add_velocity_columns(input_table, ra_velocities, dec_velocities, velocity_units):
+    """Add RA/Dec velocity columns to table of source information
+
+    Arguments
+    ---------
+    input_table : astropy.table.Table
+        Input catalog
+
+    ra_velocities : list
+        RA velocity values to be added (arcsec/hour)
+
+    dec_velocities : list
+        Dec velocity values to be added (arcsec/hour)
+
+    velocity_units : str
+        Velocity units. Will be stored in a comment in the catalog
+
+    Returns
+    -------
+    input_table : astropy.table.Table
+        Input catalog with ephemeris_file column added
+
     """
     ra_vel_col = Column(ra_velocities, name='x_or_RA_velocity')
     dec_vel_col = Column(dec_velocities, name='y_or_Dec_velocity')
@@ -810,7 +973,7 @@ def cat_from_file(filename, catalog_type='point_source'):
     return catalog_object
 
 
-def create_basic_table(ra_values, dec_values, magnitudes, location_units, minimum_index=1):
+def create_basic_table(ra_values, dec_values, magnitudes, location_units, minimum_index=1, niriss_ghost_stamp=[]):
     """Create astropy table containing the basic catalog info
     NOTE THAT THIS IS OUTSIDE CLASSES
     """
@@ -829,15 +992,23 @@ def create_basic_table(ra_values, dec_values, magnitudes, location_units, minimu
         mag_column = Column(mag_values, name=key)
         basic_table.add_column(mag_column)
 
+    # If filenames for NIRISS ghost sources are provided, add that column
+    if len(niriss_ghost_stamp) > 0:
+        nis_ghost_col = Column(niriss_ghost_stamp, name='niriss_ghost_stamp')
+        basic_table.add_column(nis_ghost_col)
+
     # Add magnitude system and position units as metadata
     basic_table.meta['comments'] = [location_units, mag_sys]
     return basic_table
 
 
 def create_basic_velocity_table(ra_values, dec_values, magnitudes, location_units,
-                                ra_velocities, dec_velocities, velocity_units):
-    tab = create_basic_table(ra_values, dec_values, magnitudes, location_units)
+                                ra_velocities, dec_velocities, velocity_units,
+                                ephemeris_values, minimum_index=1, niriss_ghost_stamp=[]):
+    tab = create_basic_table(ra_values, dec_values, magnitudes, location_units, minimum_index=minimum_index,
+                             niriss_ghost_stamp=niriss_ghost_stamp)
     tab = add_velocity_columns(tab, ra_velocities, dec_velocities, velocity_units)
+    tab = add_ephemeris_column(tab, ephemeris_values)
     return tab
 
 

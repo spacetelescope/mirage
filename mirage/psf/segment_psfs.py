@@ -19,6 +19,7 @@ Use
         lib = get_gridded_segment_psf_library_list(instrument, detector, filter,
                 out_dir, pupilname="CLEAR")
 """
+import logging
 import os
 import time
 
@@ -32,7 +33,14 @@ from webbpsf.utils import to_griddedpsfmodel
 import multiprocessing
 import functools
 
+from mirage.logging import logging_functions
 from mirage.psf.psf_selection import get_library_file
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def _generate_psfs_for_one_segment(inst, ote, segment_tilts, out_dir, boresight, lib, detectors, filters, fov_pixels, nlambda, overwrite, i):
@@ -44,10 +52,12 @@ def _generate_psfs_for_one_segment(inst, ote, segment_tilts, out_dir, boresight,
 	See doc string of generate_segment_psfs for input parameter definitions.
 
 	"""
+    logger = logging.getLogger('mirage.psf.segment_psfs._generate_psfs_for_one_segment')
+
     i_segment = i + 1
 
     segname = webbpsf.webbpsf_core.segname(i_segment)
-    print('GENERATING SEGMENT {} DATA'.format(segname))
+    logger.info('GENERATING SEGMENT {} DATA'.format(segname))
 
     det_filt_match = False
     for det in sorted(detectors):
@@ -113,7 +123,7 @@ def _generate_psfs_for_one_segment(inst, ote, segment_tilts, out_dir, boresight,
             primaryhdu.header.extend(tuples)
             hdu = fits.HDUList(primaryhdu)
             hdu.writeto(filepath, overwrite=overwrite)
-            print('Saved gridded library file to {}'.format(filepath))
+            logger.info('Saved gridded library file to {}'.format(filepath))
 
     if inst.name.lower()=='nircam' and det_filt_match == False:
         raise ValueError('No matching filters and detectors given - all '
@@ -178,6 +188,8 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         Optional; additional options to set on the NIRCam or FGS class instance used in this function.
         Any items in this dict will be added into the .options dict prior to the PSF calculations.
     """
+    logger = logging.getLogger('mirage.psf.segment_psfs.generate_segment_psfs')
+
     # Create webbpsf NIRCam instance
     inst = webbpsf.Instrument(instrument)
 
@@ -218,16 +230,16 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
         if isinstance(jitter, float):
             inst.options['jitter'] = 'gaussian'
             inst.options['jitter_sigma'] = jitter
-            print('Adding jitter', jitter)
+            logger.info('Adding jitter: {} arcsec'.format(jitter))
         elif isinstance(jitter, str):
             allowed_strings = ['PCS=Coarse_Like_ITM', 'PCS=Coarse']
             if jitter in allowed_strings:
                 inst.options['jitter'] = jitter
-                print('Adding {} jitter'.format(jitter))
+                logger.info('Adding {} jitter'.format(jitter))
             else:
-                print("Invalid jitter string. Must be one of: {}. Ignoring and using defaults.".format(allowed_strings))
+                logger.warning("Invalid jitter string. Must be one of: {}. Ignoring and using defaults.".format(allowed_strings))
         else:
-            print("Wrong input to jitter, assuming defaults")
+            logger.warning("Wrong input to jitter, assuming defaults")
     if inst_options is not None:
         inst.options.update(inst_options)
 
@@ -236,7 +248,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
                                                   # some parts of PSF calc are themselves parallelized so using
                                                   # fewer processes than number of cores is likely reasonable.
     pool = multiprocessing.Pool(processes=nproc)
-    print(f"Will perform parallelized calculation using {nproc} processes")
+    logger.info(f"Will perform parallelized calculation using {nproc} processes")
 
     # Set up a function instance with most arguments fixed
     calc_psfs_for_one_segment = functools.partial(_generate_psfs_for_one_segment, inst, ote, segment_tilts,
@@ -247,7 +259,7 @@ def generate_segment_psfs(ote, segment_tilts, out_dir, filters=['F212N', 'F480M'
     pool_start_time = time.time()
     results = pool.map(calc_psfs_for_one_segment, segments)
     pool_stop_time = time.time()
-    print('\n=========== Elapsed time (all segments):', pool_stop_time - pool_start_time, '============\n')
+    logger.info('\n=========== Elapsed time (all segments): {} ============\n'.format(pool_stop_time - pool_start_time))
     pool.close()
 
 
@@ -279,11 +291,13 @@ def get_gridded_segment_psf_library_list(instrument, detector, filtername,
         List of object containing segment PSF libraries
 
     """
+    logger = logging.getLogger('mirage.psf.segment_psfs.get_gridded_segment_psf_library_list')
+
     library_list = get_segment_library_list(instrument, detector, filtername, library_path, pupil=pupilname)
 
-    print("Segment PSFs will be generated using:")
+    logger.info("Segment PSFs will be generated using:")
     for filename in library_list:
-        print(os.path.basename(filename))
+        logger.info(os.path.basename(filename))
 
     libraries = []
     for filename in library_list:
@@ -429,6 +443,18 @@ def get_segment_offset(segment_number, detector, library_list):
 
     x_arcsec += x_boresight_offset
     y_arcsec += y_boresight_offset
+
+    # Optionally, for more recent versions of webbpsf, the FITS header may simply contain the
+    # Hexike tilt coefficient that we want to use. If so, use that instead of all of the above!
+    # This method is superior, because it more correctly (and more simply) book-keeps the cross terms
+    # between different OTE pose terms into optical tip and tilt. In particular, this is needed for
+    # accurate modeling of radial translation corrections when using incoherent PSF calculations.
+    if f'S{segment_number:02d}XTILT' in header:
+        hexike_to_arcsec = 206265/webbpsf.constants.JWST_SEGMENT_RADIUS
+        # recall that Hexike tilt _around the X axis_ produces an offset _into Y_, and vice versa.
+        x_arcsec =  header[f'S{segment_number:02d}YTILT'] * hexike_to_arcsec
+        # also recall coord flip of Y axis from OTE L.O.M in entrance pupil to exit pupil
+        y_arcsec = -header[f'S{segment_number:02d}XTILT'] * hexike_to_arcsec
 
     # Optionally, arbitrary boresight offset may also be present in the FITS header metadata.
     # If so, include that in the PSF too. Be careful about coordinate sign for the V2 axis!

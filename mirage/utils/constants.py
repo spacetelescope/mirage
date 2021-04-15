@@ -6,6 +6,9 @@ Use
         from mirage.utils import constants
         inst_abb = constants.instrument_abbreviations
 """
+import os
+import pkg_resources
+
 import astropy.units as u
 import numpy as np
 
@@ -18,8 +21,22 @@ instrument_abbreviations = {'nircam': 'NRC',
 EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NRC_WFSS", "ts_grism": "NRC_TSGRISM"},
             "niriss": {"imaging": "NIS_IMAGE", "ami": "NIS_AMI", "pom": "NIS_IMAGE",
-                       "wfss": "NIS_WFSS"},
+                       "wfss": "NIS_WFSS", "soss": "NIS_SOSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
+
+# Number of detector resets prior to the start of an exposure
+NUM_RESETS_BEFORE_EXP = {"nircam": {"full": 0, "sub": 1},
+                         "niriss": {"full": 0, "sub": 1},
+                         "fgs": {"full": 0, "sub": 0}
+                         }
+
+# Numer of detector resets between integrations in an exposure
+NUM_RESETS_BEFORE_INT = {"nircam": 1, "niriss": 1, "fgs":1}
+
+# SEARCH STRINGS TO USE FOR FGS DARKS (needed because darks for the two
+# detectors are mixed in a single directory)
+FGS1_DARK_SEARCH_STRING = '*_497_*fits'
+FGS2_DARK_SEARCH_STRING = '*_498_*fits'
 
 # Supported NIRISS filters
 NIRISS_FILTER_WHEEL_FILTERS = ['F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
@@ -68,11 +85,19 @@ CATALOG_YAML_ENTRIES = ['pointsource', 'galaxyListFile', 'extended', 'movingTarg
                         'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack',
                         'tso_imaging_catalog', 'tso_grism_catalog']
 
+IMAGING_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended', 'movingTargetList',
+                            'movingTargetSersic', 'movingTargetExtended', 'movingTargetToTrack']
+
+WFSS_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended']
+
+TS_IMAGING_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended', 'tso_imaging_catalog']
+TS_GRISM_ALLOWED_CATALOGS = ['pointsource', 'galaxyListFile', 'extended', 'tso_grism_catalog']
+
 TSO_MODES = ['ts_imaging', 'ts_grism']
 
 # Upper limit to the size of a seed image or dark current array. Arrays
 # containing more pixels than this limit will be split into segment files.
-FILE_SPLITTING_LIMIT = 38. * 2048. * 2048
+FILE_SPLITTING_LIMIT = 160. * 2048. * 2048
 
 CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'astrometric': 'distortion',
@@ -80,6 +105,7 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'ipc': 'ipc',
                    'linearity': 'linearity',
                    'pixelAreaMap': 'area',
+                   'transmission': 'transmission',
                    'saturation': 'saturation',
                    'superbias': 'superbias',
                    'pixelflat': 'flat',
@@ -108,22 +134,15 @@ PLANCK = 6.62607004e-34  * u.meter * u.meter * u.kg / u.second
 # Fraction of the total Sersic
 SERSIC_FRACTIONAL_SIGNAL = 0.9995
 
+# Configuration file for defining the logs
+LOG_CONFIG_FILENAME = 'logging_config.yaml'
 
-def grism_factor(instrument_name):
-    """Return the factor by which the field of view is expanded when
-    creating grism simulations compared to direct image simulations
+# Standard log file names. These are needed because we need to have a
+# log file name before we know the yaml/xml filename
+STANDARD_LOGFILE_NAME = 'mirage_latest.log'
 
-    Parameters
-    ----------
-    instrument_name : str
-        JWST instrument name
-
-    Returns
-    -------
-    factor : float
-        Multiplicative factor by which the fov is enlarged
-    """
-    if instrument_name.lower() == 'nircam':
-        return np.sqrt(2.)
-    elif instrument_name.lower() == 'niriss':
-        return 2322./2048.
+# Default stamp image to use for ghost sources resulting from point sources
+MODULE_PATH = pkg_resources.resource_filename('mirage', '')
+CONFIG_DIR = os.path.join(MODULE_PATH, 'config')
+NIRISS_GHOST_GAP_FILE = os.path.join(CONFIG_DIR, 'niriss_ghost_gap_summary.txt')
+DEFAULT_NIRISS_PTSRC_GHOST_FILE = os.path.join(os.path.expandvars('$MIRAGE_DATA'), 'niriss/ghosts/', 'niriss_ghost_cen.fits')

@@ -1,4 +1,4 @@
-#! /usr/bin.env python
+#! /usr/bin/env python
 
 """This module reads in a Mirage-formatted source catalog and for each
 source, interpolates the provided magnitudes in order to produce a
@@ -23,6 +23,7 @@ Use
 """
 from collections import OrderedDict
 import copy
+import logging
 import os
 import pkg_resources
 
@@ -36,7 +37,9 @@ from synphot.spectrum import SpectralElement
 from synphot.models import Empirical1D
 
 from . import hdf5_catalog
-from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES
+from mirage.logging import logging_functions
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.flux_cal import mag_col_name_to_filter_pupil
 from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file, standardize_filters
 
@@ -45,6 +48,10 @@ CONFIG_PATH = os.path.join(MODULE_PATH, 'config')
 ZEROPOINT_FILES = {'niriss': os.path.join(CONFIG_PATH, 'niriss_zeropoints.list'),
                    'nircam': os.path.join(CONFIG_PATH, 'NIRCam_zeropoints.list'),
                    'fgs': os.path.join(CONFIG_PATH, 'guider_zeropoints.list')}
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def add_flam_columns(cat, mag_sys):
@@ -83,6 +90,10 @@ def add_flam_columns(cat, mag_sys):
             niriss_mag_cols.append(col)
         elif 'fgs' in col.lower():
             fgs_mag_cols.append(col)
+        elif col.lower() == 'magnitude':
+            raise ValueError(("Mirage no longer supports a source catalog column named simply 'magnitude'. Please "
+                              "use a column name that specifies instrument and optical elements. (e.g. 'nircam_f444w_clear_magnitude', "
+                              "niriss_f090w_magnitude."))
 
     # Get PHOTFLAM and filter zeropoint values
     parameters = {}
@@ -108,6 +119,22 @@ def add_flam_columns(cat, mag_sys):
         new_column_name = key.replace('magnitude', 'flam')
         cat[new_column_name] = flam_values
     return cat, parameters
+
+
+def create_ghost_seds(catalogs, sed_file):
+    """Create SED data for ghost sources using catalog index numbers. For a given
+    ghost source, get the index number of the original source that causes the ghost.
+    Get the SED of that original object and copy it over as the SED for the ghost.
+
+    Parameters
+    ----------
+    catalogs : list
+        List of Mirage-formatted source catalog files
+
+    sed_file : str
+        HDF5 file containing target SEDs
+    """
+    pass
 
 
 def convert_to_flam(instrument, filter_name, magnitudes, param_tuple, magnitude_system):
@@ -211,6 +238,7 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
         are numpy arrays of values. These can optionally have astropy units
         attached to them.
     """
+    logger = logging.getLogger('mirage.catalogs.spectra_from_catalog.create_spectra')
     flambda_cols = [col for col in catalog_with_flambda.colnames if 'flam' in col]
     filter_name = [colname.split('_')[1] for colname in flambda_cols]
     instrument = np.array([colname.split('_')[0] for colname in flambda_cols])
@@ -227,8 +255,8 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
     pivots = np.array(pivots)
 
     if (len(pivots) == 1):
-        print(("INFO: single filter magnitude input. Extrapolating to produce "
-               "a flat continuum."))
+        logger.info(("Single filter magnitude input. Extrapolating to produce "
+                     "a flat continuum."))
         extrapolate_SED = True
         pivots = np.append(pivots, pivots[0] + 0.01)
 
@@ -251,14 +279,21 @@ def create_spectra(catalog_with_flambda, filter_params, extrapolate_SED=True):
         if len(flux) == 1:
             flux.append(flux[0])
 
+        # Remove any NaN entries
         sorted_fluxes = np.array(flux)[sorted_indexes]
+        finite = np.isfinite(sorted_fluxes)
+        sorted_fluxes = sorted_fluxes[finite]
+        filtered_wavelengths = wavelengths[finite]
         final_sorted_fluxes = copy.deepcopy(sorted_fluxes)
 
         # If the provided flux values don't cover the complete wavelength
         # range, extrapolate, if requested.
-        if ((np.min(wavelengths) > min_wave) or (np.max(wavelengths) < max_wave)) and extrapolate_SED:
-            interp_func = interp1d(wavelengths, sorted_fluxes, fill_value="extrapolate", bounds_error=False)
+        if ((np.min(filtered_wavelengths) > min_wave) or (np.max(filtered_wavelengths) < max_wave)) and extrapolate_SED:
+            interp_func = interp1d(filtered_wavelengths, sorted_fluxes, fill_value="extrapolate", bounds_error=False)
             final_sorted_fluxes = interp_func(final_wavelengths)
+        else:
+            final_wavelengths = filtered_wavelengths
+
         # Set any flux values that are less than zero to zero
         final_sorted_fluxes[final_sorted_fluxes < 0.] = 0.
 
@@ -335,7 +370,7 @@ def get_filter_info(column_names, magsys):
 
 def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                      extrapolate_SED=True, output_filename=None, normalizing_mag_column=None,
-                     module=None, detector=None):
+                     module=None, detector=None, ghost_catalog_files=[]):
     """Overall wrapper function
 
     Parameters
@@ -378,11 +413,17 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
         Name of detector (e.g. 'GUIDER1'). Only used when ``normalizing_mag_column``
         is for FGS
 
+    ghost_catalog_files : list
+        Source catalogs containing optical ghosts, based on the astrophysical
+        sources within ``catalog_files``
+
     Returns
     -------
     output_filename : str
         Name of the saved HDF5 file containing all object spectra.
     """
+    logger = logging.getLogger('mirage.catalogs.spectra_from_catalog.make_all_spectra')
+
     # Create the output filename if needed
     if output_filename is None:
         output_filename = create_output_sed_filename(catalog_files[0], input_spectra_file)
@@ -444,7 +485,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
 
         catalog, filter_info = add_flam_columns(ascii_catalog, mag_sys)
         catalog.write(flambda_output_catalog, format='ascii', overwrite=True)
-        print('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
+        logger.info('Catalog updated with f_lambda columns, saved to: {}'.format(flambda_output_catalog))
 
         # Renormalize
         if len(all_input_spectra) > 0 and normalizing_mag_column is not None:
@@ -471,6 +512,26 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
                                        extrapolate_SED=extrapolate_SED)
             all_input_spectra = {**all_input_spectra, **continuum}
 
+    # Add entries for any ghost sources by copying the spectra for the
+    # sources that caused the ghosts. This needs to be done after we have
+    # spectra for all real sources, so we need a separate, second loop over
+    # the catalogs here.
+    for catalog_file in ghost_catalog_files:
+        ascii_catalog, mag_sys = read_catalog(catalog_file)
+
+        if 'corresponding_source_index_for_ghost' in ascii_catalog.colnames:
+            print('Within the catalog')
+            for source in ascii_catalog:
+                if source['corresponding_source_index_for_ghost'] != 0:
+                    spec = all_input_spectra[source['corresponding_source_index_for_ghost']]
+                    if source['index'] in all_input_spectra.keys():
+                        raise ValueError(("Attempting to add spectrum for ghost source {} to SED file, "
+                                          "but there is already a spectrum for that index present.".format(source['index'])))
+                    print('Found a ghost. Adding source.')
+                    all_input_spectra[source[index]] = spec
+                    logger.info(("Adding spectrum for ghost source {} to SED file. Copy spectrum from source {}. "
+                                 .format(source[index], source['corresponding_source_index_for_ghost'])))
+
     # For convenience, reorder the sources by index number
     spectra = OrderedDict({})
     for item in sorted(all_input_spectra.items()):
@@ -478,7 +539,7 @@ def make_all_spectra(catalog_files, input_spectra=None, input_spectra_file=None,
 
     # Save the source spectra in an hdf5 file
     hdf5_catalog.save(spectra, output_filename, wavelength_unit='micron', flux_unit='flam')
-    print('Spectra catalog file saved to {}'.format(output_filename))
+    logger.info('Spectra catalog file saved to {}'.format(output_filename))
     return output_filename
 
 
@@ -559,6 +620,8 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         requested magnitude, only for spectra where the flux units are
         astropy.units.pct
     """
+    logger = logging.getLogger('mirage.catalogs.spectra_from_catalog.rescale_normalized_spectra')
+
     # Get the Vega spectrum from synphot. Use the version that was used
     # to create the photom reference files and filter zeropoints
     with syn_conf.set_temp('vega_file', 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_008.fits'):
@@ -576,12 +639,13 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
         flux = spec[dataset]['fluxes']
         flux_units = flux.unit
         if (flux_units == u.pct):
-            print('SED for source {} is normalized. Rescaling.'.format(dataset))
+            logger.info('SED for source {} is normalized. Rescaling.'.format(dataset))
             match = catalog_info['index'] == dataset
 
             if not any(match):
-                raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
-                                  'number {}. Unable to rescale.').format(dataset))
+                #raise ValueError(('WARNING: No matching target in ascii catalog for normalized source '
+                #                  'number {}. Unable to rescale.').format(dataset))
+                continue
             magnitude = catalog_info[mag_colname].data[match][0]
 
             # Create a synphot source spectrum
@@ -634,6 +698,6 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
 
             spec[dataset]['fluxes'] = renorm(waves, flux_unit='flam')
         else:
-            print('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
+            logger.info('SED for source {} is already in physical units. NOT RESCALING'.format(dataset))
 
     return spec

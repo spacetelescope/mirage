@@ -10,7 +10,7 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
 
 .. important::
 
-    Currently Mirage is able to parse the following APT templates. Mirage will fail if your APT file contains observations using a template not on this list.
+    Currently Mirage is able to parse APT files containing any observation template, including all JWST-supported coordinated parallel combinations. However, it will only generate yaml input files for the observation templates listed below. It will silently skip over all other templates.
 
     +--------------------------------+
     |         NIRCAM                 |
@@ -18,34 +18,25 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
     |  - NircamImaging               |
     |  - NircamWfss                  |
     |  - NircamEngineeringImaging    |
-    |  - NircamDark                  |
     |  - NircamTimeSeries            |
     |  - NircamGrismTimeSeries       |
     +--------------------------------+
 
-    +-------------------------------+
-    |         NIRISS                |
-    +===============================+
-    |  - NirissExternalCalibration  |
-    |  - NirissWfss                 |
-    |  - NirissAmi                  |
-    |  - NirissDark                 |
-    +-------------------------------+
+    +--------------------------------+
+    |         NIRISS                 |
+    +================================+
+    |  - NirissImaging               |
+    |  - NirissExternalCalibration   |
+    |  - NirissWfss                  |
+    |  - NirissAmi                   |
+    |                                |
+    +--------------------------------+
 
-    +-------------------------------+
-    |          FGS                  |
-    +===============================+
-    |  - FgsExternalCalibration     |
-    +-------------------------------+
-
-    +-------------------------------+
-    |     Other Instruments         |
-    | (for parallel observations)   |
-    +===============================+
-    |  - NirspecImaging             |
-    |  - NirspecInternalLamp        |
-    |  - MiriMRS                    |
-    +-------------------------------+
+    +--------------------------------+
+    |          FGS                   |
+    +================================+
+    |  - FgsExternalCalibration      |
+    +--------------------------------+
 
     +-------------------------------+
     | Wavefront Sensing and Control |
@@ -55,7 +46,6 @@ Examples of this functionality are shown in the `notebooks <https://github.com/s
     |  - WfscCoarsePhasing          |
     |  - WfscFinePhasing            |
     +-------------------------------+
-
 
 Export XML and Pointing files from APT
 --------------------------------------
@@ -245,10 +235,10 @@ Observation Dates
 +++++++++++++++++
 
 You may also specify the observation date for each observation in your APT file. This may be used along with roll angle to help define epochs in your observations, or simply
-to associate a given dataset with a date. **Note that Mirage does not pay attention to dates in any way** other than to save them into the *date-obs* header keyword in the output
+to associate a given dataset with a date. Mirage saves the input dates into the *date-obs* header keyword in the output
 files. Mirage does not check that a given roll angle and pointing are physically realizable on a given date. It is up to you to provide realistic values for these paramters
 if they are important to you. The `JWST Target Visibility Tools <http://www.stsci.edu/jwst/science-planning/proposal-planning-toolbox/target-visibility-tools>`_ (TVT) are
-useful for this. Note that in all cases below, Mirage will use the entered date (along with a default time) as the starting time of the first exposure in the observation.
+useful for this. Note that in all cases below, Mirage will use the entered date (along with a default time if necessary) as the starting time of the first exposure in the observation.
 Mirage keeps track of exposure times and makes some guesses about overheads, and increments the observation time and date for each exposure.
 
 To use the Mirage default for observation date (arbitrarily set to 2021-10-04), you can either not supply any date information, or explicitly use None.
@@ -270,6 +260,11 @@ the date strings for each.
 
     dates = {'001': '2022-06-25', '002': '2022-11-15', '003': '2023-03-14'}
 
+For observations where you want to be more specific about the observation time (such as for non-sidereal targets), datetime strings can be provided:
+
+::
+
+    dates = {'001': '2022-06-25T12:00:00', '002': '2022-11-15T12:34:56', '003': '2023-03-14T18:35:42'}
 
 .. _yam_gen_cr_inputs:
 
@@ -336,6 +331,10 @@ Mirage relies on the `CRDS <https://hst-crds.stsci.edu/static/users_guide/index.
 
     In order to specify a location on your machine to store the downloaded reference files, you must have the CRDS_PATH environment variable set to that location. If this environment variable is not set, Mirage will default to use $HOME/crds_cache/
 
+.. tip::
+
+    Even though the transmission image reference files are not currently hosted by CRDS, for the purposes of user input options, Mirage treats them as if they are. Placing "crds" for these files in the input yaml files will cause Mirage to search the collection of Mirage reference files for them, rather than searching CRDS. We anticipate the transmission image files will be moved into CRDS in the future, which is why we treat them in this way.
+
 .. important::
 
     Due to a limitation of the **CRDS** package, the CRDS_PATH and CRDS_SERVER_URL environment variables must be set BEFORE importing the **CRDS** package. If you are running Mirage using code that imports **CRDS** *or any other packages that import CRDS* (such as Mirage's **dark_prep** module or the **jwst** package, which contains the calibration pipeline) prior to running Mirage, you should explicitly set the environment variables before importing those packages. If you do not, you will get the following error:
@@ -361,16 +360,17 @@ Here is a view of the dictionary structure required when specifying reference fi
 
 ::
 
-    override = {'nircam': {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
-                           'linearity':  {detector_name: 'reffile_name.fits'},
-                           'saturation': {detector_name: 'reffile_name.fits'},
-                           'gain':       {detector_name: 'reffile_name.fits'},
-                           'distortion': {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
-                           'ipc':        {detector_name: 'reffile_name.fits'},
-                           'area':       {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
-                           'badpixmask': {detector_name: 'reffile_name.fits'},
-                           'pixelflat':  {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
-                           'photom':     {detector_name: 'reffile_name.fits'}
+    override = {'nircam': {'superbias':    {detector_name: {readpattern: 'reffile_name.fits'}},
+                           'linearity':    {detector_name: 'reffile_name.fits'},
+                           'saturation':   {detector_name: 'reffile_name.fits'},
+                           'gain':         {detector_name: 'reffile_name.fits'},
+                           'distortion':   {detector_name: {filter: {exposure_type: 'reffile_name.asdf'}}},
+                           'ipc':          {detector_name: 'reffile_name.fits'},
+                           'area':         {detector_name: {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}}},
+                           'transmission': {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
+                           'badpixmask':   {detector_name: 'reffile_name.fits'},
+                           'pixelflat':    {detector_name: {filter: {pupil: 'reffile_name.fits'}}},
+                           'photom':       {detector_name: 'reffile_name.fits'}
                            },
                 'niriss': {'superbias':  {readpattern: 'reffile_name.fits'},
                            'linearity':  'reffile_name.fits',
@@ -379,20 +379,22 @@ Here is a view of the dictionary structure required when specifying reference fi
                            'distortion': {pupil: {exposure_type: 'reffile_name.fits'}},
                            'ipc':        'reffile_name.fits',
                            'area':       {filter: {pupil: {exposure_type: 'reffile_name.asdf'}}},
+                           'transmission': {filter: {pupil: 'reffile_name.fits'}},
                            'badpixmask': 'reffile_name.fits',
                            'pixelflat':  {filter: {pupil: 'reffile_name.fits'}},
                            'photom':     {detector_name: 'reffile_name.fits'}
                            },
-                'fgs':    {'superbias':  {detector_name: {readpattern: 'reffile_name.fits'}},
-                           'linearity':  {detector_name: 'reffile_name.fits'},
-                           'saturation': {detector_name: 'reffile_name.fits'},
-                           'gain':       {detector_name: 'reffile_name.fits'},
-                           'distortion': {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'ipc':        {detector_name: 'reffile_name.fits'},
-                           'area':       {detector_name: 'reffile_name.asdf'},
-                           'badpixmask': {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'pixelflat':  {detector_name: {exposure_type: 'reffile_name.fits'}},
-                           'photom':     {detector_name: 'reffile_name.fits'}
+                'fgs':    {'superbias':    {detector_name: {readpattern: 'reffile_name.fits'}},
+                           'linearity':    {detector_name: 'reffile_name.fits'},
+                           'saturation':   {detector_name: 'reffile_name.fits'},
+                           'gain':         {detector_name: 'reffile_name.fits'},
+                           'distortion':   {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'ipc':          {detector_name: 'reffile_name.fits'},
+                           'area':         {detector_name: 'reffile_name.asdf'},
+                           'transmission': {detector_name: 'reffile_name.fits'},
+                           'badpixmask':   {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'pixelflat':    {detector_name: {exposure_type: 'reffile_name.fits'}},
+                           'photom':       {detector_name: 'reffile_name.fits'}
                            }
 
 
@@ -418,6 +420,7 @@ Here we show an example dictionary for a particular set of observations.
                                           'nrcb4': 'my_reffiles/my_ipc_for_b4.fits'},
                            'area':       {'nrcb5': {'f322w2': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b5.asdf'}}},
                                           'nrcb4': {'f444w':  {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.asdf'}}}},
+                           'transmission': {'nrcb5': {'f356w': {'clear': 'my_reffiles/my_transmission_for_b5.fits'}}},
                            'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                           'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
                            'pixelflat':  {'nrcb5': {'f322w2': {'clear': 'my_favorites/lw_flat.fits',
@@ -446,6 +449,19 @@ Accompanying the noiseless seed image, Mirage will also produce a segmentation m
 
 The allowed units for the threshold value are: ADU/sec, e/sec, MJy/sr, erg/cm2/A, erg/cm2/Hz
 Note that these are case insensitive.
+
+
+.. _add_ghosts:
+
+Add Optical Ghosts to NIRISS Observations
++++++++++++++++++++++++++++++++++++++++++
+
+If you will be creating NIRISS simulations and have point sources, you can instruct Mirage to add optical ghosts corresponding to your astronomical sources. This is controlled using the **add_ghosts** and **convolve_ghosts_with_psf** keywords. **add_ghosts** is a boolean parameter describing whether or not to add ghosts to the simulation. The default for this is True. **convolve_ghosts_with_psf** is also a boolean. This parameter describes whether a stamp image containing the ghost should be convolved with the instrumental PSF prior to adding the ghost to the data. The default for this parameter is False. Details on how the ghosts are added and their morphology are given on the :ref:`ghosts <ghosts>` page.
+
+::
+
+    ghosts = True
+    convolve_ghosts = False
 
 
 .. _yaml_generator:
@@ -478,7 +494,8 @@ Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
                                   cosmic_rays=crs, background=background, roll_angle=pav3,
                                   dates=dates, datatype='raw', dateobs_for_background=False,
                                   reffile_defaults='crds', reffile_overrides=reffile_overrides,
-                                  segmap_flux_limit=minmum_signal, segmap_flux_limit_units=minimum_signal_units
+                                  segmap_flux_limit=minmum_signal, segmap_flux_limit_units=minimum_signal_units,
+                                  add_ghosts=ghosts, convolve_ghosts_with_psf=convolve_ghosts
                                   )
     yam.use_linearized_darks = True
     yam.create_inputs()

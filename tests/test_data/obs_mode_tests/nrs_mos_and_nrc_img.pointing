@@ -1,0 +1,23 @@
+# APT Output Product
+# 
+# APT Version: Version 2020.5  JWST PRD: PRDOPSSOC-032 
+# Date: Thu Mar 04 15:05:04 GMT 2021
+
+JWST Pointing Report for JWST Submitted Proposal 89898 (nrs_mos_and_nrc_img.aptx)
+
+========================================
+* mos_nrcimg (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  0    0   0    0 NRS_S1600A1_SLIT          1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.000 +321.532 -473.679   +0.000   +0.000 TARGET     T_ACQ          0      0  0.000 (base)
+  0    0   0    0 NRS_S1600A1_SLIT          1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.000 +321.532 -473.679   +0.000   +0.000 TARGET     T_ACQ          0      0  0.000          
+  1    1   1    1 NRS_FIELD1_MSA4           1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.000 +299.525 -456.598   +0.000   +0.000 MSA_CONFIG SCIENCE        0      0 27.858          
+  1    1   1    1 NRCB5_SUB320              1 TARGONE   +12.00000  +12.00000 -386.616  +35.014   +0.000   +0.000 +299.525 -456.598 -386.617  +35.014 MSA_CONFIG PARALLEL       0      0                 
+  1    1   1    2 NRS_FIELD1_MSA4           1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.010 +299.532 -456.605   +0.000   +0.010 SUBDITHER  SCIENCE        0      0  0.010          
+  1    1   1    2 NRCB5_SUB320              1 TARGONE   +12.00000  +12.00000 -386.616  +35.014   -0.007   -0.007 +299.532 -456.605 -386.624  +35.007 SUBDITHER  PARALLEL       0      0                 
+  1    1   2    1 NRS_FIELD1_MSA4           1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.000 +299.525 -456.598   +0.000   +0.000 MSA_CONFIG SCIENCE        0      0  0.010          
+  1    1   2    1 NRCB5_SUB320              1 TARGONE   +12.00000  +12.00000 -386.616  +35.014   +0.000   +0.000 +299.525 -456.598 -386.617  +35.014 MSA_CONFIG PARALLEL       0      0                 
+  1    1   2    2 NRS_FIELD1_MSA4           1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +0.000   +0.010 +299.532 -456.605   +0.000   +0.010 SUBDITHER  SCIENCE        0      0  0.010          
+  1    1   2    2 NRCB5_SUB320              1 TARGONE   +12.00000  +12.00000 -386.616  +35.014   -0.007   -0.007 +299.532 -456.605 -386.624  +35.007 SUBDITHER  PARALLEL       0      0                 
+
+

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  pull_request:
+  schedule:
+    # Run every Monday at 6am UTC
+    - cron: "0 6 * * 1"
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit tests Python 3.7
+            os: ubuntu-latest
+            python-version: 3.7
+            extras: test
+            test-command: pytest
+
+          - name: Unit tests Python 3.8
+            os: ubuntu-latest
+            python-version: 3.8
+            extras: test
+            test-command: pytest
+
+          - name: Unit tests Python 3.9
+            os: ubuntu-latest
+            python-version: 3.9
+            extras: test
+            test-command: pytest
+
+          - name: Build docs
+            os: ubuntu-latest
+            python-version: 3.8
+            extras: docs
+            test-command: sphinx-build docs docs/_build
+
+    steps:
+      - name: Install system packages
+        if: ${{ contains(matrix.name,'docs') }}
+        run: |
+          sudo apt-get install pandoc
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Upgrade pip
+        run: |
+          pip install --upgrade pip
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
+      - name: Install dependencies
+        run: |
+          conda env update --file environment_python_${PYTHONVERSION}.yml --name mirage-${{ matrix.python-version }}
+        env:
+            PYTHONVERSION: ${{ matrix.python-version }}
+      - name: Install package
+        run: |
+          pip install -e .[${{ matrix.extras }}]
+      - name: Run tests
+        run: |
+          ${{ matrix.test-command }}

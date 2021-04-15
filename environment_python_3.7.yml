@@ -1,0 +1,36 @@
+channels:
+- http://ssb.stsci.edu/astroconda
+- conda-forge
+- defaults
+dependencies:
+- pip
+- python==3.7.7
+- webbpsf==0.9.1
+- pip:
+    - asdf==2.7.2
+    - astropy==4.2
+    - astroquery==0.4.1
+    - bokeh>=2.2.3
+    - batman-package==2.4.7
+    - crds==10.3.8
+    - grismconf==1.32
+    - gwcs==0.16.1
+    - healpy==1.14
+    - hotsoss==0.1.7
+    - h5py==3.1.0
+    - ipython==7.20.0
+    - jupyter==1.0.0
+    - jwst==1.0.0
+    - jwst-backgrounds==1.1.2
+    - jwxml==0.3.2
+    - lxml==4.6.2
+    - matplotlib==3.3.4
+    - nircam_gsim==1.56
+    - numpy==1.20.1
+    - photutils==1.0.2
+    - pysiaf==0.10.0
+    - pytest==6.2.2
+    - scipy==1.6.1
+    - sphinx==3.5.1
+    - synphot==1.0.1
+    - pyyaml==5.4.1

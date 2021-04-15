@@ -4,11 +4,14 @@ jwst_backgrounds
 """
 import astropy.units as u
 import datetime
+import logging
 import numpy as np
+import os
 
 from jwst_backgrounds import jbt
 
-from mirage.utils.constants import PRIMARY_MIRROR_AREA, PLANCK
+from mirage.logging import logging_functions
+from mirage.utils.constants import PRIMARY_MIRROR_AREA, PLANCK, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils.file_io import read_filter_throughput
 from mirage.utils.flux_cal import fluxcal_info
 
@@ -17,6 +20,11 @@ from mirage.utils.flux_cal import fluxcal_info
 LOW = 0.1
 MEDIUM = 0.5
 HIGH = 0.9
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def calculate_background(ra, dec, filter_file, use_dateobs, gain_value,
@@ -313,7 +321,7 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
     return value
 
 
-def nircam_background_spectrum(parameters, detector, module):
+def get_1d_background_spectrum(parameters, detector, module):
     """Generate a background spectrum by calling jwst_backgrounds and
     returning wavelengths and flux density values based on observation
     date or low/medium/high
@@ -339,17 +347,19 @@ def nircam_background_spectrum(parameters, detector, module):
     fluxes : numpy.ndarray
         1D array of flux density values
     """
+    logger = logging.getLogger('mirage.utils.backgrounds.nircam_background_spectrum')
+
     if parameters['simSignals']['use_dateobs_for_background']:
-        print("Generating background spectrum for observation date: {}"
-              .format(parameters['Output']['date_obs']))
+        logger.info("Generating background spectrum for observation date: {}"
+                     .format(parameters['Output']['date_obs']))
         waves, fluxes = day_of_year_background_spectrum(parameters['Telescope']['ra'],
                                                         parameters['Telescope']['dec'],
                                                         parameters['Output']['date_obs'])
     else:
         if isinstance(parameters['simSignals']['bkgdrate'], str):
             if parameters['simSignals']['bkgdrate'].lower() in ['low', 'medium', 'high']:
-                print("Generating background spectrum based on requested level of: {}"
-                      .format(parameters['simSignals']['bkgdrate']))
+                logger.info("Generating background spectrum based on requested level of: {}"
+                            .format(parameters['simSignals']['bkgdrate']))
                 waves, fluxes = low_med_high_background_spectrum(parameters, detector, module)
             else:
                 raise ValueError("ERROR: Unrecognized background rate. Must be one of 'low', 'medium', 'high'")
