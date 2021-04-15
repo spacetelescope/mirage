@@ -47,6 +47,45 @@ classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
 logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
+def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
+    """Check that the gridded PSF library is properly normalized. We expect
+    the total signal of the PSF to be roughly 1.0 (minus up to several percent
+    since it should be normalized to 1.0 at the pupil).
+
+    Parameters
+    ----------
+    lib : photutils.psf.models.GriddedPSFModel
+        Gridded PSF model instance
+
+    lower_limit : float
+        Lower limit for the total signal in the PSF
+
+    upper_limit : float
+        Upper limit for the total signal in the PSF
+
+    Returns
+    -------
+    result : tup
+        2-element tuple. The first is a boolean, which is
+        True if the normalization is as expected. False otherwise.
+        The second element is a short string describing the
+        result.
+    """
+    ndims = len(lib.data.shape)
+    if ndims == 3:
+        total_signal = np.sum(lib.data[0, :, :])
+    elif ndims == 2:
+        total_signal = np.sum(lib.data)
+    total_signal /= lib.meta['oversamp'][0]**2
+
+    if total_signal > upper_limit:
+        result = False, 'too high'
+    elif total_signal < lower_limit:
+        result = False, 'too low'
+    else:
+        result = True, 'correct'
+    return result
+
 
 def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
                                wavefront_error_type, wavefront_error_group, file_path,
@@ -272,9 +311,13 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         # Handle input ITM images
         library = _load_itm_library(library_file)
 
-
-    return library
-
+    # Check that the gridded PSF library is normalized as expected
+    correct_norm, reason = check_normalization(library)
+    if correct_norm:
+        return library
+    else:
+        raise ValueError(("Gridded PSF library in {} appears to be improperly normalized."
+                          "The total signal in a PSF is {}".format(library_file, reason)))
 
 def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                      library_path, wings=False, segment_id=None):
