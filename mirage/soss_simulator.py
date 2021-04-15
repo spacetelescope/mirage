@@ -240,7 +240,7 @@ class SossSim():
         obs.segmap = self.segmap
         obs.seedheader = self.seedinfo
         obs.paramfile = self.paramfile
-        obs.create()
+        obs.create(params=self.params)
 
         # Save ramp to tso attribute
         self.tso = obs.raw_outramp
