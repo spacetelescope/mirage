@@ -1,12 +1,14 @@
 asdf>=2.1.0
 astropy>=4.0
 astroquery>=0.3.8
+bokeh>=2.2.3
 batman-package>=2.4.6
 crds>=7.4.1
 grismconf>=1.24
 gwcs>=0.11
 healpy>=1.12.5
 h5py>=2.8.0
+hotsoss>=0.1.7
 ipython>=7.18.1
 jupyter>=1.0.0
 jwst>=0.16.2

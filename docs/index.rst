@@ -40,6 +40,7 @@ Mirage is based on early NIRISS simulator software written by Kevin Volk. It has
 - `Shannon Osborne <https://github.com/shanosborne>`_
 - `Marshall Perrin <https://github.com/mperrin>`_
 - `Nor Pirzkal <https://github.com/npirzkal>`_
+- `Joe Filippazzo <https://github.com/hover2pi>`_
 
 
 Indices and tables

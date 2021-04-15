@@ -10,11 +10,13 @@ dependencies:
     - asdf==2.7.2
     - astropy==4.2
     - astroquery==0.4.1
+    - bokeh>=2.2.3
     - batman-package==2.4.7
     - crds==10.3.8
     - grismconf==1.32
     - gwcs==0.16.1
     - healpy==1.14
+    - hotsoss==0.1.7
     - h5py==3.1.0
     - ipython==7.20.0
     - jupyter==1.0.0

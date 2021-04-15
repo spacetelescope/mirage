@@ -5,7 +5,7 @@ Create a final simulated exposure.
 
 This module contains code that will combine a seed image and a
 dark current exposure into a final simulated exposure. Cosmic rays,
-Poisson noise, and other detector effects are addded. This is the
+Poisson noise, and other detector effects are added. This is the
 final step when creating simulated data with Mirage. It can be run
 after catalog_Seed_image.py and dark_prep.py
 
@@ -60,7 +60,7 @@ from mirage.utils.timer import Timer
 
 INST_LIST = ['nircam', 'niriss', 'fgs']
 MODES = {"nircam": ["imaging", "ts_imaging", "wfss", "ts_grism"],
-         "niriss": ["imaging", "ami", "pom", "wfss"],
+         "niriss": ["imaging", "ami", "pom", "wfss", "soss"],
          "fgs": ["imaging"]}
 
 classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
@@ -87,6 +87,8 @@ class Observation():
         self.seedheader = None
         self.seedunits = 'ADU/sec'
         self.offline = offline
+        self.paramfile = 'None'
+        self.params = None
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -1047,10 +1049,14 @@ class Observation():
         return crhits, crs_perframe
 
     @logging_functions.log_fail
-    def create(self):
+    def create(self, params=None):
         """MAIN FUNCTION"""
         # Read in the parameter file
-        self.read_parameter_file()
+        if params is not None:
+            self.params = params
+
+        if self.params is None:
+            self.read_parameter_file()
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
@@ -1066,7 +1072,6 @@ class Observation():
 
         # Expand param entries to full paths where appropriate
         self.params = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
-
         self.file_check()
 
         #print('self.linDark:', self.linDark)
@@ -1383,6 +1388,9 @@ class Observation():
                     self.logger.info("Final raw exposure saved to: ")
                     self.logger.info("{}".format(rawrampfile))
                     self.raw_output = rawrampfile
+
+                    # Adding this as an attribute so it can be accessed by soss_simulator.py
+                    self.raw_outramp = raw_outramp
                 else:
                     raise ValueError(("WARNING: raw output ramp requested, but the signal associated "
                                       "with the superbias and reference pixels is not present in "
@@ -2891,14 +2899,14 @@ class Observation():
 
         # Grism TSO data have the XREF_SCI and YREF_SCI keywords populated.
         # These are used to describe the location of the source on the detector.
-        self.logger.info('\n\nPopulating xref_sci in output file:')
-        self.logger.info('{}'.format(self.seedheader['XREF_SCI']))
-
         try:
+            self.logger.info('\n\nPopulating xref_sci in output file:')
+            self.logger.info('{}'.format(self.seedheader['XREF_SCI']))
+
             outModel.meta.wcsinfo.siaf_xref_sci = self.seedheader['XREF_SCI']
             outModel.meta.wcsinfo.siaf_yref_sci = self.seedheader['YREF_SCI']
         except KeyError:
-            self.logger.warning('Unable to propagate XREF_SCI, YREF_SCI from seed image to simualted data file.')
+            self.logger.warning('Unable to propagate XREF_SCI, YREF_SCI from seed image to simulated data file.')
 
         # ra_v1, dec_v1, and pa_v3 are not used by the level 2 pipelines
         # compute pointing of V1 axis
@@ -2978,8 +2986,13 @@ class Observation():
         outModel.meta.exposure.nframes = self.params['Readout']['nframe']
         outModel.meta.exposure.ngroups = self.params['Readout']['ngroup']
         outModel.meta.exposure.nints = self.params['Readout']['nint']
-        outModel.meta.exposure.integration_start = self.seedheader['SEGINTST'] + 1
-        outModel.meta.exposure.integration_end = self.seedheader['SEGINTED'] + 1
+
+        # TODO: Putting this try/except here because SOSS mode mysteriously breaks it (Joe)
+        try:
+            outModel.meta.exposure.integration_start = self.seedheader['SEGINTST'] + 1
+            outModel.meta.exposure.integration_end = self.seedheader['SEGINTED'] + 1
+        except KeyError:
+            pass
 
         outModel.meta.exposure.sample_time = 10
         outModel.meta.exposure.frame_time = self.frametime

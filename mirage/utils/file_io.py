@@ -23,6 +23,7 @@ import logging
 import os
 
 from astropy.io import ascii, fits
+import astropy.units as q
 import numpy as np
 
 from mirage.logging import logging_functions
@@ -33,6 +34,82 @@ classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
 logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
+
+def read_file_spectrum(file, wave_units=q.um, flux_units=q.erg/q.s/q.cm**2/q.AA, survey=None):
+    """Create a spectrum from an ASCII, XML, or FITS file
+
+    Parameters
+    ----------
+    file: str
+        The path to the file
+    wave_units: str, astropy.units.quantity.Quantity
+        The wavelength units
+    flux_units: str, astropy.units.quantity.Quantity, None
+        The flux units
+    survey: str
+        The name of the survey, ['SDSS']
+
+    Returns
+    -------
+    list
+        The [wavelength, flux, error] of the file spectrum with units
+    """
+    # Read the fits data...
+    if file.endswith('.fits'):
+
+        if file.endswith('.fits'):
+            data, head = fits.getdata(file, header=True)
+
+        elif survey == 'SDSS':
+            raw, head = fits.getdata(file, header=True)
+            flux_units = 1E-17 * q.erg / q.s / q.cm ** 2 / q.AA
+            wave_units = q.AA
+            log_w = head['COEFF0'] + head['COEFF1'] * np.arange(len(raw.flux))
+            data = [10 ** log_w, raw.flux, raw.ivar]
+
+        # Check if it is a recarray
+        elif isinstance(raw, fits.fitsrec.FITS_rec):
+
+            # Check if it's an SDSS spectrum
+            raw = fits.getdata(file, ext=ext)
+            data = raw['WAVELENGTH'], raw['FLUX'], raw['ERROR']
+
+        # Otherwise just an array
+        else:
+            print("Sorry, I cannot read the file at", file)
+
+    # ...or the ascii data...
+    elif file.endswith('.txt'):
+        data = np.genfromtxt(file, unpack=True)
+
+    # ...or the VO Table
+    elif file.endswith('.xml'):
+        vot = vo.parse_single_table(file)
+        data = np.array([list(i) for i in vot.array]).T
+
+    else:
+        raise IOError('The file needs to be ASCII, XML, or FITS.')
+
+    # Make sure units are astropy quantities
+    if isinstance(wave_units, str):
+        wave_units = q.Unit(wave_units)
+    if isinstance(flux_units, str):
+        flux_units = q.Unit(flux_units)
+
+    # Sanity check for wave_units
+    if data[0].min() > 100 and wave_units == q.um:
+        print("WARNING: Your wavelength range ({} - {}) looks like Angstroms. Are you sure it's {}?".format(
+            data[0].min(), data[0].max(), wave_units))
+
+    # Apply units
+    wave = data[0] * wave_units
+    flux = data[1] * (flux_units or 1.)
+    if len(data) > 2:
+        unc = data[2] * (flux_units or 1.)
+    else:
+        unc = None
+
+    return [wave, flux, unc]
 
 
 def read_filter_throughput(filename):
