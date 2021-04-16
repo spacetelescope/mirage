@@ -1,0 +1,16 @@
+# APT Output Product
+# 
+# APT Version: Version 2020.1.2  JWST PRD: PRDOPSSOC-M-026 
+# Date: Wed Feb 26 17:08:04 GMT 2020
+
+JWST Pointing Report for JWST Approved Proposal 1136 (Unsaved)
+
+========================================
+* SM Focus Sweep - Iteration 1 (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +120.292  +22.568   +0.000   +0.000 -120.664 -470.634 +120.292  +22.568 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +120.292  +22.568   +0.000   +0.000 -120.664 -470.634 +120.292  +22.568 TARGET     SCIENCE        0      0  0.000          
+  1    1   1    1 NRCALL_FULL               2 HD-84406 +146.87731  +63.24781 +120.292  +22.568   +0.000   +0.000 -120.664 -470.634 +120.292  +22.568 TARGET     SCIENCE        0      0  0.000          
+
+

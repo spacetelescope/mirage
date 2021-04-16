@@ -30,6 +30,7 @@ Use
 
 from copy import copy
 from glob import glob
+import logging
 import os
 import warnings
 
@@ -37,9 +38,53 @@ from astropy.io import fits
 import numpy as np
 from webbpsf.utils import to_griddedpsfmodel
 
-from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS
-from mirage.utils.utils import expand_environment_variable
+from mirage.logging import logging_functions
+from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils.utils import expand_environment_variable, standardize_filters
 
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
+def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
+    """Check that the gridded PSF library is properly normalized. We expect
+    the total signal of the PSF to be roughly 1.0 (minus up to several percent
+    since it should be normalized to 1.0 at the pupil).
+
+    Parameters
+    ----------
+    lib : photutils.psf.models.GriddedPSFModel
+        Gridded PSF model instance
+
+    lower_limit : float
+        Lower limit for the total signal in the PSF
+
+    upper_limit : float
+        Upper limit for the total signal in the PSF
+
+    Returns
+    -------
+    result : tup
+        2-element tuple. The first is a boolean, which is
+        True if the normalization is as expected. False otherwise.
+        The second element is a short string describing the
+        result.
+    """
+    ndims = len(lib.data.shape)
+    if ndims == 3:
+        total_signal = np.sum(lib.data[0, :, :])
+    elif ndims == 2:
+        total_signal = np.sum(lib.data)
+    total_signal /= lib.meta['oversamp'][0]**2
+
+    if total_signal > upper_limit:
+        result = False, 'too high'
+    elif total_signal < lower_limit:
+        result = False, 'too low'
+    else:
+        result = True, 'correct'
+    return result
 
 
 def confirm_gridded_properties(filename, instrument, detector, filtername, pupilname,
@@ -200,6 +245,8 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         Object containing PSF library
 
     """
+    logger = logging.getLogger('mirage.psf.psf_selection.get_gridded_psf_library')
+
     # First, as a way to save time, let's assume a file naming convention
     # and search for the appropriate file that way. If we find a match,
     # confirm the properties of the file via the header. This way we don't
@@ -207,18 +254,35 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # saves at least a handful of seconds.
     if instrument.lower() == 'fgs':
         default_file_pattern = '{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
-                                                                                        detector.lower(),
-                                                                                        wavefront_error.lower(),
-                                                                                        wavefront_error_group)
+                                                                                      detector.lower(),
+                                                                                      wavefront_error.lower(),
+                                                                                      wavefront_error_group)
     else:
-        default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
-                                                                                        detector.lower(),
-                                                                                        filtername.lower(),
-                                                                                        pupilname.lower(),
-                                                                                        wavefront_error.lower(),
-                                                                                        wavefront_error_group)
-    default_matches = glob(os.path.join(library_path, default_file_pattern))
+        # NIRISS gridded library names don't follow standard filter/pupil rules.
+        # The filenames are all <filter>_<clear>, where <clear> is clear if it
+        # is in the filter wheel and clearp if in the pupil wheel.
+        if instrument.lower() == 'niriss':
+            if filtername.lower() == 'clear':
+                filename_filter = pupilname
+                filename_pupil = filtername
+            elif pupilname.lower() == 'clearp':
+                filename_filter = filtername
+                filename_pupil = pupilname
+            # filter=clear, pupil=nrm is currently not allowed
+            if pupilname.lower() == 'nrm':
+                filename_filter = filtername
+                filename_pupil = 'mask_nrm'
+        elif instrument.lower() == 'nircam':
+            filename_filter = filtername
+            filename_pupil = pupilname if 'GDHS' not in pupilname else 'clear'  # for WFSC team practice purposes we don't produce DHS "PSFs"
 
+        default_file_pattern = '{}_{}_{}_{}_fovp*_samp*_npsf*_{}_realization{}.fits'.format(instrument.lower(),
+                                                                                            detector.lower(),
+                                                                                            filename_filter.lower(),
+                                                                                            filename_pupil.lower(),
+                                                                                            wavefront_error.lower(),
+                                                                                            wavefront_error_group)
+    default_matches = glob(os.path.join(library_path, default_file_pattern))
     library_file = None
     if len(default_matches) == 1:
         library_file = confirm_gridded_properties(default_matches[0], instrument, detector, filtername,
@@ -233,20 +297,27 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         library_file = get_library_file(instrument, detector, filtername, pupilname,
                                         wavefront_error, wavefront_error_group, library_path)
 
-    print("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
+    logger.info("PSFs will be generated using: {}".format(os.path.abspath(library_file)))
 
-    try:
-        library = to_griddedpsfmodel(library_file)
-    except KeyError:
+    lib_head = fits.getheader(library_file)
+    itm_sim = lib_head.get('ORIGIN', '') == 'ITM'
+
+    if not itm_sim:
+        try:
+            library = to_griddedpsfmodel(library_file)
+        except OSError:
+            logger.error("OSError: Unable to open {}.".format(library_file))
+    else:
         # Handle input ITM images
-        itm_sim = fits.getval(library_file, 'ORIGIN')
-        if itm_sim:
-            library = _load_itm_library(library_file)
+        library = _load_itm_library(library_file)
 
-    except OSError:
-        print("OSError: Unable to open {}.".format(library_file))
-    return library
-
+    # Check that the gridded PSF library is normalized as expected
+    correct_norm, reason = check_normalization(library)
+    if correct_norm:
+        return library
+    else:
+        raise ValueError(("Gridded PSF library in {} appears to be improperly normalized."
+                          "The total signal in a PSF is {}".format(library_file, reason)))
 
 def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                      library_path, wings=False, segment_id=None):
@@ -288,6 +359,8 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     matches : str
         Name of the PSF library file for the instrument and filter name
     """
+    logger = logging.getLogger('mirage.psf.psf_selection.get_library_file')
+
     psf_files = glob(os.path.join(library_path, '*.fits'))
 
     # Determine if the PSF path is default or not
@@ -312,6 +385,12 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     # handle the NIRISS NRM case
     if pupil == 'NRM':
         pupil = 'MASK_NRM'
+
+    # Handle the DHS for Coarse Phasing - this is a workaround for webbpsf not
+    # implementing this. We're going to load an ITM image in any case in this mode
+    # so the PSF is entirely unused, but we need to load something or else MIRAGE errors.
+    if pupil == 'GDHS0' or pupil == 'GDHS60':
+        pupil = 'CLEAR'
 
     for filename in psf_files:
         try:
@@ -383,6 +462,12 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                 segment_id = int(segment_id)
                 file_segment_id = int(header['SEGID'])
 
+            if segment_id is None and itm_sim:
+                # If we have an ITM library, then wfe is
+                # meaningless, so force it to match
+                file_wfe = 'predicted'
+                wfe = 'predicted'
+
             # allow check below to pass for FGS
             if instrument.lower() == 'fgs':
                 file_filt = 'N/A'
@@ -415,7 +500,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
     if len(matches) == 1:
         return matches[0]
     elif len(matches) == 0:
-        print('Requested parameters:\ninstrument {}\ndetector {}\nfilt {}\npupil {}\nwfe {}\n'
+        logger.info('Requested parameters:\ninstrument {}\ndetector {}\nfilt {}\npupil {}\nwfe {}\n'
               'wfe_group {}\nlibrary_path {}\n'.format(instrument, detector, filt, pupil, wfe,
                                                        wfe_group, library_path))
         raise ValueError("No PSF library file found matching requested parameters.")
@@ -463,6 +548,8 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
         and column are not returned, in order to avoid edge effects
 
     """
+    logger = logging.getLogger('mirage.psf.psf_selection.get_psf_wings')
+
     # First, as a way to save time, let's assume a file naming convention
     # and search for the appropriate file that way. If we find a match,
     # confirm the properties of the file via the header. This way we don't
@@ -491,7 +578,7 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
         wings_file = get_library_file(instrument, detector, filtername, pupilname,
                                       wavefront_error, wavefront_error_group, library_path, wings=True)
 
-    print("PSF wings will be from: {}".format(os.path.basename(wings_file)))
+    logger.info("PSF wings will be from: {}".format(os.path.basename(wings_file)))
     with fits.open(wings_file) as hdulist:
         psf_wing = hdulist['DET_DIST'].data
     # Crop the outer row and column in order to remove any potential edge
@@ -500,7 +587,7 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
 
     for shape in psf_wing.shape:
         if shape % 2 == 0:
-            print(("WARNING: PSF wing file contains an even number of rows or columns. "
+            logger.error(("WARNING: PSF wing file contains an even number of rows or columns. "
                    "These must be even."))
             raise ValueError
     return psf_wing
@@ -522,9 +609,8 @@ def _load_itm_library(library_file):
     data = fits.getdata(library_file)
     hdr = fits.getheader(library_file)
     if data.shape == (2048, 2048):
-        # TODO: Remove when Shannon adds her 3rd dimension check
-        # Add (empty) 3rd dimension to the data
-        data = np.array([data])
+        # Normalize the data
+        data /= np.sum(data)
 
         # Add PSF location and oversampling keywords
         hdr['DET_YX0'] = ('(1023, 1023)', "The #0 PSF's (y,x) detector pixel position")

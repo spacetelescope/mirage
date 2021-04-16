@@ -31,12 +31,12 @@ from mirage import imaging_simulator
 
 os.environ['TEST_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
 
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_niriss_imaging():
     nis = imaging_simulator.ImgSim(offline=True)
     nis.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS/niriss_imaging_test.yaml')
@@ -46,7 +46,11 @@ def test_niriss_imaging():
     value1 = numpy.loadtxt('V88888024002P000000000112o_NIS_F480M_uncal_pointsources.list',usecols=[8,])
     value2 = numpy.loadtxt('V88888024002P000000000112o_NIS_NRM_F480M_uncal_pointsources.list',usecols=[8,])
     fluxratio = value2 / value1
-    targetratio = 0.15 / 0.84
+
+    # The 0.15 factor for the NRM and the 0.84 factor from the CLEARP element
+    # are now baked into the PSF from WebbPSF.
+    #targetratio = 0.15 / 0.84
+    targetratio = 1.0
     deviation = abs(fluxratio/targetratio - 1.)
     assert deviation < 1.e-06
     # clean up the output files in the test directory from this test.

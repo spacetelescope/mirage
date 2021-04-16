@@ -1,0 +1,42 @@
+# APT Output Product
+# 
+# APT Version: Version 2020.5  JWST PRD: PRDOPSSOC-032 
+# Date: Mon Mar 01 17:26:35 GMT 2021
+
+JWST Pointing Report for JWST Submitted Proposal 87878 (nrc_img_and_miri_img.aptx)
+
+========================================
+* nircam_img_miri_img (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   -3.750   +3.750  -78.369 -492.291   -3.750   +3.750 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   -3.423   +4.051  -78.369 -492.291 -383.840  -86.436 TARGET     PARALLEL       0      0                 
+  1    1   1    2 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   -3.137   +3.507  -78.982 -492.533   -3.137   +3.507 SUBDITHER  SCIENCE        0      0  0.659          
+  1    1   1    2 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   -2.832   +3.757  -78.982 -492.533 -383.250  -86.730 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    3 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   -4.363   +3.993  -77.756 -492.048   -4.363   +3.993 SUBDITHER  SCIENCE        0      0  1.319          
+  1    1   1    3 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   -4.013   +4.344  -77.756 -492.048 -384.430  -86.143 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    4 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +3.750   -3.750  -85.873 -499.787   +3.750   -3.750 DITHER     SCIENCE        0      0 11.215          
+  1    1   1    4 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   +3.423   -4.051  -85.873 -499.787 -376.995  -94.538 DITHER     PARALLEL       0      0                 
+  1    1   1    5 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +4.363   -3.993  -86.486 -500.030   +4.363   -3.993 SUBDITHER  SCIENCE        0      0  0.659          
+  1    1   1    5 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   +4.013   -4.344  -86.486 -500.030 -376.404  -94.832 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    6 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +3.137   -3.507  -85.260 -499.544   +3.137   -3.507 SUBDITHER  SCIENCE        0      0  1.319          
+  1    1   1    6 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   +2.832   -3.757  -85.260 -499.544 -377.585  -94.245 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    7 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000  +11.250  -11.250  -93.377 -507.283  +11.250  -11.250 DITHER     SCIENCE        0      0 11.215          
+  1    1   1    7 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488  +10.268  -12.153  -93.377 -507.283 -370.149 -102.640 DITHER     PARALLEL       0      0                 
+  1    1   1    8 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000  +11.863  -11.493  -93.990 -507.526  +11.863  -11.493 SUBDITHER  SCIENCE        0      0  0.659          
+  1    1   1    8 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488  +10.859  -12.446  -93.990 -507.526 -369.559 -102.933 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    9 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000  +10.637  -11.007  -92.764 -507.040  +10.637  -11.007 SUBDITHER  SCIENCE        0      0  1.319          
+  1    1   1    9 MIRIM_ILLUM               1 TARGONE   +12.00000  +12.00000 -380.417  -90.488   +9.678  -11.859  -92.764 -507.040 -370.739 -102.346 SUBDITHER  PARALLEL       0      0                 
+
+========================================
+* nircam_img_miri_img_2 (Obs 2)
+** Visit 2:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   -2.900   -3.100  -79.222 -499.140   -2.900   -3.100 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 MIRIM_SUB256              1 TARGONE   +12.00000  +12.00000 -363.532  -53.514   -3.149   -2.846  -79.222 -499.140 -366.682  -56.359 TARGET     PARALLEL       0      0                 
+  1    1   1    2 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   -3.100   +2.900  -79.019 -493.140   -3.100   +2.900 DITHER     SCIENCE        0      0  6.003          
+  1    1   1    2 MIRIM_SUB256              1 TARGONE   +12.00000  +12.00000 -363.532  -53.514   -2.846   +3.149  -79.019 -493.140 -366.379  -50.364 DITHER     PARALLEL       0      0                 
+  1    1   1    3 NRCBS_FULL                1 TARGONE   +12.00000  +12.00000   +0.000   +0.000   +2.900   +3.100  -85.019 -492.937   +2.900   +3.100 DITHER     SCIENCE        0      0  6.003          
+  1    1   1    3 MIRIM_SUB256              1 TARGONE   +12.00000  +12.00000 -363.532  -53.514   +3.149   +2.846  -85.019 -492.937 -360.383  -50.667 DITHER     PARALLEL       0      0                 
+
+

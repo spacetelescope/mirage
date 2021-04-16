@@ -8,10 +8,12 @@ in catalog_generator.py that can combine catalogs
 
 from collections import OrderedDict
 import copy
+import logging
 import math
 import numpy as np
 import os
 import pkg_resources
+import re
 
 from astropy.coordinates import SkyCoord, Galactic
 from astropy.io import ascii
@@ -25,7 +27,15 @@ from mirage.apt.apt_inputs import get_filters
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, \
     ExtendedCatalog, MovingPointSourceCatalog, MovingExtendedCatalog, \
     MovingSersicCatalog
-from mirage.utils.utils import ensure_dir_exists
+from mirage.logging import logging_functions
+from mirage.utils.constants import FGS_FILTERS, NIRCAM_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
+    NIRISS_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
+    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils.utils import ensure_dir_exists, make_mag_column_names, standardize_filters
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def create_basic_exposure_list(xml_file, pointing_file):
@@ -64,7 +74,7 @@ def create_basic_exposure_list(xml_file, pointing_file):
 def for_proposal(xml_filename, pointing_filename, point_source=True, extragalactic=True,
                  catalog_splitting_threshold=0.12, besancon_catalog_file=None,
                  ra_column_name='RAJ2000', dec_column_name='DECJ2000', out_dir=None,
-                 save_catalogs=True, galaxy_seed=None):
+                 save_catalogs=True, galaxy_seed=None, wise_catalog='allwise'):
     """
     Given a pointing dictionary from an APT file, generate source catalogs
     that cover all of the coordinates specifired.
@@ -115,6 +125,11 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     galaxy_seed : int
         Seed to use in the random number generator used in galaxy_background
 
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     ptsrc_catalog_list : list
@@ -129,6 +144,8 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     galaxy_catalog_names : list
         List of filenames of the saved galaxy catalogs
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.for_proposal')
+
     pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
     instrument_filter_dict = get_filters(pointing_dictionary)
 
@@ -235,18 +252,23 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         if out_dir is None:
             out_dir = os.path.dirname(xml_filename)
 
+        starting_index = 1
+
         if point_source:
             for i, instrument in enumerate(instrument_filter_dict):
-                print('\n--- Creating {} point source catalog ---'.format(instrument))
+                logger.info('\n--- Creating {} point source catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
                                                         besancon_catalog_file=besancon_catalog_file,
                                                         instrument=instrument, filters=filter_list,
-                                                        ra_column_name=ra_column_name, dec_column_name=dec_column_name)
+                                                        ra_column_name=ra_column_name, dec_column_name=dec_column_name,
+                                                        starting_index=starting_index, wise_catalog=wise_catalog)
                 if i == 0:
                     ptsrc_cat = copy.deepcopy(tmp_cat)
                 else:
-                    ptsrc_cat = combine_catalogs(ptsrc_cat, tmp_cat)
+                    ptsrc_cat = combine_catalogs(ptsrc_cat, tmp_cat, starting_index=starting_index)
+
+            starting_index += len(ptsrc_cat['index'])
 
             if save_catalogs:
                 ptsrc_catalog_name = 'ptsrc_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -260,7 +282,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 ensure_dir_exists(out_dir)
                 full_catalog_path = os.path.join(out_dir, ptsrc_catalog_name)
                 ptsrc_cat.save(full_catalog_path)
-                print('\nPOINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
+                logger.info('\nPOINT SOURCE CATALOG SAVED: {}'.format(full_catalog_path))
                 ptsrc_catalog_names.append(full_catalog_path)
 
             ptsrc_catalog_list.append(ptsrc_cat)
@@ -269,17 +291,18 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
         if extragalactic:
             for i, instrument in enumerate(instrument_filter_dict):
-                print('\n--- Creating {} extragalactic catalog ---'.format(instrument))
+                logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
                 filter_list = instrument_filter_dict[instrument]
                 tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
                                                       filter_list, boxflag=False, brightlimit=14.0,
-                                                      seed=galaxy_seed)
+                                                      seed=galaxy_seed, starting_index=starting_index)
 
                 if i == 0:
                     galaxy_cat = copy.deepcopy(tmp_cat)
                 else:
-                    galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat)
+                    galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
 
+            starting_index += len(galaxy_cat['index'])
 
             if save_catalogs:
                 gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -292,7 +315,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
                 full_catalog_path = os.path.join(out_dir, gal_catalog_name)
                 galaxy_cat.save(full_catalog_path)
-                print('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
+                logger.info('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
                 galaxy_catalog_names.append(full_catalog_path)
 
             galaxy_catalog_list.append(galaxy_cat)
@@ -346,7 +369,7 @@ def query_2MASS_ptsrc_catalog(ra, dec, box_width):
     return query_table, magnitude_column_names
 
 
-def get_wise_ptsrc_catalog(ra, dec, box_width):
+def get_wise_ptsrc_catalog(ra, dec, box_width, wise_catalog='allwise'):
     """Wrapper around WISE query and creation of mirage-formatted catalog
 
     Parameters
@@ -358,13 +381,18 @@ def get_wise_ptsrc_catalog(ra, dec, box_width):
     dec : float or str
         Declination of the center of the catalog. Can be decimal degrees of
         DMS string
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'ALLWISE' (default), which searches the ALLWISE source catalog, or
+        'WISE_all_sky', which searches the older WISE All-Sky catalog.
     """
-    wise_cat, wise_mag_cols = query_WISE_ptsrc_catalog(ra, dec, box_width)
+    wise_cat, wise_mag_cols = query_WISE_ptsrc_catalog(ra, dec, box_width, wise_catalog=wise_catalog)
     wise_mirage = mirage_ptsrc_catalog_from_table(wise_cat, 'WISE', wise_mag_cols)
     return wise_mirage, wise_cat
 
 
-def query_WISE_ptsrc_catalog(ra, dec, box_width):
+def query_WISE_ptsrc_catalog(ra, dec, box_width, wise_catalog='ALLWISE'):
     """Query the WISE All-Sky Point Source Catalog in a square region around the RA and Dec
     provided. Box width must be in units of arcseconds
 
@@ -381,6 +409,11 @@ def query_WISE_ptsrc_catalog(ra, dec, box_width):
     box_width : float
         Width of the box in arcseconds containing the catalog.
 
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'ALLWISE' (default), which searches the ALLWISE source catalog, or
+        'WISE_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     query_table : astropy.table.Table
@@ -389,12 +422,26 @@ def query_WISE_ptsrc_catalog(ra, dec, box_width):
     magnitude_column_names : list
         List of column header names corresponding to columns containing source magnitude
     """
+    # List of columns to be retrieved from the WISE catalog. For the case of the ALLWISE
+    # catalog, the 2mass columns we need are not returned by default, so we need to explicitly
+    # list all of the columns we want.
+    cols = 'ra,dec,w1mpro,w2mpro,w3mpro,w4mpro,w1sigmpro,w2sigmpro,w3sigmpro,w4sigmpro,j_m_2mass,h_m_2mass,k_m_2mass'
+
+    # Determine which WISE catalog will be searched
+    if wise_catalog.lower() == 'allwise':
+        search_cat = 'allwise_p3as_psd'
+    elif wise_catalog.lower() == 'wise_all_sky':
+        search_cat = 'allsky_4band_p3as_psd'
+    else:
+        raise ValueError(('{}: Unrecognized WISE catalog version to be searched. wise_catalog should '
+                          'be "allwise" or "wise_all_sky".'.format(wise_catalog)))
+
     # Don't artificially limit how many sources are returned
     Irsa.ROW_LIMIT = -1
 
     ra_dec_string = "{}  {}".format(ra, dec)
-    query_table = Irsa.query_region(ra_dec_string, catalog='allsky_4band_p3as_psd', spatial='Box',
-                                    width=box_width * u.arcsec)
+    query_table = Irsa.query_region(ra_dec_string, catalog=search_cat, spatial='Box',
+                                    width=box_width * u.arcsec, selcols=cols)
 
     # Exclude any entries with missing RA or Dec values
     radec_mask = filter_bad_ra_dec(query_table)
@@ -496,7 +543,7 @@ def twoMASS_plus_background(ra, dec, box_width, kmag_limits=(17, 29), email='', 
 
 
 def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument='NIRISS', filters=[],
-                     ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                     ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1, wise_catalog='allwise'):
     """
     This is a driver function to query the GAIA/2MASS/WISE catalogues
     plus the Besancon model and combine these into a single JWST source list.
@@ -515,48 +562,58 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
 
     Parameters
     ----------
-        ra : float or str
-            Right ascension of the target field in degrees or HMS
+    ra : float or str
+        Right ascension of the target field in degrees or HMS
 
-        dec : float or str
-            Declination of the target field in degrees or DMS
+    dec : float or str
+        Declination of the target field in degrees or DMS
 
-        box_width : float
-            Size of the (square) target field in arc-seconds
+    box_width : float
+        Size of the (square) target field in arc-seconds
 
-        besancon_catalog_file : str
-            Name of ascii catalog containing background stars. The code was
-            developed around this being a catalog output by the Besaoncon
-            model (via ``besancon()``), but it can be any ascii catalog
-            of sources as long as it contains the columns specified in
-            the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
-            If None, the Besancon step will be skipped and a catalog will be
-            built using only GAIA/2MASS/WISE
+    besancon_catalog_file : str
+        Name of ascii catalog containing background stars. The code was
+        developed around this being a catalog output by the Besaoncon
+        model (via ``besancon()``), but it can be any ascii catalog
+        of sources as long as it contains the columns specified in
+        the ``catalog`` parameter of ``johnson_catalog_to_mirage_catalog()``
+        If None, the Besancon step will be skipped and a catalog will be
+        built using only GAIA/2MASS/WISE
 
-        instrument : str
-            One of "all", "NIRISS", "NIRCam", or "Guider"
+    instrument : str
+        One of "all", "NIRISS", "NIRCam", or "Guider"
 
-        filters : list
-            Either an empty list (which gives all filters) or a list
-            of filter names (i.e. F090W) to be calculated.
+    filters : list
+        Either an empty list (which gives all filters) or a list
+        of filter names (i.e. F090W) to be calculated.
 
-        ra_column_name : str
-            Name of the column within ``besancon_catalog_file`` containing the
-            right ascension of the sources.
+    ra_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        right ascension of the sources.
 
-        dec_column_name : str
-            Name of the column within ``besancon_catalog_file`` containing the
-            declination of the sources
+    dec_column_name : str
+        Name of the column within ``besancon_catalog_file`` containing the
+        declination of the sources
+
+    starting_index : int
+        Beginning value to use for the 'index' column of the catalog. Default is 1.
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
 
     Returns
     -------
-        source_list : mirage.catalogs.create_catalogs.PointSourceCatalog
-            A table with the filter magnitudes
+    source_list : mirage.catalogs.create_catalogs.PointSourceCatalog
+        A table with the filter magnitudes
 
-        filter_names : list
-            A list of the filter name header strings for writing to
-            an output file.
+    filter_names : list
+        A list of the filter name header strings for writing to
+        an output file.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.get_all_catalogs')
+
     if isinstance(ra, str):
         pos = SkyCoord(ra, dec, frame='icrs')
         outra = pos.ra.deg
@@ -564,12 +621,16 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
     else:
         outra = ra
         outdec = dec
-    filter_names = make_filter_names(instrument, filters)
+
+    # Normalize filter names. Transform any shorthand into a full filter
+    # specification. (e.g. "F090W" -> "W090W/CLEAR")
+    filters = standardize_filters(instrument, filters)
+    filter_names = make_mag_column_names(instrument, filters)
 
     gaia_cat, gaia_mag_cols, gaia_2mass, gaia_2mass_crossref, gaia_wise, \
         gaia_wise_crossref = query_GAIA_ptsrc_catalog(outra, outdec, box_width)
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
-    wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width)
+    wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width, wise_catalog=wise_catalog)
 
     if besancon_catalog_file is not None:
         filter_dict = {instrument: filters}
@@ -578,12 +639,13 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
 
     # Combine data from GAIA/2MASS/WISE to create single catalog with JWST filters
     observed_jwst = combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise,
-                                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters)
+                                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filters,
+                                            starting_index=starting_index)
 
     if besancon_catalog_file is not None:
-        print('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_jwst.ra),
+        logger.info('Adding %d sources from Besancon to %d sources from the catalogues.' % (len(besancon_jwst.ra),
                                                                                       len(observed_jwst.ra)))
-        source_list = combine_catalogs(observed_jwst, besancon_jwst)
+        source_list = combine_catalogs(observed_jwst, besancon_jwst, starting_index=starting_index)
     else:
         source_list = observed_jwst
     return source_list, filter_names
@@ -679,7 +741,7 @@ def catalog_colors_to_vjhk(color_catalog):
 
 
 def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ2000', dec_column_name='DECJ2000',
-                                      magnitude_system='abmag', output_file=None):
+                                      magnitude_system='abmag', output_file=None, starting_index=1):
     """Create a Mirage-formatted catalog containing sources from a query of the Besancon model
 
     Parameters
@@ -695,7 +757,7 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     filters : dict
         Dictionary with keys equal to JWST instrument names, and values
         that are lists of filter names. Besancon sources will have magnitudes
-        transformed into thiese filters
+        transformed into these filters
 
     ra_column_name : str
         Name of the column in the input catalog that contains the Right Ascension
@@ -712,6 +774,9 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     output_file : str
         If not None, save the catalog to a file with this name
 
+    starting_index : int
+        Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
     transformed_besancon_cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -726,7 +791,7 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     # Create list of filter names from filters dictionary
     all_filters = []
     for instrument in filters:
-        filt_list = make_filter_names(instrument.lower(), filters[instrument])
+        filt_list = make_mag_column_names(instrument.lower(), filters[instrument])
         all_filters.extend(filt_list)
 
     # Read in the input catalog
@@ -761,11 +826,12 @@ def johnson_catalog_to_mirage_catalog(catalog_file, filters, ra_column_name='RAJ
     # Extract the relevant columns and create a Mirage-formatted point
     # source catalog
     mirage_cat = PointSourceCatalog(ra=catalog[ra_column_name].data,
-                                    dec=catalog[dec_column_name].data)
+                                    dec=catalog[dec_column_name].data,
+                                    starting_index=starting_index)
 
     for filt in all_filters:
-        instrument, filter_name, _ = filt.split('_')
-        mirage_cat.add_magnitude_column(catalog[filt], instrument=instrument, filter_name=filter_name)
+        #instrument, filter_name, _ = filt.split('_')
+        mirage_cat.add_magnitude_column(catalog[filt], column_name=filt)
 
     # Save to output file if requested
     if output_file is not None:
@@ -791,10 +857,16 @@ def crossmatch_filter_names(filter_names, standard_filters):
         List of matching filter names
     """
     inds = []
-    for loop in range(len(filter_names)):
-        for n1 in range(len(standard_filters)):
-            if filter_names[loop] in standard_filters[n1]:
-                inds.append(n1)
+    for filter_name in filter_names:
+        name_to_match = filter_name
+
+        # Weak lens inputs can be WLP8 or WLM8, but we want to match either
+        # with the WLP8 entries in the standard magnitude list
+        if 'wlm' in filter_name:
+            name_to_match = filter_name.replace('wlm', 'wlp')
+
+        index = standard_filters.index(name_to_match)
+        inds.append(index)
     return inds
 
 
@@ -835,10 +907,11 @@ def match_model_magnitudes(in_magnitudes, in_filters, standard_magnitudes,
         1D array of the full set of estimated magnitudes from the model
         matching, or None if a problem occurs.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.match_model_magnitudes')
     inds = crossmatch_filter_names(in_filters, standard_filters)
     nmatch = float(len(inds))
     if nmatch != len(in_filters):
-        print('Error in matching the requested filters for model matching.')
+        logger.warning('Error in matching the requested filters for model matching.')
         return None
 
     subset = np.copy(standard_magnitudes[:, inds])
@@ -888,7 +961,7 @@ def read_standard_magnitudes():
     standard_magnitudes = np.loadtxt(standard_mag_file, comments='#')
     # standard_values holds the wavelengths (microns), zero magnitude flux
     # density values (W/m^2/micron and Jy) and the relative ISM extinction
-    standard_values = np.zeros((4, 58), dtype=np.float32)
+    standard_values = np.zeros((4, 73), dtype=np.float32)
     # The following list is manually produced, but must match the order
     # of filters in the input file, where the names are a bit different.
     # Note that for the GAIA g filter the trailing space is needed to
@@ -904,21 +977,29 @@ def read_standard_magnitudes():
                         'niriss_f380m_magnitude', 'niriss_f430m_magnitude',
                         'niriss_f444w_magnitude', 'niriss_f480m_magnitude',
                         'fgs_guider1_magnitude', 'fgs_guider2_magnitude',
-                        'nircam_f070w_magnitude', 'nircam_f090w_magnitude',
-                        'nircam_f115w_magnitude', 'nircam_f140m_magnitude',
-                        'nircam_f150w_magnitude', 'nircam_f150w2_magnitude',
-                        'nircam_f162m_magnitude', 'nircam_f164n_magnitude',
-                        'nircam_f182m_magnitude', 'nircam_f187n_magnitude',
-                        'nircam_f200w_magnitude', 'nircam_f210m_magnitude',
-                        'nircam_f212n_magnitude', 'nircam_f250m_magnitude',
-                        'nircam_f277w_magnitude', 'nircam_f300m_magnitude',
-                        'nircam_f322w2_magnitude', 'nircam_f323n_magnitude',
-                        'nircam_f335m_magnitude', 'nircam_f356w_magnitude',
-                        'nircam_f360m_magnitude', 'nircam_f405n_magnitude',
-                        'nircam_f410m_magnitude', 'nircam_f430m_magnitude',
-                        'nircam_f444w_magnitude', 'nircam_f460m_magnitude',
-                        'nircam_f466n_magnitude', 'nircam_f470n_magnitude',
-                        'nircam_f480m_magnitude']
+                        'nircam_f070w_clear_magnitude', 'nircam_f090w_clear_magnitude',
+                        'nircam_f115w_clear_magnitude', 'nircam_f140m_clear_magnitude',
+                        'nircam_f150w_clear_magnitude', 'nircam_f150w2_clear_magnitude',
+                        'nircam_f150w2_f162m_magnitude', 'nircam_f150w2_f164n_magnitude',
+                        'nircam_f182m_clear_magnitude', 'nircam_f187n_clear_magnitude',
+                        'nircam_f200w_clear_magnitude', 'nircam_f210m_clear_magnitude',
+                        'nircam_f212n_clear_magnitude', 'nircam_f250m_clear_magnitude',
+                        'nircam_f277w_clear_magnitude', 'nircam_f300m_clear_magnitude',
+                        'nircam_f322w2_clear_magnitude', 'nircam_f322w2_f323n_magnitude',
+                        'nircam_f335m_clear_magnitude', 'nircam_f356w_clear_magnitude',
+                        'nircam_f360m_clear_magnitude', 'nircam_f444w_f405n_magnitude',
+                        'nircam_f410m_clear_magnitude', 'nircam_f430m_clear_magnitude',
+                        'nircam_f444w_clear_magnitude', 'nircam_f460m_clear_magnitude',
+                        'nircam_f444w_f466n_magnitude', 'nircam_f444w_f470n_magnitude',
+                        'nircam_f480m_clear_magnitude', 'nircam_wlp4_clear_magnitude',
+                        'nircam_f070w_wlp8_magnitude', 'nircam_f090w_wlp8_magnitude',
+                        'nircam_f115w_wlp8_magnitude', 'nircam_f140m_wlp8_magnitude',
+                        'nircam_f150w2_wlp8_magnitude', 'nircam_f150w_wlp8_magnitude',
+                        'nircam_f162m_wlp8_magnitude', 'nircam_f164n_wlp8_magnitude',
+                        'nircam_f182m_wlp8_magnitude', 'nircam_f187n_wlp8_magnitude',
+                        'nircam_f200w_wlp8_magnitude', 'nircam_f210m_wlp8_magnitude',
+                        'nircam_f212n_wlp8_magnitude', 'nircam_wlp4_wlp8_magnitude']
+
     standard_labels = []
     n1 = 0
     for line in lines:
@@ -937,7 +1018,8 @@ def read_standard_magnitudes():
 
 
 def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise,
-                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filter_names):
+                            gaia_wise_crossref, twomass_cat, wise_cat, instrument, filter_names,
+                            starting_index):
     """
     This function combines GAIA/2MASS/WISE photometry to estimate JWST filter
     magnitudes.  The algorithm depends a bit on what magnitudes are available.
@@ -985,11 +1067,16 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
         If the list is empty, or the value is None, all filters are
         selected.
 
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
     outcat : mirage.catalogs.create_catalog.PointSourceCatalog
         This is the catalog of positions/magnitudes.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.combine_and_interpolate')
+
     standard_magnitudes, standard_values, standard_filters, standard_labels = read_standard_magnitudes()
     nfilters = len(filter_names)
     ngaia = len(gaia_cat['ra'])
@@ -1006,7 +1093,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
                   '2MASS Ks', 'WISE W1', 'WISE W2', 'WISE W3', 'WISE W4']
     inds = crossmatch_filter_names(in_filters, standard_filters)
     if len(inds) != len(in_filters):
-        print('Error matching the filters to the standard set.')
+        logger.warning('Error matching the filters to the standard set.')
         return None
     # first populate the gaia sources, with cross-references
     in_magnitudes[0:ngaia, 1] = gaia_cat['phot_g_mean_mag']
@@ -1098,8 +1185,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     # Now, convert to JWST magnitudes either by transformation (for sources
     # with GAIA G/BP/RP magnitudes) or by interpolation (all other
     # cases).
-    out_filter_names = make_filter_names(instrument, filter_names)
-    inds = crossmatch_filter_names(in_filters, standard_filters)
+    out_filter_names = make_mag_column_names(instrument, filter_names)
     in_wavelengths = np.squeeze(np.copy(standard_values[0, inds]))
     inds = crossmatch_filter_names(out_filter_names, standard_filters)
     if len(inds) < 1:
@@ -1118,18 +1204,11 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     raout = np.copy(raout[0:nfinal])
     decout = np.copy(decout[0:nfinal])
     out_magnitudes = np.copy(out_magnitudes[0:nfinal, :])
-    outcat = PointSourceCatalog(ra=raout, dec=decout)
+    outcat = PointSourceCatalog(ra=raout, dec=decout, starting_index=starting_index)
     n1 = 0
-    for filter in out_filter_names:
-        values = filter.split('_')
-        if len(values) == 3:
-            inst = values[0].upper()
-            fil1 = values[1].upper()
-        else:
-            inst = values[0].upper()
-            fil1 = ''
-        outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), instrument=inst,
-                                    filter_name=fil1, magnitude_system='vegamag')
+    for column_value in out_filter_names:
+        outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value,
+                                    magnitude_system='vegamag')
         n1 = n1+1
     return outcat
 
@@ -1200,15 +1279,25 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                             # select 2MASS magnitude: first ph_qual = A or if none
                             # is of quality A the first ph_qual = B or if none is
                             # of quality A or B then the first non U value.
-                            for l3 in range(3):
-                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "A"):
-                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
-                            for l3 in range(3):
-                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] == "B"):
-                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
-                            for l3 in range(3):
-                                if (irmag < -100.) and (gaia_2mass['ph_qual'][match1[l1]].decode()[l3:l3+1] != "U"):
-                                    irmag = gaia_2mass[magkeys[l3]][match1[l1]]
+                            magval = gaia_2mass['ph_qual'][match1[l1]]
+                            if isinstance(magval, str):
+                                qual = magval[0:3]
+                            else:
+                                qual = magval.decode()[0:3]
+
+                            if (irmag < -100.):
+                                a_pos = qual.find('A')
+                                if a_pos != -1:
+                                    irmag = gaia_2mass[magkeys[a_pos]][match1[l1]]
+                                else:
+                                    b_pos = qual.find('B')
+                                    if b_pos != -1:
+                                        irmag = gaia_2mass[magkeys[b_pos]][match1[l1]]
+                                    else:
+                                        non_u_pos = re.search(r'[^U]', qual)
+                                        if non_u_pos is not None:
+                                            irmag = gaia_2mass[magkeys[non_u_pos.start()]][match1[l1]]
+
                             delm = gmag - irmag
                             if (delm > -1.2) and (delm < 30.0):
                                 if delm < mindelm:
@@ -1378,49 +1467,6 @@ def interpolate_magnitudes(wl1, mag1, wl2, filternames):
     return outmags
 
 
-def make_filter_names(instrument, filters):
-    """
-    Given as input the instrument name and the list of filters needed, this
-    routine generates the list of output header values for the Mirage input
-    file.
-
-    Parameters
-    ----------
-    insrument : str
-        'NIRCam', 'NIRISS', or 'Guider"
-
-    filters : list
-        List of the filters needed (names such as F090W) or either None or
-        an empty list to select all filters)
-
-    Returns
-    -------
-    headerstrs : list
-        The header string list for the output Mirage magnitudes line;
-        if concatentated with spaces, it is the list of magnitudes header
-        values that needs to be written to the source list file.
-    """
-    instrument_names = ['FGS', 'NIRCam', 'NIRISS']
-    guider_filters = ['guider1', 'guider2']
-    guider_filter_names = ['fgs_guider1_magnitude', 'fgs_guider2_magnitude']
-    niriss_filters = ['F090W', 'F115W', 'F140M', 'F150W', 'F158M', 'F200W',
-                      'F277W', 'F356W', 'F380M', 'F430M', 'F444W', 'F480M']
-    niriss_filter_names = ['niriss_{}_magnitude'.format(filt.lower()) for filt in niriss_filters]
-    nircam_filters = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F150W2',
-                      'F162M', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M',
-                      'F212N', 'WLP4',  'F250M', 'F277W', 'F300M', 'F322W2', 'F323N',
-                      'F335M', 'F356W', 'F360M', 'F405N', 'F410M', 'F430M',
-                      'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
-    nircam_filter_names = ['nircam_{}_magnitude'.format(filt.lower()) for filt in nircam_filters]
-    names1 = [guider_filters, nircam_filters, niriss_filters]
-    names2 = [guider_filter_names, nircam_filter_names, niriss_filter_names]
-    headerstrs = []
-    for loop in range(len(instrument_names)):
-        if (instrument_names[loop].lower() == instrument.lower()) or (instrument.lower() == 'all'):
-            headerstrs = add_filter_names(headerstrs, names1[loop], names2[loop], filters)
-    return headerstrs
-
-
 def add_filter_names(headerlist, filter_names, filter_labels, filters):
     """
     Add a set of filter header labels (i.e. niriss_f090w_magnitude for example)
@@ -1462,7 +1508,7 @@ def add_filter_names(headerlist, filter_names, filter_labels, filters):
     return headerlist
 
 
-def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
+def combine_catalogs(cat1, cat2, magnitude_fill_value=99., starting_index=1):
     """Combine two Mirage catalog objects. Catalogs must be of the same
     type (e.g. PointSourceCatalog), and have the same values for position
     units (RA, Dec or x, y) velocity units (arcsec/hour vs pixels/hour),
@@ -1479,6 +1525,13 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
 
     cat2 : mirage.catalogs.catalog_generator.XXCatalog
         Second catalog to be joined
+
+    magnitude_fill_value : float
+        Magnitude value to use for sources that are undefined in one catalog
+
+    starting_index : int
+        Index value to begin counting with inside the new catalog. These values
+        will be placed in the 'index' column of the new catalog
 
     Returns
     -------
@@ -1521,7 +1574,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
             else:
                 new_cat = MovingSersicCatalog(ra=combined['x_or_RA'].data,
                                               dec=combined['y_or_Dec'].data,
@@ -1531,7 +1585,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
         else:
             if cat1.velocity_units == 'velocity_RA_Dec':
                 new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
@@ -1542,7 +1597,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
             else:
                 new_cat = MovingSersicCatalog(x=combined['x_or_RA'].data,
                                               y=combined['y_or_Dec'].data,
@@ -1552,7 +1608,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                               radius=combined['radius'].data,
                                               sersic_index=combined['sersic_index'].data,
                                               position_angle=combined['pos_angle'].data,
-                                              radius_units=cat1.radius_units)
+                                              radius_units=cat1.radius_units,
+                                              starting_index=starting_index)
 
     # --------------Moving Extended Sources-------------------------------
     elif isinstance(cat1, MovingExtendedCatalog):
@@ -1566,14 +1623,16 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                 ra_velocity=combined['ra_velocity'].data,
                                                 dec_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
             else:
                 new_cat = MovingExtendedCatalog(ra=combined['x_or_RA'].data,
                                                 dec=combined['y_or_Dec'].data,
                                                 x_velocity=combined['ra_velocity'].data,
                                                 y_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
         else:
             if cat1.velocity_units == 'velocity_RA_Dec':
                 new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
@@ -1581,14 +1640,16 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                                 ra_velocity=combined['ra_velocity'].data,
                                                 dec_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
             else:
                 new_cat = MovingExtendedCatalog(x=combined['x_or_RA'].data,
                                                 y=combined['y_or_Dec'].data,
                                                 x_velocity=combined['ra_velocity'].data,
                                                 y_velocity=combined['dec_velocity'].data,
                                                 filenames=combined['filename'].data,
-                                                position_angle=combined['pos_angle'].data)
+                                                position_angle=combined['pos_angle'].data,
+                                                starting_index=starting_index)
 
     # --------------------Galaxies------------------------------------
     elif isinstance(cat1, GalaxyCatalog):
@@ -1602,7 +1663,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                     radius=combined['radius'].data,
                                     sersic_index=combined['sersic_index'].data,
                                     position_angle=combined['pos_angle'].data,
-                                    radius_units=cat1.radius_units)
+                                    radius_units=cat1.radius_units,
+                                    starting_index=starting_index)
         else:
             new_cat = GalaxyCatalog(x=combined['x_or_RA'].data,
                                     y=combined['y_or_Dec'].data,
@@ -1610,7 +1672,8 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                                     radius=combined['radius'].data,
                                     sersic_index=combined['sersic_index'].data,
                                     position_angle=combined['pos_angle'].data,
-                                    radius_units=cat1.radius_units)
+                                    radius_units=cat1.radius_units,
+                                    starting_index=starting_index)
 
     # ------------------Extended Sources-------------------------------
     elif isinstance(cat1, ExtendedCatalog):
@@ -1618,12 +1681,14 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
             new_cat = ExtendedCatalog(ra=combined['x_or_RA'].data,
                                       dec=combined['y_or_Dec'].data,
                                       filenames=combined['filename'].data,
-                                      position_angle=combined['pos_angle'].data)
+                                      position_angle=combined['pos_angle'].data,
+                                      starting_index=starting_index)
         else:
             new_cat = ExtendedCatalog(x=combined['x_or_RA'].data,
                                       y=combined['y_or_Dec'].data,
                                       filenames=combined['filename'].data,
-                                      position_angle=combined['pos_angle'].data)
+                                      position_angle=combined['pos_angle'].data,
+                                      starting_index=starting_index)
 
     # -------------Moving Point Sources--------------------------------
     elif isinstance(cat1, MovingPointSourceCatalog):
@@ -1635,44 +1700,47 @@ def combine_catalogs(cat1, cat2, magnitude_fill_value=99.):
                 new_cat = MovingPointSourceCatalog(ra=combined['x_or_RA'].data,
                                                    dec=combined['y_or_Dec'].data,
                                                    ra_velocity=combined['ra_velocity'].data,
-                                                   dec_velocity=combined['dec_velocity'].data)
+                                                   dec_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
             else:
                 new_cat = MovingPointSourceCatalog(ra=combined['x_or_RA'].data,
                                                    dec=combined['y_or_Dec'].data,
                                                    x_velocity=combined['ra_velocity'].data,
-                                                   y_velocity=combined['dec_velocity'].data)
+                                                   y_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
         else:
             if cat1.location_units == 'velocity_RA_Dec':
                 new_cat = MovingPointSourceCatalog(x=combined['x_or_RA'].data,
                                                    y=combined['y_or_Dec'].data,
                                                    ra_velocity=combined['ra_velocity'].data,
-                                                   dec_velocity=combined['dec_velocity'].data)
+                                                   dec_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
             else:
                 new_cat = MovingPointSourceCatalog(x=combined['x_or_RA'].data,
                                                    y=combined['y_or_Dec'].data,
                                                    x_velocity=combined['ra_velocity'].data,
-                                                   y_velocity=combined['dec_velocity'].data)
+                                                   y_velocity=combined['dec_velocity'].data,
+                                                   starting_index=starting_index)
 
     # --------------------Point Sources-------------------------------
     elif isinstance(cat1, PointSourceCatalog):
         # Create new catalog object and populate
         if cat1.location_units == 'position_RA_Dec':
             new_cat = PointSourceCatalog(ra=combined['x_or_RA'].data,
-                                         dec=combined['y_or_Dec'].data)
+                                         dec=combined['y_or_Dec'].data,
+                                         starting_index=starting_index)
         else:
             new_cat = PointSourceCatalog(x=combined['x_or_RA'].data,
-                                         y=combined['y_or_Dec'].data)
+                                         y=combined['y_or_Dec'].data,
+                                         starting_index=starting_index)
 
 
     # -------------Add magnitude columns-------------------------------
     mag_cols = [colname for colname in combined.colnames if 'magnitude' in colname]
+    cat1_mag_cols = [colname for colname in cat1.magnitudes.keys() if 'magnitude' in colname]
     for col in mag_cols:
-        elements = col.split('_')
-        instrument = elements[0]
-        minus_inst = col.split('{}_'.format(instrument))[-1]
-        filter_name = minus_inst.split('_magnitude')[0]
-        new_cat.add_magnitude_column(combined[col].data, instrument=instrument,
-                                     filter_name=filter_name)
+        new_cat.add_magnitude_column(combined[col].data, column_name=col,
+                                     magnitude_system=cat1.magnitudes[cat1_mag_cols[0]][0])
 
     return new_cat
 
@@ -1692,6 +1760,8 @@ def combine_catalogs_v0(observed_jwst, besancon_jwst):
     outcat:           (mirage.catalogs.catalog_generator.PointSourceCatalog)
                       A new catalog object combining the two input catalogs
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.combine_catalogs_v0')
+
     keys1 = list(observed_jwst.magnitudes.keys())
     keys2 = list(besancon_jwst.magnitudes.keys())
     besanconinds = []
@@ -1700,10 +1770,10 @@ def combine_catalogs_v0(observed_jwst, besancon_jwst):
             if key == keys2[loop]:
                 besanconinds.append(loop)
     if len(keys1) != len(besanconinds):
-        print('Magnitude mismatch in catalogs to combine.  Will return None.')
+        logger.warning('Magnitude mismatch in catalogs to combine.  Will return None.')
         return None
     if observed_jwst.location_units != besancon_jwst.location_units:
-        print('Coordinate mismatch in catalogs to combine.  Will return None.')
+        logger.warning('Coordinate mismatch in catalogs to combine.  Will return None.')
         return None
     ra1 = observed_jwst.ra
     dec1 = observed_jwst.dec
@@ -1778,6 +1848,8 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     gaia_wise_crossref : astropy.table.Table
         The cross-reference list with WISE sources
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.query_GAIA_ptsrc_catalog')
+
     data = OrderedDict()
     data['gaia'] = OrderedDict()
     data['tmass'] = OrderedDict()
@@ -1821,12 +1893,12 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
         """.format(ra, dec, boxwidth, boxwidth)
 
     outvalues = {}
-    print('Searching the GAIA DR2 catalog')
+    logger.info('Searching the GAIA DR2 catalog')
     for key in data.keys():
         job = Gaia.launch_job_async(data[key]['query'], dump_to_file=False)
         table = job.get_results()
         outvalues[key] = table
-        print('Retrieved {} sources for catalog {}'.format(len(table), key))
+        logger.info('Retrieved {} sources for catalog {}'.format(len(table), key))
     gaia_mag_cols = ['phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag']
     return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
 
@@ -1841,27 +1913,28 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
     in producing the simulated NIRISS/NIRCam/Guider magnitudes.
     Note that the Besancon model uses a simplified exinction model, and so
     this is carried over into the Mirage point source lists.
-    An email address is required for the besancon call.
+    An email address is required for the besancon call. The KLEH value of
+    2 in the call to the model means that the input coordinates are
+    RA, Dec in units of degrees.
 
     Parameters
     ----------
         ra : float
             Right ascension or galactic longitude for the sky
             position where the model is to be calculated, in degrees.
-            Which it is depends on the "coords" parameter.
 
         dec : float
             Declinatinon or galactic latitude for the sky
             position where the model is to be calculated, in degrees.
-            Which it is depends on the "coords" parameter.
 
         box_width : float
             Size of the (square) sky area to be simulated, in arc-seconds
 
-        coords : str
-            If "ra_dec", the default value, then the input values are assumed to
-            be RA/Dec in degrees.  Otherwise the values are assumed to be (l,b)
-            in degrees.
+        username : str
+            Username associated with the Besanson model website (listed
+            in the docstring above) that will be used to submit the query.
+            The website will prompt for a password before creating the
+            query
 
         kmag_limits : tup
             The range of allowable K magnitudes for the model, given
@@ -1876,6 +1949,8 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
             saturate in full frame imaging in many cases.
     """
     from astropy import units as u
+
+    logger = logging.getLogger('mirage.catalogs.create_catalog.besancon')
 
     # Specified coordinates. Will need to convert to galactic long and lat
     # when calling model
@@ -1905,7 +1980,7 @@ def besancon(ra, dec, box_width, username='', kmag_limits=(13, 29)):
                '-p ref_filter K -p acol {} -p band_min {} -p band_max {} --run')
                .format(client, username, min_ra.value, min_dec.value, max_ra.value, max_dec.value,
                        colors, band_min, band_max))
-    print('Running command: ', command)
+    logger.info('Running command: \n {}'.format(command))
     os.system(command)
 
 
@@ -1972,7 +2047,8 @@ def crop_besancon(ra, dec, box_width, catalog_file, ra_column_name='RAJ2000', de
 
 
 def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
-                   ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1,
+                   wise_catalog='allwise'):
     """Convenience function to create a typical scene looking into the disk of
     the Milky Way, using the besancon function.
 
@@ -2004,6 +2080,14 @@ def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
         Name of the column within ``besancon_catalog_file`` containing the
         declination of the sources
 
+    starting_index : int
+        Beginning value to use for the 'index' column of the catalog. Default is 1.
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2016,12 +2100,14 @@ def galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name)
+                                               dec_column_name=dec_column_name, starting_index=starting_index,
+                                               wise_catalog=wise_catalog)
     return cat
 
 
 def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_file,
-                          ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                          ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1,
+                          wise_catalog='allwise'):
     """Convenience function to create typical scene looking out of the plane of
     the Milky Way by querying the Besancon model
 
@@ -2053,6 +2139,14 @@ def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_f
         Name of the column within ``besancon_catalog_file`` containing the
         declination of the sources
 
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2065,12 +2159,13 @@ def out_of_galactic_plane(box_width, instrument, filter_list, besancon_catalog_f
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name)
+                                               dec_column_name=dec_column_name, starting_index=starting_index,
+                                               wise_catalog=wise_catalog)
     return cat
 
 
 def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
-                   ra_column_name='RAJ2000', dec_column_name='DECJ2000'):
+                   ra_column_name='RAJ2000', dec_column_name='DECJ2000', starting_index=1, wise_catalog='allwise'):
     """Convenience function to create typical scene looking into bulge of
     the Milky Way
 
@@ -2102,6 +2197,14 @@ def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
         Name of the column within ``besancon_catalog_file`` containing the
         declination of the sources
 
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
+    wise_catalog : str
+        Switch that specifies the WISE catalog to be searched. Possible values are
+        'allwise' (default), which searches the ALLWISE source catalog, or
+        'wise_all_sky', which searches the older WISE All-Sky catalog.
+
     Returns
     -------
     cat : mirage.catalogs.create_catalog.PointSourceCatalog
@@ -2114,7 +2217,8 @@ def galactic_bulge(box_width, instrument, filter_list, besancon_catalog_file,
     cat, column_filter_list = get_all_catalogs(coord.icrs.ra.value, coord.icrs.dec.value, box_width,
                                                besancon_catalog_file=besancon_catalog_file, instrument=instrument,
                                                filters=filter_list, ra_column_name=ra_column_name,
-                                               dec_column_name=dec_column_name)
+                                               dec_column_name=dec_column_name, starting_index=starting_index,
+                                               wise_catalog=wise_catalog)
     return cat
 
 
@@ -2193,7 +2297,7 @@ def generate_ra_dec(number_of_stars, ra_min, ra_max, dec_min, dec_max, seed=None
 
 
 def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
-                      boxflag=True, brightlimit=14.0, seed=None):
+                      boxflag=True, brightlimit=14.0, seed=None, starting_index=1):
     """
     Given a sky position (ra0,dec0), and a V3 rotation angle (v3rotangle) this
     routine makes a fake galaxy background for a square region of sky or a circle
@@ -2240,6 +2344,9 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
         is None the seed is set randomly.  If a non-integer value is
         given it is converted to integer.
 
+    starting_index : int
+            Beginning value to use for the 'index' column of the catalog. Default is 1.
+
     Returns
     -------
     galaxy_cat : mirage.catalogs.catalog_generate.GalaxyCatalog
@@ -2249,6 +2356,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     seedvalue : integer
         The seed value used with numpy.random to generate the values.
     """
+    logger = logging.getLogger('mirage.catalogs.create_catalog.galaxy_background')
+
     # The following is the area of the GOODS-S field catalogue from Gabe Brammer
     # in square arc-seconds
     goodss_area = 606909.
@@ -2257,7 +2366,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     else:
         outarea = math.pi*box_width*box_width
     if outarea >= goodss_area:
-        print('Error: requested sky area is too large.  Values will not be produced.')
+        logger.error('Error: requested sky area is too large.  Values will not be produced.')
         return None, None
     if seed is None:
         seedvalue = int(950397468.*np.random.random())
@@ -2268,12 +2377,15 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             seedvalue = seed
     np.random.seed(seedvalue)
     threshold = outarea/goodss_area
-    filter_names = make_filter_names(instrument, filters)
+
+    # Standardize the input filter names
+    std_filters = standardize_filters(instrument, filters)
+    filter_names = make_mag_column_names(instrument, std_filters)
     nfilters = len(filter_names)
     if nfilters < 1:
-        print('Error matching filters to standard list.  Inputs are:')
-        print('Instrument: ', instrument)
-        print('Filter names: ', filters)
+        logger.error('Error matching filters to standard list.  Inputs are:')
+        logger.error('Instrument: ', instrument)
+        logger.error('Filter names: ', filters)
         return None, None
     # add 8 to these indexes to get the columns in the GODDS-S catalogue file
     #
@@ -2283,21 +2395,21 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     filterinds = {'niriss_f090w_magnitude': 0, 'niriss_f115w_magnitude': 1,
                   'niriss_f150w_magnitude': 2, 'niriss_f200w_magnitude': 3,
                   'niriss_f140m_magnitude': 4, 'niriss_f158m_magnitude': 5,
-                  'nircam_f070w_magnitude': 6, 'nircam_f090w_magnitude': 7,
-                  'nircam_f115w_magnitude': 8, 'nircam_f150w_magnitude': 9,
-                  'nircam_f200w_magnitude': 10, 'nircam_f150w2_magnitude': 11,
-                  'nircam_f140m_magnitude': 12, 'nircam_f162m_magnitude': 13,
-                  'nircam_f182m_magnitude': 14, 'nircam_f210m_magnitude': 15,
-                  'nircam_f164n_magnitude': 16, 'nircam_f187n_magnitude': 17,
-                  'nircam_f212n_magnitude': 18, 'nircam_f277w_magnitude': 19,
-                  'nircam_f356w_magnitude': 20, 'nircam_f444w_magnitude': 21,
-                  'nircam_f322w2_magnitude': 22, 'nircam_f250m_magnitude': 23,
-                  'nircam_f300m_magnitude': 24, 'nircam_f335m_magnitude': 25,
-                  'nircam_f360m_magnitude': 26, 'nircam_f410m_magnitude': 27,
-                  'nircam_f430m_magnitude': 28, 'nircam_f460m_magnitude': 29,
-                  'nircam_f480m_magnitude': 30, 'nircam_f323n_magnitude': 31,
-                  'nircam_f405n_magnitude': 32, 'nircam_f466n_magnitude': 33,
-                  'nircam_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
+                  'nircam_f070w_clear_magnitude': 6, 'nircam_f090w_clear_magnitude': 7,
+                  'nircam_f115w_clear_magnitude': 8, 'nircam_f150w_clear_magnitude': 9,
+                  'nircam_f200w_clear_magnitude': 10, 'nircam_f150w2_clear_magnitude': 11,
+                  'nircam_f140m_clear_magnitude': 12, 'nircam_f150w2_f162m_magnitude': 13,
+                  'nircam_f182m_clear_magnitude': 14, 'nircam_f210m_clear_magnitude': 15,
+                  'nircam_f150w2_f164n_magnitude': 16, 'nircam_f187n_clear_magnitude': 17,
+                  'nircam_f212n_clear_magnitude': 18, 'nircam_f277w_clear_magnitude': 19,
+                  'nircam_f356w_clear_magnitude': 20, 'nircam_f444w_clear_magnitude': 21,
+                  'nircam_f322w2_clear_magnitude': 22, 'nircam_f250m_clear_magnitude': 23,
+                  'nircam_f300m_clear_magnitude': 24, 'nircam_f335m_clear_magnitude': 25,
+                  'nircam_f360m_clear_magnitude': 26, 'nircam_f410m_clear_magnitude': 27,
+                  'nircam_f430m_clear_magnitude': 28, 'nircam_f460m_clear_magnitude': 29,
+                  'nircam_f480m_clear_magnitude': 30, 'nircam_f322w2_f323n_magnitude': 31,
+                  'nircam_f444w_f405n_magnitude': 32, 'nircam_f444w_f466n_magnitude': 33,
+                  'nircam_f444w_f470n_magnitude': 34, 'niriss_f277w_magnitude': 19,
                   'niriss_f356w_magnitude': 20, 'niriss_f380m_magnitude': 26,
                   'niriss_f430m_magnitude': 28, 'niriss_f444w_magnitude': 21,
                   'niriss_f480m_magnitude': 30, 'fgs_guider1_magnitude': 11,
@@ -2305,6 +2417,11 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     module_path = pkg_resources.resource_filename('mirage', '')
     catalog_file = os.path.join(module_path, 'config/goodss_3dhst.v4.1.jwst_galfit.cat')
     catalog_values = np.loadtxt(catalog_file, comments='#')
+
+    # Force positive values for radius, sersic index, and ellipticity
+    good = ((catalog_values[:, 59] >= 0.) & (catalog_values[:, 61] > 0.) & (catalog_values[:, 63] >= 0.))
+    catalog_values = catalog_values[good, :]
+
     outinds = np.zeros((nfilters), dtype=np.int16)
     try:
         loop = 0
@@ -2312,7 +2429,7 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             outinds[loop] = filterinds[filter] + 8
             loop = loop+1
     except:
-        print('Error matching filter %s to standard list.' % (filter))
+        logger.error('Error matching filter %s to those available in 3D-HST catalog.' % (filter))
         return None, None
     # The following variables hold the Sersic profile index values
     # (radius [arc-seconds], sersic index, ellipticity, position angle)
@@ -2346,14 +2463,19 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     drout = np.copy(catalog_values[outputinds, sersicerrorinds[0]])
     rout = rout+2.*drout*np.random.normal(0., 1., nout)
     rout[rout < 0.01] = 0.01
+    max_rad = np.max(catalog_values[:, sersicinds[0]])
+    rout[rout > max_rad] = max_rad
     elout = np.copy(catalog_values[outputinds, sersicinds[2]])
     delout = np.copy(catalog_values[outputinds, sersicerrorinds[2]])
     elout = elout+delout*np.random.normal(0., 1., nout)
     elout[elout > 0.98] = 0.98
+    elout[elout < 0.] = 0.0
     sindout = np.copy(catalog_values[outputinds, sersicinds[1]])
     dsindout = np.copy(catalog_values[outputinds, sersicinds[1]])
     sindout = sindout+dsindout*np.random.normal(0., 1., nout)
     sindout[sindout < 0.1] = 0.1
+    max_sersic = np.max(catalog_values[:, sersicinds[1]])
+    sindout[sindout > max_sersic] = max_sersic
     paout = np.copy(catalog_values[outputinds, sersicinds[3]])
     dpaout = np.copy(catalog_values[outputinds, sersicinds[3]])
     paout = paout+dpaout*np.random.normal(0., 1., nout)
@@ -2364,21 +2486,13 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
             paout[loop] = paout[loop]-360.
     galaxy_cat = GalaxyCatalog(ra=raout, dec=decout, ellipticity=elout,
                                radius=rout, sersic_index=sindout,
-                               position_angle=paout, radius_units='arcsec')
+                               position_angle=paout, radius_units='arcsec',
+                               starting_index=starting_index)
     for loop in range(len(filter_names)):
         mag1 = catalog_values[outputinds, outinds[loop]]
         dmag1 = -0.2*np.random.random(nout)+0.1
         mag1 = mag1 + dmag1
-        if 'niriss' in filter_names[loop]:
-            inst1 = 'NIRISS'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        elif 'nircam' in filter_names[loop]:
-            inst1 = 'NIRCam'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        else:
-            inst1 = 'FGS'
-            filter_name = filter_names[loop].split('_')[1].upper()
-        galaxy_cat.add_magnitude_column(mag1, instrument=inst1,
-                                        filter_name=filter_name,
+
+        galaxy_cat.add_magnitude_column(mag1, column_name=filter_names[loop],
                                         magnitude_system='abmag')
     return galaxy_cat, seedvalue

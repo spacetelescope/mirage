@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<SEGMENT_UPDATE_REQUEST xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" creator="lajoie" date="2020-02-24" operational="false" time="15:51:50.393Z" version="6.3.1" xsi:noNamespaceSchemaLocation="../schema/segment_update_request.xsd">
+    <CONFIGURATION_NAME>MD2_2466452_E_PRI</CONFIGURATION_NAME>
+    <CORRECTION_ID>M2020022401</CORRECTION_ID>
+    <GROUP id="1">
+        <UPDATE id="1" seg_id="SM-19" type="pose" absolute="false" coord="local" stage_type="none">
+            <X_TRANS units="meters">0.0</X_TRANS>
+            <Y_TRANS units="meters">0.0</Y_TRANS>
+            <PISTON units="meters">-4.0E-4</PISTON>
+            <X_TILT units="radians">0.0</X_TILT>
+            <Y_TILT units="radians">0.0</Y_TILT>
+            <CLOCK units="radians">0.0</CLOCK>
+        </UPDATE>
+    </GROUP>
+    <GROUP id="2">
+        <UPDATE id="1" seg_id="SM-19" type="pose" absolute="false" coord="local" stage_type="none">
+            <X_TRANS units="meters">0.0</X_TRANS>
+            <Y_TRANS units="meters">0.0</Y_TRANS>
+            <PISTON units="meters">8.0E-4</PISTON>
+            <X_TILT units="radians">0.0</X_TILT>
+            <Y_TILT units="radians">0.0</Y_TILT>
+            <CLOCK units="radians">0.0</CLOCK>
+        </UPDATE>
+    </GROUP>
+</SEGMENT_UPDATE_REQUEST>

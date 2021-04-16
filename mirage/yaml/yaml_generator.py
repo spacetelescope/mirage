@@ -93,10 +93,11 @@ History
 import sys
 import os
 import argparse
+from collections import Counter
+import logging
 from copy import deepcopy
 from glob import glob
 import datetime
-import warnings
 
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
@@ -106,14 +107,25 @@ import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
+from ..catalogs.utils import get_nonsidereal_catalog_name, read_nonsidereal_catalog
+from ..logging import logging_functions
 from ..reference_files import crds_tools
-from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable
+from ..reference_files.utils import get_transmission_file
+from ..seed_image import ephemeris_tools
+from ..utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING
+from ..utils.siaf_interface import aperture_xy_to_radec
+from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable, parse_RA_Dec
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
-from ..utils.constants import CRDS_FILE_TYPES
-from ..utils import utils
+from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE, \
+                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from ..utils import siaf_interface, utils
 
 ENV_VAR = 'MIRAGE_DATA'
+
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class SimInput:
@@ -121,7 +133,9 @@ class SimInput:
                  reffile_overrides=None, use_JWST_pipeline=True, catalogs=None, cosmic_rays=None,
                  background=None, roll_angle=None, dates=None,
                  observation_list_file=None, verbose=False, output_dir='./', simdata_output_dir='./',
-                 dateobs_for_background=False, offline=False):
+                 dateobs_for_background=False, segmap_flux_limit=None, segmap_flux_limit_units=None,
+                 add_ghosts=True, convolve_ghosts_with_psf=False, convolve_extended_with_psf=True,
+                 offline=False):
         """Initialize instance. Read APT xml and pointing files if provided.
 
         Also sets the reference files definitions for all instruments.
@@ -204,11 +218,19 @@ class SimInput:
             https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
 
         dates : str or dict
-            Observation dates assocated with the exposures or program. If
+            Observation dates. Can be a single value, which will be treated as the
+            start date for the first observation, with all other observations following
+            immediately after, or a dictionary with one date per observation. If
             ``dateobs_for_background`` is True, the background for each
             exposure will be calculated based on these dates.
-            See Mirage's onling documentation for examples:
+            See Mirage's online documentation for examples:
             https://mirage-data-simulator.readthedocs.io/en/latest/yaml_generator.html
+
+        times : str or dict
+            Observation start time. Can be a single value, which will be treated as the
+            start time for the first observation, with all other observations following
+            immediately after, or a dictionary with one time per observation. Used in
+            conjunction with ``dates``.
 
         observation_list_file=None
         verbose : bool
@@ -226,10 +248,37 @@ class SimInput:
             when calculating the background level for the observation.
             If False, the value from ``background`` will be used.
 
+        segmap_flux_limit : float
+            Lower signal limit for pixels that will be added to the segmentation
+            map. Pixels with signals larger than or equal to this value will be
+            added to the segmentation map.
+
+        segmap_flux_limit_units : str
+            Units corresponding to the value in ```segmap_flux_limit```. Can be
+            'ADU/sec', 'e/sec', 'MJy/sr', 'ergs/cm2/A', 'ergs/cm2/Hz'
+
+        add_ghosts : bool
+            If True, optical ghosts will be added to the seed image based on
+            source locations. Currently only supported for NIRISS.
+
+        convolve_ghosts_with_psf : bool
+            If True, the stamp images used for ghost sources will be convolved
+            with the PSF prior to adding to the seed image
+
+        convolve_extended_with_psf : bool
+            If True, the stamp images used for astronomical sources will be
+            convolved with the PSF prior to adding to the seed image
+
         offline : bool
             Whether the class is being called with or without access to
             Mirage reference data. Used primarily for testing.
         """
+        # Initialize log
+        self.logger = logging.getLogger('mirage.yaml.yaml_generator')
+        self.logger.info('Running yaml_generator....\n')
+        self.logger.info('using APT xml file: {}\n'.format(input_xml))
+        self.logger.info('Original log file name: ./{}'.format(STANDARD_LOGFILE_NAME))
+
         parameter_overrides = {'cosmic_rays': cosmic_rays, 'background': background, 'roll_angle': roll_angle,
                                'dates': dates}
 
@@ -248,18 +297,33 @@ class SimInput:
             raise ValueError("reffile_defaults must be 'crds' or 'crds_full_name'")
         self.reffile_overrides = reffile_overrides
 
+        self.catalogs = catalogs
         self.table_file = None
         self.use_nonstsci_names = False
         self.use_linearized_darks = True
         self.psfwfe = 'predicted'
         self.psfwfegroup = 0
         self.resets_bet_ints = 1  # NIRCam should be 1
-        self.tracking = 'sidereal'
         self.psf_paths = None
         self.expand_catalog_for_segments = False
         self.dateobs_for_background = dateobs_for_background
         self.add_psf_wings = True
+        self.add_ghosts = add_ghosts
+        self.convolve_ghosts = convolve_ghosts_with_psf
+        self.convolve_extended = convolve_extended_with_psf
         self.offline = offline
+
+        if ((segmap_flux_limit is not None) and (segmap_flux_limit_units is None)):
+            raise ValueError("If segmap_flux_limit is provided, segmap_flux_units must also be provided.")
+
+        if segmap_flux_limit is None:
+            self.segmentation_threshold = SEGMENTATION_MIN_SIGNAL_RATE
+        else:
+            self.segmentation_threshold = segmap_flux_limit
+        if segmap_flux_limit_units is None:
+            self.segmentation_threshold_units = 'ADU/sec'
+        else:
+            self.segmentation_threshold_units = segmap_flux_limit_units
 
         # Expand the MIRAGE_DATA environment variable
         self.datadir = expand_environment_variable(ENV_VAR, offline=self.offline)
@@ -270,17 +334,18 @@ class SimInput:
         # Get the path to the 'MIRAGE' package
         self.modpath = pkg_resources.resource_filename('mirage', '')
 
-        self.set_global_definitions()
+        self.config_information = utils.organize_config_files(offline=self.offline)
+
         self.path_defs()
 
         if (input_xml is not None):
             if self.observation_list_file is None:
                 self.observation_list_file = os.path.join(self.output_dir, 'observation_list.yaml')
-            self.apt_xml_dict = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
-                                                     verbose=self.verbose,
-                                                     parameter_overrides=parameter_overrides)
+            self.apt_xml_dict, self.xml_skipped_observations = get_observation_dict(self.input_xml, self.observation_list_file, catalogs,
+                                                                                    verbose=self.verbose,
+                                                                                    parameter_overrides=parameter_overrides)
         else:
-            print('No input xml file provided. Observation dictionary not constructed.')
+            self.logger.error('No input xml file provided. Observation dictionary not constructed.')
 
         self.reffile_setup()
 
@@ -366,9 +431,11 @@ class SimInput:
         saturation_arr = deepcopy(empty_col)
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
+        photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         ipc_invert = np.array([True] * len(self.info['Instrument']))
         pixelAreaMap_arr = deepcopy(empty_col)
+        transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
 
@@ -402,7 +469,10 @@ class SimInput:
                     updated_status = (instrument, detector, filtername, pupilname, readpattern, exptype)
 
             # Query CRDS
-            reffiles = crds_tools.get_reffiles(status_dict, list(CRDS_FILE_TYPES.values()),
+            # Exclude transmission file for now
+            files_no_transmission = list(CRDS_FILE_TYPES.values())
+            files_no_transmission.remove('transmission')
+            reffiles = crds_tools.get_reffiles(status_dict, files_no_transmission,
                                                download=not self.offline)
 
             # If the user entered reference files in self.reffile_defaults
@@ -424,6 +494,13 @@ class SimInput:
                             crds_key = key
                         reffiles[crds_key] = manual_reffiles[key]
 
+            # Transmission image file
+            # For the moment, this file is retrieved from NIRCAM_GRISM or NIRISS_GRISM
+            # Down the road it will become part of CRDS, at which point
+            if 'transmission' not in reffiles.keys():
+                reffiles['transmission'] = get_transmission_file(status_dict)
+                self.logger.info('Using transmission file: {}'.format(reffiles['transmission']))
+
             # Check to see if a version of the inverted IPC kernel file
             # exists already in the same directory. If so, use that and
             # avoid having to invert the kernel at run time.
@@ -441,9 +518,11 @@ class SimInput:
             saturation_arr[match] = reffiles['saturation']
             gain_arr[match] = reffiles['gain']
             distortion_arr[match] = reffiles['distortion']
+            photom_arr[match] = reffiles['photom']
             ipc_arr[match] = reffiles['ipc']
             ipc_invert[match] = reffiles['invert_ipc']
             pixelAreaMap_arr[match] = reffiles['area']
+            transmission_arr[match] = reffiles['transmission']
             badpixmask_arr[match] = reffiles['mask']
             pixelflat_arr[match] = reffiles['flat']
 
@@ -452,9 +531,11 @@ class SimInput:
         self.info['saturation'] = list(saturation_arr)
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
+        self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['invert_ipc'] = list(ipc_invert)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
 
@@ -475,8 +556,10 @@ class SimInput:
         saturation_arr = deepcopy(empty_col)
         gain_arr = deepcopy(empty_col)
         distortion_arr = deepcopy(empty_col)
+        photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         pixelAreaMap_arr = deepcopy(empty_col)
+        transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
 
@@ -507,8 +590,10 @@ class SimInput:
             saturation_arr[match] = manual_reffiles['saturation']
             gain_arr[match] = manual_reffiles['gain']
             distortion_arr[match] = manual_reffiles['distortion']
+            photom_arr[match] = manual_reffiles['photom']
             ipc_arr[match] = manual_reffiles['ipc']
             pixelAreaMap_arr[match] = manual_reffiles['area']
+            transmission_arr[match] = manual_reffiles['transmission']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
             pixelflat_arr[match] = manual_reffiles['pixelflat']
 
@@ -517,8 +602,10 @@ class SimInput:
         self.info['saturation'] = list(saturation_arr)
         self.info['gain'] = list(gain_arr)
         self.info['astrometric'] = list(distortion_arr)
+        self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
+        self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
 
@@ -562,6 +649,7 @@ class SimInput:
                 self.multiple_catalog_match(filter, cattype, match)
             return match[0]
 
+    @logging_functions.log_fail
     def create_inputs(self):
         """Create observation table """
         self.path_defs()
@@ -578,30 +666,32 @@ class SimInput:
 
             # Read XML file and make observation table
             apt = apt_inputs.AptInput(input_xml=self.input_xml, pointing_file=self.pointing_file,
-                                      output_dir=self.output_dir)
+                                      output_dir=self.output_dir, offline=self.offline)
             # apt.input_xml = self.input_xml
             # apt.pointing_file = self.pointing_file
             apt.observation_list_file = self.observation_list_file
             apt.apt_xml_dict = self.apt_xml_dict
 
             apt.output_dir = self.output_dir
-            apt.create_input_table()
-
+            apt.create_input_table(skip_observations=self.xml_skipped_observations)
             self.info = apt.exposure_tab
 
-            # Add start time info to each element.
-            # Ignore warnings as astropy.time.Time will give a warning
-            # related to unknown leap seconds if the date is too far in
-            # the future.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                self.make_start_times()
+            # If we have a non-sidereal observation, then we need to
+            # update the pointing information based on the input
+            # ephemeris file or target velocity
+            self.nonsidereal_pointing_updates()
+
+            # Get the correct pointing for each aperture
+            siaf_dictionary = {}
+            for instrument_name in np.unique(self.info['Instrument']):
+                siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
+            self.info = apt_inputs.ra_dec_update(self.info, siaf_dictionary)
 
             # Add a list of output yaml names to the dictionary
             self.make_output_names()
 
         elif self.table_file is not None:
-            print('Reading table file: {}'.format(self.table_file))
+            self.logger.info('Reading table file: {}'.format(self.table_file))
             info = ascii.read(self.table_file)
             self.info = self.table_to_dict(info)
             final_file = self.table_file + '_with_yaml_parameters.csv'
@@ -624,9 +714,11 @@ class SimInput:
             self.info['saturation'] = column_data
             self.info['gain'] = column_data
             self.info['astrometric'] = column_data
+            self.info['photom'] = column_data
             self.info['ipc'] = column_data
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
             self.info['pixelAreaMap'] = column_data
+            self.info['transmission'] = column_data
             self.info['badpixmask'] = column_data
             self.info['pixelflat'] = column_data
 
@@ -657,14 +749,19 @@ class SimInput:
             darks.append(self.get_dark(instrument, det))
             lindarks.append(self.get_lindark(instrument, det))
 
-        self.info['dark'] = darks
         # If linearized darks are to be used, set the darks to None
         if self.use_linearized_darks:
             self.info['dark'] = [None] * len(darks)
             self.info['lindark'] = lindarks
+            if set(lindarks) == set([None]):
+                raise RuntimeError(("ERROR: Linearized darks requested, but no linearized dark files "
+                                    "found. Check: {}").format(os.path.join(os.path.expandvars('$MIRAGE_DATA'), instrument)))
         else:
             self.info['dark'] = darks
             self.info['lindark'] = [None] * len(lindarks)
+            if set(darks) == set([None]):
+                raise RuntimeError(("ERROR: Raw darks requested, but no raw dark files found. "
+                                    "Check: {}").format(os.path.join(os.path.expandvars('$MIRAGE_DATA'), instrument)))
 
         # Add setting describing whether JWST pipeline will be used
         self.info['use_JWST_pipeline'] = [self.use_JWST_pipeline] * len(darks)
@@ -712,7 +809,7 @@ class SimInput:
 
         table = Table(self.info)
         table.write(final_file, format='csv', overwrite=True)
-        print('Updated observation table file saved to {}'.format(final_file))
+        self.logger.info('Updated observation table file saved to {}'.format(final_file))
 
         # Now go through the lists one element at a time
         # and create a yaml file for each.
@@ -723,6 +820,29 @@ class SimInput:
             if instrument not in 'fgs nircam niriss'.split():
                 # do not write files for MIRI and NIRSpec
                 continue
+            elif instrument=='nircam':
+                # special case for coronagraphy:
+                # only 1 detector at a time is returned to the ground, depending on selected mask.
+                # do not write files for the detectors that are not downloaded.
+                if self.info['APTTemplate'][i]=='NircamCoron':
+                    # do not write files for detectors not read out
+                    # the ones not used are tagged with 'n/a' in ReadAPTXML.read_nircam_coronagraphy_template
+                    # and recall NIRCam coronagraphy always uses module A
+                    if ((self.info['LongPupil'][i]=='n/a' and self.info['detector'][i]=='A5') or
+                        (self.info['ShortPupil'][i]=='n/a' and self.info['detector'][i] in ['A1','A2','A3','A4'])):
+                        print(f"Skipping {self.info['yamlfile'][i]} because this coronagraphy obs does not use that detector")
+                        continue
+                              
+                    # SW coronagraphy exposures that use MASKRND collect data from A2 only
+                    if (self.info['ShortPupil'][i] == 'MASKRND' and self.info['detector'][i] != 'A2'):
+                        print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
+                        continue
+
+                    # SW coronagraphy exposures that use MASKSWB collect data from A4 only
+                    if (self.info['ShortPupil'][i] == 'MASKSWB' and self.info['detector'][i] != 'A4'):
+                        print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
+                        continue          
+
             file_dict = {}
             for key in self.info:
                 file_dict[key] = self.info[key][i]
@@ -733,7 +853,7 @@ class SimInput:
             # primarytot = np.int(file_dict['PrimaryDithers'])
             primarytot = np.int(file_dict['number_of_dithers'])
 
-            if file_dict['SubpixelPositions'].upper() == 'NONE':
+            if isinstance(file_dict['SubpixelPositions'], str) and file_dict['SubpixelPositions'].upper() == 'NONE':
                 subpixtot = 1
             else:
                 try:
@@ -744,13 +864,14 @@ class SimInput:
             file_dict['primary_dither_num'] = np.int(primary_dither)
             subpix_dither = (tot_dith-1) % subpixtot
             file_dict['subpix_dither_num'] = subpix_dither + 1
-            file_dict['subarray_def_file'] = self.global_subarray_definition_files[instrument]
-            file_dict['readpatt_def_file'] = self.global_readout_pattern_files[instrument]
-            file_dict['crosstalk_file'] = self.global_crosstalk_files[instrument]
-            file_dict['filtpupilcombo_file'] = self.global_filtpupilcombo_files[instrument]
-            file_dict['filter_position_file'] = self.global_filter_position_files[instrument]
-            file_dict['flux_cal_file'] = self.global_flux_cal_files[instrument]
-            file_dict['psf_wing_threshold_file'] = self.global_psf_wing_threshold_file[instrument]
+
+            file_dict['subarray_def_file'] = self.config_information['global_subarray_definition_files'][instrument]
+            file_dict['readpatt_def_file'] = self.config_information['global_readout_pattern_files'][instrument]
+            file_dict['crosstalk_file'] = self.config_information['global_crosstalk_files'][instrument]
+            file_dict['filtpupilcombo_file'] = self.config_information['global_filtpupilcombo_files'][instrument]
+            file_dict['filter_position_file'] = self.config_information['global_filter_position_files'][instrument]
+            file_dict['flux_cal_file'] = self.config_information['global_flux_cal_files'][instrument]
+            file_dict['psf_wing_threshold_file'] = self.config_information['global_psf_wing_threshold_file'][instrument]
             fname = self.write_yaml(file_dict)
             yamls.append(fname)
         self.yaml_files = yamls
@@ -760,7 +881,7 @@ class SimInput:
         mosaic_numbers = sorted(list(set([f.split('_')[0] for f in filenames])))
         obs_ids = sorted(list(set([m[7:10] for m in mosaic_numbers])))
 
-        print('\n')
+        self.logger.info('\n')
 
         total_exposures = 0
         for obs in obs_ids:
@@ -813,17 +934,21 @@ class SimInput:
             else:
                 instrument_string = '    Prime: {}'.format(prime_instrument)
 
-            print('\nObservation {}:'.format(obs))
-            print(instrument_string)
-            print('    {} visit(s)'.format(n_visits))
-            print('    {} activity(ies)'.format(n_activities))
-            #print('    {} exposure(s)'.format(n_exposures))
+            self.logger.info('Observation {}:'.format(obs))
+            self.logger.info(instrument_string)
+            self.logger.info('    {} visit(s)'.format(n_visits))
+            self.logger.info('    {} activity(ies)'.format(n_activities))
+            #self.logger.info('    {} exposure(s)'.format(n_exposures))
             if ((prime_instrument.upper() == 'NIRCAM') or (parallel_instrument.upper() == 'NIRCAM')):
-                print('    {} NIRCam detector(s) in module {}'.format(n_det, module))
-            print('    {} file(s)'.format(total_files))
+                self.logger.info('    {} NIRCam detector(s) in module {}'.format(n_det, module))
+            self.logger.info('    {} file(s)'.format(total_files))
 
-        # print('\n{} exposures total.'.format(total_exposures))
-        print('{} output files written to: {}'.format(len(yamls), self.output_dir))
+        # self.logger.info('\n{} exposures total.'.format(total_exposures))
+        self.logger.info('{} output files written to: {}'.format(len(yamls), self.output_dir))
+        self.logger.info('Yaml generator complete')
+        log_outdir = os.path.dirname(self.input_xml)
+        logging_functions.move_logfile_to_standard_location(self.input_xml, STANDARD_LOGFILE_NAME,
+                                                            yaml_outdir=log_outdir, log_type='yaml_generator')
 
     def create_output_name(self, input_obj, index=0):
         """Put together the JWST formatted fits file name based on observation parameters
@@ -900,9 +1025,11 @@ class SimInput:
         files = self.dark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
-        else:
+        elif len(files) > 1:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
+        else:
+            return None
 
     def get_lindark(self, instrument, detector):
         """
@@ -922,9 +1049,11 @@ class SimInput:
         files = self.lindark_list[instrument][detector]
         if len(files) == 1:
             return files[0]
-        else:
+        elif len(files) > 1:
             rand_index = np.random.randint(0, len(files) - 1)
             return files[rand_index]
+        else:
+            return None
 
     def get_readpattern_defs(self, filename=None):
         """Read in the readpattern definition file and return table.
@@ -964,7 +1093,7 @@ class SimInput:
         for key in refs:
             if detector in key:
                 return refs[key]
-        print("WARNING: no file found for detector {} in {}"
+        self.logger.error("WARNING: no file found for detector {} in {}"
               .format(detector, refs))
 
     def get_subarray_defs(self, filename=None):
@@ -1098,6 +1227,158 @@ class SimInput:
         self.info['outputfits'] = fits_names
         # Table([self.info['yamlfile']]).pprint()
 
+    def nonsidereal_pointing_updates(self):
+        """Update the pointing info for non-sidereal observations using the
+        requested observation date/time.
+        """
+        obs = np.array(self.info['ObservationID'])
+        all_date_obs = np.array(self.info['date_obs'])
+        all_time_obs = np.array(self.info['time_obs'])
+        all_exposure = np.array(self.info['exposure'])
+        all_apertures = np.array(self.info['aperture'])
+        tracking = np.array(self.info['Tracking'])
+        targs = np.array(self.info['TargetID'])
+        inst = np.array(self.info['Instrument'])
+        ra_from_pointing_file = np.array(self.info['ra'])
+        dec_from_pointing_file = np.array(self.info['dec'])
+        nonsidereal_index = np.where(np.array(tracking) == 'non-sidereal')
+        all_nonsidereal_targs = targs[nonsidereal_index]
+        all_nonsidereal_instruments = inst[nonsidereal_index]
+
+        # Get a list of the unique (target, instrument) combinations for
+        # non-sidereal observations
+        inst_targs = [[t, i] for t, i in zip(all_nonsidereal_targs, all_nonsidereal_instruments)]
+        ctr = Counter(tuple(x) for x in inst_targs)
+        unique = [list(key) for key in ctr.keys()]
+
+        # Check that all non-sidereal targets have catalogs associated with them
+        #for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
+        for element in unique:
+            targ, inst = element
+            ns_catalog = get_nonsidereal_catalog_name(self.catalogs, targ, inst)
+            catalog_table, pos_in_xy, vel_in_xy = read_nonsidereal_catalog(ns_catalog)
+
+            # If the ephemeris_file column is present but equal to 'none', then
+            # remove the column
+            if 'ephemeris_file' in catalog_table.colnames:
+                if catalog_table['ephemeris_file'][0].lower() == 'none':
+                    catalog_table.remove_column('ephemeris_file')
+
+            if 'ephemeris_file' in catalog_table.colnames:
+                ephemeris_file = catalog_table['ephemeris_file'][0]
+                ra_ephem, dec_ephem = ephemeris_tools.get_ephemeris(ephemeris_file)
+
+            # Find the observations that use this target
+            exp_index_this_target = targs == targ
+            obs_this_target = np.unique(obs[exp_index_this_target])
+
+            # Loop over observations
+            for obs_name in obs_this_target:
+
+                # Get date/time for every exposure
+                obs_exp_indexes = np.where(obs == obs_name)
+                obs_dates = all_date_obs[obs_exp_indexes]
+                obs_times = all_time_obs[obs_exp_indexes]
+                exposures = all_exposure[obs_exp_indexes]
+                apertures = all_apertures[obs_exp_indexes]
+                unique_apertures = np.unique(apertures)
+
+                start_dates = []
+                for date_obs, time_obs in zip(obs_dates, obs_times):
+                    ob_time = '{}T{}'.format(date_obs, time_obs)
+                    try:
+                        start_dates.append(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S'))
+                    except ValueError:
+                        start_dates.append(datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f'))
+
+                if 'ephemeris_file' in catalog_table.colnames:
+                    all_times = [ephemeris_tools.to_timestamp(elem) for elem in start_dates]
+
+                    # Create list of positions for all frames
+                    try:
+                        ra_target = ra_ephem(all_times)
+                        dec_target = dec_ephem(all_times)
+
+                    except ValueError:
+                        raise ValueError(("Observation dates ({} - {}) are not present within the ephemeris file {}"
+                                          .format(start_dates[0], start_dates[-1], ephemeris_file)))
+                else:
+                    if not pos_in_xy:
+                        # Here we assume that the source (and aperture reference location)
+                        # is located at the given RA, Dec at the start of the first exposure
+                        base_ra, base_dec = parse_RA_Dec(catalog_table['x_or_RA'].data[0], catalog_table['y_or_Dec'].data[0])
+                        ra_target = [base_ra]
+                        dec_target = [base_dec]
+
+                        ra_vel = catalog_table['x_or_RA_velocity'].data[0]
+                        dec_vel = catalog_table['y_or_Dec_velocity'].data[0]
+
+                        # If the source velocity is given in units of pixels/hour, then we need
+                        # to multiply this by the appropriate pixel scale.
+                        if vel_in_xy:
+                            if len(unique_apertures) > 1:
+                                if inst.lower() == 'nircam':
+                                    det_ints = [int(ele.split('_')[0][-1]) for ele in unique_apertures]
+                                    # If the observation contains NIRCam exposures in both the LW and
+                                    # SW channels, then the source velocity is ambiguous due to the
+                                    # different pixel scales. In that case, raise an exception.
+                                    if np.min(det_ints) < 5 and np.max(det_ints) == 5:
+                                        raise ValueError(('Non-sidereal source {} has no ephemeris file, and a velocity that '
+                                                          'is specified in units of pixels/hour in the source catalog. '
+                                                          'Since observation {} contains NIRCam apertures within both the '
+                                                          'SW and LW channels (which have different pixel scales), '
+                                                          'Mirage does not know which pixel scale to use '
+                                                          'when placing the source.'.format(targ, obs_name)))
+
+                            # In this case, there is a well-defined pixel scale, so we can translate
+                            # velocities to units of arcsec/hour
+                            siaf = pysiaf.Siaf(inst)[unique_apertures[0]]
+                            ra_vel *= siaf.XSciScale
+                            dec_vel *= siaf.XSciScale
+
+                        # Calculate RA, Dec for each exposure given the velocities
+                        for ob_date in start_dates[1:]:
+                            delta_time = ob_date - start_dates[0]
+                            delta_ra = ra_vel * delta_time.total_seconds() / 3600.
+                            delta_dec = dec_vel * delta_time.total_seconds() / 3600.
+                            ra_target.append(base_ra + delta_ra)
+                            dec_target.append(base_dec + delta_dec)
+
+                    else:
+                        # Source location comes from the source catalog and is in units of pixels.
+                        # This can't really be supported, since we don't know which detector the
+                        # location is for. We could proceed, but Mirage would then put the source
+                        # pixel (x, y) in every aperture/detector.
+                        if len(unique_apertures) > 1:
+                            raise ValueError(('Non-sidereal source {} has no ephemeris file, and a location that '
+                                              'is specified in units of detector pixels in the source catalog. '
+                                              'Since observation {} contains multiple apertures (implying different '
+                                              'coordinate systems), Mirage does not know which coordinate system '
+                                              'to use when placing the source.'.format(targ, obs_name)))
+
+                        # If there is only a single aperture associated with the observation,
+                        # then we can proceed. We first need to translate the given x, y position
+                        # to RA, Dec
+                        base_ra, base_dec = aperture_xy_to_radec(catalog_table['x_or_RA'].data[0],
+                                                                 catalog_table['y_or_Dec'].data[0],
+                                                                 inst, aperture, fiducial_ra, fiducial_dec, pav3)
+
+
+                ra_from_pointing_file[obs_exp_indexes] = ra_target
+                dec_from_pointing_file[obs_exp_indexes] = dec_target
+
+        self.info['TargetRA'] = ra_from_pointing_file
+        self.info['TargetDec'] = dec_from_pointing_file
+
+        # Need to update these values (which come from the pointing file)
+        # so that below we can adjust them for the different detectors/apertures
+        self.info['ra'] = [np.float64(ele) for ele in ra_from_pointing_file]
+        self.info['dec'] = [np.float64(ele) for ele in dec_from_pointing_file]
+
+        # These go into the pointing in the yaml file
+        self.info['ra_ref'] = ra_from_pointing_file
+        self.info['dec_ref'] = dec_from_pointing_file
+
     def set_global_definitions(self):
         """Store the subarray definitions of all supported instruments."""
         # TODO: Investigate how this could be combined with the creation of
@@ -1170,247 +1451,40 @@ class SimInput:
         users, allow the input keys to be case insensitive. Take the user
         input dictionary and translate all the keys to be lower case.
         """
-        for key in self.reffile_overrides:
-            if key.lower() != key:
-                newkey = key.lower()
-                self.reffile_overrides[newkey] = self.reffile_overrides.pop(key)
-            else:
-                newkey = key
-            if isinstance(self.reffile_overrides[newkey], dict):
-                for key2 in self.reffile_overrides[newkey]:
-                    if (key2.lower() != key2):
-                        newkey2 = key2.lower()
-                        self.reffile_overrides[newkey][newkey2] = self.reffile_overrides[newkey].pop(key2)
-                    else:
-                        newkey2 = key2
-                    if isinstance(self.reffile_overrides[newkey][newkey2], dict):
-                        for key3 in self.reffile_overrides[newkey][newkey2]:
-                            if (key3.lower() != key3):
-                                newkey3 = key3.lower()
-                                self.reffile_overrides[newkey][newkey2][newkey3] = self.reffile_overrides[newkey][newkey2].pop(key3)
-                            else:
-                                newkey3 = key3
-                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3], dict):
-                                for key4 in self.reffile_overrides[newkey][newkey2][newkey3]:
-                                    if (key4.lower() != key4):
-                                        newkey4 = key4.lower()
-                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4] = self.reffile_overrides[newkey][newkey2][newkey3].pop(key4)
-                                    else:
-                                        newkey4 = key4
-                                    if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4], dict):
-                                        for key5 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4]:
-                                            if (key5.lower() != key5):
-                                                newkey5 = key5.lower()
-                                                self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4].pop(key5)
+        lower1 = {}
+        for key1, val1 in self.reffile_overrides.items():
+            if isinstance(val1, dict):
+                lower2 = {}
+                for key2, val2 in val1.items():
+                    if isinstance(val2, dict):
+                        lower3 = {}
+                        for key3, val3 in val2.items():
+                            if isinstance(val3, dict):
+                                lower4 = {}
+                                for key4, val4 in val3.items():
+                                    if isinstance(val4, dict):
+                                        lower5 = {}
+                                        for key5, val5 in val4.items():
+                                            if isinstance(val5, dict):
+                                                lower6 = {}
+                                                for key6, val6 in val5.items():
+                                                    lower6[key6.lower()] = val6
+                                                lower5[key5.lower()] = deepcopy(lower6)
                                             else:
-                                                newkey5 = key5
-                                            if isinstance(self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5], dict):
-                                                for key6 in self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5]:
-                                                    if (key6.lower() != key6):
-                                                        newkey6 = key6.lower()
-                                                        self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5][newkey6] = self.reffile_overrides[newkey][newkey2][newkey3][newkey4][newkey5].pop(key6)
-                                                    else:
-                                                        newkey6 = key6
-
-    def make_start_times(self):
-        """Create exposure start times for each entry in the observation dictionary."""
-        date_obs = []
-        time_obs = []
-        expstart = []
-        nframe = []
-        nskip = []
-        namp = []
-
-        # choose arbitrary start time for each epoch
-        epoch_base_time = '16:44:12'
-        epoch_base_time0 = deepcopy(epoch_base_time)
-
-        if 'epoch_start_date' in self.info.keys():
-            epoch_base_date = self.info['epoch_start_date'][0]
-        else:
-            epoch_base_date = self.info['Date'][0]
-        base = Time(epoch_base_date + 'T' + epoch_base_time)
-        base_date, base_time = base.iso.split()
-
-        # Pick some arbirary overhead values
-        act_overhead = 90  # seconds. (filter change)
-        visit_overhead = 600  # seconds. (slew)
-
-        # Get visit, activity_id, dither_id info for first exposure
-        ditherid = self.info['dither'][0]
-        actid = self.info['act_id'][0]
-        visit = self.info['visit_num'][0]
-        # obsname = self.info['obs_label'][0]
-
-        # for i in range(len(self.info['Module'])):
-        for i, instrument in enumerate(self.info['Instrument']):
-            # Get dither/visit
-            # Files with the same activity_id should have the same start time
-            # Overhead after a visit break should be large, smaller between
-            # exposures within a visit
-            next_actid = self.info['act_id'][i]
-            next_visit = self.info['visit_num'][i]
-            next_obsname = self.info['obs_label'][i]
-            next_ditherid = self.info['dither'][i]
-
-            # Find the readpattern of the file
-            readpatt = self.info['ReadoutPattern'][i]
-            groups = np.int(self.info['Groups'][i])
-            integrations = np.int(self.info['Integrations'][i])
-
-            if instrument.lower() in ['miri', 'nirspec']:
-                nframe.append(0)
-                nskip.append(0)
-                namp.append(0)
-                date_obs.append(base_date)
-                time_obs.append(base_time)
-                expstart.append(base.mjd)
-
+                                                lower5[key5.lower()] = val5
+                                        lower4[key4.lower()] = deepcopy(lower5)
+                                    else:
+                                        lower4[key4.lower()] = val4
+                                lower3[key3.lower()] = deepcopy(lower4)
+                            else:
+                                lower3[key3.lower()] = val3
+                        lower2[key2.lower()] = deepcopy(lower3)
+                    else:
+                        lower2[key2.lower()] = val2
+                lower1[key1.lower()] = deepcopy(lower2)
             else:
-                # Now read in readpattern definitions
-                readpatt_def = self.global_readout_patterns[instrument.lower()]
-
-                # Read in file containing subarray definitions
-                subarray_def = self.global_subarray_definitions[instrument.lower()]
-
-                match2 = readpatt == readpatt_def['name']
-                if np.sum(match2) == 0:
-                    raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
-                                        .format(readpatt)))
-
-                # Now get nframe and nskip so we know how many frames in a group
-                fpg = np.int(readpatt_def['nframe'][match2][0])
-                spg = np.int(readpatt_def['nskip'][match2][0])
-                nframe.append(fpg)
-                nskip.append(spg)
-
-                # Get the aperture name. For non-NIRCam instruments,
-                # this is simply the self.info['aperture']. But for NIRCam,
-                # we need to be careful of entries like NRCBS_FULL, which is used
-                # for observations using all 4 shortwave B detectors. In that case,
-                # we need to build the aperture name from the combination of detector
-                # and subarray name.
-                aperture = self.info['aperture'][i]
-
-                # Get the number of amps from the subarray definition file
-                match = aperture == subarray_def['AperName']
-
-                # needed for NIRCam case
-                if np.sum(match) == 0:
-                    aperture = [apername for apername, name in
-                                np.array(subarray_def['AperName', 'Name']) if
-                                (sub in apername) or (sub in name)]
-
-                    match = aperture == subarray_def['AperName']
-
-                    if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
-                        raise ValueError('Cannot combine detector {} and subarray {}\
-                            into valid aperture name.'.format(det, sub))
-                    # We don't want aperture as a list
-                    aperture = aperture[0]
-
-                # For grism tso observations, get the number of
-                # amplifiers to use from the APT file.
-                # For other modes, check the subarray def table.
-                try:
-                    amp = int(self.info['NumOutputs'][i])
-                except ValueError:
-                    amp = subarray_def['num_amps'][match][0]
-
-                # Default to amps=4 for subarrays that can have 1 or 4
-                # if the number of amps is not defined. Hopefully we
-                # should never enter this code block given the lines above.
-                if amp == 0:
-                    amp = 4
-                    print(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
-                           'In the future this information should be made a user input.'.format(aperture)))
-                namp.append(amp)
-
-                # same activity ID
-                # Remove this for now, since Mirage was not correctly
-                # specifying activities. At the moment all exposures have
-                # the same activity ID, which means we must allow the
-                # the epoch_start_date to change even if the activity ID
-                # does not. This will change back in the future when we
-                # figure out more realistic activity ID values.
-                #if next_actid == actid:
-                #    # in this case, the start time should remain the same
-                #    date_obs.append(base_date)
-                #    time_obs.append(base_time)
-                #    expstart.append(base.mjd)
-                #    continue
-
-                epoch_date = self.info['epoch_start_date'][i]
-                epoch_time = deepcopy(epoch_base_time0)
-
-                # new epoch - update the base time
-                if epoch_date != epoch_base_date:
-                    epoch_base_date = deepcopy(epoch_date)
-                    base = Time(epoch_base_date + 'T' + epoch_base_time)
-                    base_date, base_time = base.iso.split()
-                    basereset = True
-                    date_obs.append(base_date)
-                    time_obs.append(base_time)
-                    expstart.append(base.mjd)
-                    actid = deepcopy(next_actid)
-                    visit = deepcopy(next_visit)
-                    obsname = deepcopy(next_obsname)
-                    continue
-
-                # new visit
-                if next_visit != visit:
-                    # visit break. Larger overhead
-                    overhead = visit_overhead
-
-                # This block should be updated when we have more realistic
-                # activity IDs
-                elif ((next_actid > actid) & (next_visit == visit)):
-                    # same visit, new activity. Smaller overhead
-                    overhead = act_overhead
-                elif ((next_ditherid != ditherid) & (next_visit == visit)):
-                    # same visit, new dither position. Smaller overhead
-                    overhead = act_overhead
-                else:
-                    # same observation, activity, dither. Filter changes
-                    # will still fall in here, which is not accurate
-                    overhead = 10.
-
-                # For cases where the base time needs to change
-                # continue down here
-                siaf_inst = self.info['Instrument'][i].upper()
-                if siaf_inst == 'NIRCAM':
-                    siaf_inst = "NIRCam"
-                siaf_obj = pysiaf.Siaf(siaf_inst)[aperture]
-
-                # Calculate the readout time for a single frame
-                frametime = calc_frame_time(siaf_inst, aperture,
-                                            siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
-
-                # Estimate total exposure time
-                exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
-
-                # Delta should include the exposure time, plus overhead
-                delta = TimeDelta(exptime + overhead, format='sec')
-                base += delta
-                base_date, base_time = base.iso.split()
-
-                # Add updated dates and times to the list
-                date_obs.append(base_date)
-                time_obs.append(base_time)
-                expstart.append(base.mjd)
-
-                # increment the activity ID and visit
-                actid = deepcopy(next_actid)
-                visit = deepcopy(next_visit)
-                obsname = deepcopy(next_obsname)
-                ditherid = deepcopy(next_ditherid)
-
-        self.info['date_obs'] = date_obs
-        self.info['time_obs'] = time_obs
-        # self.info['expstart'] = expstart
-        self.info['nframe'] = nframe
-        self.info['nskip'] = nskip
-        self.info['namp'] = namp
+                lower1[key1.lower()] = val1
+        self.reffile_overrides = lower1
 
     def multiple_catalog_match(self, filter, cattype, matchlist):
         """
@@ -1425,9 +1499,9 @@ class SimInput:
         matchlist : list
           Matching catalog names
         """
-        print("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
-        print("Observation filter: {}".format(filter))
-        print("Matched point source catalogs: {}".format(matchlist))
+        self.logger.warning("WARNING: multiple {} catalogs matched! Using the first.".format(cattype))
+        self.logger.warning("Observation filter: {}".format(filter))
+        self.logger.warning("Matched point source catalogs: {}".format(matchlist))
 
     def no_catalog_match(self, filter, cattype):
         """
@@ -1441,10 +1515,10 @@ class SimInput:
           Type of catalog (e.g. pointsource)
 
         """
-        print("WARNING: unable to find filter ({}) name".format(filter))
-        print("in any of the given {} inputs".format(cattype))
-        print("Using the first input for now. Make sure input catalog names have")
-        print("the appropriate filter name in the filename to get matching to work.")
+        self.logger.warning("WARNING: unable to find filter ({}) name".format(filter))
+        self.logger.warning("in any of the given {} inputs".format(cattype))
+        self.logger.warning("Using the first input for now. Make sure input catalog names have")
+        self.logger.warning("the appropriate filter name in the filename to get matching to work.")
 
     def path_defs(self):
         """Expand input files to have full paths"""
@@ -1524,7 +1598,7 @@ class SimInput:
             self.psfbasename[instrument] = 'N/A'
 
         # create empty dictionaries
-        list_names = 'superbias linearity gain saturation ipc astrometric pam dark lindark'.split()
+        list_names = 'superbias linearity gain saturation ipc astrometric photom pam dark lindark'.split()
         for list_name in list_names:
             setattr(self, '{}_list'.format(list_name), {})
 
@@ -1569,14 +1643,12 @@ class SimInput:
             else:  # niriss and fgs
                 for det in self.det_list[instrument]:
                     if det == 'G1':
-                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                                                            '*30632_1x88_FGSF03511-D-NR-G1-5346180117_1_497_SE_2015-12-12T19h00m12_dms_uncal*.fits'))
-                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_497_*fits'))
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw', FGS1_DARK_SEARCH_STRING))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', FGS1_DARK_SEARCH_STRING))
 
                     elif det == 'G2':
-                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw',
-                                                                            '*30670_1x88_FGSF03511-D-NR-G2-5346181816_1_498_SE_2015-12-12T21h31m01_dms_uncal*.fits'))
-                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', '*_498_*fits'))
+                        self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/raw', FGS2_DARK_SEARCH_STRING))
+                        self.lindark_list[instrument][det] = glob(os.path.join(self.datadir, 'fgs/darks/linearized', FGS2_DARK_SEARCH_STRING))
 
                     elif det == 'NIS':
                         self.dark_list[instrument][det] = glob(os.path.join(self.datadir, 'niriss/darks/raw',
@@ -1629,24 +1701,23 @@ class SimInput:
             The list of paths to the PSF library(ies), with a length
             equal to the number of activities in the APT program.
         """
-        act_ids = sorted(list(set(self.info['act_id'])))
-        act_id_indices = []
-        for act_id in self.info['act_id']:
-            act_id_indices.append(act_ids.index(act_id))
-        n_activities = len(act_ids)
+        exp_ids = sorted(list(set(self.info['entry_number'])))
+        exp_id_indices = []
+        for exp_id in self.info['entry_number']:
+            exp_id_indices.append(exp_ids.index(exp_id))
+        n_activities = len(exp_ids)
 
         # If no path explicitly provided, use the default path.
         if self.psf_paths is None:
-            print('No PSF path provided. Using default path as PSF path for all yamls.')
+            self.logger.info('No PSF path provided. Using default path as PSF path for all yamls.')
             paths_out = []
             for instrument in self.info['Instrument']:
-                default_path = self.global_psfpath[instrument.lower()]
-                # default_path = os.path.join(self.datadir, instrument.lower(), 'webbpsf_library')
+                default_path = self.config_information['global_psfpath'][instrument.lower()]
                 paths_out.append(default_path)
             return paths_out
 
         elif isinstance(self.psf_paths, str):
-            print('Using provided PSF path.')
+            self.logger.info('Using provided PSF path.')
             paths_out = [self.psf_paths] * len(self.info['act_id'])
             return paths_out
 
@@ -1658,8 +1729,8 @@ class SimInput:
                              .format(n_activities, len(self.psf_paths)))
 
         elif isinstance(self.psf_paths, list):
-            print('Using provided PSF paths.')
-            paths_out = [sorted(self.psf_paths)[i] for i in act_id_indices]  # Why is this sorted..?? Seg number?
+            self.logger.info('Using provided PSF paths.')
+            paths_out = [self.psf_paths[i] for i in exp_id_indices]
             return paths_out
 
         elif not isinstance(self.psf_paths, list) or not isinstance(self.psf_paths, str):
@@ -1778,6 +1849,17 @@ class SimInput:
         except KeyError:
             files['area'] = 'none'
 
+        # transmission image
+        try:
+            if instrument == 'nircam':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][detector][filtername][pupilname]
+            elif instrument == 'niriss':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][filtername][pupilname]
+            elif instrument == 'fgs':
+                files['transmission'] = self.reffile_overrides[instrument]['transmission'][detector]
+        except KeyError:
+            files['transmission'] = 'none'
+
         # bad pixel map
         try:
             if instrument == 'nircam':
@@ -1799,6 +1881,12 @@ class SimInput:
                 files['pixelflat'] = self.reffile_overrides[instrument]['pixelflat'][detector][exptype]
         except KeyError:
             files['pixelflat'] = 'none'
+
+        # photom reference file
+        try:
+            files['photom'] = self.reffile_overrides[instrument]['photom'][detector]
+        except KeyError:
+            files['photom'] = 'none'
 
         return files
 
@@ -1840,8 +1928,20 @@ class SimInput:
             # set the FilterWheel and PupilWheel for NIRISS
             if input['APTTemplate'] in ['NirissAmi']:
                 filter_name = input['Filter']
-                input[filtkey] = filter_name
-                input[pupilkey] = 'NRM'
+
+                # TA and direct images will be set to imaging mode
+                # rather than ami mode
+                if input['Mode'].lower() == 'imaging':
+                    if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
+                        input[pupilkey] = filter_name
+                        input[filtkey] = 'CLEAR'
+                    elif filter_name in NIRISS_FILTER_WHEEL_ELEMENTS:
+                        input[pupilkey] = 'CLEARP'
+                        input[filtkey] = filter_name
+                else:
+                    input[filtkey] = filter_name
+                    input[pupilkey] = 'NRM'
+
             elif input['APTTemplate'] not in ['NirissExternalCalibration', 'NirissWfss']:
                 filter_name = input['Filter']
                 if filter_name in NIRISS_PUPIL_WHEEL_ELEMENTS:
@@ -1898,7 +1998,7 @@ class SimInput:
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
-            subarray_definitions = self.global_subarray_definitions[instrument.lower()]
+            subarray_definitions = self.config_information['global_subarray_definitions'][instrument.lower()]
 
 
             if full_ap not in subarray_definitions['AperName']:
@@ -1926,12 +2026,15 @@ class SimInput:
             f.write('  pixelflat: {}    # Flat field file to use for un-flattening output\n'.format(input['pixelflat']))
             f.write('  illumflat: None                               # Illumination flat field file\n')
             f.write('  astrometric: {}  # Astrometric distortion file (asdf)\n'.format(input['astrometric']))
+            f.write('  photom: {}   # cal pipeline photom reference file\n'.format(input['photom']))
             f.write('  ipc: {} # File containing IPC kernel to apply\n'.format(input['ipc']))
             f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
                      'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(input['invert_ipc'])))
             f.write('  occult: None                                    # Occulting spots correction image\n')
             f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
                      .format(input['pixelAreaMap'])))
+            f.write(('  transmission: {}      # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov\n'
+                     .format(input['transmission'])))
             f.write(('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'
                      .format(input['subarray_def_file'])))
             f.write(('  readpattdefs: {}  # File that contains a list of all possible readout pattern names and associated '
@@ -1943,6 +2046,7 @@ class SimInput:
             f.write(('  flux_cal: {} # File that lists flux conversion factor and pivot wavelength for each filter. Only '
                      'used when making direct image outputs to be fed into the grism disperser code.\n'.format(input['flux_cal_file'] )))
             f.write('  filter_throughput: {} #File containing filter throughput curve\n'.format(self.configfiles[instrument.lower()]['filter_throughput']))
+            f.write('  ')
             f.write('\n')
             f.write('nonlin:\n')
             f.write('  limit: 60000.0                           # Upper singal limit to which nonlinearity is applied (ADU)\n')
@@ -2018,8 +2122,8 @@ class SimInput:
             f.write('  extendedscale: {}                          #Scaling factor for extended emission image\n'.format(ExtendedScale))
             f.write(('  extendedCenter: {}                   #x, y pixel location at which to place the extended image '
                      'if it is smaller than the output array size\n'.format(ExtendedCenter)))
-            f.write(('  PSFConvolveExtended: True #Convolve the extended image with the PSF before adding to the output '
-                     'image (True or False)\n'))
+            f.write(('  PSFConvolveExtended: {} #Convolve the extended image with the PSF before adding to the output '
+                     'image (True or False)\n'.format(self.convolve_extended)))
             f.write(('  movingTargetList: {}          #Name of file containing a list of point source moving targets (e.g. '
                      'KBOs, asteroids) to add.\n'.format(MovingTargetList)))
             f.write(('  movingTargetSersic: {}  #ascii file containing a list of 2D sersic profiles to have moving through '
@@ -2047,7 +2151,12 @@ class SimInput:
                     .format(self.expand_catalog_for_segments))
             f.write('  use_dateobs_for_background: {}          # Use date_obs below to deternine background. If False, bkgdrate is used.\n'
                     .format(self.dateobs_for_background))
-
+            f.write('  signal_low_limit_for_segmap: {}         # Lower signal limit to include pix in segmentation map. See below for units.\n'
+                    .format(self.segmentation_threshold))
+            f.write(('  signal_low_limit_for_segmap_units: {}  # Units of signal_low_limit_for_segmap. Can be: [ADU/sec, e/sec, MJy/sr, '
+                     'ergs/cm2/a, ergs/cm2/hz]\n'.format(self.segmentation_threshold_units)))
+            f.write('  add_ghosts: {}  # Add optical ghosts associated with astronomical sources\n'.format(self.add_ghosts))
+            f.write('  PSFConvolveGhosts: {}  # Convolve ghost stamp images with instrument PSF before adding\n'.format(self.convolve_ghosts))
             f.write('\n')
             f.write('Telescope:\n')
             f.write('  ra: {}                      # RA of simulated pointing\n'.format(input['ra_ref']))
@@ -2057,7 +2166,7 @@ class SimInput:
             else:
                 pav3_value = input['PAV3']
             f.write('  rotation: {}                    # PA_V3 in degrees, i.e. the position angle of the V3 axis at V1 (V2=0, V3=0) measured from N to E.\n'.format(pav3_value))
-            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(self.tracking))
+            f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(input['Tracking']))
             f.write('\n')
             f.write('newRamp:\n')
             f.write('  dq_configfile: {}\n'.format(self.configfiles[instrument.lower()]['dq_init_config']))
@@ -2116,7 +2225,9 @@ class SimInput:
             f.write("  subpix_dither_type: {}  # Subpixel dither pattern name\n".format(input['SubpixelDitherType']))
             # For WFSS we need to strip out the '-Points' from
             # the number of subpixel positions entry
-            dash = input['SubpixelPositions'].find('-')
+            dash = -1
+            if isinstance(input['SubpixelPositions'], str):
+                dash = input['SubpixelPositions'].find('-')
             if (dash == -1):
                 val = input['SubpixelPositions']
             else:
@@ -2168,6 +2279,122 @@ class SimInput:
         parser.add_argument("--tracking", help="Type of telescope tracking: 'sidereal' or 'non-sidereal'", default='sidereal')
 
         return parser
+
+
+def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
+    """Call JWST GTVT to retrieve nominal observatory position angle (V3 PA) for given coordinates and date
+
+    This is a lower-level util function; most MIRAGE users should typically use default_obs_v3pa_on_date or
+    all_obs_v3pa_on_date instead.
+
+    Parameters
+    ----------
+    ra : str
+        RA in sexagesimal format e.g. '00:00:00.0'
+
+    dec : str
+        Dec in sexagesimal format e.g. '00:00:00.0'
+
+    date : string
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+
+    return_range : bool
+        Return tuple including the range accessible via observatory roll, i.e. (v3pa, min_v3pa, max_v3pa)
+
+    Returns
+    -------
+    pa_v3 : float
+        V3PA in degrees
+    """
+    import jwst_gtvt.find_tgt_info
+
+    if date is None:
+        start_date_obj = datetime.date.today()
+        start_date = start_date_obj.isoformat()
+    else:
+        start_date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+        start_date = start_date_obj.isoformat().split('T')[0]
+
+    # note, get_table requires distinct start and end dates, different by at least 1 day
+    end_date_obj = start_date_obj + datetime.timedelta(days=1)
+    end_date = end_date_obj.isoformat().split('T')[0]
+
+    tbl = jwst_gtvt.find_tgt_info.get_table(ra=ra, dec=dec, instrument='NIRCam',
+                                            start_date=start_date, end_date=end_date,
+                                            verbose=False)
+    row = tbl[0]
+
+    if return_range:
+        return row['V3PA'], row['V3PA min'], row['V3PA max']
+    return row['V3PA']
+
+
+def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=False, pointing_table=None):
+    """Find the nominal/default V3PA for an observation on a given date.
+
+    Note, this relies on the JWST Generalized Target Visibility Tool (GTVT), and as such it
+    just considers the basic spherical geometry of the sky. It does *NOT* take into account
+    any special requirements defined in APT.
+
+    Parameters
+    ----------
+    pointing_filename : string
+        Pointing file filename exported by APT
+    obs_num : int
+        Observation number.
+    date : str or None
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+    pointing_table : dict, optional
+        Dictionary of info read from pointing filename; alternate input for this in case it's already been read from disk
+
+    Returns
+    -------
+    pa : float
+        V3PA in decimal degrees. Provide this to the `roll_angle` argument to mirage.yaml_generator()
+    """
+
+    if pointing_table is None:
+        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
+    for i in range(len(pointing_table['obs_num'])):
+        if pointing_table['obs_num'][i] == f"{obs_num:03d}":
+            ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
+            if verbose:
+                self.logger.info(f"Pointing table row {i} is for obs {obs_num}")
+                self.logger.info(f" Coords from APT pointing file: {ra_deg} {dec_deg} deg")
+            break
+    else:
+        raise RuntimeError(f"Could not find any info for an observation number {obs_num} in the pointing table.")
+
+    result = _gtvt_v3pa_on_date(ra_deg, dec_deg, date=date)
+    if np.isnan(result):
+        raise RuntimeError("Obs {obs_num} is not observable on date {date}. Target not in the field of regard.")
+    return result
+
+
+def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
+    """Find the nominal/default V3PA for all observations in a program.
+
+    Parameters
+    ----------
+    pointing_filename : string
+        Pointing file filename exported by APT
+    date : str or None
+        Desired date of observation, in YYYY-MM-DD format. If not supplied, the current date will be used.
+
+
+    Returns
+    -------
+    pas : dict
+        Dict of V3PAs, in the format for passing to the `roll_angle` argument to mirage.yaml_generator()
+
+    """
+    results = {}
+    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
+    obsnums = sorted(list(set(pointing_table['obs_num'])))
+    for obs_num in obsnums:
+        results[obs_num] = default_obs_v3pa_on_date(pointing_filename, int(obs_num), date=date, verbose=verbose,
+                                                    pointing_table=pointing_table)
+    return results
 
 
 if __name__ == '__main__':

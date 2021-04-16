@@ -1,0 +1,69 @@
+# APT Output Product
+# 
+# APT Version: Version 2020.5  JWST PRD: PRDOPSSOC-032 
+# Date: Thu Mar 04 15:12:25 GMT 2021
+
+JWST Pointing Report for JWST Submitted Proposal 38383 (nircam_wfss_miri_img.aptx)
+
+========================================
+* obs1 (Obs 1)
+** Visit 1:1
+Tar Tile Exp Dith Aperture Name             Target       RA         Dec        BaseX    BaseY    DithX    DithY    V2       V3       IdlX     IdlY   Level      Type      ExPar  DkPar   dDist          
+  1    1   1    1 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -3.750   +3.750  +89.789 -489.636   -3.750   +3.750 TARGET     SCIENCE        0      0  0.000 (base)
+  1    1   1    1 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -3.421   +4.053  +89.789 -489.636 -551.176  -69.619 TARGET     PARALLEL       0      0                 
+  1    1   1    2 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -3.179   +4.844  +89.218 -488.542   -3.179   +4.844 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   1    2 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -2.760   +5.094  +89.218 -488.542 -550.515  -68.578 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    3 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -2.656   +3.179  +88.695 -490.206   -2.656   +3.179 SUBDITHER  SCIENCE        0      0  1.744          
+  1    1   1    3 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -2.379   +3.392  +88.695 -490.206 -550.134  -70.280 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    4 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -2.086   +4.273  +88.125 -489.113   -2.086   +4.273 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   1    4 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -1.718   +4.434  +88.125 -489.113 -549.473  -69.238 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    5 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +3.750   -3.750  +82.289 -497.136   +3.750   -3.750 DITHER     SCIENCE        0      0  9.921          
+  1    1   1    5 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +3.421   -4.053  +82.289 -497.136 -544.335  -77.725 DITHER     PARALLEL       0      0                 
+  1    1   1    6 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +4.321   -2.656  +81.718 -496.042   +4.321   -2.656 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   1    6 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +4.081   -3.011  +81.718 -496.042 -543.674  -76.683 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    7 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +4.844   -4.321  +81.195 -497.706   +4.844   -4.321 SUBDITHER  SCIENCE        0      0  1.744          
+  1    1   1    7 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +4.462   -4.713  +81.195 -497.706 -543.293  -78.385 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    8 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +5.414   -3.227  +80.625 -496.613   +5.414   -3.227 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   1    8 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +5.123   -3.672  +80.625 -496.613 -542.632  -77.344 SUBDITHER  PARALLEL       0      0                 
+  1    1   1    9 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +11.250  -11.250  +74.789 -504.636  +11.250  -11.250 DITHER     SCIENCE        0      0  9.921          
+  1    1   1    9 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +10.262  -12.158  +74.789 -504.636 -537.493  -85.830 DITHER     PARALLEL       0      0                 
+  1    1   1   10 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +11.821  -10.156  +74.218 -503.542  +11.821  -10.156 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   1   10 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +10.923  -11.116  +74.218 -503.542 -536.833  -84.788 SUBDITHER  PARALLEL       0      0                 
+  1    1   1   11 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.344  -11.821  +73.695 -505.206  +12.344  -11.821 SUBDITHER  SCIENCE        0      0  1.744          
+  1    1   1   11 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.304  -12.819  +73.695 -505.206 -536.452  -86.491 SUBDITHER  PARALLEL       0      0                 
+  1    1   1   12 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.914  -10.727  +73.125 -504.113  +12.914  -10.727 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   1   12 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.965  -11.777  +73.125 -504.113 -535.791  -85.449 SUBDITHER  PARALLEL       0      0                 
+  1    1   2    1 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.914  -10.727  +73.125 -504.113  +12.914  -10.727 FILTER     DIRECT         0      0  0.000          
+  1    1   2    1 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.965  -11.777  +73.125 -504.113 -535.791  -85.449 FILTER     PARALLEL       0      0                 
+  1    1   3    1 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -3.750   +3.750  +89.789 -489.636   -3.750   +3.750 FILTER     SCIENCE        0      0 22.074          
+  1    1   3    1 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -3.421   +4.053  +89.789 -489.636 -551.176  -69.619 FILTER     PARALLEL       0      0                 
+  1    1   3    2 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -3.179   +4.844  +89.218 -488.542   -3.179   +4.844 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   3    2 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -2.760   +5.094  +89.218 -488.542 -550.515  -68.578 SUBDITHER  PARALLEL       0      0                 
+  1    1   3    3 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -2.656   +3.179  +88.695 -490.206   -2.656   +3.179 SUBDITHER  SCIENCE        0      0  1.744          
+  1    1   3    3 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -2.379   +3.392  +88.695 -490.206 -550.134  -70.280 SUBDITHER  PARALLEL       0      0                 
+  1    1   3    4 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   -2.086   +4.273  +88.125 -489.113   -2.086   +4.273 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   3    4 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   -1.718   +4.434  +88.125 -489.113 -549.473  -69.238 SUBDITHER  PARALLEL       0      0                 
+  1    1   3    5 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +3.750   -3.750  +82.289 -497.136   +3.750   -3.750 DITHER     SCIENCE        0      0  9.921          
+  1    1   3    5 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +3.421   -4.053  +82.289 -497.136 -544.335  -77.725 DITHER     PARALLEL       0      0                 
+  1    1   3    6 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +4.321   -2.656  +81.718 -496.042   +4.321   -2.656 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   3    6 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +4.081   -3.011  +81.718 -496.042 -543.674  -76.683 SUBDITHER  PARALLEL       0      0                 
+  1    1   3    7 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +4.844   -4.321  +81.195 -497.706   +4.844   -4.321 SUBDITHER  SCIENCE        0      0  1.744          
+  1    1   3    7 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +4.462   -4.713  +81.195 -497.706 -543.293  -78.385 SUBDITHER  PARALLEL       0      0                 
+  1    1   3    8 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000   +5.414   -3.227  +80.625 -496.613   +5.414   -3.227 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   3    8 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674   +5.123   -3.672  +80.625 -496.613 -542.632  -77.344 SUBDITHER  PARALLEL       0      0                 
+  1    1   3    9 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +11.250  -11.250  +74.789 -504.636  +11.250  -11.250 DITHER     SCIENCE        0      0  9.921          
+  1    1   3    9 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +10.262  -12.158  +74.789 -504.636 -537.493  -85.830 DITHER     PARALLEL       0      0                 
+  1    1   3   10 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +11.821  -10.156  +74.218 -503.542  +11.821  -10.156 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   3   10 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +10.923  -11.116  +74.218 -503.542 -536.833  -84.788 SUBDITHER  PARALLEL       0      0                 
+  1    1   3   11 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.344  -11.821  +73.695 -505.206  +12.344  -11.821 SUBDITHER  SCIENCE        0      0  1.744          
+  1    1   3   11 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.304  -12.819  +73.695 -505.206 -536.452  -86.491 SUBDITHER  PARALLEL       0      0                 
+  1    1   3   12 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.914  -10.727  +73.125 -504.113  +12.914  -10.727 SUBDITHER  SCIENCE        0      0  1.234          
+  1    1   3   12 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.965  -11.777  +73.125 -504.113 -535.791  -85.449 SUBDITHER  PARALLEL       0      0                 
+  1    1   4    1 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.914  -10.727  +73.125 -504.113  +12.914  -10.727 FILTER     DIRECT         0      0  0.000          
+  1    1   4    1 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.965  -11.777  +73.125 -504.113 -535.791  -85.449 FILTER     PARALLEL       0      0                 
+  1    1   5    1 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  -12.000   +0.000  +98.039 -493.386  -12.000   +0.000 FILTER     OUTOFFLD       0      0 27.125          
+  1    1   5    1 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  -11.957   +1.011  +98.039 -493.386 -559.713  -72.661 FILTER     PARALLEL       0      0                 
+  1    1   5    2 NRCA5_GRISMR_WFSS         1 TARGETON  +12.00000  +12.00000   +0.000   +0.000  +12.000   +0.000  +74.039 -493.386  +12.000   +0.000 SUBDITHER  OUTOFFLD       0      0 24.000          
+  1    1   5    2 MIRIM_ILLUM               1 TARGETON  +12.00000  +12.00000 -547.755  -73.674  +11.957   -1.011  +74.039 -493.386 -535.798  -74.683 SUBDITHER  PARALLEL       0      0                 
+
+

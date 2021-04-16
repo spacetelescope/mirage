@@ -6,13 +6,24 @@ image or ramp. Introduce non-linearity into a linear
 input ramp.
 '''
 
+import logging
 import sys
 import numpy as np
+import os
+
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def unlinearize(image, coeffs, sat, lin_satmap, maxiter=10, accuracy=0.000001, robberto=False,
                 save_accuracy_map=False, accuracy_file='unlinearize_no_convergence.fits'):
     # Insert non-linearity into the linear synthetic sources
+    logger = logging.getLogger('mirage.ramp_generator.unlinearize.unlinearize')
 
     # If the sizes of the satmap or coeffs are different than
     # the data, return an error
@@ -72,9 +83,9 @@ def unlinearize(image, coeffs, sat, lin_satmap, maxiter=10, accuracy=0.000001, r
     # locations.
     if i == maxiter and save_accuracy_map:
         from astropy.io import fits
-        print(("WARNING: some pixels failed to unlinearize correctly within "
-               "the maximum number of iterations. Map of accuracy of the "
-               "unlinearized values saved to {}.".format(accuracy_file)))
+        logger.warning(("WARNING: some pixels failed to unlinearize correctly within "
+                        "the maximum number of iterations. Map of accuracy of the "
+                        "unlinearized values saved to {}.".format(accuracy_file)))
         devcheck = np.copy(dev)
         devcheck[i2] = -1.
         h0 = fits.PrimaryHDU()

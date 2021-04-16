@@ -44,16 +44,19 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  pixelflat_: None
 	  illumflat_: None           #Illumination flat field file
 	  astrometric_: crds         #Astrometric distortion file (asdf)
+	  photom_: crds              #Cal pipeline photom reference file
 	  ipc_: crds                 #File containing IPC kernel to apply
 	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
 	  pixelAreaMap_: crds        #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+	  transmission_: crds        # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
 	  crosstalk_:       config   #File containing crosstalk coefficients
 	  filtpupilcombo_:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
 	  filter_wheel_positions_: config  #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
 	  flux_cal_:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
+	  filter_throughput_: /Users/me/mirage/mirage/config/placeholder.txt #File containing filter throughput curve
 
 	nonlin_:
 	  limit_: 60000.0        #Upper singal limit to which nonlinearity is applied (ADU)
@@ -86,6 +89,8 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  movingTargetExtended_: None                     #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
 	  movingTargetConvolveExtended_: True             #convolve the extended moving targets with PSF before adding.
 	  movingTargetToTrack_: None                      #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+	  tso_imaging_catalog_: None                      #Catalog listing TSO source to be used for imaging TSO simulations
+	  tso_grism_catalog_: None                        #Catalog listing TSO source to be used for grism TSO observations
 	  zodiacal_:  None                                #Zodiacal light count rate image file
 	  zodiscale_:  1.0                                #Zodi scaling factor
 	  scattered_:  None                               #Scattered light count rate image file
@@ -96,6 +101,10 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  pymethod_: True                                 #Use double Poisson simulation for photon yield
 	  expand_catalog_for_segments_: False             # Expand catalog for 18 segments and use distinct PSFs
 	  use_dateobs_for_background_: False              # Use date_obs value to determine background. If False, bkgdrate is used.
+	  signal_low_limit_for_segmap_: 0.031             # Lower signal limit for a pixel to be included in the segmentation map
+	  signal_low_limit_for_segmap_units_: ADU/sec     # Units of signal_low_limit_for_segmap_. Can be: ADU/sec, e/sec, MJy/sr, ergs/cm2/a, ergs/cm2/hz
+	  add_ghosts_: True                               # Add optical ghosts to simulation
+	  PSFConvolveGhosts_: False                       # Convolve ghost sources with instrument PSF before adding
 
 	Telescope_:
 	  ra_: 53.1                     #RA of simulated pointing
@@ -396,6 +405,19 @@ Name of the astrometric distortion reference file to use for including the effec
 .. hint::
 	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
+.. _photom:
+
+Photom Reference File
++++++++++++++++++++++
+
+*Reffiles:photom*
+
+Name of the JWST calibration pipeline photom reference file to use. This file is used to translate the minimum flux level for pixel inclusion in the segmentation map to ADU/sec in the case where the user provides that value in MJy/sr.
+
+.. hint::
+	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
+
+
 .. _ipc:
 
 Interpixel capacitance (IPC)
@@ -437,6 +459,18 @@ Fits file containing the pixel area map for the detector to be simulated. If pro
 
 .. hint::
 	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
+
+.. _transmission:
+
+Transmission Image
+++++++++++++++++++
+
+*Reffiles:transmission*
+
+Fits file containing the transmission image for the detector/filter/pupil to be simulated. The values in this image are the transmission fraction for each pixel, and the image is multiplied in to the seed image (prior to dispersing if simulating WFSS data). This image is designed to contain occulters/masks that are present within the field of view.
+
+.. hint::
+    Setting this entry equal to 'crds' will cause Mirage to get the appropriate file from the collection of Mirage reference files. The ultimate source of these files are the `GRISM_NIRCAM <https://github.com/npirzkal/GRISM_NIRCAM>`_ and `GRISM_NIRISS <https://github.com/npirzkal/GRISM_NIRISS>`_ repositories, which must be cloned from github during the Mirage installation process and placed within the Mirage reference files directory structure. In the future, we anticipate that the transmission files will be hosted by the CRDS system, which is why they are treated similarly to the current CRDS reference files.
 
 .. _subarray_defs:
 
@@ -511,6 +545,15 @@ Ascii file that lists flux conversion factors and the pivot wavelength associate
 
 .. hint::
 	To use the flux calibration files packaged with Mirage, set this to **config** in the input yaml file. This is the default when creating yaml files from an APT file using the :ref:`yaml generator <yaml_generator>`
+
+.. _filter_throughput:
+
+Filter Throughput
++++++++++++++++++
+
+*Reffiels:filter_throughput*
+
+Ascii files that contains the system throughput when using a particular filter. By default, the yaml generator will set this parameter to have a value of "placeholder.txt" in the input yaml files. Mirage will then locate the appropriate throughput file at runtime.
 
 .. _nonlin:
 
@@ -768,6 +811,24 @@ Tracked non-sidereal target catalog file
 
 This ascii catalog file is used for what are traditionally (in HST jargon) called 'moving targets'.  Targets listed in this file are treated as non-sidereal targets that JWST will track during the simulated observation. In this case, the target listed in this file will appear static in the output data, but all other sources (e.g. those listed in :ref:`pointSource <pointsource>`, :ref:`galaxyListFile <galaxyListFile>`, and :ref:`extended <extended>`) will all appear trailed through the data. A description and example of the file are shown in the :ref:`Non-sidereal Source <nonsidereal>` section on the :ref:`Catalogs <catalogs>` page.
 
+.. _tso_imaging_catalog:
+
+TSO Imaging Catalog
++++++++++++++++++++
+
+*simSignals:tso_imaging_catalog*
+
+Ascii catalog file containing information on the source to be used when creating imaging TSO observations. The catalog format is detailed in the :ref:`Imaging TSO Catalog section <imaging_tso_cat>` section of the :ref:`Source Catalog Formats page <catalogs>`.
+
+.. _tso_grism_catalog:
+
+TSO Grism Catalog
++++++++++++++++++
+
+*simSignals:tso_grism_catalog*
+
+Ascii catalog file containing information on the source to be used when creating grism TSO observations. The catalog format is detailed in the :ref:`Grism TSO Catalog section <grism_tso_cat>` section of the :ref:`Source Catalog Formats page <catalogs>`.
+
 .. _zodiacal:
 
 Zodiacal light
@@ -891,6 +952,44 @@ Use date_obs for background
 *simSignals:use_dateobs_for_background*
 
 This entry controls the way the background signal for the observation is calculated. If it is True, then the background value will be created by extracting the background spectrum assoicated with :ref:`date_obs <date_obs>` from the `jwst_backgrounds <https://github.com/spacetelescope/jwst_backgrounds>`_ package. If False, the background will be determined by calculating the background value at a certain percentile of the collection of backgrounds for the given pointing over 365 days. If :ref:`bkgdrate <bkgdrate>` is "low", "medium", "high", then the percentiles used are 10th, 50th, and 90th, respectively. If it is a float, that value (in ADU/sec/pixel) will be added to all pixels.
+
+.. _signal_low_limit_for_segmap:
+
+Lower Signal Limit for the Segmentation Map
++++++++++++++++++++++++++++++++++++++++++++
+
+*simSignals:signal_low_limit_for_segmap*
+
+When adding an astrophysical source to the seed image, this is the lower threshold value used to control which pixels in the source are added to the segmentation map. Pixels with signal rates below this threshold will not be included. Mirage uses the segmentation map for WFSS simulations. Only object pixels that are present in the segmentation map are dispersed. This is done, rather than dispersing all pixels, in order to save compute time. The value can be given in a number of units. See :ref:`signal_low_limit_for_segmap_units <signal_low_limit_for_segmap_units>` below for a list of valid units.
+
+.. _signal_low_limit_for_segmap_units:
+
+Units for the Lower Signal Limit for the Segmentation Map
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*simSignals:signal_low_limit_for_segmap_units*
+
+This field gives the units associated with the value in the :ref: `signal_low_limit_for_segmap <signal_low_limit_for_segmap>` value above. Supported units include: ADU/sec, ADU/s, e/sec, e/s, MJy/sr, ergs/cm2/a, ergs/cm2/hz. Note that this field is case insensitive. If the signal limit is given in units other than ADU/sec, Mirage will convert the value to ADU/sec before comparing source signal levels and adding pixels to the segmentation map.
+
+.. _add_ghosts:
+
+Add ghosts
+++++++++++
+
+*simSignals:add_ghosts*
+
+If True, Mirage will add :ref:`optical ghosts <ghosts>` to the simulated data. Currently this is only supported for NIRISS F090W, F115W, F140M, F150W, and F200W. In simulations using other instruments or filters, this keyword will be ignored.
+
+.. _PSFConvolveGhosts:
+
+Convolve ghosts with PSF
+++++++++++++++++++++++++
+
+*simSignals:PSFConvolveGhosts*
+
+If True, optical ghosts sources will be convolved with the instrumental PSF before adding them to the simulation
+
+
 
 .. _Telescope:
 

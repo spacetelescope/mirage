@@ -20,10 +20,10 @@ import numpy as np
 import pytest
 
 from mirage.yaml import generate_observationlist, yaml_generator
-from .test_apt_interface import ON_TRAVIS, temporary_directory, TEST_DATA_DIR
+from .test_apt_interface import ON_GITHUB, temporary_directory, TEST_DATA_DIR
 
-@pytest.mark.skipif(ON_TRAVIS,
-                   reason="Cannot access mirage data in the central storage directory from Travis CI.")
+@pytest.mark.skipif(ON_GITHUB,
+                   reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_filenames(temporary_directory):
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
 

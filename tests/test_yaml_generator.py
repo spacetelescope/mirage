@@ -20,9 +20,10 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 
 # Reset the MIRAGE_DATA env variable to be a real location so yaml_generator
 # doesn't croak
-# Determine if tests are being run on Travis
-ON_TRAVIS = 'travis' in os.path.expanduser('~')
-if not ON_TRAVIS:
+# Determine if tests are being run on Github Actions CI
+ON_GITHUB = '/home/runner' in os.path.expanduser('~')
+
+if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
 
 os.environ["MIRAGE_DATA"] = __location__
@@ -72,7 +73,7 @@ def test_user_inputs_basic():
                       }
             }
     cr = {'library': 'FLARE', 'scale': 44.0}
-    date = '2019-5-25'
+    date = '2019-05-25'
     background = {'001': 'high', '002': 'medium', '003': 22.3}
     roll_angle = 34.5
 
@@ -88,7 +89,9 @@ def test_user_inputs_basic():
     nis_obs = np.vstack([nis_obs1, nis_obs2, nis_obs3])
 
     # Check dates
-    date_match = [entry == date for entry in tab['Date']]
+    date_to_match = '{} 00:00:00'.format(date)
+    date_match = [str(entry) == date_to_match for entry in tab['Date']]
+
     assert all(date_match) is True
 
     # Check roll angle
@@ -197,7 +200,7 @@ def test_user_inputs_complex():
           '002': {'library': 'SUNMIN', 'scale': 5.5},
           '003': {'library': 'SUNMAX', 'scale': 4.4}}
 
-    date = {'001': '2019-05-25', '002': '2019-11-15', '003': '2020-10-14'}
+    date = {'001': '2019-05-25', '002': '2019-11-15T12:12:12.120000', '003': '2020-10-14T19:20:21'}
 
     background = {'001': {'nircam': {'sw': 0.2, 'lw': 0.3}, 'niriss': 0.4},
                   '002': {'nircam': {'sw': 'medium', 'lw': 'high'}, 'niriss': 'low'},
@@ -218,9 +221,14 @@ def test_user_inputs_complex():
 
     # Check dates
     for i, key in enumerate(date):
-        date_match = [entry == date[key] for entry in np.array(tab['Date'])[nis_obs[i, :]]]
+        if 'T' not in date[key]:
+            date_to_match = '{} 00:00:00'.format(date[key])
+        else:
+            date_to_match = date[key].replace('T', ' ')
+
+        date_match = [str(entry) == date_to_match for entry in np.array(tab['Date'])[nis_obs[i, :]]]
         assert all(date_match) is True
-        date_match = [entry == date[key] for entry in np.array(tab['Date'])[nrc_obs[i, :]]]
+        date_match = [str(entry) == date_to_match for entry in np.array(tab['Date'])[nrc_obs[i, :]]]
         assert all(date_match) is True
 
     # Check roll angle
@@ -308,6 +316,12 @@ def test_get_psf_path():
     yam.info['act_id'] = act_ids
     yam.info['Instrument'] = ['NIRCam'] * n_activities
 
+    # Put the entry_number entry of yam.apt_xml_dict into yam.info.
+    # Typically this is done when running create_inputs() in the
+    # yaml_generator. This step is skipped here to save time and
+    # avoid having to deal with lots of output files.
+    yam.info['entry_number'] = yam.apt_xml_dict['entry_number']
+
     # Test for a default path
     paths_out = yam.get_psf_path()
     assert len(paths_out) == n_activities,\
@@ -329,14 +343,15 @@ def test_get_psf_path():
         yam.get_psf_path()
         assert 'Please provide the psf_paths in the form of a list of strings ' \
                'with a length equal to the number of activities in the APT ' \
-               'program (101), not equal to 99.' in e, \
+               'program (103), not equal to 99.' in e, \
             'Failed to reject psf_path of incorrect length.'
 
     # Test for a list of paths of correct length
-    list_101_paths = [__location__] * 50 + [os.path.dirname(__location__)] * 51
-    yam.psf_paths = list_101_paths
+    list_paths = [__location__] * 9 + [os.path.dirname(__location__)] * 9
+    yam.psf_paths = list_paths
     paths_out = yam.get_psf_path()
-    assert paths_out == sorted(list_101_paths),\
+
+    assert paths_out == list_paths,\
         'List of PSF paths not properly assigned.'
 
     # Test for a completely invalid path
@@ -399,6 +414,27 @@ def test_reffile_crds_full_name():
                                                    'nrcb4': {'f150w': {'NRC_IMAGE': 'my_reffiles/my_distortion_for_b4.asdf'}}},
                                     'area': {'nrcb5': {'f322w2': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b5.fits'}}},
                                              'nrcb4': {'f150w': {'clear': {'nrc_image': 'my_reffiles/my_pam_for_b4.fits'}}}},
+                                    'transmission': {'nrcb5': {'f322w2': {'clear': 'my_reffiles/my_transmission_for_b5.fits'},
+                                                               'f444w': {'clear': 'my_reffiles/my_transmission_for_b5.fits'},
+                                                               'f335m': {'clear': 'my_reffiles/my_transmission_for_b5.fits'},
+                                                               'f300m': {'clear': 'my_reffiles/my_transmission_for_b5.fits'}},
+                                                     'nrcb1': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b1.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b1.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b1.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b1.fits'}},
+                                                     'nrcb2': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b2.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b2.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b2.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b2.fits'}},
+                                                     'nrcb3': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b3.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b3.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b3.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b3.fits'}},
+                                                     'nrcb4': {'f150w': {'clear': 'my_reffiles/my_transmission_for_b4.fits'},
+                                                               'f070w': {'clear': 'my_reffiles/my_transmission_for_b4.fits'},
+                                                               'f150w2': {'clear': 'my_reffiles/my_transmission_for_b4.fits'},
+                                                               'f187n': {'clear': 'my_reffiles/my_transmission_for_b4.fits'}},
+                                                    },
                                     'badpixmask': {'nrcb5': 'my_reffiles/my_bpm_for_b5.fits',
                                                    'nrcb4': 'my_reffiles/my_bpm_for_b4.fits'},
                                     'pixelflat': {'nrcb5': {'f322w2': {'clear': 'my_reffiles/my_flatfield_for_b5.fits'}}}
@@ -409,6 +445,9 @@ def test_reffile_crds_full_name():
                                     'gain': 'my_niriss_gain.fits',
                                     'distortion': {'F115W': {'nis_image': 'my_niriss_disotrtion.asdf'}},
                                     'area': {'clear': {'f115w': {'nis_image': 'my_niriss_area.fits'}}},
+                                    'transmission': {'clear': {'f115w': 'my_niriss_transmission.fits'},
+                                                     'gr150c': {'f115w': 'my_niriss_gr_transmission.fits'}
+                                                     },
                                     'badpixmask': 'my_niriss_badpixmask.fits',
                                     'pixelflat': {'clear': {'f115w': 'my_niriss_flatfield.fits'}}
                                     }
@@ -472,9 +511,11 @@ def test_reffile_crds_full_name():
     for index in match_nrc_sw_distortion_area:
         assert yam.info['astrometric'][index] == 'my_reffiles/my_distortion_for_b4.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_reffiles/my_pam_for_b4.fits'
+        assert yam.info['transmission'][index] == 'my_reffiles/my_transmission_for_b4.fits'
     for index in match_nrc_lw_distortion_area:
         assert yam.info['astrometric'][index] == 'my_reffiles/my_distortion_for_b5.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_reffiles/my_pam_for_b5.fits'
+        assert yam.info['transmission'][index] == 'my_reffiles/my_transmission_for_b5.fits'
     for index in match_nrc_lw_flat:
         assert yam.info['pixelflat'][index] == 'my_reffiles/my_flatfield_for_b5.fits'
 
@@ -488,6 +529,7 @@ def test_reffile_crds_full_name():
     for info in match_nis_distortion_area:
         assert yam.info['astrometric'][index] == 'my_niriss_disotrtion.asdf'
         assert yam.info['pixelAreaMap'][index] == 'my_niriss_area.fits'
+        assert yam.info['transmission'][index] == 'my_niriss_transmission.fits'
     for info in match_nis_flat:
         assert yam.info['pixelflat'][index] == 'my_niriss_flatfield.fits'
 
@@ -508,5 +550,5 @@ def test_reffile_crds_full_name():
 
 # Return environment variable to original value. This is helpful when
 # calling many tests at once, some of which need the real value.
-if not ON_TRAVIS:
+if not ON_GITHUB:
     os.environ['MIRAGE_DATA'] = orig_mirage_data

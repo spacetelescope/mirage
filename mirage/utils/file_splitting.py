@@ -6,8 +6,18 @@ DMS pipeline will do the same job. Files that are spllit will have
 ``segNNN`` added to their names, where ``NNN`` is a number.
 """
 import copy
+import logging
 import numpy as np
-from mirage.utils.constants import FILE_SPLITTING_LIMIT
+import os
+
+from mirage.logging import logging_functions
+from mirage.utils.constants import FILE_SPLITTING_LIMIT, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
+
 
 
 def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
@@ -50,6 +60,8 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
         1d array listing the beginning integration number of each file
         split
     """
+    logger = logging.getLogger('mirage.utils.file_splitting.find_file_splits')
+
     pix_per_group = ydim * xdim
     pix_per_int = groups * pix_per_group
     observation = pix_per_int * integrations
@@ -74,19 +86,19 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
 
         group_list = np.arange(0, groups, delta_group).astype(np.int)
         group_list = np.append(group_list, groups)
-        print('Splitting within each integration:')
+        logger.info('Splitting within each integration:')
         integration_list = np.arange(integrations + 1).astype(np.int)
-        print('integration_list: ', integration_list)
-        print('group_list: ', group_list)
+        logger.info('integration_list: {}'.format(integration_list))
+        logger.info('group_list: {}'.format(group_list))
     elif observation > pixel_limit:
         split = True
-        print('Splitting by integration:')
+        logger.info('Splitting by integration:')
         group_list = np.array([0, groups])
         delta_int = np.int(pixel_limit / pix_per_int)
         integration_list = np.arange(0, integrations, delta_int).astype(np.int)
         integration_list = np.append(integration_list, integrations)
-        print('integration_list: ', integration_list)
-        print('group_list: ', group_list)
+        logger.info('integration_list: {}'.format(integration_list))
+        logger.info('group_list: {}'.format(group_list))
 
     return split, group_list, integration_list
 

@@ -41,18 +41,28 @@ October 2018 - Major modifications to read programs of all science instruments a
 '''
 import copy
 import os
+import logging
 import re
 import argparse
 import pkg_resources
+import warnings
 
 from astropy.table import Table, vstack
+from astropy.time import Time, TimeDelta
 from astropy.io import ascii
 import numpy as np
-from pysiaf import rotations
+from pysiaf import JWST_PRD_VERSION, rotations, Siaf
 import yaml
 
 from . import read_apt_xml
+from ..logging import logging_functions
 from ..utils import siaf_interface, constants, utils
+from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classpath, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class AptInput:
@@ -68,12 +78,15 @@ class AptInput:
     """
 
     def __init__(self, input_xml=None, pointing_file=None, output_dir=None, output_csv=None,
-                 observation_list_file=None):
+                 observation_list_file=None, offline=False):
+        self.logger = logging.getLogger('mirage.apt.apt_inputs')
+
         self.input_xml = input_xml
         self.pointing_file = pointing_file
         self.output_dir = output_dir
         self.output_csv = output_csv
         self.observation_list_file = observation_list_file
+        self.offline = offline
 
         # Locate the module files, so that we know where to look
         # for config subdirectory
@@ -99,8 +112,8 @@ class AptInput:
         for obs in intab['obs_label']:
             match = obs == epochs['observation'].data
             if np.sum(match) == 0:
-                print("No valid epoch line found for observation {}".format(obs))
-                print(epochs['observation'].data)
+                self.logger.error("No valid epoch line found for observation {}".format(obs))
+                self.logger.error('{}'.format(epochs['observation'].data))
                 epoch_start.append(default_date)
                 epoch_pav3.append(0.)
             else:
@@ -255,19 +268,21 @@ class AptInput:
         combined.update(dict2)
         return combined
 
-    def create_input_table(self, verbose=False):
+    def create_input_table(self, skip_observations=None, verbose=False):
         """
-
-        Expansion for dithers is done upstream.
+        Main function for creating a table of parameters for each
+        exposure
 
         Parameters
         ----------
-        verbose
+        skip_observations : list
+            List of observation numbers to be skipped when reading in pointing file
 
-        Returns
-        -------
-
+        verbose : bool
+            If True, extra information is printed to the log
         """
+        self.skip_observations = skip_observations
+
         # Expand paths to full paths
         # self.input_xml = os.path.abspath(self.input_xml)
         # self.pointing_file = os.path.abspath(self.pointing_file)
@@ -276,16 +291,14 @@ class AptInput:
         if self.observation_list_file is not None:
             self.observation_list_file = os.path.abspath(self.observation_list_file)
 
-        # main_dir = os.path.split(self.input_xml)[0]
-
         # if APT.xml content has already been generated during observation list creation
         # (generate_observationlist.py) load it here
-
         if self.apt_xml_dict is None:
             raise RuntimeError('self.apt_xml_dict is not defined')
 
         # Read in the pointing file and produce dictionary
-        pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0])
+        pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0],
+                                                     skipped_obs_from_xml=self.skip_observations)
 
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
@@ -299,15 +312,32 @@ class AptInput:
         # Add epoch and catalog information
         observation_dictionary = self.add_observation_info(observation_dictionary)
 
-        # if verbose:
-        #     print('Summary of observation dictionary:')
-        #     for key in observation_dictionary.keys():
-        #         print('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
+        if verbose:
+            self.logger.info('Summary of observation dictionary:')
+            for key in observation_dictionary.keys():
+                self.logger.info('{:<25}: number of elements is {:>5}'.format(key, len(observation_dictionary[key])))
 
+        # Global Alignment observations need to have the pointing information for the
+        # FGS exposures updated
+        if 'WfscGlobalAlignment' in observation_dictionary['APTTemplate']:
+            observation_dictionary = self.global_alignment_pointing(observation_dictionary)
+
+        # Expand the dictionary to have one entry for each detector in each exposure
         self.exposure_tab = self.expand_for_detectors(observation_dictionary)
 
-        # fix data for filename generation
-        # set parallel seq id
+        # For fiducial point overrides, save the pointing aperture and actual aperture separately
+        self.check_aperture_override()
+
+        # Add start times for each exposure
+        # Ignore warnings as astropy.time.Time will give a warning
+        # related to unknown leap seconds if the date is too far in
+        # the future.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.exposure_tab = make_start_times(self.exposure_tab, offline=self.offline)
+
+        # Fix data for filename generation
+        # Set parallel seq id
         for j, isparallel in enumerate(self.exposure_tab['ParallelInstrument']):
             if isparallel:
                 self.exposure_tab['sequence_id'][j] = '2'
@@ -327,26 +357,21 @@ class AptInput:
                     temp_table['exposure'][parallel_index] = ['{:05d}'.format(n+1) for n in np.arange(len(parallel_index))]
         self.exposure_tab['exposure'] = list(temp_table['exposure'])
 
-        self.check_aperture_override()
-
         if verbose:
             for key in self.exposure_tab.keys():
-                print('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
+                self.logger.info('{:>20} has {:>10} items'.format(key, len(self.exposure_tab[key])))
 
         # Create a pysiaf.Siaf instance for each instrument in the proposal
         self.siaf = {}
         for instrument_name in np.unique(observation_dictionary['Instrument']):
             self.siaf[instrument_name] = siaf_interface.get_instance(instrument_name)
 
-        # Calculate the correct V2, V3 and RA, Dec for each exposure/detector
-        self.ra_dec_update()
-
         # Output to a csv file.
         if self.output_csv is None:
             indir, infile = os.path.split(self.input_xml)
             self.output_csv = os.path.join(self.output_dir, 'Observation_table_for_' + infile.split('.')[0] + '.csv')
         ascii.write(Table(self.exposure_tab), self.output_csv, format='csv', overwrite=True)
-        print('csv exposure list written to {}'.format(self.output_csv))
+        self.logger.info('csv exposure list written to {}'.format(self.output_csv))
 
     def check_aperture_override(self):
         if bool(self.exposure_tab['FiducialPointOverride']) is True:
@@ -362,11 +387,17 @@ class AptInput:
                     # Handle the one case we understand, for now
                     if instrument.lower() == 'fgs' and aperture[:3] == 'NRC':
                         obs_num = self.exposure_tab['obs_num'][i]
-                        guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+
+                        if self.exposure_tab['APTTemplate'][i] == 'WfscGlobalAlignment':
+                            guider_number = self.exposure_tab['aperture'][i][3]
+                        elif self.exposure_tab['APTTemplate'][i] == 'FgsExternalCalibration':
+                            guider_number = read_apt_xml.get_guider_number(self.input_xml, obs_num)
+                        else:
+                            raise ValueError("WARNING: unsupported APT template with Fiducial Override.")
                         guider_aperture = 'FGS{}_FULL'.format(guider_number)
                         fixed_apertures.append(guider_aperture)
                     else:
-                        print(instrument, aperture, inst_match_ap, aperture_key[instrument.lower()])
+                        self.logger.error('{} {} {} {}'.format(instrument, aperture, inst_match_ap, aperture_key[instrument.lower()]))
                         raise ValueError('Unknown FiducialPointOverride in program. Instrument = {} but aperture = {}.'.format(instrument, aperture))
                 else:
                     fixed_apertures.append(aperture)
@@ -435,9 +466,9 @@ class AptInput:
 
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
                     mode = input_dictionary['Mode'][index]
+                    template = input_dictionary['APTTemplate'][index]
                     if (sub == 'FULL'):
-
-                        if mode in ['imaging', 'ts_imaging', 'wfss']:
+                        if mode in ['imaging', 'ts_imaging', 'wfss', 'coron']:
                             # This block should catch full-frame observations
                             # in either imaging (including TS imaging) or
                             # wfss mode
@@ -548,7 +579,10 @@ class AptInput:
                     detectors = ['NRS']
 
                 elif instrument == 'fgs':
-                    guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
+                    if input_dictionary['APTTemplate'][index] == 'WfscGlobalAlignment':
+                        guider_number = input_dictionary['aperture'][index][3]
+                    elif input_dictionary['APTTemplate'][index] == 'FgsExternalCalibration':
+                        guider_number = read_apt_xml.get_guider_number(self.input_xml, input_dictionary['obs_num'][index])
                     detectors = ['G{}'.format(guider_number)]
 
                 elif instrument == 'miri':
@@ -607,18 +641,18 @@ class AptInput:
         """
         filter_match = [True if filter_name in mtch else False for mtch in apertures]
         if any(filter_match):
-            print('EXACT FILTER MATCH')
-            print(filter_match)
+            self.logger.debug('EXACT FILTER MATCH')
+            self.logger.debud('{}'.format(filter_match))
             apertures = list(np.array(apertures)[filter_match])
         else:
-            print('NO EXACT FILTER MATCH')
+            self.logger.debug('NO EXACT FILTER MATCH')
             filter_int = int(filter_name[1:4])
             aperture_int = np.array([int(ap.split('_')[-1][1:4]) for ap in apertures])
             wave_diffs = np.abs(aperture_int - filter_int)
             min_diff_index = np.where(wave_diffs == np.min(wave_diffs))[0]
             apertures = list(apertures[min_diff_index])
 
-            print(filter_int, aperture_int, min_diff_index, apertures)
+            self.logger.debug('{} {} {} {}'.format(filter_int, aperture_int, min_diff_index, apertures))
 
         return apertures
 
@@ -638,6 +672,38 @@ class AptInput:
         gt = line.find('>')
         lt = line.find('<', gt)
         return line[gt + 1:lt]
+
+    def filter_unsuppoted_obs_numbers(self, pointing_dict, skipped_obs):
+        """Remove observations from the pointing dictionary that are for
+        unsupported observing modes
+
+        Parameters
+        ----------
+        pointing_dict : dict
+            Dictionary of pointing information
+
+        skipped_obs : list
+            List of observation numbers that should be removed
+
+        Returns
+        -------
+        pointing_dict : dict
+            Dictionary with the appropriate entries removed
+        """
+        if skipped_obs is None:
+            return pointing_dict
+
+        for obnum in skipped_obs:
+            #matches = pointing_dict['obs_num'] != obnum
+            matches = [True if obnum != o else False for o in pointing_dict['obs_num']]
+
+            for key in pointing_dict:
+                values = np.array(pointing_dict[key])
+                values = values[matches]
+                pointing_dict[key] = list(values)
+
+        return pointing_dict
+
 
     def full_path(self, in_path):
         """
@@ -660,16 +726,20 @@ class AptInput:
         else:
             return os.path.abspath(os.path.expandvars(in_path))
 
-    def get_pointing_info(self, file, propid=0, verbose=False):
+    def get_pointing_info(self, file, propid=0, skipped_obs_from_xml=None, verbose=False):
         """Read in information from APT's pointing file.
 
         Parameters
         ----------
         file : str
             Name of APT-exported pointing file to be read
+
         propid : int
             Proposal ID number (integer). This is used to
             create various ID fields
+
+        skipped_obs_from_xml : list
+            List of observation numbers to be removed
 
         Returns
         -------
@@ -718,10 +788,25 @@ class AptInput:
         with open(file) as f:
             for line in f:
 
-                # skip comments and new lines
+                # Skip comments and new lines except for the line with the version of the PRD
                 if (line[0] == '#') or (line in ['\n']) or ('=====' in line):
-                    continue
-                # extract proposal ID
+
+                    # Compare the version of the PRD from APT and pysiaf
+                    if 'PRDOPSSOC' in line:
+                        apt_prd_version = line.split(' ')[-2]
+                        if apt_prd_version != JWST_PRD_VERSION:
+                            self.logger.warning(('\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n'
+                                                 'The pointing file from APT was created using PRD version: {},\n'
+                                                 'while the current installation of pysiaf uses PRD version: {}.\n'
+                                                 'This inconsistency may lead to errors in source locations or\n'
+                                                 'the WCS of simulated data if the apertures being simulated are\n'
+                                                 'shifted between the two versions. We highly recommend using a\n'
+                                                 'consistent version of the PRD between APT and pysiaf.\n'
+                                                 '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n'
+                                                 .format(apt_prd_version, JWST_PRD_VERSION)))
+                    else:
+                        continue
+                # Extract proposal ID
                 elif line.split()[0] == 'JWST':
                     propid_header = line.split()[7]
                     try:
@@ -730,7 +815,7 @@ class AptInput:
                         # adopt value passed to function
                         pass
                     if verbose:
-                        print('Extracted proposal ID {}'.format(propid))
+                        self.logger.info('Extracted proposal ID {}'.format(propid))
                     continue
 
                 elif (len(line) > 1):
@@ -756,7 +841,7 @@ class AptInput:
                         obsnum = str(obsnum).zfill(3)
                         visitnum = str(visitnum).zfill(3)
                         if (skip is True) and (verbose):
-                            print('Skipping observation {} ({})'.format(obsnum, obslabel))
+                            self.logger.info('Skipping observation {} ({})'.format(obsnum, obslabel))
 
                     try:
                         # Skip the line at the beginning of each
@@ -776,10 +861,7 @@ class AptInput:
                                                          or 'NRS' in elements[4]
                                                          or 'MIR' in elements[4])
                             ) or (('TA' in elements[4]) & ('NRC' in elements[4]
-                                                         or 'NIS' in elements[4]
-                                                         or 'FGS' in elements[4]
-                                                         or 'NRS' in elements[4]
-                                                         or 'MIR' in elements[4])):
+                                                           or 'NIS' in elements[4])):
                             if (elements[18] == 'PARALLEL') and ('MIRI' in elements[4]):
                                 skip = True
 
@@ -798,7 +880,7 @@ class AptInput:
                             # groups. For now just keep everything in a single visit group.
                             vgrp = '01'
                             visit_grp.append(vgrp)
-                            # Parallel sequence id hard coded to 1 (Simulated instrument as prime rather than
+                            # Parallel sequence is hard coded to 1 (Simulated instrument as prime rather than
                             # parallel) at the moment. Future improvements may allow the proper sequence
                             # number to be constructed.
                             seq = '1'
@@ -832,12 +914,7 @@ class AptInput:
                             type_str.append(elements[18])
                             expar.append(np.int(elements[19]))
                             dkpar.append(np.int(elements[20]))
-                            #if elements[18] == 'PARALLEL':
-                            #    ddist.append(None)
-                            #else:
-                                #print('line is: {}'.format(elements))
-                                #print(ddist)
-                                #ddist.append(np.float(elements[21]))
+
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
                             # as seen in the line below.
@@ -846,7 +923,7 @@ class AptInput:
 
                     except ValueError as e:
                         if verbose:
-                            print('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
+                            self.logger.info('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
                         pass
 
         pointing = {'exposure': exp, 'dither': dith, 'aperture': aperture,
@@ -857,7 +934,79 @@ class AptInput:
                     'obs_num': observation_number, 'visit_num': visit_number,
                     'act_id': activity_id, 'visit_id': visit_id, 'visit_group': visit_grp,
                     'sequence_id': seq_id, 'observation_id': observation_id}
+
+        pointing = self.filter_unsuppoted_obs_numbers(pointing, skipped_obs_from_xml)
         return pointing
+
+
+    def global_alignment_pointing(self, obs_dict):
+        """Adjust the pointing dictionary information for global alignment
+        observations. Some of the entries need to be changed from NIRCam to
+        FGS. Remember that not all observations in the dictionary will
+        necessarily be WfscGlobalAlignment template. Be sure the leave all
+        other templates unchanged.
+
+        Parameters
+        ----------
+        obs_dict : dict
+            Dictionary of observation parameters, as returned from add_observation_info()
+
+        Returns
+        -------
+        obs_dict : dict
+            Dictionary with modified values for FGS pointing in Global Alignment templates
+        """
+
+        # We'll always be changing NIRCam to FGS, so set up the NIRCam siaf
+        # instance outside of loop
+        nrc_siaf = Siaf('nircam')['NRCA3_FULL']
+
+        ga_index = np.array(obs_dict['APTTemplate']) == 'WfscGlobalAlignment'
+
+        observation_numbers = np.unique(np.array(obs_dict['obs_num'])[ga_index])
+
+        for obs_num in observation_numbers:
+            obs_indexes = np.where(np.array(obs_dict['obs_num']) == obs_num)[0]
+
+            # Get the subarray and aperture entries for the observation
+            aperture_values = np.array(obs_dict['aperture'])[obs_indexes]
+            subarr_values = np.array(obs_dict['Subarray'])[obs_indexes]
+
+            # Subarray values, which come from the xml file, are correct. The aperture
+            # values, which come from the pointing file, are not correct. We need to
+            # copy over the FGS values from the Subarray column to the aperture column
+            to_fgs = [True if 'FGS' in subarr else False for subarr in subarr_values]
+            aperture_values[to_fgs] = subarr_values[to_fgs]
+            fgs_aperture = aperture_values[to_fgs][0]
+
+            all_aperture_values = np.array(obs_dict['aperture'])
+            all_aperture_values[obs_indexes] = aperture_values
+            obs_dict['aperture'] = all_aperture_values
+
+            # Update the pointing info for the FGS exposures
+            fgs = Siaf('fgs')[fgs_aperture]
+            basex, basey = fgs.tel_to_idl(nrc_siaf.V2Ref, nrc_siaf.V3Ref)
+            dithx = np.array(obs_dict['dithx'])[obs_indexes[to_fgs]]
+            dithy = np.array(obs_dict['dithy'])[obs_indexes[to_fgs]]
+            idlx = basex + dithx
+            idly = basey + dithy
+
+            basex_col = np.array(obs_dict['basex'])
+            basey_col = np.array(obs_dict['basey'])
+            idlx_col = np.array(obs_dict['idlx'])
+            idly_col = np.array(obs_dict['idly'])
+
+            basex_col[obs_indexes[to_fgs]] = basex
+            basey_col[obs_indexes[to_fgs]] = basey
+            idlx_col[obs_indexes[to_fgs]] = idlx
+            idly_col[obs_indexes[to_fgs]] = idly
+
+            obs_dict['basex'] = basex_col
+            obs_dict['basey'] = basey_col
+            obs_dict['idlx'] = idlx_col
+            obs_dict['idly'] = idly_col
+
+        return obs_dict
 
     def tight_dithers(self, input_dict):
         """
@@ -887,86 +1036,6 @@ class AptInput:
         modlist = [v if 'TIGHT' not in v else v.strip('TIGHT') for v in inlist]
         input_dict['PrimaryDithers'] = modlist
         return input_dict
-
-    def ra_dec_update(self, verbose=False):
-        """Given the V2, V3 values for the reference pixels associated
-        with detector apertures, calculate corresponding RA, Dec.
-        """
-        sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64',
-                                'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64']
-
-        lw_grismts_apertures = ['NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2',
-                                'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W']
-
-        intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
-
-        aperture_ra = []
-        aperture_dec = []
-
-        lw_grismts_aperture = None
-        for i in range(len(self.exposure_tab['Module'])):
-            siaf_instrument = self.exposure_tab["Instrument"][i]
-            aperture_name = self.exposure_tab['aperture'][i]
-            pointing_ra = np.float(self.exposure_tab['ra'][i])
-            pointing_dec = np.float(self.exposure_tab['dec'][i])
-            pointing_v2 = np.float(self.exposure_tab['v2'][i])
-            pointing_v3 = np.float(self.exposure_tab['v3'][i])
-
-            # When we run across a LW grism TS aperture, save
-            # the aperture name, because we'll need it when looking
-            # at the accompanying SW apertuers to follow. THIS
-            # RELIES ON THE LW ENTRY COMING BEFORE THE SW ENTRIES.
-            if aperture_name in lw_grismts_apertures:
-                lw_grismts_aperture = copy.deepcopy(aperture_name)
-                lw_filter = lw_grismts_aperture.split('_')[2]
-                lw_intermediate_aperture = [ap for ap in intermediate_lw_grismts_apertures if lw_filter in ap][0]
-
-            if 'pav3' in self.exposure_tab.keys():
-                pav3 = np.float(self.exposure_tab['pav3'][i])
-            else:
-                pav3 = np.float(self.exposure_tab['PAV3'][i])
-
-            telescope_roll = pav3
-
-            aperture = self.siaf[siaf_instrument][aperture_name]
-
-            if 'NRCA5_GRISM' in aperture_name and 'WFSS' not in aperture_name:
-                # This puts the source in row 29, but faster just to grab the ra, dec directly
-                #local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                #    siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
-                #                                        pointing_ra, pointing_dec, telescope_roll,
-                #                                        v2_arcsec=aperture.V2Ref, v3_arcsec=aperture.V3Ref)
-                ra = pointing_ra
-                dec = pointing_dec
-            else:
-                if aperture_name in sw_grismts_apertures:
-                    # Special case. When looking at grism time series observation
-                    # we force the pointing to be at the reference location of the
-                    # LW *intermediate* aperture, rather than paying attention to
-                    # the V2, V3 in the pointing file. V2, V3 from the intermediate
-                    # aperture is where the source would land on the detector if
-                    # the grism were not in the beam. This is exactly what we want
-                    # for the SW detectors, where this is no grism.
-
-                    # Generate an attitude matrix from this and
-                    # use to get the RA, Dec in the SW apertures
-                    lw_gts = self.siaf[siaf_instrument][lw_intermediate_aperture]
-                    pointing_v2 = lw_gts.V2Ref
-                    pointing_v3 = lw_gts.V3Ref
-
-                local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
-                    siaf_interface.get_siaf_information(self.siaf[siaf_instrument], aperture_name,
-                                                        pointing_ra, pointing_dec, telescope_roll,
-                                                        v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
-
-                # Calculate RA, Dec of reference location for the detector
-                # Add in any offsets from the pointing file in the BaseX, BaseY columns
-                ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
-            aperture_ra.append(ra)
-            aperture_dec.append(dec)
-
-        self.exposure_tab['ra_ref'] = aperture_ra
-        self.exposure_tab['dec_ref'] = aperture_dec
 
     def add_options(self, parser=None, usage=None):
         if parser is None:
@@ -1025,25 +1094,19 @@ def get_filters(pointing_info):
     for inst in instrument_list:
         good = np.where(np.array(pointing_info['Instrument']) == inst.upper())[0]
         if inst.upper() == 'NIRCAM':
+            filter_list = []
             short_filters = np.array(pointing_info['ShortFilter'])[good]
             long_filters = np.array(pointing_info['LongFilter'])[good]
             short_pupils = np.array(pointing_info['ShortPupil'])[good]
             long_pupils = np.array(pointing_info['LongPupil'])[good]
 
-            short_filter_only = np.where(short_pupils == 'CLEAR')[0]
-            long_filter_only = np.where(long_pupils == 'CLEAR')[0]
-
-            filter_list = list(set(short_pupils))
-            filter_list.remove('CLEAR')
-            for wfsc_optic in  ['WLP8', 'WLM8', 'GDHS0', 'GDHS60']:
-                if wfsc_optic in filter_list:
-                    filter_list.remove(wfsc_optic)
-
-            filter_list.extend(list(set(long_pupils)))
-            filter_list.remove('CLEAR')
-
-            filter_list.extend(list(set(short_filters[short_filter_only])))
-            filter_list.extend(list(set(long_filters[long_filter_only])))
+            for s_filt, s_pup, l_filt, l_pup in zip(short_filters, short_pupils, long_filters, long_pupils):
+                if s_pup not in NIRCAM_UNSUPPORTED_PUPIL_VALUES:
+                    filter_list.append('{}/{}'.format(s_filt, s_pup))
+                if l_pup not in NIRCAM_UNSUPPORTED_PUPIL_VALUES:
+                    if 'GRISM' in l_pup:
+                        l_pup = 'CLEAR'
+                    filter_list.append('{}/{}'.format(l_filt, l_pup))
 
         elif inst.upper() == 'FGS':
             filter_list = ['guider1', 'guider2']
@@ -1059,6 +1122,340 @@ def get_filters(pointing_info):
 
         filters[inst.upper()] = filter_list
     return filters
+
+
+def make_start_times(obs_info, offline=False):
+    """Create exposure start times for each entry in the observation dictionary.
+
+    Parameters
+    ----------
+    obs_info : dict
+        Dictionary of exposures. Development was around a dictionary containing
+        APT xml-derived properties as well as pointing file properties. Should
+        be before expanding to have one entry for each detector in each exposure.
+
+    offline : bool
+        Whether the class is being called with or without access to
+        Mirage reference data. Used primarily for testing.
+
+    Returns
+    -------
+    obs_info : dict
+        Modified dictionary with observation dates and times added
+    """
+    logger = logging.getLogger('mirage.apt.apt_inputs')
+
+    date_obs = []
+    time_obs = []
+    expstart = []
+    nframe = []
+    nskip = []
+    namp = []
+
+    # Read in file containing subarray definitions
+    config_information = utils.organize_config_files(offline=offline)
+
+    if 'epoch_start_date' in obs_info.keys():
+        epoch_base_date = obs_info['epoch_start_date'][0]
+    else:
+        epoch_base_date = obs_info['Date'][0]
+
+    base = Time(obs_info['epoch_start_date'][0])
+    #base = Time(epoch_base_date + 'T' + epoch_base_time)
+    base_date, base_time = base.iso.split()
+
+    # Pick some arbirary overhead values
+    act_overhead = 90  # seconds. (filter change)
+    visit_overhead = 600  # seconds. (slew)
+
+    # Get visit, activity_id, dither_id info for first exposure
+    ditherid = obs_info['dither'][0]
+    actid = obs_info['act_id'][0]
+    visit = obs_info['visit_num'][0]
+    obsid = obs_info['ObservationID'][0]
+    exp = obs_info['exposure'][0]
+    entry_num = obs_info['entry_number'][0]
+
+    for i, instrument in enumerate(obs_info['Instrument']):
+        # Get dither/visit
+        # Files with the same activity_id should have the same start time
+        # Overhead after a visit break should be large, smaller between
+        # exposures within a visit
+        next_actid = obs_info['act_id'][i]
+        next_visit = obs_info['visit_num'][i]
+        next_obsname = obs_info['obs_label'][i]
+        next_ditherid = obs_info['dither'][i]
+        next_obsid = obs_info['ObservationID'][i]
+        next_exp = obs_info['exposure'][i]
+        next_entry_num = obs_info['entry_number'][i]
+
+        # Find the readpattern of the file
+        readpatt = obs_info['ReadoutPattern'][i]
+        groups = np.int(obs_info['Groups'][i])
+        integrations = np.int(obs_info['Integrations'][i])
+
+        if instrument.lower() in ['miri', 'nirspec']:
+            nframe.append(0)
+            nskip.append(0)
+            namp.append(0)
+            date_obs.append(base_date)
+            time_obs.append(base_time)
+            expstart.append(base.mjd)
+
+        else:
+            readpatt_def = config_information['global_readout_patterns'][instrument.lower()]
+            subarray_def = config_information['global_subarray_definitions'][instrument.lower()]
+
+            match2 = readpatt == readpatt_def['name']
+            if np.sum(match2) == 0:
+                raise RuntimeError(("WARNING!! Readout pattern {} not found in definition file."
+                                    .format(readpatt)))
+
+            # Now get nframe and nskip so we know how many frames in a group
+            fpg = np.int(readpatt_def['nframe'][match2][0])
+            spg = np.int(readpatt_def['nskip'][match2][0])
+            nframe.append(fpg)
+            nskip.append(spg)
+
+            # Get the aperture name. For non-NIRCam instruments,
+            # this is simply the obs_info['aperture']. But for NIRCam,
+            # we need to be careful of entries like NRCBS_FULL, which is used
+            # for observations using all 4 shortwave B detectors. In that case,
+            # we need to build the aperture name from the combination of detector
+            # and subarray name.
+            aperture = obs_info['aperture'][i]
+
+            # Get the number of amps from the subarray definition file
+            match = aperture == subarray_def['AperName']
+
+            # needed for NIRCam case
+            if np.sum(match) == 0:
+                logger.info(('Aperture: {} does not match any entries in the subarray definition file. Guessing at the '
+                             'aperture for the purpose of calculating the exposure time and number of amps.'.format(aperture)))
+                sub = aperture.split('_')[1]
+                aperture = [apername for apername, name in
+                            np.array(subarray_def['AperName', 'Name']) if
+                            (sub in apername) or (sub in name)]
+
+                match = aperture == subarray_def['AperName']
+
+                if len(aperture) > 1 or len(aperture) == 0 or np.sum(match) == 0:
+                    raise ValueError('Cannot combine detector {} and subarray {}\
+                                     into valid aperture name.'.format(det, sub))
+                # We don't want aperture as a list
+                aperture = aperture[0]
+
+            # For grism tso observations, get the number of
+            # amplifiers to use from the APT file.
+            # For other modes, check the subarray def table.
+            try:
+                amp = int(obs_info['NumOutputs'][i])
+            except ValueError:
+                amp = subarray_def['num_amps'][match][0]
+
+            # Default to amps=4 for subarrays that can have 1 or 4
+            # if the number of amps is not defined. Hopefully we
+            # should never enter this code block given the lines above.
+            if amp == 0:
+                amp = 4
+                logger.info(('Aperture {} can be used with 1 or 4 readout amplifiers. Defaulting to use 4.'
+                             'In the future this information should be made a user input.'.format(aperture)))
+            namp.append(amp)
+
+            # same activity ID
+            # Remove this for now, since Mirage was not correctly
+            # specifying activities. At the moment all exposures have
+            # the same activity ID, which means we must allow the
+            # the epoch_start_date to change even if the activity ID
+            # does not. This will change back in the future when we
+            # figure out more realistic activity ID values.
+            #if next_actid == actid:
+            #    # in this case, the start time should remain the same
+            #    date_obs.append(base_date)
+            #    time_obs.append(base_time)
+            #    expstart.append(base.mjd)
+            #    continue
+
+            epoch_date = obs_info['epoch_start_date'][i]
+            #epoch_time = copy.deepcopy(epoch_base_time0)
+
+            # new epoch - update the base time
+            if epoch_date != epoch_base_date:
+                epoch_base_date = copy.deepcopy(epoch_date)
+                #base = Time(epoch_base_date + 'T' + epoch_base_time)
+                base = Time(obs_info['epoch_start_date'][i])
+                base_date, base_time = base.iso.split()
+                basereset = True
+                date_obs.append(base_date)
+                time_obs.append(base_time)
+                expstart.append(base.mjd)
+                actid = copy.deepcopy(next_actid)
+                visit = copy.deepcopy(next_visit)
+                obsid = copy.deepcopy(next_obsid)
+                obsname = copy.deepcopy(next_obsname)
+                ditherid = copy.deepcopy(next_ditherid)
+                exp = copy.deepcopy(next_exp)
+                entry_num = copy.deepcopy(next_entry_num)
+                continue
+
+            # new observation or visit (if a different epoch time has
+            # not been provided)
+            if ((next_obsid != obsid) | (next_visit != visit)):
+                # visit break. Larger overhead
+                overhead = visit_overhead
+            elif ((next_actid > actid) & (next_visit == visit)):
+                # This block should be updated when we have more realistic
+                # activity IDs
+                # same visit, new activity. Smaller overhead
+                overhead = act_overhead
+            elif ((next_ditherid != ditherid) & (next_visit == visit)):
+                # same visit, new dither position. Smaller overhead
+                overhead = act_overhead
+            else:
+                # same observation, activity, dither. Filter changes
+                # will still fall in here, which is not accurate
+                overhead = 0.  # Reset frame captured in exptime below
+
+            # For cases where the base time needs to change
+            # continue down here
+            siaf_inst = obs_info['Instrument'][i].upper()
+            siaf_obj = Siaf(siaf_inst)[aperture]
+
+            # Calculate the readout time for a single frame
+            frametime = utils.calc_frame_time(siaf_inst, aperture,
+                                              siaf_obj.XSciSize, siaf_obj.YSciSize, amp)
+
+            # Estimate total exposure time
+            exptime = ((fpg + spg) * groups + fpg) * integrations * frametime
+
+            if ((next_obsid == obsid) & (next_visit == visit) & (next_actid == actid) & (next_ditherid == ditherid) & (next_entry_num == entry_num)):
+                # If we are in the same exposure (but with a different detector),
+                # then we should keep the start time the same
+                delta = TimeDelta(0., format='sec')
+            else:
+                # If we are moving on to the next exposure, activity, or visit
+                # then move the start time by the expoure time of the current
+                # exposure, plus the overhead
+                delta = TimeDelta(exptime + overhead, format='sec')
+
+            base += delta
+            base_date, base_time = base.iso.split()
+
+            # Add updated dates and times to the list
+            date_obs.append(base_date)
+            time_obs.append(base_time)
+            expstart.append(base.mjd)
+
+            # increment the activity ID and visit
+            actid = copy.deepcopy(next_actid)
+            visit = copy.deepcopy(next_visit)
+            obsname = copy.deepcopy(next_obsname)
+            ditherid = copy.deepcopy(next_ditherid)
+            obsid = copy.deepcopy(next_obsid)
+            exp = copy.deepcopy(next_exp)
+            entry_num = copy.deepcopy(next_entry_num)
+
+    obs_info['date_obs'] = date_obs
+    obs_info['time_obs'] = time_obs
+    obs_info['nframe'] = nframe
+    obs_info['nskip'] = nskip
+    obs_info['namp'] = namp
+    return obs_info
+
+
+def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
+    """Given the V2, V3 values for the reference locations associated
+    with detector apertures, calculate corresponding RA, Dec.
+
+    Parameters
+    ----------
+    exposure_dict : dict
+        Dictionary of exposure parameters, like self.exposure_tab, after expanding for
+        detectors
+
+    siaf_instances : dict
+        Dictionary of instrument level SIAF instances. Instrument names are the
+        keys and the SIAF instances are the values
+
+    Returns
+    -------
+    exposure_dict : dict
+        Modified exposure dictionary with updated RA, Dec values for the pointing
+    """
+    sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64',
+                            'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64']
+
+    lw_grismts_apertures = ['NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2',
+                            'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W']
+
+    intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
+
+    aperture_ra = []
+    aperture_dec = []
+
+    lw_grismts_aperture = None
+    for i in range(len(exposure_dict['Module'])):
+        siaf_instrument = exposure_dict["Instrument"][i]
+        aperture_name = exposure_dict['aperture'][i]
+        pointing_ra = np.float(exposure_dict['ra'][i])
+        pointing_dec = np.float(exposure_dict['dec'][i])
+        pointing_v2 = np.float(exposure_dict['v2'][i])
+        pointing_v3 = np.float(exposure_dict['v3'][i])
+
+        # When we run across a LW grism TS aperture, save
+        # the aperture name, because we'll need it when looking
+        # at the accompanying SW apertuers to follow. THIS
+        # RELIES ON THE LW ENTRY COMING BEFORE THE SW ENTRIES.
+        if aperture_name in lw_grismts_apertures:
+            lw_grismts_aperture = copy.deepcopy(aperture_name)
+            lw_filter = lw_grismts_aperture.split('_')[2]
+            lw_intermediate_aperture = [ap for ap in intermediate_lw_grismts_apertures if lw_filter in ap][0]
+
+        if 'pav3' in exposure_dict.keys():
+            pav3 = np.float(exposure_dict['pav3'][i])
+        else:
+            pav3 = np.float(exposure_dict['PAV3'][i])
+
+        telescope_roll = pav3
+
+        aperture = siaf_instances[siaf_instrument][aperture_name]
+
+        if 'NRCA5_GRISM' in aperture_name and 'WFSS' not in aperture_name:
+            ra = pointing_ra
+            dec = pointing_dec
+        else:
+            if aperture_name in sw_grismts_apertures:
+                # Special case. When looking at grism time series observation
+                # we force the pointing to be at the reference location of the
+                # LW *intermediate* aperture, rather than paying attention to
+                # the V2, V3 in the pointing file. V2, V3 from the intermediate
+                # aperture is where the source would land on the detector if
+                # the grism were not in the beam. This is exactly what we want
+                # for the SW detectors, where this is no grism.
+
+                # Generate an attitude matrix from this and
+                # use to get the RA, Dec in the SW apertures
+                lw_gts = siaf_instances[siaf_instrument][lw_intermediate_aperture]
+                pointing_v2 = lw_gts.V2Ref
+                pointing_v3 = lw_gts.V3Ref
+
+
+            local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
+                siaf_interface.get_siaf_information(siaf_instances[siaf_instrument], aperture_name,
+                                                    pointing_ra, pointing_dec, telescope_roll,
+                                                    v2_arcsec=pointing_v2, v3_arcsec=pointing_v3)
+
+            # Calculate RA, Dec of reference location for the detector
+            # Add in any offsets from the pointing file in the BaseX, BaseY columns
+            ra, dec = rotations.pointing(attitude_matrix, aperture.V2Ref, aperture.V3Ref)
+
+        aperture_ra.append(ra)
+        aperture_dec.append(dec)
+
+    exposure_dict['ra_ref'] = aperture_ra
+    exposure_dict['dec_ref'] = aperture_dec
+    return exposure_dict
+
 
 
 # if __name__ == '__main__':

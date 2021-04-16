@@ -39,13 +39,32 @@ class SegMap():
         flag = image >= cutoff
         stamp[flag] = number
 
-    def add_object_noise(self, image, ystart, xstart, number, noise):
-        # Add an object to the segmentation map
-        # In this case, only flag pixels whose
-        # signal is higher than a calculated cutoff
-        # that is based on average noise/background
-        # values for NIRCam
+    def add_object_threshold(self, image, ystart, xstart, number, threshold):
+        """Add an object to the segmentation map
+        In this case, only flag pixels whose
+        signal is higher than the given threshold value
+
+        Paramters
+        ---------
+        image : numpy.ndarray
+            Image containing the source to be added to the segmentation map
+
+        ystart : int
+            Y coordinate, in the coordinate system of the full seed image
+            of the lower left corner of '''image'''
+
+        xstart : imt
+            X coordinate, in the coordinate system of the full seed image
+            of the lower left corner of '''image'''
+
+        number : int
+            Value to be placed into the segmentation map for this object
+
+        threshold : float
+            Pixels with signal values higher than this will be added to
+            the segmentation map as part of this object
+        """
         yd, xd = image.shape
         stamp = self.segmap[ystart:ystart+yd, xstart:xstart+xd]
-        flag = image >= noise
+        flag = image >= threshold
         stamp[flag] = number

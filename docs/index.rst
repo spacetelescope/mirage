@@ -14,6 +14,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    install.rst
    reference_files.rst
    catalogs.rst
+   ghosts.rst
    catalog_creation.rst
    yaml_generator.rst
    example_yaml.rst
@@ -24,6 +25,7 @@ MIRAGE: Multi-Instrument RAmp GEnerator
    seed_images.rst
    dark_preparation.rst
    observation_generator.rst
+   logging.rst
 ..   api.rst
 
 
@@ -38,6 +40,7 @@ Mirage is based on early NIRISS simulator software written by Kevin Volk. It has
 - `Shannon Osborne <https://github.com/shanosborne>`_
 - `Marshall Perrin <https://github.com/mperrin>`_
 - `Nor Pirzkal <https://github.com/npirzkal>`_
+- `Joe Filippazzo <https://github.com/hover2pi>`_
 
 
 Indices and tables

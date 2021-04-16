@@ -23,16 +23,22 @@ Use
 
     This module can be used as such:
     ::
-        from mirage.reference_files import crds
+        from mirage.reference_files import crds_tools
         params = {'INSTRUME': 'NIRCAM', 'DETECTOR': 'NRCA1'}
-        reffiles = crds.get_reffiles(params)
+        reffiles = crds_tools.get_reffiles(params, ['photom])
 """
 
 import datetime
 import os
+import logging
 
+from mirage.logging import logging_functions
 from mirage.utils.utils import ensure_dir_exists
-from mirage.utils.constants import EXPTYPES
+from mirage.utils.constants import EXPTYPES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def env_variables():
@@ -58,12 +64,13 @@ def path_check():
     crds_path : str
         Full path to the location of the CRDS reference files
     """
+    logger = logging.getLogger('mirage.reference_files.crds_tools.path_check')
     crds_path = os.environ.get('CRDS_PATH')
     if crds_path is None:
         reffile_dir = '{}/crds_cache'.format(os.environ.get('HOME'))
         os.environ["CRDS_PATH"] = reffile_dir
         ensure_dir_exists(reffile_dir)
-        print('CRDS_PATH environment variable not set. Setting to {}'.format(reffile_dir))
+        logger.info('CRDS_PATH environment variable not set. Setting to {}'.format(reffile_dir))
         return reffile_dir
     else:
         return crds_path

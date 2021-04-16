@@ -14,7 +14,7 @@ After installing Mirage, these reference files can be downloaded using the *down
 
   from mirage.reference_files import downloader
   download_path = '/path/into/which/files/are/downlaoded/'
-  downloader.download_reffiles(download_path, instrument='all', dark_type='linearized', skip_darks=False, skip_cosmic_rays=False, skip_psfs=False, skip_grism=False)
+  downloader.download_reffiles(download_path, instrument='all', dark_type='linearized', skip_darks=False, single_dark=False, skip_cosmic_rays=False, skip_psfs=False, skip_grism=False)
 
 The ``instrument`` keyword controls which subset of reference files are downloaded. You can give it the name of a single instrument, a string containing a comma-separated list of instruments, or the string ``all``, which will download reference files for NIRCam, NIRISS, and FGS.
 
@@ -22,7 +22,7 @@ The ``dark_type`` keyword controls which dark current exposures are downloaded. 
 
 If True, the ``skip_dark`` parameter will cause the script not to download the dark current files for the given instrument. Similarly, the ``skip_cosmic_rays`` and ``skip_psfs`` parameters, if True, will cause the script to skip downloading the cosmic ray library and PSF library, respectively, for the indicated instruments. The default for all three of these parameters is False.
 
-The ``skip_grism`` parameter controls whether the reference files associated with the grisms (needed for WFSS simulations) are downloaded. If False, the grism data will be downloaded.
+If True, the ``single_dark`` parameter will cause the script to download only a single dark current file for each detector of the selected instruments. Downloading only a single dark rather than the full collection of darks will save significant time and disk space. This is intended as a quick-start of sorts, for those interested in testing Mirage. However, we recommend against creating a large amount of simulated data all based on only a single dark for each detector.
 
 When called, the function will download the appropriate files from the `STScI Box repository <https://stsci.app.box.com/folder/69205492331>`_, unzip the files, and create the directory structure Mirage expects. It will then remind you to point your MIRAGE_DATA environment variable to the top-level location of these files, so that Mirage knows where to find them. You
 may wish to add this definition to your .bashrc or .cshrc file.
@@ -32,6 +32,12 @@ For example:
 ::
 
 	export MIRAGE_DATA="/my_files/jwst/simulations/mirage_data"
+
+Download Grism-related Reference Data
+-------------------------------------
+
+In order to create dispersed images, using WFSS or grism TSO modes, a set of reference files describing the performance of the grisms are necessary. These files include sensitivity curves and dispersion information. These files are currently stored on GitHub in two repositories: one for `NIRCam <https://github.com/npirzkal/GRISM_NIRCAM>`_ and one for `NIRISS <https://github.com/npirzkal/GRISM_NIRISS>`_. To retrieve these files, clone the repositories from GitHub, and then move the files into the appropriate directory within the reference file directory structure. For NIRCam, copy the files from the folder with the latest version number (e.g. "V2") into $MIRAGE_DATA/nircam/GRISM_NIRCAM/current/. For NIRISS, copy the files into the $MIRAGE_DATA/niriss/GRISM_NIRISS/current directory.
+
 
 CRDS Environment Variables
 --------------------------

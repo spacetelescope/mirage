@@ -21,9 +21,20 @@ exptype = exposure.type EXP_TYPE
 detector - instrument.detector DETECTOR
 instrument - instrument.name INSTRUME
 '''
+import logging
 import numpy as np
+import os
+
 from astropy.io import fits
 from jwst.datamodels import RampModel
+
+from mirage.logging import logging_functions
+from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+
+
+classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
+logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 class Read_fits():
@@ -35,6 +46,8 @@ class Read_fits():
         self.translate['NFRAMES'] = 'exposure.nframes'
         self.translate['NSKIP'] = 'exposure.nskip'
         self.translate['GROUPGAP'] = 'exposure.groupgap'
+        self.translate['TFRAME'] = 'exposure.frame_time'
+        self.translate['TGROUP'] = 'exposure.group_time'
         self.translate['EXP_TYPE'] = 'exposure.type'
         self.translate['DETECTOR'] = 'instrument.detector'
         self.translate['INSTRUME'] = 'instrument.name'
@@ -88,6 +101,7 @@ class Read_fits():
                 self.header[key] = None
 
     def read_datamodel(self):
+        logger = logging.getLogger('mirage.utils.read_fits.read_datamodel')
 
         h = RampModel(self.file)
 
@@ -103,8 +117,7 @@ class Read_fits():
         #zeros, then set it to None here
         #self.zeroframe = h.zeroframe
         if np.all(h.zeroframe == 0):
-            print("Zeroframe in {}".format(self.file))
-            print("All zeros. Returning None.")
+            logger.info("Zeroframe in {} is all zeros. Returning None.".format(self.file))
             self.zeroframe = None
         else:
             self.zeroframe = h.zeroframe
