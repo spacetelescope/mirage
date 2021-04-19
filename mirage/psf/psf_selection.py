@@ -247,6 +247,12 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     """
     logger = logging.getLogger('mirage.psf.psf_selection.get_gridded_psf_library')
 
+    # In the default case, we expect the (total PSF signal)/ (oversample factor**2)
+    # to be close to 1.0. In certain cases for NIRISS, this expectation is lower by
+    # some factor. Here we set the defaul factor to lower expectations to 1.0
+    # (i.e. don't lower expectations).
+    grid_min_factor = 1.0
+
     # First, as a way to save time, let's assume a file naming convention
     # and search for the appropriate file that way. If we find a match,
     # confirm the properties of the file via the header. This way we don't
@@ -266,12 +272,20 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
                 filename_filter = pupilname
                 filename_pupil = filtername
             elif pupilname.lower() == 'clearp':
+                # If CLEARP is used, we need to alert the normalization check
+                # below to expect PSFs with a total signal/oversamp**2 lower
+                # than otherwise expected by a factor of 0.84
                 filename_filter = filtername
                 filename_pupil = pupilname
+                grid_min_factor = 0.84
             # filter=clear, pupil=nrm is currently not allowed
             if pupilname.lower() == 'nrm':
+                # In NRM mode, the 0.15 throughput factor associated with the
+                # NRM mask is baked into the PSFs from Webbpsf, so we need to
+                # adjust the expectations of the normalization check below.
                 filename_filter = filtername
                 filename_pupil = 'mask_nrm'
+                grid_min_factor = 0.15
         elif instrument.lower() == 'nircam':
             filename_filter = filtername
             filename_pupil = pupilname if 'GDHS' not in pupilname else 'clear'  # for WFSC team practice purposes we don't produce DHS "PSFs"
@@ -312,7 +326,9 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         library = _load_itm_library(library_file)
 
     # Check that the gridded PSF library is normalized as expected
-    correct_norm, reason = check_normalization(library)
+    check_max = 1.0 * grid_min_factor
+    check_min = 0.8 * grid_min_factor
+    correct_norm, reason = check_normalization(library, lower_limit=check_min, upper_limit=check_max)
     if correct_norm:
         return library
     else:
