@@ -1,3 +1,13 @@
+2.0.1
+=====
+
+NIRISS AMI
+----------
+
+Updated the PSF normalization check to lower the expected total PSF signal in the gridded PSF library for cases where
+the NRM is in the beam, as well as imaging cases where CLEARP is used. (#662)
+
+
 2.0.0
 =====
 
