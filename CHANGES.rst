@@ -1,3 +1,12 @@
+2.0.2
+=====
+
+NIRISS AMI
+----------
+
+Updated the PSF normalization check threshold value to match the new value from an updated NRM mask calculation. Prior to this, Mirage was stopping AMI simulations because the normalization threshold was too low. (#664)
+
+
 2.0.1
 =====
 
