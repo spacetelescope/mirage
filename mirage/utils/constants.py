@@ -126,7 +126,7 @@ NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 # Factors by which total throughput is reduced and gridded PSF library
 # signal (output from WebbPSF) is reduced. Used in normalization_check()
 # in psf_selection.py when performing a sanity check on the input PSF signal
-NIRISS_NRM_PSF_THROUGHPUT_REDUCTION = 0.16
+NIRISS_NRM_PSF_THROUGHPUT_REDUCTION = 0.17
 NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION = 0.84
 
 # PSF normalization check - default min and max allowed values for the
