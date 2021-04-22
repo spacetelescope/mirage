@@ -6,6 +6,10 @@ Inspired by a tutorial on RealPython: https://realpython.com/python-timer/
 import time
 
 
+class TimerError(Exception):
+    """A custom exception used to report errors in use of Timer class"""
+
+
 class Timer:
     timers = dict()
 
