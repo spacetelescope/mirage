@@ -30,7 +30,7 @@ If **add_ghosts** is True, Mirage will calculate, for each point source in your 
 
 .. tip::
 
-    If you wish to run Mirage with a "gap summary" file other than that in the config directory, you can either replace the file in the config directory with your own, or update the value of NIRISS_GHOST_GAP_FILE in the constants.py file of the repository to point to your file. This may be useful for testing new ghost position calibration results.
+    The current "gap summary" file allows for the addition of ghost sources for observations that use F090W, F115W, F140M, F150W, and F200W. For other filters, the ghost positions and/or magnitudes have not been characterized, and therefore ghosts will not be added. If you wish to run Mirage with a "gap summary" file other than that in the config directory, you can either replace the file in the config directory with your own, or update the value of NIRISS_GHOST_GAP_FILE in the constants.py file of the repository to point to your file. This may be useful for testing new ghost position calibration results.
 
 Mirage currently carries one fits file in its collection of :ref:`reference files <reference_files>` that provides an image of an optical ghost from a point source on the NIRISS detector. This image was created from ground testing data. By default, this file is used when adding ghosts to the data. **NOTE that this stamp image applies to point sources only. By default, no ghosts are added for galaxy or extended sources.**
 
