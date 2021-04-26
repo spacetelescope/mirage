@@ -2397,6 +2397,26 @@ def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
     return results
 
 
+def yaml_from_params(input, yamlout=None):
+    """Generate a YAML parameter file from a dict of parameters
+
+    Parameters
+    ----------
+    input: dict
+        The dict of parameters
+    yamlout: str
+        The full path of the new file
+    """
+    yamlout = yamlout or os.path.join(input['Output']['directory'], 'paramfile.yaml')
+    with open(yamlout, 'w') as f:
+        for section, info in input.items():
+            f.write('\n{}:\n'.format(section))
+            for k, v in info.items():
+                f.write('  {}: {}\n'.format(k, v))
+
+    print("YAML file created at {}".format(yamlout))
+
+
 if __name__ == '__main__':
 
     usagestring = 'USAGE: yaml_generator.py NIRCam_obs.xml NIRCam_obs.pointing'
