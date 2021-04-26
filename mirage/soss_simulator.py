@@ -288,6 +288,9 @@ class SossSim():
         # Reset relative response function
         self._reset_psfs()
 
+        # Reset paramfile
+        self.paramfile = None
+
         # Logging
         self.logger = logging.getLogger('mirage.soss_simulator')
         self.logger.info('\n\nRunning soss_simulator....\n')
