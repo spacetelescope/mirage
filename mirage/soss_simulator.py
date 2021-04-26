@@ -41,6 +41,7 @@ from mirage.reference_files import crds_tools
 from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils import utils, file_io
 from mirage.psf import soss_trace
+from mirage.yaml import yaml_generator
 
 
 classpath = os.path.dirname(__file__)
@@ -119,7 +120,7 @@ class SossSim():
 
         # Set default reference file parameters
         self._star = None
-        self.ref_params = {"INSTRUME": "NIRISS", "READPATT": "NIS", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
+        self.ref_params = {"INSTRUME": "NIRISS", "READPATT": "NISRAPID", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
 
         # Additional parmeters
         self.orders = orders
@@ -129,26 +130,13 @@ class SossSim():
         self.dropframes1 = self.dropframes3 = self.nskip = 0
         self.model_grid = 'ACES'
         self.override_dark = None
-
-        # Use parameter file if available...
-        if paramfile is not None:
-
-            self.paramfile = paramfile
-
-        # ...or set exposure parameters from args
-        else:
-
-            self.obs_datetime = obs_date or Time.now()
-            self.ngrps = ngrps
-            self.nints = nints
-            self.filter = filter
-            self.subarray = subarray
-            self.readpatt = 'NISRAPID'
-            self.groupgap = 0
-            self.nframes = self.nsample = 1
-            self.nresets = self.nresets1 = self.nresets2 = 1
-            self.dropframes1 = self.dropframes3 = 0
-            self.paramfile = None
+        self.obs_datetime = obs_date or Time.now()
+        self.ngrps = ngrps
+        self.nints = nints
+        self.filter = filter
+        self.subarray = subarray
+        self.readpatt = 'NISRAPID'
+        self.paramfile = paramfile
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -226,7 +214,7 @@ class SossSim():
             self.logger.info('Running dark prep')
             d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfile
-            d.prepare(params=self.params)
+            d.prepare()
             use_darks = d.dark_files
         else:
             self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
@@ -249,7 +237,7 @@ class SossSim():
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, **kwargs):
+    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, test=False, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -307,94 +295,100 @@ class SossSim():
         self.logger.info('{}'.format(self.paramfile))
         begin = time.time()
 
-        # Set the number of cores for multiprocessing
-        max_cores = cpu_count()
-        if n_jobs == -1 or n_jobs > max_cores:
-            n_jobs = max_cores
+        if test:
 
-        # Chunk along the time axis so results can be dumped into a file and then deleted
-        max_frames = 50
-        nints_per_chunk = max_frames // self.ngrps
-        nframes_per_chunk = self.ngrps * nints_per_chunk
+            self.message("Generating test simulation of shape {}...".format(self.dims))
+            self.tso_order1_ideal = self.tso_order2_ideal = np.ones((self.nints * self.ngrps, 256, 2048))
 
-        # Chunk the time arrays
-        time_chunks = [self.time[i:i + nframes_per_chunk] for i in range(0, self.total_groups, nframes_per_chunk)]
-        inttime_chunks = [self.inttime[i:i + nframes_per_chunk] for i in range(0, self.total_groups, nframes_per_chunk)]
-        n_chunks = len(time_chunks)
+        else:
+            # Set the number of cores for multiprocessing
+            max_cores = cpu_count()
+            if n_jobs == -1 or n_jobs > max_cores:
+                n_jobs = max_cores
 
-        # Iterate over chunks
-        self.message('Simulating {target} in {title}\nConfiguration: {subarray} + {filter}\nGroups: {ngrps}, Integrations: {nints}\n'.format(**self.info))
-        for chunk, (time_chunk, inttime_chunk) in enumerate(zip(time_chunks, inttime_chunks)):
+            # Chunk along the time axis so results can be dumped into a file and then deleted
+            max_frames = 50
+            nints_per_chunk = max_frames // self.ngrps
+            nframes_per_chunk = self.ngrps * nints_per_chunk
 
-            # Run multiprocessing to generate lightcurves
-            self.message('Constructing frames for chunk {}/{}...'.format(chunk + 1, n_chunks))
-            start = time.time()
+            # Chunk the time arrays
+            time_chunks = [self.time[i:i + nframes_per_chunk] for i in range(0, self.total_groups, nframes_per_chunk)]
+            inttime_chunks = [self.inttime[i:i + nframes_per_chunk] for i in range(0, self.total_groups, nframes_per_chunk)]
+            n_chunks = len(time_chunks)
 
-            # Re-define lightcurve model for the current chunk
-            if tparams is not None:
-                if supersample_factor is None:
-                    c_tmodel = batman.TransitModel(tparams, time_chunk.jd)
+            # Iterate over chunks
+            self.message('Simulating {target} in {title}\nConfiguration: {subarray} + {filter}\nGroups: {ngrps}, Integrations: {nints}\n'.format(**self.info))
+            for chunk, (time_chunk, inttime_chunk) in enumerate(zip(time_chunks, inttime_chunks)):
+
+                # Run multiprocessing to generate lightcurves
+                self.message('Constructing frames for chunk {}/{}...'.format(chunk + 1, n_chunks))
+                start = time.time()
+
+                # Re-define lightcurve model for the current chunk
+                if tparams is not None:
+                    if supersample_factor is None:
+                        c_tmodel = batman.TransitModel(tparams, time_chunk.jd)
+                    else:
+                        frame_days = (self.frame_time * q.s).to(q.d).value
+                        c_tmodel = batman.TransitModel(tparams, time_chunk.jd, supersample_factor=supersample_factor, exp_time=frame_days)
                 else:
-                    frame_days = (self.frame_time * q.s).to(q.d).value
-                    c_tmodel = batman.TransitModel(tparams, time_chunk.jd, supersample_factor=supersample_factor, exp_time=frame_days)
-            else:
-                c_tmodel = self.tmodel
+                    c_tmodel = self.tmodel
 
-            # Generate simulation for each order
-            for order in self.orders:
+                # Generate simulation for each order
+                for order in self.orders:
 
-                # Get the wavelength map
-                wave = self.avg_wave[order - 1]
+                    # Get the wavelength map
+                    wave = self.avg_wave[order - 1]
 
-                # Get the psf cube and filter response function
-                psfs = getattr(self, 'order{}_psfs'.format(order))
+                    # Get the psf cube and filter response function
+                    psfs = getattr(self, 'order{}_psfs'.format(order))
 
-                # Get limb darkening coeffs and make into a list
-                ld_coeffs = self.ld_coeffs[order - 1]
-                ld_coeffs = list(map(list, ld_coeffs))
+                    # Get limb darkening coeffs and make into a list
+                    ld_coeffs = self.ld_coeffs[order - 1]
+                    ld_coeffs = list(map(list, ld_coeffs))
 
-                # Set the radius at the given wavelength from the transmission
-                # spectrum (Rp/R*)**2... or an array of ones
-                if self.planet is not None:
-                    tdepth = np.interp(wave, self.planet[0].to(q.um).value, self.planet[1])
-                else:
-                    tdepth = np.ones_like(wave)
-                tdepth[tdepth < 0] = np.nan
-                self.rp = np.sqrt(tdepth)
+                    # Set the radius at the given wavelength from the transmission
+                    # spectrum (Rp/R*)**2... or an array of ones
+                    if self.planet is not None:
+                        tdepth = np.interp(wave, self.planet[0].to(q.um).value, self.planet[1])
+                    else:
+                        tdepth = np.ones_like(wave)
+                    tdepth[tdepth < 0] = np.nan
+                    self.rp = np.sqrt(tdepth)
 
-                # Generate the lightcurves at each wavelength
-                pool = ThreadPool(n_jobs)
-                func = partial(soss_trace.psf_lightcurve, time=time_chunk, tmodel=c_tmodel)
-                data = list(zip(psfs, ld_coeffs, self.rp))
-                lightcurves = np.asarray(pool.starmap(func, data), dtype=np.float16)
-                pool.close()
-                pool.join()
-                del pool
+                    # Generate the lightcurves at each wavelength
+                    pool = ThreadPool(n_jobs)
+                    func = partial(soss_trace.psf_lightcurve, time=time_chunk, tmodel=c_tmodel)
+                    data = list(zip(psfs, ld_coeffs, self.rp))
+                    lightcurves = np.asarray(pool.starmap(func, data), dtype=np.float16)
+                    pool.close()
+                    pool.join()
+                    del pool
 
-                # Reshape to make frames
-                lightcurves = lightcurves.swapaxes(0, 1)
+                    # Reshape to make frames
+                    lightcurves = lightcurves.swapaxes(0, 1)
 
-                # Multiply by the integration time to convert to [ADU]
-                lightcurves *= inttime_chunk[:, None, None, None]
+                    # Multiply by the integration time to convert to [ADU]
+                    lightcurves *= inttime_chunk[:, None, None, None]
 
-                # Make the 2048*N lightcurves into N frames
-                pool = ThreadPool(n_jobs)
-                frames = np.asarray(pool.map(soss_trace.make_frame, lightcurves))
-                pool.close()
-                pool.join()
-                del pool
+                    # Make the 2048*N lightcurves into N frames
+                    pool = ThreadPool(n_jobs)
+                    frames = np.asarray(pool.map(soss_trace.make_frame, lightcurves))
+                    pool.close()
+                    pool.join()
+                    del pool
 
-                # Add it to the individual order
-                order_name = 'tso_order{}_ideal'.format(order)
-                if getattr(self, order_name) is None:
-                    setattr(self, order_name, frames)
-                else:
-                    setattr(self, order_name, np.concatenate([getattr(self, order_name), frames]))
+                    # Add it to the individual order
+                    order_name = 'tso_order{}_ideal'.format(order)
+                    if getattr(self, order_name) is None:
+                        setattr(self, order_name, frames)
+                    else:
+                        setattr(self, order_name, np.concatenate([getattr(self, order_name), frames]))
 
-                # Clear memory
-                del frames, lightcurves, psfs, wave
+                    # Clear memory
+                    del frames, lightcurves, psfs, wave
 
-            self.message('Chunk {}/{} finished: {} {}'.format(chunk + 1, n_chunks, round(time.time() - start, 3), 's'))
+                self.message('Chunk {}/{} finished: {} {}'.format(chunk + 1, n_chunks, round(time.time() - start, 3), 's'))
 
         # Trim SUBSTRIP256 array if SUBSTRIP96
         if self.subarray == 'SUBSTRIP96':
@@ -646,7 +640,6 @@ class SossSim():
             The path to the parameter file
         """
         # Populate params attribute if no file given
-        # TODO: This is clunky. Have yaml_generator.py just make a paramfile file from the attributes
         if pfile is None:
 
             # Read template file
@@ -667,7 +660,7 @@ class SossSim():
             self.params['Output']['target_dec'] = self.dec
             self.params['Output']['obs_id'] = self.title
             self.params['Output']['directory'] = '.'
-            self.params['Output']['paramfile'] = pfile
+            self.params['Output']['paramfile'] = pfile = yaml_generator.yaml_from_params(self.params)
 
         else:
 

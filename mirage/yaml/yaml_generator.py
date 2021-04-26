@@ -2414,7 +2414,8 @@ def yaml_from_params(input, yamlout=None):
             for k, v in info.items():
                 f.write('  {}: {}\n'.format(k, v))
 
-    print("YAML file created at {}".format(yamlout))
+    return yamlout
+
 
 
 if __name__ == '__main__':
