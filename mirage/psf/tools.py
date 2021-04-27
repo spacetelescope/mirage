@@ -243,8 +243,30 @@ def get_psf_metadata(filename):
         if metadata['instrument'] == 'IRAC':
             metadata['channel'] = int(metadata_entry('CHNLNUM', header))
             metadata['pix_scale1'] = np.abs(metadata_entry('PXSCAL1', header))
+            if metadata['pix_scale1'] is None:
+                metadata['pix_scale1'] = np.abs(metadata_entry('CDELT1', header)) / 3600.
+
             metadata['pix_scale2'] = np.abs(metadata_entry('PXSCAL2', header))
+            if metadata['pix_scale2'] is None:
+                metadata['pix_scale2'] = np.abs(metadata_entry('CDELT2', header)) / 3600.
+
+            if ((metadata['pix_scale1'] is None) or (metadata['pix_scale2'] is None)):
+                raise ValueError(('Unable to determine pixel scale of input image. Header must contain '
+                                  'either PXSCAL1 and PXSCAL2 with values in arcsec per pixel, or CDELT1 '
+                                  'and CDELT2 with values in degrees per pixel.'))
+
             metadata['pa'] = metadata_entry('PA', header)  # deg] Position angle of axis 2 (E of N)
+            if metadata['pa'] is None:
+                metadata['pa'] = 365. - metadata_entry('CROTA2', header)
+                if metadata['pa'] is None:
+                    raise ValueError(('Unable to determine position angle of input image. Header must contain '
+                                      'either PA with the angle of axis 2 East of North in degrees, or CROTA2 '
+                                      'with the angle of axis 2 West of North in degrees.'))
+
+            cd_check = metadata_entry('CD1_1', header)
+            if cd_check is None:
+                raise ValueError(('CD matrix not present in input image. Unable to proceed. Will not be able '
+                                  'to extract the appropriate subarray from the image to use for the simulation.'))
 
         if metadata['telescope'] not in 'JWST HST SPITZER'.split():
             metadata['pix_scale1'] = np.abs(metadata_entry('CD1_1', header)) * 3600.
