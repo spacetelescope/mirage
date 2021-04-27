@@ -365,7 +365,7 @@ class ImgSeed:
             raise ValueError(("ERROR: FWHM of the mosaic image is larger than that of "
                               "the JWST PSF. Unable to create a matching PSF kernel "
                               "using photutils. \nMosaic FWHM: {}\nJWST FWHM: {}"
-                              .format(self.mosaic_fwhm, jwst_y_fwhm_arcsec)))
+                              .format(mosaic_fwhm_arcsec, jwst_y_fwhm_arcsec)))
 
         # The JWST PSF as read in is large (399 x 399 pixels). Crop to
         # something reasonable so that the convolution doesn't take
@@ -399,7 +399,11 @@ class ImgSeed:
         blot = blot_image.Blot(instrument=self.instrument, aperture=self.aperture,
                                ra=[self.blot_center_ra], dec=[self.blot_center_dec],
                                pav3=[self.blot_pav3], blotfile=crop.cropped,
-                               distortion_file=self.distortion_file)
+                               distortion_file=self.distortion_file,
+                               filtername=self.params['Readout']['filter'],
+                               pupilname=self.params['Readout']['pupil'],
+                               obs_date=self.params['Output']['date_obs'],
+                               obs_time=self.params['Output']['time_obs'])
         blot.blot()
 
         # Blot the PSF associated with the mosaic
@@ -686,10 +690,10 @@ class ImgSeed:
                     self.logger.info('Creating HST PSF, using 2D Gaussian')
                     self.logger.info('HST FWHM in arcsec: {}'.format(self.mosaic_fwhm * self.mosaic_metadata['pix_scale2']))
                     self.mosaic_psf = tools.get_HST_PSF(self.mosaic_metadata, self.mosaic_fwhm)
-                elif self.mosaic_psf_metadata['telescope'] == 'JWST':
+                elif self.mosaic_metadata['telescope'] == 'JWST':
                     self.logger.info("Retrieving JWST PSF")
                     self.mosaic_psf = tools.get_JWST_PSF(self.mosaic_metadata)
-                elif self.mosaic_psf_metadata['instrument'] == 'IRAC':
+                elif self.mosaic_metadata['instrument'] == 'IRAC':
                     self.logger.info("Retrieving IRAC PSF")
                     self.mosaic_psf = tools.get_IRAC_PSF(self.mosaic_metadata)
             else:

@@ -155,9 +155,9 @@ class Extraction():
         if maxx > mosaic_shape[1]:
             maxx = mosaic_shape[1]
 
-        self.logger.info("Coords of center of cropped area", mosaic_center_x, mosaic_center_y)
-        self.logger.info("X-min, X-max coords: ", minx, maxx)
-        self.logger.info("Y-min, Y-max coords: ", miny, maxy)
+        self.logger.info("Coords of center of cropped area: {}, {}".format(mosaic_center_x, mosaic_center_y))
+        self.logger.info("X-min, X-max coords: {}, {}".format(minx, maxx))
+        self.logger.info("Y-min, Y-max coords: {}, {}".format(miny, maxy))
 
         crop = mosaic[self.data_extension_number].data[miny: maxy, minx: maxx]
 
