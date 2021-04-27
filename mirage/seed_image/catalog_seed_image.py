@@ -2984,6 +2984,7 @@ class Catalog_seed():
 
             # Skip sources that fall completely off the detector
             if scaled_psf is None:
+                self.timer.stop()
                 continue
 
             scaled_psf *= entry['countrate_e/s']
@@ -3015,6 +3016,7 @@ class Catalog_seed():
 
             # Skip sources that fall completely off the detector
             if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                self.timer.stop()
                 continue
 
             try:
@@ -4254,6 +4256,7 @@ class Catalog_seed():
 
             # Skip sources that fall completely off the detector
             if psf_image is None:
+                self.timer.stop()
                 continue
 
             # Normalize the signal in the PSF stamp so that the final galaxy

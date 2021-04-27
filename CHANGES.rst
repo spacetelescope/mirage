@@ -1,3 +1,18 @@
+Unreleased - in development version only
+========================================
+
+Timer
+-----
+
+Stop the timer before moving on to the next source in the source catalog when the current source is completely off the detector. Prior to this, sources that were outside the detector would sometimes raise a timer error when Mirage attempted to start the timer for the next source while that for the current source was still running. (#669)
+
+
+Logging
+-------
+
+Fix logging error so that in NIRISS simulations where ghosts are requested, if the filter used does not support the addition of ghosts, this fact is logged only once, rather than for each source. (#667)
+
+
 2.0.2
 =====
 
