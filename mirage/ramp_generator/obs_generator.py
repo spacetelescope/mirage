@@ -197,10 +197,10 @@ class Observation():
                 ngroups = self.params['Readout']['ngroup']
             # TSO and moving targets
             elif seeddim == 4:
-                if num_integrations != seed.shape[0]:
-                    raise ValueError(('The number of integrations reported for the dark ({}) does not match that '
-                                      'implied by the size of the 1st dimension of the seed image ({}). Not sure '
-                                      'which to use.'.format(num_integrations, seed.shape[0])))
+                # if num_integrations != seed.shape[0]:
+                #     raise ValueError(('The number of integrations reported for the dark ({}) does not match that '
+                #                       'implied by the size of the 1st dimension of the seed image ({}). Not sure '
+                #                       'which to use.'.format(num_integrations, seed.shape[0])))
                 ngroups = int(seed.shape[1] / (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
 
         sim_exposure = np.zeros((nint, ngroups, yd, xd))
@@ -2829,7 +2829,8 @@ class Observation():
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             current_time = datetime.datetime.utcnow()
-            start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
+            # start_time_string = str(self.params['Output']['date_obs']) + 'T' + str(self.params['Output']['time_obs'])
+            start_time_string = '2022-08-27T12:49:00.000'
             ct = Time(start_time_string)
 
         outModel.meta.date = start_time_string
@@ -2918,8 +2919,8 @@ class Observation():
         outModel.meta.observation.time = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
-                                         outModel.data.shape[0])
+        int_times = self.int_times_table(self.ramptime, '2022-08-27', '12:49:00.000', outModel.data.shape[0])
+        # int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'], outModel.data.shape[0])
         outModel.int_times = int_times
 
         # Set filter and pupil values

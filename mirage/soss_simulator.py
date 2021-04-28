@@ -228,7 +228,7 @@ class SossSim():
         obs.segmap = self.segmap
         obs.seedheader = self.seedinfo
         obs.paramfile = self.paramfile
-        obs.create(params=self.params)
+        obs.create()
 
         # Save ramp to tso attribute
         self.tso = obs.raw_outramp
@@ -237,7 +237,7 @@ class SossSim():
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, test=False, **kwargs):
+    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, test=False, override_dark=None, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -270,6 +270,12 @@ class SossSim():
         tparams.rp = 1.                                      # planet radius (placeholder)
         tso.create(planet=PLANET_DATA, tparams=tparams)
         """
+        # Is this a test run?
+        self.test = test
+
+        # Override the dark file
+        self.override_dark = override_dark
+
         # Check that there is star data
         if self.star is None:
             print("No star to simulate! Please set the self.star attribute!")
@@ -298,11 +304,13 @@ class SossSim():
         self.logger.info('{}'.format(self.paramfile))
         begin = time.time()
 
-        if test:
+        # Make a simulation of all ones to save time
+        if self.test:
 
             self.message("Generating test simulation of shape {}...".format(self.dims))
             self.tso_order1_ideal = self.tso_order2_ideal = np.ones((self.nints * self.ngrps, 256, 2048))
 
+        # Make a true simulation
         else:
             # Set the number of cores for multiprocessing
             max_cores = cpu_count()
@@ -654,7 +662,6 @@ class SossSim():
             self.params['Readout']['ngroup'] = self.ngrps
             self.params['Readout']['array_name'] = 'NIS_' + self.subarray.replace('FULL', 'SOSSFULL')
             self.params['Readout']['filter'] = self.filter
-            # self._obs_datetime = Time('{0[date_obs]} {0[time_obs]}'.format(self.params['Output']))
             self.params['Readout']['readpatt'] = self.readpatt
             self.params['Readout']['nframe'] = self.nframes
             self.params['Readout']['nskip'] = self.nskip
@@ -664,6 +671,7 @@ class SossSim():
             self.params['Output']['obs_id'] = self.title
             self.params['Output']['directory'] = '.'
             self.params['Output']['paramfile'] = pfile = yaml_generator.yaml_from_params(self.params)
+            self.params['Output']['date_obs'], self.params['Output']['time_obs'] = self.obs_datetime.to_value('iso').split()
 
         else:
 
