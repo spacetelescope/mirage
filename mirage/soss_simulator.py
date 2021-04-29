@@ -72,9 +72,9 @@ class SossSim():
     """
     Generate NIRISS SOSS time series observations
     """
-    def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None,
-                 filter='CLEAR', subarray='SUBSTRIP256', orders=[1, 2], paramfile=None,
-                 obs_date=None, target='New Target', title=None, offline=True, verbose=True):
+    def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None, filter='CLEAR',
+                 subarray='SUBSTRIP256', orders=[1, 2], paramfile=None, obs_date=None, target='New Target',
+                 title=None, offline=True, test=False, verbose=True):
         """
         Initialize the TSO object and do all pre-calculations
 
@@ -104,6 +104,8 @@ class SossSim():
             A title for the simulation
         offline: bool
             Offline mode
+        test: bool
+            Skip simulation
         verbose: bool
             Print status updates throughout calculation
 
@@ -117,6 +119,8 @@ class SossSim():
         self.target = target
         self.title = title or '{} Simulation'.format(self.target)
         self.offline = offline
+        self.test = test
+        self.params = None
 
         # Set default reference file parameters
         self._star = None
@@ -237,7 +241,7 @@ class SossSim():
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, test=False, override_dark=None, **kwargs):
+    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, override_dark=None, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -270,9 +274,6 @@ class SossSim():
         tparams.rp = 1.                                      # planet radius (placeholder)
         tso.create(planet=PLANET_DATA, tparams=tparams)
         """
-        # Is this a test run?
-        self.test = test
-
         # Override the dark file
         self.override_dark = override_dark
 
@@ -293,9 +294,6 @@ class SossSim():
 
         # Reset relative response function
         self._reset_psfs()
-
-        # Reset paramfile
-        self.paramfile = None
 
         # Logging
         self.logger = logging.getLogger('mirage.soss_simulator')
@@ -669,9 +667,10 @@ class SossSim():
             self.params['Output']['target_ra'] = self.ra
             self.params['Output']['target_dec'] = self.dec
             self.params['Output']['obs_id'] = self.title
+            self.params['Output']['file'] = '{}_NIS_SOSS_{}_{}.fits'.format(self.title.replace(' ', '-'), self.filter, self.subarray)
             self.params['Output']['directory'] = '.'
-            self.params['Output']['paramfile'] = pfile = yaml_generator.yaml_from_params(self.params)
             self.params['Output']['date_obs'], self.params['Output']['time_obs'] = self.obs_datetime.to_value('iso').split()
+            self.params['Output']['paramfile'] = pfile = yaml_generator.yaml_from_params(self.params)
 
         else:
 
@@ -874,6 +873,10 @@ class SossSim():
             # self.duration = TimeDelta(self.time.max() - self.obs_datetime, format='sec')
             self.exposure_time = self.frame_time * ( (self.ngrps * self.nframes + (self.ngrps - 1) * self.groupgap + self.dropframes1) * self.nints)
             self.duration = self.exposure_time + self.frame_time * (self.dropframes3 * self.nints + self.nresets1 + self.nresets2 * (self.nints - 1))
+
+            # Update params dict
+            if self.params is not None:
+                self.params['Output']['date_obs'], self.params['Output']['time_obs'] = self.obs_datetime.to_value('iso').split()
 
     def _reset_psfs(self):
         """Scale the psf for each detector column to the flux from the 1D spectrum"""

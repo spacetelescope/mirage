@@ -1049,14 +1049,10 @@ class Observation():
         return crhits, crs_perframe
 
     @logging_functions.log_fail
-    def create(self, params=None):
+    def create(self):
         """MAIN FUNCTION"""
         # Read in the parameter file
-        if params is not None:
-            self.params = params
-
-        if self.params is None:
-            self.read_parameter_file()
+        self.read_parameter_file()
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
@@ -2829,8 +2825,7 @@ class Observation():
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             current_time = datetime.datetime.utcnow()
-            # start_time_string = str(self.params['Output']['date_obs']) + 'T' + str(self.params['Output']['time_obs'])
-            start_time_string = '2022-08-27T12:49:00.000'
+            start_time_string = str(self.params['Output']['date_obs']) + ' ' + str(self.params['Output']['time_obs'])
             ct = Time(start_time_string)
 
         outModel.meta.date = start_time_string
@@ -2919,8 +2914,7 @@ class Observation():
         outModel.meta.observation.time = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(self.ramptime, '2022-08-27', '12:49:00.000', outModel.data.shape[0])
-        # int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'], outModel.data.shape[0])
+        int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'], outModel.data.shape[0])
         outModel.int_times = int_times
 
         # Set filter and pupil values
