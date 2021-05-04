@@ -241,7 +241,7 @@ class SossSim():
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, tparams=None, supersample_factor=None, noise=True, override_dark=None, **kwargs):
+    def create(self, n_jobs=-1, noise=True, override_dark=None, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -271,8 +271,11 @@ class SossSim():
         tparams.w = 90.                                      # longitude of periastron (in degrees)
         tparams.limb_dark = 'quadratic'                      # limb darkening profile to use
         tparams.u = [0.1, 0.1]                               # limb darkening coefficients
-        tparams.rp = 1.                                      # planet radius (placeholder)
-        tso.create(planet=PLANET_DATA, tparams=tparams)
+        tparams.rp = 1.                                     # planet radius (placeholder)
+
+        tso.tmodel = tparams
+        tso.planet = PLANET_DATA
+        tso.create()
         """
         # Override the dark file
         self.override_dark = override_dark
@@ -333,15 +336,8 @@ class SossSim():
                 self.message('Constructing frames for chunk {}/{}...'.format(chunk + 1, n_chunks))
                 start = time.time()
 
-                # Re-define lightcurve model for the current chunk
-                if tparams is not None:
-                    if supersample_factor is None:
-                        c_tmodel = batman.TransitModel(tparams, time_chunk.jd)
-                    else:
-                        frame_days = (self.frame_time * q.s).to(q.d).value
-                        c_tmodel = batman.TransitModel(tparams, time_chunk.jd, supersample_factor=supersample_factor, exp_time=frame_days)
-                else:
-                    c_tmodel = self.tmodel
+                # Get transit model for the current time chunk
+                c_tmodel = None if self.tmodel is None else batman.TransitModel(self.tmodel, time_chunk.jd)
 
                 # Generate simulation for each order
                 for order in self.orders:

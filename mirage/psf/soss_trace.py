@@ -342,7 +342,7 @@ def make_frame(psfs):
     return frame[:, 38:-38]
 
 
-def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
+def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel):
     """
     Generate a lightcurve for a (76, 76) psf of a given wavelength
 
@@ -358,8 +358,6 @@ def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
         The time axis for the TSO
     tmodel: batman.transitmodel.TransitModel
         The transit model of the planet
-    plot: bool
-        Plot the lightcurve
 
     Returns
     -------
@@ -373,7 +371,7 @@ def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
     from mirage.psf import soss_trace as st
     psf = np.ones((76, 76))
     time = np.linspace(-0.2, 0.2, 200)
-    lc = st.psf_lightcurve(psf, None, None, time, None, plot=True)
+    lc = st.psf_lightcurve(psf, None, None, time, None)
 
     Example 2
     ---------
@@ -395,13 +393,13 @@ def psf_lightcurve(psf, ld_coeffs, rp, time, tmodel, plot=False):
     params.limb_dark = 'quadratic'                # limb darkening profile to use
     params.u = [1, 1]                             # limb darkening coefficients
     tmodel = batman.TransitModel(params, time)
-    lc = st.psf_lightcurve(psf, [0.1, 0.1], 0.05, time, tmodel, plot=True)
+    lc = st.psf_lightcurve(psf, [0.1, 0.1], 0.05, time, tmodel)
     """
     # Expand to shape of time axis
     flux = np.tile(psf, (len(time), 1, 1))
 
     # If there is a transiting planet...
-    if ld_coeffs is not None and rp is not None and str(type(tmodel)) == "<class 'batman.transitmodel.TransitModel'>":
+    if ld_coeffs is not None and rp is not None and tmodel is not None:
 
         # Set the wavelength dependent orbital parameters
         tmodel.u = ld_coeffs
