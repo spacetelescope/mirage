@@ -50,7 +50,7 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 warnings.simplefilter('ignore')
 
-SUB_SLICE = {'SUBSTRIP96': slice(1792, 1888), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
+SUB_SLICE = {'SUBSTRIP96': slice(1802, 1898), 'SUBSTRIP256': slice(1792, 2048), 'FULL': slice(0, 2048)}
 SUB_DIMS = {'SUBSTRIP96': (96, 2048), 'SUBSTRIP256': (256, 2048), 'FULL': (2048, 2048)}
 
 
