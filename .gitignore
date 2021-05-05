@@ -32,6 +32,7 @@ mirage_latest.log
 
 # exceptions
 !tests/test_data/*/*.yaml
+!examples/niriss_soss_example_data/niriss_soss_substrip256_clear.yaml
 
 # Other #
 #########
