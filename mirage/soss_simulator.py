@@ -121,6 +121,7 @@ class SossSim():
         self.offline = offline
         self.test = test
         self.params = None
+        self.logger = logging.getLogger('mirage.soss_simulator')
 
         # Set default reference file parameters
         self._star = None
@@ -208,6 +209,9 @@ class SossSim():
         """
         self.message("Starting noise generator...")
         start = time.time()
+
+        # Save the raw signal as a seed image
+        self.seedfile, self.seedinfo = save_seed.save(self.tso_ideal, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
 
         # Generate segmentation map with correct dimensions
         self.segmap = segmentation_map.SegMap()
@@ -299,7 +303,6 @@ class SossSim():
         self._reset_psfs()
 
         # Logging
-        self.logger = logging.getLogger('mirage.soss_simulator')
         self.logger.info('\n\nRunning soss_simulator....\n')
         self.logger.info('Using parameter file: ')
         self.logger.info('{}'.format(self.paramfile))
@@ -414,9 +417,6 @@ class SossSim():
         for order in self.orders:
             order_name = 'tso_order{}_ideal'.format(order)
             setattr(self, order_name, getattr(self, order_name).reshape(self.dims).astype(np.float64))
-
-        # Save the raw signal as a seed image
-        self.seedfile, self.seedinfo = save_seed.save(self.tso_ideal, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
 
         # Make ramps and add noise to the observations
         if noise:
@@ -1263,3 +1263,43 @@ class SossModelSim(SossSim):
         # Run the simulation
         if run:
             self.create()
+
+
+class SossSeedSim(SossSim):
+    """
+    Generate a SossSim object from a 4D seed image
+    """
+    def __init__(self, seed, filter='CLEAR', paramfile=None, noise=True, **kwargs):
+        """
+        Parameters
+        ----------
+        seed: np.ndarray
+            4D array of data
+        """
+        # Ingest seed file if possible
+        if isinstance(seed, str):
+            seed = fits.getdata(seed)
+
+        # Get shape
+        nints, ngrps, nrows, ncols = seed.shape
+
+        # Determine subarray
+        if nrows == 256 and ncols == 2048:
+            subarray = 'SUBSTRIP256'
+        elif nrows == 96 and ncols == 2048:
+            subarray == 'SUBSTRIP96'
+        elif nrows == 2048 and ncols == 2048:
+            subarray == 'FULL'
+        else:
+            raise ValueError("{}: Axes 2 and 3 don't match a valid SOSS subarray. Try {}".format(seed.shape, SUB_DIMS))
+
+        # Initialize base class
+        super().__init__(ngrps=ngrps, nints=nints, star=None, subarray=subarray, filter=filter, paramfile=paramfile, **kwargs)
+
+        # Set the ideal (noiseless) simulation
+        self.tso_order1_ideal = seed
+        self.tso_order2_ideal = np.zeros_like(seed)
+
+        # Run noise and ramp generator
+        if noise:
+            self.add_noise()
