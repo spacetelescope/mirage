@@ -55,6 +55,7 @@ For any questions about the `mirage` project or its software or documentation, p
 
 ## Current Development Team
 - Bryan Hilbert [@bhilbert4](https://github.com/bhilbert4)
+- Joe Filippazzo [@hover2pi](https://github.com/hover2pi)
 - Nor Pirzkal [@NorPirzkal](https://github.com/npirzkal)
 - Kevin Volk [@KevinVolkSTScI](https://github.com/KevinVolkSTScI)
 - Shannon Osborne [@shanosborne](https://github.com/shanosborne)
