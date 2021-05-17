@@ -197,10 +197,10 @@ class Observation():
                 ngroups = self.params['Readout']['ngroup']
             # TSO and moving targets
             elif seeddim == 4:
-                # if num_integrations != seed.shape[0]:
-                #     raise ValueError(('The number of integrations reported for the dark ({}) does not match that '
-                #                       'implied by the size of the 1st dimension of the seed image ({}). Not sure '
-                #                       'which to use.'.format(num_integrations, seed.shape[0])))
+                if num_integrations != seed.shape[0]:
+                    raise ValueError(('The number of integrations reported for the dark ({}) does not match that '
+                                      'implied by the size of the 1st dimension of the seed image ({}). Not sure '
+                                      'which to use.'.format(num_integrations, seed.shape[0])))
                 ngroups = int(seed.shape[1] / (self.params['Readout']['nframe'] + self.params['Readout']['nskip']))
 
         sim_exposure = np.zeros((nint, ngroups, yd, xd))
@@ -1159,6 +1159,7 @@ class Observation():
             self.logger.info(('An estimate of the remaining processing time will be provided after the first '
                               'segment file has been created.\n\n'))
         for i, linDark in enumerate(self.linDark):
+
             # Run the timer over each segment in order to come up with
             # a rough estimate of computation time
             self.timer.start()
