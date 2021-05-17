@@ -74,7 +74,7 @@ class SossSim():
     """
     def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None, filter='CLEAR',
                  subarray='SUBSTRIP256', orders=[1, 2], paramfile=None, obs_date=None, target='New Target',
-                 title=None, offline=True, test=False, verbose=True):
+                 title=None, offline=True, test=False, override_dark=None, verbose=True):
         """
         Initialize the TSO object and do all pre-calculations
 
@@ -134,7 +134,7 @@ class SossSim():
         self.nresets = self.nresets1 = self.nresets2 = 1
         self.dropframes1 = self.dropframes3 = self.nskip = 0
         self.model_grid = 'ACES'
-        self.override_dark = None
+        self.override_dark = override_dark
         self.obs_datetime = obs_date or Time.now()
         self.ngrps = ngrps
         self.nints = nints
@@ -210,9 +210,6 @@ class SossSim():
         self.message("Starting noise generator...")
         start = time.time()
 
-        # Save the raw signal as a seed image
-        self.seedfile, self.seedinfo = save_seed.save(self.tso_ideal, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
-
         # Generate segmentation map with correct dimensions
         self.segmap = segmentation_map.SegMap()
         self.segmap.ydim = self.nrows
@@ -228,18 +225,39 @@ class SossSim():
             self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
             use_darks = self.override_dark
 
-        # Combine into final observation
-        self.logger.info('Running observation generator')
-        obs = obs_generator.Observation(offline=self.offline)
-        obs.linDark = use_darks
-        obs.seed = self.tso_ideal
-        obs.segmap = self.segmap
-        obs.seedheader = self.seedinfo
-        obs.paramfile = self.paramfile
-        obs.create()
+        # Make a seed files split like the dark file
+        if isinstance(use_darks, str):
+            use_darks = [use_darks]
 
-        # Save ramp to tso attribute
-        self.tso = obs.raw_outramp
+        nint = 0
+        nfiles = len(use_darks)
+        self.tso = np.empty_like(self.tso_ideal)
+        for n, dfile in enumerate(use_darks):
+            dhead = fits.getheader(dfile)
+            dnint = dhead['NINTS']
+
+            # Save the raw signal as a seed image
+            seed_seg = self.tso_ideal[nint:nint + dnint, :, :, :]
+            seedfile, seedinfo = save_seed.save(seed_seg, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
+
+            # Combine into final observation
+            self.logger.info('Running observation generator for segment {}/{}'.format(n, nfiles))
+            obs = obs_generator.Observation(offline=self.offline)
+            obs.linDark = dfile
+            obs.seed = seed_seg
+            obs.segmap = self.segmap
+            obs.seedheader = seedinfo
+            obs.paramfile = self.paramfile
+            obs.create()
+
+            if nfiles > 1:
+                os.system('mv {} {}'.format(seedfile, seedfile.replace('_seed_image.fits', '_seg{}_part001_seed_image.fits'.format(str(n + 1).zfill(3)))))
+
+            # Save ramp to tso attribute
+            self.tso[nint:nint + dnint, :, :, :] = obs.raw_outramp
+
+            # Pickup where last segment left off
+            nint += dnint
 
         # Log it
         self.logger.info('\nSOSS simulator complete')
