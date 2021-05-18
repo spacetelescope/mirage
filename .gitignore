@@ -16,6 +16,7 @@ mirages.egg-info/*
 mirage/catalogs/*.list
 *uncal*.list
 *.list~
+*.list
 *.fits
 *.yaml
 *.yaml~
