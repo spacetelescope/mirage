@@ -6,6 +6,7 @@ dependencies:
 - pip
 - python==3.7.7
 - webbpsf==0.9.1
+- numpy==1.20.1
 - pip:
     - asdf==2.7.2
     - astropy==4.2
@@ -25,7 +26,6 @@ dependencies:
     - lxml==4.6.2
     - matplotlib==3.3.4
     - nircam_gsim==1.56
-    - numpy==1.20.1
     - photutils==1.0.2
     - pysiaf==0.10.0
     - pytest==6.2.2
