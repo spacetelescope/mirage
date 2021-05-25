@@ -11,7 +11,7 @@ h5py>=2.8.0
 hotsoss>=0.1.7
 ipython>=7.18.1
 jupyter>=1.0.0
-jwst>=0.16.2
+jwst==1.1.0
 jwst-backgrounds>=1.1.1
 jwxml>=0.3.0
 lxml>=3.6.4
