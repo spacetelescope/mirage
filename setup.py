@@ -101,7 +101,7 @@ setup(
         'hotsoss==0.1.7',
         'ipython',
         'jupyter',
-        'jwst',
+        'jwst==1.1.0',
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
         'matplotlib>=3.0.0',
