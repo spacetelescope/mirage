@@ -429,12 +429,16 @@ class Catalog_seed():
                 self.pom_segmap = copy.deepcopy(self.seed_segmap)
 
                 # Save the full-sized pom seed image to a file
-                self.pom_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_pom_seed_image.fits')
+                if 'clear' in self.params['Readout']['filter'].lower():
+                    usefilt = self.params['Readout']['pupil']
+                else:
+                    usefilt = self.params['Readout']['filter']
+                self.pom_file = os.path.join(self.basename + '_' + usefilt + '_pom_seed_image.fits')
                 self.saveSeedImage(self.pom_seed, self.pom_segmap, self.pom_file)
                 self.logger.info('Full POM seed image saved as: {}'.format(self.pom_file))
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
                 # Multiply the mask by the seed image and segmentation map in
                 # order to reflect the fact that reference pixels have no signal
                 # from external sources. Seed images to be dispersed do not have
@@ -696,7 +700,6 @@ class Catalog_seed():
                                          self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
         newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,
                                              self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-        self.params['Inst']['mode'] = "imaging"
         return newseedimage, newseed_segmap
 
     def add_detector_to_zeropoints(self, detector):
@@ -777,8 +780,18 @@ class Catalog_seed():
         else:
             self.logger.info(('No transmission file given. Assuming full transmission for all pixels, '
                               'not including flat field effects. (no e.g. occulters blocking any pixels).'))
-            transmission = np.ones((2048, 2048))
-            header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
+            if self.params['Inst']['mode'].lower() == 'imaging':
+                transmission = np.ones((2048, 2048))
+                header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
+            elif self.params['Inst']['mode'].lower() == 'pom':
+                # For pom mode, we treat the situation similar to imaging
+                # mode, but use a larger array of 1s, so that we can create
+                # a larger seed image
+                transmission = np.ones((2322, 2322))
+                header = {'NOMXSTRT': 137, 'NOMYSTRT': 137}
+            else:
+                raise ValueError(('POM transmission file is None, but the observing mode is not '
+                                  '"imaging" or "pom". Not sure what to do for POM transmission.'))
 
         yd, xd = transmission.shape
 
