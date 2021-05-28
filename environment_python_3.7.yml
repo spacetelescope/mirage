@@ -19,6 +19,7 @@ dependencies:
     - hotsoss==0.1.7
     - h5py==3.1.0
     - ipython==7.20.0
+    - jinja==2.11.2
     - jupyter==1.0.0
     - jwst==1.1.0
     - jwst-backgrounds==1.1.2
