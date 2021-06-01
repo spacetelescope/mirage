@@ -6,6 +6,7 @@ dependencies:
 - asdf>=2.1.0
 - astropy>=4.0
 - astroquery>=0.3.8
+- batman-package==2.4.8
 - crds>=7.4.1
 - gwcs>=0.11
 - healpy>=1.12.5
