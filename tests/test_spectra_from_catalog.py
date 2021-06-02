@@ -33,8 +33,8 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/hdf5_catalogs
 
 def test_get_filter_info():
     nrc = spec.get_filter_info(['nircam_f444w_magnitude'], 'abmag')
-    assert nrc == {'nircam_f444w_magnitude': (6.6928e-22 * FLAMBDA_CGS_UNITS, 4.3637e-31 * FNU_CGS_UNITS, 27.3004,
-                                              4.4212 * u.micron)}
+    assert nrc == {'nircam_f444w_magnitude': (5.584676852068291e-22 * FLAMBDA_CGS_UNITS, 3.641228911284274e-31 * FNU_CGS_UNITS, 27.496928286774455,
+                                              4.421150698281195 * u.micron)}
 
     nis = spec.get_filter_info(['niriss_f200w_magnitude'], 'vegamag')
     assert nis == {'niriss_f200w_magnitude': (2.173398e-21 * FLAMBDA_CGS_UNITS, 2.879494e-31 * FNU_CGS_UNITS,
@@ -235,7 +235,7 @@ def test_spectra_rescaling():
     filter_name = ['F322W2', 'F090W']  # , 'N/A']
     pupil_name = ['CLEAR', 'none']
     module = ['B', 'N']  # , 'F']
-    detector = ['NRCA1', 'NIS']  # , 'GUIDER1']
+    detector = ['NRCB5', 'NIS']  # , 'GUIDER1']
 
     # Magnitude systems of renormalization magnitudes
     mag_sys = ['vegamag', 'abmag', 'stmag']
