@@ -328,6 +328,15 @@ class ReadAPTXML():
             elif template_name == 'NirissExternalCalibration':
                 exposures_dictionary = self.read_niriss_external_calibration_template(template, template_name, obs,
                                                                                       proposal_parameter_dictionary)
+                if coordparallel == 'true':
+                    parallel_template_name = etree.QName(obs.find(self.apt + 'FirstCoordinatedTemplate')[0]).localname
+                    if parallel_template_name in ['MiriImaging']:
+                        pass
+                    else:
+                        parallel_exposures_dictionary = self.read_parallel_exposures(obs, exposures_dictionary,
+                                                                                     proposal_parameter_dictionary,
+                                                                                     verbose=verbose)
+                        exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
 
             elif template_name == 'MiriImaging':
                 exposures_dictionary = self.read_miri_prime_imaging(template, template_name, obs,
