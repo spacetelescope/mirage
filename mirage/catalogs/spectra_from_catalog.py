@@ -39,7 +39,7 @@ from synphot.models import Empirical1D
 from . import hdf5_catalog
 from mirage.logging import logging_functions
 from mirage.utils.constants import FLAMBDA_CGS_UNITS, FNU_CGS_UNITS, MEAN_GAIN_VALUES, \
-                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, VEGA_SPECTRUM
 from mirage.utils.flux_cal import mag_col_name_to_filter_pupil
 from mirage.utils.utils import magnitude_to_countrate, get_filter_throughput_file, standardize_filters
 
@@ -624,7 +624,8 @@ def rescale_normalized_spectra(spectra, catalog_info, magnitude_system, bandpass
 
     # Get the Vega spectrum from synphot. Use the version that was used
     # to create the photom reference files and filter zeropoints
-    with syn_conf.set_temp('vega_file', 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_008.fits'):
+    logger.info('Using {} for the Vega spectrum used to renormalize input spectra to input vegamag values.'.format(VEGA_SPECTRUM))
+    with syn_conf.set_temp('vega_file', VEGA_SPECTRUM):
         vegaspec = SourceSpectrum.from_vega()
 
     mag_colname = [col for col in catalog_info.colnames if 'index' not in col][0]
