@@ -148,6 +148,7 @@ class SossSim():
         self.star = star
         self.tmodel = tmodel
         self.ld_coeffs = np.zeros((3, 2048, 2))
+        self.planet_radius = np.ones_like(self.avg_wave)
         self.planet = planet
 
     def add_line(self, x_0, amplitude, fwhm, profile='lorentz', name='Line I'):
@@ -363,29 +364,23 @@ class SossSim():
                 # Generate simulation for each order
                 for order in self.orders:
 
-                    # Get the wavelength map
-                    wave = self.avg_wave[order - 1]
-
                     # Get the psf cube and filter response function
                     psfs = getattr(self, 'order{}_psfs'.format(order))
 
-                    # Get limb darkening coeffs and make into a list
-                    ld_coeffs = self.ld_coeffs[order - 1]
-                    ld_coeffs = list(map(list, ld_coeffs))
-
-                    # Set the radius at the given wavelength from the transmission
-                    # spectrum (Rp/R*)**2... or an array of ones
-                    if self.planet is not None:
-                        tdepth = np.interp(wave, self.planet[0].to(q.um).value, self.planet[1])
-                    else:
-                        tdepth = np.ones_like(wave)
-                    tdepth[tdepth < 0] = np.nan
-                    self.rp = np.sqrt(tdepth)
+                    # Make a transit model for each radius and limb darkening coefficients
+                    # (Dumb but multiprocessing requires it)
+                    tmodels = []
+                    for radius, ldc in zip(self.planet_radius[order - 1], self.ld_coeffs[order - 1]):
+                        tmod = copy(c_tmodel)
+                        tmod.rp = radius
+                        tmod.u = ldc
+                        tmodels.append(tmod)
+                        del tmod
 
                     # Generate the lightcurves at each wavelength
                     pool = ThreadPool(n_jobs)
-                    func = partial(soss_trace.psf_lightcurve, time=time_chunk, tmodel=c_tmodel)
-                    data = list(zip(psfs, ld_coeffs, self.rp))
+                    func = partial(soss_trace.psf_lightcurve, time=time_chunk)
+                    data = list(zip(psfs, tmodels))
                     lightcurves = np.asarray(pool.starmap(func, data), dtype=np.float16)
                     pool.close()
                     pool.join()
@@ -412,7 +407,7 @@ class SossSim():
                         setattr(self, order_name, np.concatenate([getattr(self, order_name), frames]))
 
                     # Clear memory
-                    del frames, lightcurves, psfs, wave
+                    del frames, lightcurves, psfs
 
                 self.message('Chunk {}/{} finished: {} {}'.format(chunk + 1, n_chunks, round(time.time() - start, 3), 's'))
 
@@ -744,6 +739,7 @@ class SossSim():
         # Check if the planet has been set
         if spectrum is None:
             self._planet = None
+            self.planet_radius = np.ones_like(self.avg_wave)
 
         else:
 
@@ -776,6 +772,12 @@ class SossSim():
 
             # Good to go
             self._planet = spectrum
+
+            # Set the radius at the given wavelength from the transmission spectrum (Rp/R*)**2
+            for order, wave in enumerate(self.avg_wave):
+                tdepth = np.interp(wave, self.planet[0].to(q.um).value, self.planet[1])
+                tdepth[tdepth < 0] = np.nan
+                self.planet_radius[order] = np.sqrt(tdepth)
 
     @run_required
     def plot(self, idx=0, scale='linear', order=None, noise=True, traces=False, saturation=0.8, draw=True):
