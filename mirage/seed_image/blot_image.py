@@ -34,7 +34,8 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 class Blot():
     def __init__(self, instrument=None, aperture=None, ra=None, dec=None,
-                 pav3=None, output_file=None, blotfile=None, distortion_file=None):
+                 pav3=None, output_file=None, blotfile=None, distortion_file=None,
+                 filtername=None, pupilname=None, obs_date=None, obs_time=None):
         """Blot (i.e. resample) the given image to be centered on the input
         list of RA, Dec, pav3 values using the appropriate instrument/aperture
         distortion.
@@ -65,6 +66,20 @@ class Blot():
         distortion_file : str
             Name of a CRDS distortion reference file to be used when running
             the assign_wcs pipeline step on the blotted data
+
+        filtername : str
+            Name of filter to use for the output file. If None, this information
+            is taken from the input file
+
+        pupilname : str
+            Name of pupil element to use for the output file. If None, this information
+            is taken from the input file
+
+        obs_date : str
+            Date of the simulated observation (e.g. '2021-10-31')
+
+        obs_time : str
+            Time of the simulated observation (e.g. '00:00:00')
         """
         self.logger = logging.getLogger(__name__)
 
@@ -87,6 +102,22 @@ class Blot():
         self.outfile = output_file
         self.blotfile = blotfile
         self.distortion_file = distortion_file
+        if isinstance(filtername, str):
+            self.filtername = [filtername]
+        else:
+            self.filtername = filtername
+        if isinstance(pupilname, str):
+            self.pupilname = [pupilname]
+        else:
+            self.pupilname = pupilname
+        if isinstance(obs_date, str):
+            self.obs_date = [obs_date]
+        else:
+            self.obs_date = obs_date
+        if isinstance(obs_time, str):
+            self.obs_time = [obs_time]
+        else:
+            self.obs_time = obs_time
 
     def blot(self):
         """MAIN FUNCTION
@@ -143,13 +174,14 @@ class Blot():
         shellname = 'temp_wcs_container.fits'
 
         blist = []
-        for (aper, det, ra, dec, roll) in \
-            zip(self.aperture, self.detector, self.center_ra, self.center_dec, self.pav3):
+        for (aper, det, ra, dec, roll, filterval, pupilval, obdate, obtime) in \
+            zip(self.aperture, self.detector, self.center_ra, self.center_dec, self.pav3, self.filtername,
+                self.pupilname, self.obs_date, self.obs_time):
             # Get aperture-specific info
             self.siaf = get_instance(self.instrument)[aper]
 
             # Create datamodel with appropriate metadata
-            bmodel = self.make_model(det, ra, dec, input_pav3, filtername, pupil)
+            bmodel = self.make_model(det, ra, dec, input_pav3, filterval, pupilval, obdate, obtime)
             bmodel.save(shellname, overwrite=True)
 
             # Use set_telescope_pointing to compute local roll
@@ -192,7 +224,7 @@ class Blot():
         self.siaf = pysiaf.Siaf(instrument_name)[aperture_name]
 
     def make_model(self, detector_name, ra_val, dec_val, roll_val,
-                   filter_element, pupil_element):
+                   filter_element, pupil_element, date_val, time_val):
         """Define the WCS of the blotted output
 
         Parameters
@@ -214,6 +246,12 @@ class Blot():
 
         pupil_element : str
             Pupil name
+
+        date_val : str
+            Date of the simulated observation (e.g. '2021-10-31'
+
+        time_val : str
+            Time of the simulated observation (e.g. '00:00:00')
 
         Returns
         -------
@@ -244,9 +282,10 @@ class Blot():
             blot_to.meta.instrument.detector = detector_name
         else:
             blot_to.meta.instrument.detector = detector_name.replace('5', 'LONG')
+            blot_to.meta.instrument.channel = 'LONG'
 
         blot_to.meta.instrument.filter = filter_element
-        blot_to.meta.instrument.module = detector_name[0]
+        blot_to.meta.instrument.module = detector_name[3]
         blot_to.meta.instrument.name = 'NIRCAM'
         blot_to.meta.instrument.pupil = pupil_element
         blot_to.meta.telescope = 'JWST'
@@ -255,6 +294,9 @@ class Blot():
         blot_to.meta.exposure.type = 'NRC_IMAGE'
         blot_to.meta.target.ra = ra_val
         blot_to.meta.target.dec = dec_val
+        blot_to.meta.observation.date = date_val
+        blot_to.meta.observation.time = time_val
+
         return blot_to
 
     def add_options(self,parser=None,usage=None):

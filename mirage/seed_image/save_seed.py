@@ -72,10 +72,10 @@ def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength
     kw['PHOTPLAM'] = pivot_wavelength * 1.e4  # put into angstroms
     kw['NOMXDIM'] = nominal_dimensions[1]
     kw['NOMYDIM'] = nominal_dimensions[0]
-    kw['NOMXSTRT'] = np.int(coord_adjust['xoffset'] + 1)
-    kw['NOMXEND'] = np.int(nominal_dimensions[1] + coord_adjust['xoffset'])
-    kw['NOMYSTRT'] = np.int(coord_adjust['yoffset'] + 1)
-    kw['NOMYEND'] = np.int(nominal_dimensions[0] + coord_adjust['yoffset'])
+    kw['NOMXSTRT'] = int(coord_adjust['xoffset'] + 1)
+    kw['NOMXEND'] = int(nominal_dimensions[1] + coord_adjust['xoffset'])
+    kw['NOMYSTRT'] = int(coord_adjust['yoffset'] + 1)
+    kw['NOMYEND'] = int(nominal_dimensions[0] + coord_adjust['yoffset'])
 
     # Files/inputs used during seed image production
     kw['YAMLFILE'] = param_file
@@ -105,9 +105,9 @@ def save(seed_image, param_file, parameters, photflam, photfnu, pivot_wavelength
     if parameters['Inst']['mode'] in ['wfss', 'ts_wfss']:
         kw['NOMXDIM'] = fullframe_size
         kw['NOMYDIM'] = fullframe_size
-        kw['NOMXSTRT'] = np.int(fullframe_size * (grism_direct_factor - 1) / 2.)
+        kw['NOMXSTRT'] = int(fullframe_size * (grism_direct_factor - 1) / 2.)
         kw['NOMXEND'] = kw['NOMXSTRT'] + fullframe_size - 1
-        kw['NOMYSTRT'] = np.int(fullframe_size * (grism_direct_factor - 1) / 2.)
+        kw['NOMYSTRT'] = int(fullframe_size * (grism_direct_factor - 1) / 2.)
         kw['NOMYEND'] = kw['NOMYSTRT'] + fullframe_size - 1
 
     kw['GRISMPAD'] = grism_direct_factor

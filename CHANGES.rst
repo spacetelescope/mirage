@@ -1,3 +1,27 @@
+Unreleased - in development version only
+========================================
+
+Timer
+-----
+
+Stop the timer before moving on to the next source in the source catalog when the current source is completely off the detector. Prior to this, sources that were outside the detector would sometimes raise a timer error when Mirage attempted to start the timer for the next source while that for the current source was still running. (#669)
+
+
+Logging
+-------
+
+Fix logging error so that in NIRISS simulations where ghosts are requested, if the filter used does not support the addition of ghosts, this fact is logged only once, rather than for each source. (#667)
+
+
+2.0.2
+=====
+
+NIRISS AMI
+----------
+
+Updated the PSF normalization check threshold value to match the new value from an updated NRM mask calculation. Prior to this, Mirage was stopping AMI simulations because the normalization threshold was too low. (#664)
+
+
 2.0.1
 =====
 

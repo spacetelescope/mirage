@@ -40,7 +40,9 @@ from webbpsf.utils import to_griddedpsfmodel
 
 from mirage.logging import logging_functions
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
-                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, PSF_NORM_MIN, \
+                                   PSF_NORM_MAX, NIRISS_NRM_PSF_THROUGHPUT_REDUCTION, \
+                                   NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION
 from mirage.utils.utils import expand_environment_variable, standardize_filters
 
 classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
@@ -274,18 +276,18 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
             elif pupilname.lower() == 'clearp':
                 # If CLEARP is used, we need to alert the normalization check
                 # below to expect PSFs with a total signal/oversamp**2 lower
-                # than otherwise expected by a factor of 0.84
+                # than otherwise expected by a factor of ~0.84
                 filename_filter = filtername
                 filename_pupil = pupilname
-                grid_min_factor = 0.84
+                grid_min_factor = NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION
             # filter=clear, pupil=nrm is currently not allowed
             if pupilname.lower() == 'nrm':
-                # In NRM mode, the 0.15 throughput factor associated with the
+                # In NRM mode, the ~0.15 throughput factor associated with the
                 # NRM mask is baked into the PSFs from Webbpsf, so we need to
                 # adjust the expectations of the normalization check below.
                 filename_filter = filtername
                 filename_pupil = 'mask_nrm'
-                grid_min_factor = 0.15
+                grid_min_factor = NIRISS_NRM_PSF_THROUGHPUT_REDUCTION
         elif instrument.lower() == 'nircam':
             filename_filter = filtername
             filename_pupil = pupilname if 'GDHS' not in pupilname else 'clear'  # for WFSC team practice purposes we don't produce DHS "PSFs"
@@ -326,8 +328,8 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
         library = _load_itm_library(library_file)
 
     # Check that the gridded PSF library is normalized as expected
-    check_max = 1.0 * grid_min_factor
-    check_min = 0.8 * grid_min_factor
+    check_max = PSF_NORM_MAX * grid_min_factor
+    check_min = PSF_NORM_MIN * grid_min_factor
     correct_norm, reason = check_normalization(library, lower_limit=check_min, upper_limit=check_max)
     if correct_norm:
         return library

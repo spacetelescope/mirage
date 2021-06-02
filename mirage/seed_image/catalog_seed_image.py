@@ -429,12 +429,16 @@ class Catalog_seed():
                 self.pom_segmap = copy.deepcopy(self.seed_segmap)
 
                 # Save the full-sized pom seed image to a file
-                self.pom_file = os.path.join(self.basename + '_' + self.params['Readout'][self.usefilt] + '_pom_seed_image.fits')
+                if 'clear' in self.params['Readout']['filter'].lower():
+                    usefilt = self.params['Readout']['pupil']
+                else:
+                    usefilt = self.params['Readout']['filter']
+                self.pom_file = os.path.join(self.basename + '_' + usefilt + '_pom_seed_image.fits')
                 self.saveSeedImage(self.pom_seed, self.pom_segmap, self.pom_file)
                 self.logger.info('Full POM seed image saved as: {}'.format(self.pom_file))
                 self.seedimage, self.seed_segmap = self.extract_full_from_pom(self.seedimage, self.seed_segmap)
 
-            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism', 'pom']:
+            if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
                 # Multiply the mask by the seed image and segmentation map in
                 # order to reflect the fact that reference pixels have no signal
                 # from external sources. Seed images to be dispersed do not have
@@ -696,7 +700,6 @@ class Catalog_seed():
                                          self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
         newseed_segmap = np.copy(seed_segmap[self.coord_adjust['yoffset']:self.coord_adjust['yoffset']+2048,
                                              self.coord_adjust['xoffset']:self.coord_adjust['xoffset']+2048])
-        self.params['Inst']['mode'] = "imaging"
         return newseedimage, newseed_segmap
 
     def add_detector_to_zeropoints(self, detector):
@@ -777,8 +780,18 @@ class Catalog_seed():
         else:
             self.logger.info(('No transmission file given. Assuming full transmission for all pixels, '
                               'not including flat field effects. (no e.g. occulters blocking any pixels).'))
-            transmission = np.ones((2048, 2048))
-            header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
+            if self.params['Inst']['mode'].lower() == 'imaging':
+                transmission = np.ones((2048, 2048))
+                header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
+            elif self.params['Inst']['mode'].lower() == 'pom':
+                # For pom mode, we treat the situation similar to imaging
+                # mode, but use a larger array of 1s, so that we can create
+                # a larger seed image
+                transmission = np.ones((2322, 2322))
+                header = {'NOMXSTRT': 137, 'NOMYSTRT': 137}
+            else:
+                raise ValueError(('POM transmission file is None, but the observing mode is not '
+                                  '"imaging" or "pom". Not sure what to do for POM transmission.'))
 
         yd, xd = transmission.shape
 
@@ -1626,7 +1639,8 @@ class Catalog_seed():
             # frame individually.
             if add_ghosts:
                 ghost_x_frames, ghost_y_frames, ghost_mags, ghost_countrate, ghost_file = self.locate_ghost(x_frames, y_frames, rate,
-                                                                                                            magsys, entry, input_type)
+                                                                                                            magsys, entry, input_type,
+                                                                                                            log_skipped_filters=False)
                 if ghost_file is not None:
                     ghost_stamp, ghost_header = self.basic_get_image(ghost_file)
 
@@ -2677,7 +2691,8 @@ class Catalog_seed():
             # If this is a NIRISS simulation and the user wants to add ghosts,
             # do that here.
             if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
-                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, countrate, magsys, values, 'point_source')
+                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, countrate, magsys, values, 'point_source',
+                                                                 log_skipped_filters=log_ghost_err)
                 if np.isfinite(gx) and gfile is not None:
                     ghost_source_index.append(index)
                     ghost_x.append(gx)
@@ -2686,13 +2701,16 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=log_ghost_err)
-                    ghost_i += 1
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
                     else:
                         ghost_mags = vstack([ghost_mags, ghost_src])
+
+                # Increment the counter to control the logging regardless of whether the source
+                # is on the detector or not.
+                ghost_i += 1
 
             psf_len = self.find_psf_size(countrate)
             edgex = np.int(psf_len // 2)
@@ -2979,6 +2997,7 @@ class Catalog_seed():
 
             # Skip sources that fall completely off the detector
             if scaled_psf is None:
+                self.timer.stop()
                 continue
 
             scaled_psf *= entry['countrate_e/s']
@@ -3010,6 +3029,7 @@ class Catalog_seed():
 
             # Skip sources that fall completely off the detector
             if None in [i1, i2, j1, j2, k1, k2, l1, l2]:
+                self.timer.stop()
                 continue
 
             try:
@@ -3920,7 +3940,8 @@ class Catalog_seed():
             # If this is a NIRISS simulation and the user wants to add ghosts,
             # do that here.
             if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
-                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, rate, magsystem, source, 'galaxies')
+                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, rate, magsystem, source, 'galaxies',
+                                                                 log_skipped_filters=log_ghost_err)
                 if np.isfinite(gx) and gfile is not None:
                     ghost_source_index.append(index)
                     ghost_x.append(gx)
@@ -3929,13 +3950,16 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(source, self.params['Reffiles']['flux_cal'], magsystem,
-                                                                              NIRISS_GHOST_GAP_FILE, log_skipped_filters=log_ghost_err)
-                    ghost_i += 1
+                                                                              NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
                     else:
                         ghost_mags = vstack([ghost_mags, ghost_src])
+
+                # Increment the counter to control the logging regardless of whether the source
+                # is on the detector or not.
+                ghost_i += 1
 
             # only keep the source if the peak will fall within the subarray
             if pixely > outminy and pixely < outmaxy and pixelx > outminx and pixelx < outmaxx:
@@ -4245,6 +4269,7 @@ class Catalog_seed():
 
             # Skip sources that fall completely off the detector
             if psf_image is None:
+                self.timer.stop()
                 continue
 
             # Normalize the signal in the PSF stamp so that the final galaxy
@@ -4328,7 +4353,7 @@ class Catalog_seed():
                          + 90. - self.params['Telescope']['rotation'])
         return x_posang
 
-    def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type):
+    def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type, log_skipped_filters=True):
         """Calculate the ghost location, brightness, and stamp image file name
         for the input source.
 
@@ -4368,6 +4393,10 @@ class Catalog_seed():
 
         ghost_file : str
             Name of fits file containing the stamp image to use for the ghost source
+
+        log_skipped_filters : bool
+            If True, any filter magnitudes that are not converted because
+            the filter is not in the gap summary file will be logged.
         """
         allowed_types = ['point_source', 'galaxies', 'extended']
         if obj_type not in allowed_types:
@@ -4382,7 +4411,8 @@ class Catalog_seed():
                                                                 count_rate,
                                                                 search_filter,
                                                                 self.params['Readout']['pupil'],
-                                                                NIRISS_GHOST_GAP_FILE
+                                                                NIRISS_GHOST_GAP_FILE,
+                                                                log_skipped_filters=log_skipped_filters
                                                                 )
         if isinstance(ghost_pixelx, np.float):
             if not np.isfinite(ghost_pixelx):
@@ -4629,7 +4659,8 @@ class Catalog_seed():
             # This is done outside the if statement below because sources outside the
             # detector can potentially produce ghosts on the detector
             if ghost_search and self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
-                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, countrate, magsys, values, 'extended')
+                gx, gy, gmag, gcounts, gfile = self.locate_ghost(pixelx, pixely, countrate, magsys, values, 'extended',
+                                                                 log_skipped_filters=log_ghost_err)
                 if np.isfinite(gx) and gfile is not None:
                     ghost_source_index.append(indexnum)
                     ghost_x.append(gx)
@@ -4638,13 +4669,16 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=log_ghost_err)
-                    ghost_i += 1
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
                     else:
                         ghost_mags = vstack([ghost_mags, ghost_src])
+
+                # Increment the counter to control the logging regardless of whether the source
+                # is on the detector or not.
+                ghost_i += 1
 
             # Keep only sources within the appropriate bounds
             if pixely > miny and pixely < maxy and pixelx > minx and pixelx < maxx:

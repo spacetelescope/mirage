@@ -123,6 +123,19 @@ MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.19235
 # to when it is not in the beam
 NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 
+# Factors by which total throughput is reduced and gridded PSF library
+# signal (output from WebbPSF) is reduced. Used in normalization_check()
+# in psf_selection.py when performing a sanity check on the input PSF signal
+NIRISS_NRM_PSF_THROUGHPUT_REDUCTION = 0.17
+NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION = 0.84
+
+# PSF normalization check - default min and max allowed values for the
+# total signal in the PSF divided by the square of the oversampling factor.
+# In most cases this value will be close to 1.0. In cases where NIRISS
+# NRM or CLEARP are used, these values will be reduced by the factors above.
+PSF_NORM_MAX = 1.0
+PSF_NORM_MIN = 0.8
+
 # Minimum signal rate for a pixel to be included in the segmentation map.
 SEGMENTATION_MIN_SIGNAL_RATE = 0.031  # ADU/sec
 SUPPORTED_SEGMENTATION_THRESHOLD_UNITS = ['adu/s', 'adu/sec', 'e/s', 'e/sec', 'mjy/str', 'mjy/sr', 'erg/cm2/a', 'erg/cm2/hz']
