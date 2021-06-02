@@ -369,13 +369,14 @@ class SossSim():
 
                     # Make a transit model for each radius and limb darkening coefficients
                     # (Dumb but multiprocessing requires it)
-                    tmodels = []
-                    for radius, ldc in zip(self.planet_radius[order - 1], self.ld_coeffs[order - 1]):
-                        tmod = copy(c_tmodel)
-                        tmod.rp = radius
-                        tmod.u = ldc
-                        tmodels.append(tmod)
-                        del tmod
+                    tmodels = [None] * self.ncols
+                    if self.planet is not None:
+                        for idx, (radius, ldc) in enumerate(zip(self.planet_radius[order - 1], self.ld_coeffs[order - 1])):
+                            tmod = copy(c_tmodel)
+                            tmod.rp = radius
+                            tmod.u = ldc
+                            tmodels[idx] = tmod
+                            del tmod
 
                     # Generate the lightcurves at each wavelength
                     pool = ThreadPool(n_jobs)
