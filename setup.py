@@ -67,7 +67,7 @@ setup(
                       'from source catalogs. Data can optionally be'
                       'dispersed as well, to simulate wide field'
                       'slitless data files.'),
-    author='STScI (Hilbert, Volk, Chambers, Sahlmann et al.)',
+    author='STScI (Hilbert, Volk, Chambers, Sahlmann, Filippazzo et al.)',
     author_email='hilbert@stsci.edu',
     url='https://github.com/spacetelescope/mirage',
     keywords=['astronomy'],

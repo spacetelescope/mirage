@@ -1049,14 +1049,10 @@ class Observation():
         return crhits, crs_perframe
 
     @logging_functions.log_fail
-    def create(self, params=None):
+    def create(self):
         """MAIN FUNCTION"""
         # Read in the parameter file
-        if params is not None:
-            self.params = params
-
-        if self.params is None:
-            self.read_parameter_file()
+        self.read_parameter_file()
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
@@ -1163,6 +1159,7 @@ class Observation():
             self.logger.info(('An estimate of the remaining processing time will be provided after the first '
                               'segment file has been created.\n\n'))
         for i, linDark in enumerate(self.linDark):
+
             # Run the timer over each segment in order to come up with
             # a rough estimate of computation time
             self.timer.start()
@@ -2829,7 +2826,7 @@ class Observation():
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             current_time = datetime.datetime.utcnow()
-            start_time_string = self.params['Output']['date_obs'] + 'T' + self.params['Output']['time_obs']
+            start_time_string = str(self.params['Output']['date_obs']) + ' ' + str(self.params['Output']['time_obs'])
             ct = Time(start_time_string)
 
         outModel.meta.date = start_time_string
@@ -2918,8 +2915,7 @@ class Observation():
         outModel.meta.observation.time = self.params['Output']['time_obs']
 
         # Create INT_TIMES table, to be saved in INT_TIMES extension
-        int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'],
-                                         outModel.data.shape[0])
+        int_times = self.int_times_table(self.ramptime, self.params['Output']['date_obs'], self.params['Output']['time_obs'], outModel.data.shape[0])
         outModel.int_times = int_times
 
         # Set filter and pupil values

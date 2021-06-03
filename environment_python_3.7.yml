@@ -6,6 +6,7 @@ dependencies:
 - pip
 - python==3.7.7
 - webbpsf==0.9.1
+- numpy
 - pip:
     - asdf==2.7.2
     - astropy==4.2
