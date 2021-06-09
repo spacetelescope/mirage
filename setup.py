@@ -102,7 +102,7 @@ setup(
         'ipython',
         'jinja2==2.11.3',
         'jupyter',
-        'jwst==1.1.0',
+        'jwst==1.2.3',
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
         'matplotlib>=3.0.0',

@@ -12,7 +12,7 @@ hotsoss>=0.1.7
 ipython>=7.18.1
 jinja2==2.11.3
 jupyter>=1.0.0
-jwst==1.1.0
+jwst==1.2.3
 jwst-backgrounds>=1.1.1
 jwxml>=0.3.0
 lxml>=3.6.4
