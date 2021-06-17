@@ -111,10 +111,10 @@ CRDS_FILE_TYPES = {'badpixmask': 'mask',
                    'pixelflat': 'flat',
                    'photom': 'photom'}
 
-MEAN_GAIN_VALUES = {'nircam': {'swa': 2.443376, 'swb': 2.4908085, 'lwa': 2.1923525, 'lwb': 2.1811192,
-                               'nrca1': 2.4926066, 'nrca2': 2.5222762, 'nrca3': 2.4837794, 'nrca4': 2.2748423,
-                               'nrcb1': 2.5201690, 'nrcb2': 2.5557644, 'nrcb3': 2.5512073, 'nrcb4': 2.3360932,
-                               'nrca5': 2.1923525, 'nrcb5': 2.1811192},
+MEAN_GAIN_VALUES = {'nircam': {'swa': 2.05, 'swb': 2.05, 'lwa': 1.82, 'lwb': 1.82,
+                               'nrca1': 2.05, 'nrca2': 2.05, 'nrca3': 2.05, 'nrca4': 2.05,
+                               'nrcb1': 2.05, 'nrcb2': 2.05, 'nrcb3': 2.05, 'nrcb4': 2.05,
+                               'nrca5': 1.82, 'nrcb5': 1.82},
                     'niriss': 1.611902,
                     'fgs': {'guider1': 1.9712874, 'guider2': 1.6897644}
                     }
@@ -159,3 +159,10 @@ MODULE_PATH = pkg_resources.resource_filename('mirage', '')
 CONFIG_DIR = os.path.join(MODULE_PATH, 'config')
 NIRISS_GHOST_GAP_FILE = os.path.join(CONFIG_DIR, 'niriss_ghost_gap_summary.txt')
 DEFAULT_NIRISS_PTSRC_GHOST_FILE = os.path.join(os.path.expandvars('$MIRAGE_DATA'), 'niriss/ghosts/', 'niriss_ghost_cen.fits')
+
+# Vega spectrum to use when translating/normalizing input spectra to a given vegamag
+# (in spectra_from_catalog.rescale_normalized_spectra). This needs to be consistent with the
+# vega spectrum used to generate zeropoints in the zeropoints files in the config dirctory!
+# For the June 2021 update to the zeropoints (based on updated NIRCam gain values), we used
+# alpha_lyr_stis_010.fits from synphot.
+VEGA_SPECTRUM = 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_010.fits'
