@@ -771,6 +771,10 @@ class Catalog_seed():
         """
         filename = self.params['Reffiles']['transmission']
 
+        if isinstance(filename, str):
+            if filename.lower() == 'none':
+                filename = None
+
         if filename is not None:
             # Read in file
             try:
