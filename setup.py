@@ -67,7 +67,7 @@ setup(
                       'from source catalogs. Data can optionally be'
                       'dispersed as well, to simulate wide field'
                       'slitless data files.'),
-    author='STScI (Hilbert, Volk, Chambers, Sahlmann et al.)',
+    author='STScI (Hilbert, Volk, Chambers, Sahlmann, Filippazzo et al.)',
     author_email='hilbert@stsci.edu',
     url='https://github.com/spacetelescope/mirage',
     keywords=['astronomy'],
@@ -100,8 +100,9 @@ setup(
         'h5py>=2.8.0',
         'hotsoss==0.1.7',
         'ipython',
+        'jinja2==2.11.3',
         'jupyter',
-        'jwst',
+        'jwst==1.1.0',
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
         'matplotlib>=3.0.0',

@@ -80,7 +80,7 @@ def fluxcal_info(fluxcal_file, instrument, filter_value, pupil_value, detector, 
     # In the future we expect zeropoints to be detector dependent, as they
     # currently are for FGS. So if we are working with NIRCAM or NIRISS,
     # manually add a Detector key to the dictionary as a placeholder.
-    if instrument.lower() in ["nircam", "niriss"]:
+    if instrument.lower() == "niriss":
         zps = add_detector_to_zeropoints(detector, zpts)
     else:
         zps = copy.deepcopy(zpts)

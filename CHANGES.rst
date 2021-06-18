@@ -1,3 +1,70 @@
+2.1.0
+=====
+
+Flux calibration
+----------------
+
+Updated the gain and filter-based zeropoint values for NIRCam observations. These values were changed in order to stay consistent with new gain and photom reference files delivered to CRDS. The new gain values are ~20% lower than the previous versions, which means the zeropoints have changed by the same amount. (#686)
+
+
+Logging
+-------
+
+Fix logging error so that in NIRISS simulations where ghosts are requested, if the filter used does not support the addition of ghosts, this fact is logged only once, rather than for each source. (#667)
+
+
+NIRISS Simulations
+------------------
+
+Fix bug that was preventing NIRISS External Calibration observations from being read in by the yaml_generator when they were in parallel rather than prime. (#679)
+
+When creating "pom" mode simulations, create a seed image that is larger than the detector. (#681)
+
+
+Reference Files
+---------------
+
+Fix the name of the directory into which the NIRCam longwave linearized darks are saved. Prevously the files were being saved into e.g. BLONG, while later, Mirage was looking for B5. (#692)
+
+Allow the name of the transmission file to be None or 'None' when working in imaging mode. (#695)
+
+
+Seed Image
+----------
+
+Enable the use of IRAC mosaic images as input seed images (#670)
+
+
+SOSS Simulations
+----------------
+
+Allow SOSS simulations to be made using a parameter file or keyword arguments (#671)
+
+
+Source Catalogs
+---------------
+
+Updates to the for_proposal() catalog generation function to populate ra_ref and dec_ref dictionary entries. (#696)
+
+
+Timer
+-----
+
+Stop the timer before moving on to the next source in the source catalog when the current source is completely off the detector. Prior to this, sources that were outside the detector would sometimes raise a timer error when Mirage attempted to start the timer for the next source while that for the current source was still running. (#669)
+
+
+TSO Simulations
+---------------
+
+Update the batman package to version 2.4.8 in order to avoid a problem with version 2.4.7. (#680)
+
+
+V3 Position Angle
+-----------------
+
+Remove the skipped_obs_from_xml keyword value in the call to get_pointing_info within default_obs_v3pa_on_date() and all_obs_v3pa_on_date(). (#674)
+
+
 2.0.2
 =====
 

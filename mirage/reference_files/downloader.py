@@ -323,7 +323,7 @@ def download_reffiles(directory, instrument='all', dark_type='linearized',
             if 'NRCNRC' in filename:
                 det_str = filename.split('NRCNRC')[1].split('-')[0]
                 if 'LONG' in det_str:
-                    det_str.replace('LONG', '5')
+                    det_str = det_str.replace('LONG', '5')
                 darks_dir = os.path.join(directory, 'mirage_data', 'nircam', 'darks')
                 sub_directory = os.path.join(darks_dir, cal, det_str)
             elif 'NIRISS' in filename:

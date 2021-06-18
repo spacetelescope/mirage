@@ -23,7 +23,7 @@ from astroquery.gaia import Gaia
 from astroquery.irsa import Irsa
 from pysiaf.utils.projection import deproject_from_tangent_plane
 
-from mirage.apt.apt_inputs import get_filters
+from mirage.apt.apt_inputs import get_filters, ra_dec_update
 from mirage.catalogs.catalog_generator import PointSourceCatalog, GalaxyCatalog, \
     ExtendedCatalog, MovingPointSourceCatalog, MovingExtendedCatalog, \
     MovingSersicCatalog
@@ -31,6 +31,7 @@ from mirage.logging import logging_functions
 from mirage.utils.constants import FGS_FILTERS, NIRCAM_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
     NIRISS_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
     NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils import siaf_interface
 from mirage.utils.utils import ensure_dir_exists, make_mag_column_names, standardize_filters
 
 classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
@@ -149,6 +150,12 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
     pointing_dictionary = create_basic_exposure_list(xml_filename, pointing_filename)
     instrument_filter_dict = get_filters(pointing_dictionary)
 
+    # Calculate RA, Dec of each aperture
+    siaf_dictionary = {}
+    for instrument_name in np.unique(pointing_dictionary['Instrument']):
+        siaf_dictionary[instrument_name] = siaf_interface.get_instance(instrument_name)
+    pointing_dictionary = ra_dec_update(pointing_dictionary, siaf_dictionary)
+
     threshold = catalog_splitting_threshold * u.deg
     ra_apertures = np.array(pointing_dictionary['ra_ref'] * u.deg)
     dec_apertures = np.array(pointing_dictionary['dec_ref'] * u.deg)
@@ -257,7 +264,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         if point_source:
             for i, instrument in enumerate(instrument_filter_dict):
                 logger.info('\n--- Creating {} point source catalog ---'.format(instrument))
-                filter_list = instrument_filter_dict[instrument]
+                filter_list = list(set(instrument_filter_dict[instrument]))
                 tmp_cat, tmp_filters = get_all_catalogs(mean_ra, mean_dec, full_width,
                                                         besancon_catalog_file=besancon_catalog_file,
                                                         instrument=instrument, filters=filter_list,
@@ -268,7 +275,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 else:
                     ptsrc_cat = combine_catalogs(ptsrc_cat, tmp_cat, starting_index=starting_index)
 
-            starting_index += len(ptsrc_cat['index'])
+            starting_index += len(ptsrc_cat)
 
             if save_catalogs:
                 ptsrc_catalog_name = 'ptsrc_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -292,7 +299,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         if extragalactic:
             for i, instrument in enumerate(instrument_filter_dict):
                 logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
-                filter_list = instrument_filter_dict[instrument]
+                filter_list = list(set(instrument_filter_dict[instrument]))
                 tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
                                                       filter_list, boxflag=False, brightlimit=14.0,
                                                       seed=galaxy_seed, starting_index=starting_index)
@@ -302,7 +309,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                 else:
                     galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
 
-            starting_index += len(galaxy_cat['index'])
+            starting_index += len(galaxy_cat)
 
             if save_catalogs:
                 gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
@@ -2458,6 +2465,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     decout = dely * 0.
     for loop in range(len(delx)):
         raout[loop], decout[loop] = deproject_from_tangent_plane(delx[loop], dely[loop], ra0, dec0)
+        while raout[loop] < 0.:
+            raout[loop] += 360.
     rot1 = 360.*np.random.random(nout)-180.
     rout = np.copy(catalog_values[outputinds, sersicinds[0]])
     drout = np.copy(catalog_values[outputinds, sersicerrorinds[0]])

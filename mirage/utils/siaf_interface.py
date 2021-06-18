@@ -300,7 +300,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
         if aperture_name in ['NIS_SUBSTRIP96', 'NIS_SUBSTRIP256']:
             x_corner = [1, 2048]
             if aperture_name == 'NIS_SUBSTRIP96':
-                y_corner = [1793, 1888]
+                y_corner = [1803, 1898]
             if aperture_name == 'NIS_SUBSTRIP256':
                 y_corner = [1793, 2048]
     elif instrument.lower() == 'fgs':

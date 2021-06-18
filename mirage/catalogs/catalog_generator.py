@@ -104,6 +104,11 @@ class PointSourceCatalog():
         if len(x) > 0:
             self._location_units = 'position_pixels'
 
+    def __len__(self):
+        """Return the number of rows in the catalog
+        """
+        return len(self._ra)
+
     def add_catalog(self, catalog_to_add, magnitude_fill_value=99.):
         """Add a catalog to the current catalog instance"""
         # If the the source positions in the two catalogs have different units, then the catalogs

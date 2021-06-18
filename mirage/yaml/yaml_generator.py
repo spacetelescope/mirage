@@ -832,7 +832,7 @@ class SimInput:
                         (self.info['ShortPupil'][i]=='n/a' and self.info['detector'][i] in ['A1','A2','A3','A4'])):
                         print(f"Skipping {self.info['yamlfile'][i]} because this coronagraphy obs does not use that detector")
                         continue
-                              
+
                     # SW coronagraphy exposures that use MASKRND collect data from A2 only
                     if (self.info['ShortPupil'][i] == 'MASKRND' and self.info['detector'][i] != 'A2'):
                         print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
@@ -841,7 +841,7 @@ class SimInput:
                     # SW coronagraphy exposures that use MASKSWB collect data from A4 only
                     if (self.info['ShortPupil'][i] == 'MASKSWB' and self.info['detector'][i] != 'A4'):
                         print(f"Skipping yaml for {self.info['detector'][i]} with {self.info['ShortPupil'][i]}")
-                        continue          
+                        continue
 
             file_dict = {}
             for key in self.info:
@@ -2354,7 +2354,7 @@ def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=Fals
     """
 
     if pointing_table is None:
-        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
+        pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
     for i in range(len(pointing_table['obs_num'])):
         if pointing_table['obs_num'][i] == f"{obs_num:03d}":
             ra_deg, dec_deg = pointing_table['ra'][i], pointing_table['dec'][i]
@@ -2389,12 +2389,39 @@ def all_obs_v3pa_on_date(pointing_filename, date=None, verbose=False):
 
     """
     results = {}
-    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0, skipped_obs_from_xml=self.xml_skipped_observations)
+    pointing_table = apt_inputs.AptInput().get_pointing_info(pointing_filename, 0)
     obsnums = sorted(list(set(pointing_table['obs_num'])))
     for obs_num in obsnums:
         results[obs_num] = default_obs_v3pa_on_date(pointing_filename, int(obs_num), date=date, verbose=verbose,
                                                     pointing_table=pointing_table)
     return results
+
+
+def yaml_from_params(input, yamlout=None):
+    """Generate a YAML parameter file from a dict of parameters
+
+    Parameters
+    ----------
+    input: dict
+        The dict of parameters
+    yamlout: str
+        The full path of the new file
+    """
+    # Values to put in quotes in the YAML file
+    add_quotes = ['date_obs', 'time_obs']
+
+    # Filename
+    yamlout = yamlout or os.path.join(input['Output']['directory'], 'paramfile.yaml')
+
+    # Write all the data
+    with open(yamlout, 'w') as f:
+        for section, info in input.items():
+            f.write("\n{}:\n".format(section))
+            for k, v in info.items():
+                f.write("  {}: '{}'\n".format(k, v)) if k in add_quotes else f.write("  {}: {}\n".format(k, v))
+
+    return yamlout
+
 
 
 if __name__ == '__main__':
