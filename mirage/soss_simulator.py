@@ -708,6 +708,10 @@ class SossSim():
         # Save paramfile
         self._paramfile = pfile
 
+        # Only first order if F277W
+        if self.filter == 'F277W':
+            self.orders = [1]
+
         # Set the dependent quantities
         self.wave = hu.wave_solutions(self.subarray)
         self.avg_wave = np.mean(self.wave, axis=1)
