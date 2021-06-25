@@ -1,3 +1,9 @@
+Unreleased
+==========
+
+Create a pom transmission image composed of all 1's for NIRISS AMI and NIRCam imaging TSO simulations, as is done now for regular imaging simulations.
+
+
 2.1.0
 =====
 
