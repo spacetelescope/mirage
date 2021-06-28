@@ -784,7 +784,7 @@ class Catalog_seed():
         else:
             self.logger.info(('No transmission file given. Assuming full transmission for all pixels, '
                               'not including flat field effects. (no e.g. occulters blocking any pixels).'))
-            if self.params['Inst']['mode'].lower() == 'imaging':
+            if self.params['Inst']['mode'].lower() in ['imaging', 'ami', 'ts_imaging']:
                 transmission = np.ones((2048, 2048))
                 header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
             elif self.params['Inst']['mode'].lower() == 'pom':
