@@ -1,7 +1,15 @@
 Unreleased
 ==========
 
-Create a pom transmission image composed of all 1's for NIRISS AMI and NIRCam imaging TSO simulations, as is done now for regular imaging simulations.
+Update NIRSpec MOS APT xml reader to make use of ConfigurationPointing fields, in order to determine order and number of exposures. (#707)
+
+Add PSF convolution keyword when making an extended source image with a moving target simulation. (#706)
+
+Following changes in jwst version 1.2.3, replace the NDITHPTS header keyword with NRIMDTPT. (#705)
+
+Create a pom transmission image composed of all 1's for NIRISS AMI and NIRCam imaging TSO simulations, as is done now for regular imaging simulations. (#701)
+
+Prevent the SOSS simulator from looking for a non-existing 2nd order with F277W. (#700)
 
 
 2.1.0
