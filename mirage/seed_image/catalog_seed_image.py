@@ -2159,7 +2159,8 @@ class Catalog_seed():
             extended.write(temp_ext_filename, format='ascii', overwrite=True)
 
             extlist, extstamps, ext_ghosts_file = self.getExtendedSourceList(temp_ext_filename, ghost_search=True)
-            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps)
+            conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
+            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
