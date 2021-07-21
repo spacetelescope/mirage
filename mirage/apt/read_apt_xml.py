@@ -2088,9 +2088,14 @@ class ReadAPTXML():
 
         # Get very basic TA info. We only need enough to create an entry
         # in the exposure dictionary
-        acq_target = template.find(ns + 'AcqTargetID').text
-        acq_readout_pattern = template.find(ns + 'AcqReadoutPattern').text
-        acq_subarray = template.find(ns + 'AcqSubarray').text
+        try:
+            acq_target = template.find(ns + 'AcqTargetID').text
+            acq_readout_pattern = template.find(ns + 'AcqReadoutPattern').text
+            acq_subarray = template.find(ns + 'AcqSubarray').text
+        except AttributeError:
+            acq_target = 'None'
+            acq_readout_pattern = 'None'
+            acq_subarray = 'None'
 
         # Set up exposures_dictionary and add TA exposure info
         # Other than dither information, we only need enough information
@@ -2109,17 +2114,33 @@ class ReadAPTXML():
 
         # Get info on the MOS exposure
         number_of_subpixel_dithers = 1
+        # If there are nods, treat those as subpixel dithers. But we won't
+        # know about those until we are inside the exposure loop below.
+
         dithertype = template.find(ns + 'DitherType').text
         if dithertype.lower() == 'none':
             number_of_primary_dithers = 1
         elif 'point-with-nircam' in dithertype.lower():
             number_of_primary_dithers = int(dithertype[0])
-        number_of_dithers = number_of_primary_dithers * number_of_subpixel_dithers
+        #number_of_dithers = number_of_primary_dithers * number_of_subpixel_dithers
 
         # Locate all the exposures
         exposures = template.findall('.//' + ns + 'Exposure')
 
-        for exposure in exposures:
+        # Use ConfigurationPointing to organize the exposure details
+        config_pointing = template.findall('.//' + ns + 'ConfigurationPointing')
+
+        for exposure in config_pointing:
+            exp_num = int(exposure.find(ns + 'ExposureSpec').text.split(' ')[0]) - 1
+            groups = exposures[exp_num].find(ns + 'Groups').text
+            integrations = exposures[exp_num].find(ns + 'Integrations').text
+
+            try:
+                num_nods = int(exposure.find(ns + 'NodPattern').text.split(' ')[0])
+            except AttributeError:
+                num_nods = 1
+            number_of_dithers = number_of_primary_dithers * num_nods
+
             exposure_dict = {}
             exposure_dict['ProposalID'] = proposal_parameter_dictionary['ProposalID']
             exposure_dict['ObservationID'] = proposal_parameter_dictionary['ObservationID']
@@ -2131,16 +2152,15 @@ class ReadAPTXML():
             exposure_dict['ParallelInstrument'] = False
             exposure_dict["PrimaryDitherType"] = dithertype
             exposure_dict['PrimaryDithers'] = number_of_primary_dithers
-            exposure_dict['SubpixelPositions'] = number_of_subpixel_dithers
+            exposure_dict['SubpixelPositions'] = num_nods
             exposure_dict['ImageDithers'] = 'None'
             exposure_dict['number_of_dithers'] = number_of_dithers
-            #exposure_dict['DitherType'] = dithertype
             exposure_dict['SubpixelDitherType'] = 'None'
             exposure_dict['FiducialPointOverride'] = str(False)
             exposure_dict['ParallelInstrument'] = False
             exposure_dict['Tracking'] = tracking
-            exposure_dict['Groups'] = exposure.find(ns + 'Groups').text
-            exposure_dict['Integrations'] = exposure.find(ns + 'Integrations').text
+            exposure_dict['Groups'] = groups
+            exposure_dict['Integrations'] = integrations
 
             # Add information to new entry in exposures dictionary
             for key, value in exposure_dict.items():
@@ -2411,8 +2431,6 @@ class ReadAPTXML():
                 exposure_dict['ShortPupil'] = short_pupil
                 exposure_dict['LongPupil'] = long_pupil
 
-                print(exposure_dict )
-
                 # Filter, ReadoutPattern, Groups, Integrations,
                 # set subarray also
 
@@ -2639,7 +2657,6 @@ class ReadAPTXML():
                     coron_mask='MASK' + exposure_dict['Filter'][1:5]
                 exposure_dict['Pupil'] = coron_mask
                 exposure_dict['Subarray'] = coron_mask
-                print(exposure_dict )
 
                 # Filter, ReadoutPattern, Groups, Integrations,
 
