@@ -1119,7 +1119,7 @@ def get_filters(pointing_info):
             filter_list = list(set(short_pupils))
 
             # Remove CLEAR and non-imaging elements if present
-            niriss_clears = ['CLEAR', 'CLEARP', 'None', 'NRM']
+            niriss_clears = ['CLEAR', 'CLEARP', 'None', 'NRM', 'GR700XD', 'GR150R', 'GR150C']
             for clear in niriss_clears:
                 if clear in filter_list:
                     filter_list.remove(clear)
