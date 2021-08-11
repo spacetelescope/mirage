@@ -105,13 +105,12 @@ def get_transmission_file(parameter_dict):
             # POM transmission file is not grism orientation dependent. The file is the
             # same for GR150R as GR150C, so we can just use R here
             instrument = parameter_dict['INSTRUME'].lower()
-            dmode = 'GR150R'
             filt = parameter_dict['PUPIL'].upper()
 
             loc = os.path.join(datadir, "{}/GRISM_{}/current".format(instrument.lower(),
                                                                      instrument.upper()))
 
-            configuration_file = find_wfss_config_filename(loc, 'niriss', filt, dmode)
+            configuration_file = find_wfss_config_filename(loc, 'niriss', filt, parameter_dict['FILTER'])
             c = grismconf.Config(configuration_file)
             transmission_filename = c.POM
 
