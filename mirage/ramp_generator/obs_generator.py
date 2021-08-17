@@ -1770,7 +1770,7 @@ class Observation():
         newimage = np.random.poisson(signalgain, signalgain.shape).astype(np.float64)
 
         if np.nanmin(signalgain) < 0.:
-            newimage[neg] = negatives[neg]
+            newimage[neg] = negatives[neg].astype(np.float64)
 
         newimage /= self.gain
 
