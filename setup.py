@@ -90,7 +90,7 @@ setup(
     setup_requires=['setuptools_scm'],
     install_requires=[
         'asdf>=2.1.0',
-        'astropy>=4.0',
+        'astropy==4.2',
         'astroquery>=0.3.8',
         'bokeh>=2.2.3',
         'batman-package',

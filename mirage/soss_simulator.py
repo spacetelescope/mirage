@@ -406,7 +406,7 @@ class SossSim():
                     pool = ThreadPool(n_jobs)
                     func = partial(soss_trace.psf_lightcurve, time=time_chunk)
                     data = list(zip(psfs, tmodels))
-                    lightcurves = np.asarray(pool.starmap(func, data))
+                    lightcurves = np.asarray(pool.starmap(func, data), dtype=np.float64)
                     pool.close()
                     pool.join()
                     del pool
