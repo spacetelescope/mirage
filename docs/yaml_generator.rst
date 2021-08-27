@@ -444,8 +444,8 @@ Accompanying the noiseless seed image, Mirage will also produce a segmentation m
 
 ::
 
-    minimum_signal = 0.08
-    minimum_signal_units = 'MJy/sr'
+    segmap_flux_limit = 0.08
+    segmap_flux_limit_units = 'MJy/sr'
 
 The allowed units for the threshold value are: ADU/sec, e/sec, MJy/sr, erg/cm2/A, erg/cm2/Hz
 Note that these are case insensitive.
