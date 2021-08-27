@@ -144,6 +144,12 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
 
     galaxy_catalog_names : list
         List of filenames of the saved galaxy catalogs
+
+    ptsrc_catalog_mapping : dict
+        Maps observation name to the point source catalog file to use for it
+
+    galaxy_catalog_mapping : dict
+        Maps observation name to the galaxy source catalog file to use for it
     """
     logger = logging.getLogger('mirage.catalogs.create_catalog.for_proposal')
 
