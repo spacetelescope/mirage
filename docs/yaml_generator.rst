@@ -494,7 +494,7 @@ Set ``parameter_defaults`` equal to the dictionary of parameter values to use.
                                   cosmic_rays=crs, background=background, roll_angle=pav3,
                                   dates=dates, datatype='raw', dateobs_for_background=False,
                                   reffile_defaults='crds', reffile_overrides=reffile_overrides,
-                                  segmap_flux_limit=minmum_signal, segmap_flux_limit_units=minimum_signal_units,
+                                  segmap_flux_limit=segmap_flux_limit, segmap_flux_limit_units=segmap_flux_limit_units,
                                   add_ghosts=ghosts, convolve_ghosts_with_psf=convolve_ghosts
                                   )
     yam.use_linearized_darks = True
