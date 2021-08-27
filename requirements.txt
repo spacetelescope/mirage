@@ -1,5 +1,5 @@
 asdf>=2.1.0
-astropy>=4.0
+astropy==4.2.1
 astroquery>=0.3.8
 bokeh>=2.2.3
 batman-package>=2.4.8
@@ -12,7 +12,7 @@ hotsoss>=0.1.7
 ipython>=7.18.1
 jinja2==2.11.3
 jupyter>=1.0.0
-jwst==1.1.0
+jwst>=1.3.1
 jwst-backgrounds>=1.1.1
 jwxml>=0.3.0
 lxml>=3.6.4

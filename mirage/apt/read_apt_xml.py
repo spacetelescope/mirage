@@ -679,7 +679,10 @@ class ReadAPTXML():
                     test = np.int(number_of_primary_dithers)
                 except ValueError:
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
-
+                    # Now that the dither_points metadata entry (which maps to NRIMDTPT)
+                    # has been redefined as an integer, we need to get rid of the
+                    # string in cases like '8NIRSPEC'
+                    observation_dict[dither_key_name] = number_of_primary_dithers
             else:
                 self.logger.info('Primary dither element {} not found, use default primary dithers value (1).'.format(dither_key_name))
 
