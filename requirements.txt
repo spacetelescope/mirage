@@ -1,5 +1,5 @@
 asdf>=2.1.0
-astropy==4.2.1
+astropy==4.3.1
 astroquery>=0.3.8
 bokeh>=2.2.3
 batman-package>=2.4.8
