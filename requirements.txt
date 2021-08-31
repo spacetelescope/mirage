@@ -1,5 +1,5 @@
 asdf>=2.1.0
-astropy==4.2.1
+astropy>=4.3.1
 astroquery>=0.3.8
 bokeh>=2.2.3
 batman-package>=2.4.8
@@ -17,7 +17,7 @@ jwst-backgrounds>=1.1.1
 jwxml>=0.3.0
 lxml>=3.6.4
 matplotlib>=3.0.0
-NIRCAM-Gsim>=1.3b3
+nircam_gsim>=1.56
 numpy>=1.16
 photutils>=0.6
 pysiaf>=0.6.1
