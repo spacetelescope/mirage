@@ -1117,8 +1117,14 @@ def get_filters(pointing_info):
 
             short_filter_only = np.where(short_pupils == 'CLEAR')[0]
             filter_list = list(set(short_pupils))
-            filter_list.remove('CLEAR')
-            filter_list.append(list(set(short_filters[short_filter_only])))
+
+            # Remove CLEAR and non-imaging elements if present
+            niriss_clears = ['CLEAR', 'CLEARP', 'None', 'NRM', 'GR700XD', 'GR150R', 'GR150C']
+            for clear in niriss_clears:
+                if clear in filter_list:
+                    filter_list.remove(clear)
+
+            filter_list.extend(list(set(short_filters[short_filter_only])))
 
         filters[inst.upper()] = filter_list
     return filters

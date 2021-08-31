@@ -2706,7 +2706,7 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, self.params['Readout']['filter'], log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -3955,7 +3955,7 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(source, self.params['Reffiles']['flux_cal'], magsystem,
-                                                                              NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
+                                                                              NIRISS_GHOST_GAP_FILE, self.params['Readout']['filter'], log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -4410,7 +4410,7 @@ class Catalog_seed():
         # For WFSS simulations, we ignore the grism
         search_filter = self.params['Readout']['filter']
         if self.params['Readout']['filter'].upper() in ['GR150R', 'GR150C']:
-            search_filter = 'CLEAR'
+            search_filter = 'GR150'
 
         ghost_pixelx, ghost_pixely, ghost_countrate = get_ghost(pixel_x, pixel_y,
                                                                 count_rate,
@@ -4674,7 +4674,7 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, self.params['Readout']['filter'], log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
