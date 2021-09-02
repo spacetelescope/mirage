@@ -578,6 +578,37 @@ def get_all_reffiles(param_dict):
     return mapping
 
 
+def get_lw_grism_tso_intermeidate_aperture(aperture):
+    """Grism time series observations use an intermediate aperture in
+    order to place the undispersed target at the correct location such
+    that, once the grism is in the beam, the trace lands at row 34 on
+    the detector. In the APT pointing file, the requested aperture is
+    listed (i.e. NRCA5_GRISM64_F444W), but the V2, V3 values for the
+    reference location are actually those of the intermediate aperture
+    (i.e. NRCA5_TAGRISMTS_SCI_F444W'). This function will return the
+    name of the intermediate aperture given the name of the requested
+    aperture.
+
+    Parameters
+    ----------
+    aperture : str
+        Name of the requested aperture
+
+    Returns
+    -------
+    intermediate_aperture : str
+        Name of the intermediate aperture
+    """
+    lw_filter = aperture.split('_')[2]
+    if lw_filter in ['F277W', 'F322W2', 'F356W']:
+        intermediate_aperture = 'NRCA5_TAGRISMTS_SCI_F322W2'
+    elif lw_filter == 'F444W':
+        intermediate_aperture = 'NRCA5_TAGRISMTS_SCI_F444W'
+    else:
+        raise ValueError('Unrecognized Grism TSO LW filter: {}. What intermediate aperture is used?'.format(lw_filter))
+    return intermediate_aperture
+
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.

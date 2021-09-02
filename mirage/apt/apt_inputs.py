@@ -1388,16 +1388,19 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
     exposure_dict : dict
         Modified exposure dictionary with updated RA, Dec values for the pointing
     """
-    sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64',
-                            'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64']
+    sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64', 'NRCA1_GRISMTS',
+                            'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64', 'NRCA3_GRISMTS']
 
-    lw_grismts_apertures = ['NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2',
-                            'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W']
+    lw_grismts_apertures = ['NRCA5_GRISM256_F277W', 'NRCA5_GRISM128_F277W', 'NRCA5_GRISM64_F277W', 'NRCA5_GRISM_F277W',
+                            'NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2', 'NRCA5_GRISM_F322W2',
+                            'NRCA5_GRISM256_F356W', 'NRCA5_GRISM128_F356W', 'NRCA5_GRISM64_F356W', 'NRCA5_GRISM_F356W',
+                            'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W', 'NRCA5_GRISM_F444W']
 
     intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
 
     aperture_ra = []
     aperture_dec = []
+    intermediate_apertures = []
 
     lw_grismts_aperture = None
     for i in range(len(exposure_dict['Module'])):
@@ -1412,10 +1415,16 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
         # the aperture name, because we'll need it when looking
         # at the accompanying SW apertuers to follow. THIS
         # RELIES ON THE LW ENTRY COMING BEFORE THE SW ENTRIES.
+        # Also note that F277W, F322W2, and F356W all use the same
+        # intermeidate aperture, since their nominal apertures
+        # (i.e. NRCA5_GRISM64_F322W2, NRCA5_GRISM64_F277W) are all
+        # exactly the same as well.
         if aperture_name in lw_grismts_apertures:
             lw_grismts_aperture = copy.deepcopy(aperture_name)
-            lw_filter = lw_grismts_aperture.split('_')[2]
-            lw_intermediate_aperture = [ap for ap in intermediate_lw_grismts_apertures if lw_filter in ap][0]
+            lw_intermediate_aperture = utils.get_lw_grism_tso_intermeidate_aperture(aperture_name)
+            intermediate_apertures.append(lw_intermediate_aperture)
+        else:
+            intermediate_apertures.append(None)
 
         if 'pav3' in exposure_dict.keys():
             pav3 = np.float(exposure_dict['pav3'][i])
@@ -1429,6 +1438,10 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
         if 'NRCA5_GRISM' in aperture_name and 'WFSS' not in aperture_name:
             ra = pointing_ra
             dec = pointing_dec
+            #exposure_dict['aperture'][i] = lw_intermediate_aperture  This does not work, because the intermediate aperture is a small box, and mirage happily
+            #        creates a small square subarray when the seed image generator is run with this. we need something in catalog seed generator that knows
+            #        about the link between the grismts apertures and the intermediates and uses the intermediate in the Siaf instance. Also, there are
+            #        currently no intermediate apertures in pysiaf for the F277W, F356W filters. What happens (in APT/reality) in those cases?
         else:
             if aperture_name in sw_grismts_apertures:
                 # Special case. When looking at grism time series observation
@@ -1445,7 +1458,6 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
                 pointing_v2 = lw_gts.V2Ref
                 pointing_v3 = lw_gts.V3Ref
 
-
             local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
                 siaf_interface.get_siaf_information(siaf_instances[siaf_instrument], aperture_name,
                                                     pointing_ra, pointing_dec, telescope_roll,
@@ -1458,6 +1470,7 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
         aperture_ra.append(ra)
         aperture_dec.append(dec)
 
+    exposure_dict['grismts_intermediate_aperture'] = intermediate_apertures
     exposure_dict['ra_ref'] = aperture_ra
     exposure_dict['dec_ref'] = aperture_dec
     return exposure_dict
