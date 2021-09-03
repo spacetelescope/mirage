@@ -57,7 +57,8 @@ import yaml
 from . import read_apt_xml
 from ..logging import logging_functions
 from ..utils import siaf_interface, constants, utils
-from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, \
+                                   NIRCAM_LW_GRISMTS_APERTURES, NIRCAM_SW_GRISMTS_APERTURES
 
 
 classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
@@ -1388,15 +1389,15 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
     exposure_dict : dict
         Modified exposure dictionary with updated RA, Dec values for the pointing
     """
-    sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64', 'NRCA1_GRISMTS',
-                            'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64', 'NRCA3_GRISMTS']
+    #sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64', 'NRCA1_GRISMTS',
+    #                        'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64', 'NRCA3_GRISMTS']
 
-    lw_grismts_apertures = ['NRCA5_GRISM256_F277W', 'NRCA5_GRISM128_F277W', 'NRCA5_GRISM64_F277W', 'NRCA5_GRISM_F277W',
-                            'NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2', 'NRCA5_GRISM_F322W2',
-                            'NRCA5_GRISM256_F356W', 'NRCA5_GRISM128_F356W', 'NRCA5_GRISM64_F356W', 'NRCA5_GRISM_F356W',
-                            'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W', 'NRCA5_GRISM_F444W']
+    #lw_grismts_apertures = ['NRCA5_GRISM256_F277W', 'NRCA5_GRISM128_F277W', 'NRCA5_GRISM64_F277W', 'NRCA5_GRISM_F277W',
+    #                        'NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2', 'NRCA5_GRISM_F322W2',
+    #                        'NRCA5_GRISM256_F356W', 'NRCA5_GRISM128_F356W', 'NRCA5_GRISM64_F356W', 'NRCA5_GRISM_F356W',
+    #                        'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W', 'NRCA5_GRISM_F444W']
 
-    intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
+    #intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
 
     aperture_ra = []
     aperture_dec = []
@@ -1419,9 +1420,11 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
         # intermeidate aperture, since their nominal apertures
         # (i.e. NRCA5_GRISM64_F322W2, NRCA5_GRISM64_F277W) are all
         # exactly the same as well.
-        if aperture_name in lw_grismts_apertures:
+        if aperture_name in NIRCAM_LW_GRISMTS_APERTURES:
             lw_grismts_aperture = copy.deepcopy(aperture_name)
             lw_intermediate_aperture = utils.get_lw_grism_tso_intermeidate_aperture(aperture_name)
+            intermediate_apertures.append(lw_intermediate_aperture)
+        elif aperture_name in NIRCAM_SW_GRISMTS_APERTURES:
             intermediate_apertures.append(lw_intermediate_aperture)
         else:
             intermediate_apertures.append(None)
@@ -1443,7 +1446,7 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
             #        about the link between the grismts apertures and the intermediates and uses the intermediate in the Siaf instance. Also, there are
             #        currently no intermediate apertures in pysiaf for the F277W, F356W filters. What happens (in APT/reality) in those cases?
         else:
-            if aperture_name in sw_grismts_apertures:
+            if aperture_name in NIRCAM_SW_GRISMTS_APERTURES:
                 # Special case. When looking at grism time series observation
                 # we force the pointing to be at the reference location of the
                 # LW *intermediate* aperture, rather than paying attention to
