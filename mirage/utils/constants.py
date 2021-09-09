@@ -136,6 +136,7 @@ NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 # in psf_selection.py when performing a sanity check on the input PSF signal
 NIRISS_NRM_PSF_THROUGHPUT_REDUCTION = 0.17
 NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION = 0.84
+NIRCAM_WLP12_PSF_THROUGHPUT_REDUCTION = 0.5
 
 # PSF normalization check - default min and max allowed values for the
 # total signal in the PSF divided by the square of the oversampling factor.
