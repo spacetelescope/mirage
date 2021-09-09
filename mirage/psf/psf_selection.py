@@ -33,6 +33,7 @@ from glob import glob
 import logging
 import os
 import warnings
+import pdb
 
 from astropy.io import fits
 import numpy as np
@@ -467,6 +468,25 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                                       'in the pupil wheel.'))
                 file_pupil = save_filt
 
+            elif (file_inst.upper() == 'NIRCAM') and ((file_pupil.upper() == 'WLP4') |
+                                                      (file_pupil.upper() == 'WLM4') |
+                                                      (file_pupil.upper() == 'WLP12')):
+                save_filt = copy(file_filt)
+                file_filt = 'WLP4' ## it's built in filter wheel
+                save_pupil = copy(file_pupil)
+
+                ## reverse engineer if it was paired with CLEAR, WLP8 or WLM8
+                if save_pupil == 'WLP4':
+                    file_pupil = 'CLEAR'
+                elif save_pupil == 'WLP12':
+                    file_pupil = 'WLP8'
+                elif save_pupil == 'WLM4':
+                    file_pupil = 'WLM8'
+                else:
+                    raise ValueError(('The pupil paired with WLP4 does not'
+                                      'match expectations'))
+
+            
             if segment_id is None and not itm_sim:
                 opd = header['OPD_FILE']
                 if 'requirements' in opd:
