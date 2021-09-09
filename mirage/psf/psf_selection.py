@@ -518,9 +518,7 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                                       'in the pupil wheel.'))
                 file_pupil = save_filt
 
-            elif (file_inst.upper() == 'NIRCAM') and ((file_pupil.upper() == 'WLP4') |
-                                                      (file_pupil.upper() == 'WLM4') |
-                                                      (file_pupil.upper() == 'WLP12')):
+            elif (file_inst.upper() == 'NIRCAM') and (file_pupil.upper() in ['WLP4', 'WLM4', 'WLP12']):
                 # If there is a weak lens listed in the library file's pupil value,
                 # disentangle it into the correct filter and pupil values
                 file_filt, file_pupil = fix_weak_lens_filter_pupil_values(file_filt, file_pupil)
