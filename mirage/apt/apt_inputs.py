@@ -1460,6 +1460,8 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
                 lw_gts = siaf_instances[siaf_instrument][lw_intermediate_aperture]
                 pointing_v2 = lw_gts.V2Ref
                 pointing_v3 = lw_gts.V3Ref
+                aperture.V2Ref = pointing_v2
+                aperture.V3Ref = pointing_v3
 
             local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
                 siaf_interface.get_siaf_information(siaf_instances[siaf_instrument], aperture_name,

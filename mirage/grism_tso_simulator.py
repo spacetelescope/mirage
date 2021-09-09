@@ -364,9 +364,6 @@ class GrismTSO():
             # If the user has provided a 2D array of lightcurves, plus associated 1D arrays of
             # times and wavelengths, then interpolate those lightcurves onto the grid of frame
             # times and transmission spectrum wavelengths.
-            print(len(lightcurve_wavelengths), len(lightcurve_times), self.lightcurves.shape)
-
-
             lc_function = interp2d(lightcurve_wavelengths, lightcurve_times, self.lightcurves)
             lightcurves = lc_function(transmission_spectrum['Wavelength'], times)
 
@@ -382,16 +379,6 @@ class GrismTSO():
 
         # Crop dispersed seed images to correct final subarray size
         #no_transit_signal = grism_seed_object.final
-
-        print('\n\ngrism_seed_object.final shape: {}'.format(grism_seed_object.final.shape))
-        print('background_dispersed.shape: {}'.format(background_dispersed.shape))
-        print('tso_direct subarray bounds: {}\n\n'.format(tso_direct.subarray_bounds))
-
-
-
-
-
-
         no_transit_signal = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
         background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
@@ -497,12 +484,6 @@ class GrismTSO():
                             # This will update grism_seed_object.final to
                             # contain the correct signal
                             grism_seed_object.finalize(Back=None, BackLevel=None)
-
-
-                            print('\n\ngrism_seed_object.final shape LOOP: {}'.format(grism_seed_object.final.shape))
-                            print('tso_direct subarray bounds: {}\n\n'.format(tso_direct.subarray_bounds))
-
-
                             cropped_grism_seed_object = utils.crop_to_subarray(grism_seed_object.final, tso_direct.subarray_bounds)
                             frame_only_signal = (background_dispersed + cropped_grism_seed_object) * self.frametime
 
@@ -543,14 +524,6 @@ class GrismTSO():
                 if orig_parameters['Readout']['array_name'] not in self.fullframe_apertures:
                     self.logger.info("Dispersed seed image size: {}".format(segment_seed.shape))
 
-
-                    #print('\n\nsegment_seed shape: {}'.format(segment_seed.shape))
-                    #print('tso_direct subarray bounds: {}\n\n'.format(tso_direct.subarray_bounds))
-
-
-
-
-
                     # segment_seed has already been cropped, so no need to crop here...
                     #segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
                     #gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
@@ -563,9 +536,6 @@ class GrismTSO():
                 dy = int((segy - tso_direct.nominal_dims[0]) / 2)
                 segbounds = [tso_direct.subarray_bounds[0] + dx, tso_direct.subarray_bounds[1] + dy,
                              tso_direct.subarray_bounds[2] + dx, tso_direct.subarray_bounds[3] + dy]
-
-                print('\n\nseg map shape: {}'.format(tso_segmentation_map.shape))
-                print('segbounds: {}\n\n'.format(segbounds))
 
 
                 tso_segmentation_map = utils.crop_to_subarray(tso_segmentation_map, segbounds)
