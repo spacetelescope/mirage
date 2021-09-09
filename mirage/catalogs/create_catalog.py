@@ -643,6 +643,12 @@ def get_all_catalogs(ra, dec, box_width, besancon_catalog_file=None, instrument=
     gaia_cat, gaia_mag_cols, gaia_2mass, gaia_2mass_crossref, gaia_wise, \
         gaia_wise_crossref = query_GAIA_ptsrc_catalog(outra, outdec, box_width)
     twomass_cat, twomass_cols = query_2MASS_ptsrc_catalog(outra, outdec, box_width)
+
+    print('2MASS: ', outra, outdec, box_width)
+    print(twomass_cat)
+    print('')
+    print(twomass_cols)
+
     wise_cat, wise_cols = query_WISE_ptsrc_catalog(outra, outdec, box_width, wise_catalog=wise_catalog)
 
     if besancon_catalog_file is not None:
@@ -1113,6 +1119,19 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     raout[0:ngaia] = gaia_cat['ra']
     decout[0:ngaia] = gaia_cat['dec']
     ngaia2masscr = twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat)
+
+    print('gaia_2mass:')
+    print(gaia_2mass)
+    print('gaia_cat:')
+    print(gaia_cat)
+    print('twomass_cat:')
+    print(twomass_cat)
+
+
+    print(ngaia2masscr)
+    print('\n\n\n')
+
+
     twomassflag = [True] * n2mass2
     for n1 in range(n2mass2):
         for loop in range(len(gaia_2mass['ra'])):
@@ -1120,6 +1139,17 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
                 if ngaia2masscr[n1] >= 0:
                     twomassflag[n1] = False
     matchwise, gaiawiseinds, twomasswiseinds = wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_cat)
+
+
+    print(matchwise)
+    print('\n\n')
+    print(gaiawiseinds)
+    print('\n\n')
+    print(twomasswiseinds)
+    print('\n\n')
+
+
+
     wisekeys = ['w1sigmpro', 'w2sigmpro', 'w3sigmpro', 'w4sigmpro']
 
     # Set invalid values to NaN
@@ -1451,6 +1481,7 @@ def interpolate_magnitudes(wl1, mag1, wl2, filternames):
     # Case 1:  All dummy values, return all magnitudes = 10000.0 (this should
     #          not happen)
     if np.min(mag1) > 100.:
+        print('uh oh')
         return outmags
     # Case 2,  Only GAIA magnitudes.  Either transform from the GAIA BP and RP
     #          colour to the JWST magnitudes or assume a default colour value
@@ -1462,8 +1493,17 @@ def interpolate_magnitudes(wl1, mag1, wl2, filternames):
             inmags = np.zeros((2), dtype=np.float32)
             inmags[0] = mag1[1] + 0.5923
             inmags[1] = mag1[1] - 0.7217
+
+
+            print('Use K4V star')
+
+
         else:
             inmags = np.copy(mag1[[0, 2]])
+
+            print('copying')
+
+
         standard_magnitudes, standard_values, standard_filters, standard_labels = read_standard_magnitudes()
         in_filters = ['GAIA gbp', 'GAIA grp']
         newmags = match_model_magnitudes(inmags, in_filters, standard_magnitudes, standard_values,
@@ -1473,6 +1513,9 @@ def interpolate_magnitudes(wl1, mag1, wl2, filternames):
         return outmags
     # Case 3, some infrared magnitudes are available, interpolate good values
     # (magnitude = 10000 for bad values)
+
+    print('interpolating')
+
     inds = np.where(mag1 < 100.)
     inmags = mag1[inds]
     inwl = wl1[inds]
@@ -1912,6 +1955,13 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
         table = job.get_results()
         outvalues[key] = table
         logger.info('Retrieved {} sources for catalog {}'.format(len(table), key))
+
+
+        if key == 'tmass':
+            print('2mass Table from gaia query box width {}:'.format(boxwidth))
+            print(table)
+
+
     gaia_mag_cols = ['phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag']
     return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
 
