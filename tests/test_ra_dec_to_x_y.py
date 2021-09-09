@@ -328,6 +328,7 @@ def test_locations():
                                                                         rotation)
             c.coord_transform = None
             c.siaf = siaf[aperture]
+            c.use_intermediate_aperture = False
 
             xvals_from_siaf = []
             yvals_from_siaf = []

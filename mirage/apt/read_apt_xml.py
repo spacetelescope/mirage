@@ -153,7 +153,7 @@ class ReadAPTXML():
 
         # Proposal ID
         try:
-            prop_id = '{:05d}'.format(np.int(proposal_info.find(self.apt + 'ProposalID').text))
+            prop_id = '{:05d}'.format(int(proposal_info.find(self.apt + 'ProposalID').text))
         except:
             prop_id = '{:05d}'.format(propid_default)
 
@@ -292,7 +292,7 @@ class ReadAPTXML():
                 self.target_info[targ_name] = ('0', '0')
 
             # extract visit numbers
-            visit_numbers = [np.int(element.items()[0][1]) for element in obs if
+            visit_numbers = [int(element.items()[0][1]) for element in obs if
                              element.tag.split(self.apt)[1] == 'Visit']
 
             prop_params = [pi_name, prop_id, prop_title, prop_category,
@@ -676,7 +676,7 @@ class ReadAPTXML():
 
                 # Deal with cases like 2TIGHTGAPS, 8NIRSPEC, etc.
                 try:
-                    test = np.int(number_of_primary_dithers)
+                    test = int(number_of_primary_dithers)
                 except ValueError:
                     number_of_primary_dithers = observation_dict[dither_key_name][0]
                     # Now that the dither_points metadata entry (which maps to NRIMDTPT)
@@ -690,11 +690,11 @@ class ReadAPTXML():
             if not parallel:
                 if '-WITH-MIRI' in observation_dict['SubpixelDitherType']:
                     # Handle the special case for MIRI
-                    number_of_subpixel_dithers = np.int(observation_dict['SubpixelDitherType'][0])
+                    number_of_subpixel_dithers = int(observation_dict['SubpixelDitherType'][0])
                 elif "-WITH-NIRISS" in observation_dict['SubpixelDitherType']:
-                    number_of_subpixel_dithers = np.int(observation_dict['SubpixelDitherType'][0])
+                    number_of_subpixel_dithers = int(observation_dict['SubpixelDitherType'][0])
                 elif observation_dict['SubpixelDitherType'] in ['STANDARD', 'IMAGING', 'SMALL-GRID-DITHER']:
-                    number_of_subpixel_dithers = np.int(observation_dict['SubpixelPositions'])
+                    number_of_subpixel_dithers = int(observation_dict['SubpixelPositions'])
             else:
                 # For parallel instrument we ignore any dither info and set values to 0
                 number_of_primary_dithers = 0
@@ -714,12 +714,12 @@ class ReadAPTXML():
                     # In the case where PrimaryDithers is e.g. 2-POINT-WITH-NIRCam,
                     # extract the '2' and place it in the PrimaryDithers field
                     try:
-                        int_dithers = np.int(observation_dict['PrimaryDithers'])
+                        int_dithers = int(observation_dict['PrimaryDithers'])
                     except ValueError:
                         observation_dict['PrimaryDitherType'] = copy.deepcopy(observation_dict['PrimaryDithers'])
                         observation_dict['PrimaryDithers'] = observation_dict['PrimaryDithers'][0]
                     observation_dict['DitherSize'] = prime_template.find(prime_ns + 'DitherSize').text
-                    number_of_primary_dithers = np.int(observation_dict['PrimaryDithers'][0])
+                    number_of_primary_dithers = int(observation_dict['PrimaryDithers'][0])
                     number_of_subpixel_dithers = 1
 
             # Combine primary and subpixel dithers
@@ -818,7 +818,7 @@ class ReadAPTXML():
                     number_of_primary_dithers = int(element.text)
                 elif element_tag_stripped == 'SubpixelPositions':
                     if element.text != 'NONE':
-                        number_of_subpixel_positions = np.int(element.text)
+                        number_of_subpixel_positions = int(element.text)
                 elif element_tag_stripped == 'PrimaryDithers':
                     if (element.text is not None) & (element.text != 'NONE'):
                         number_of_primary_dithers = int(element.text)
@@ -862,7 +862,7 @@ class ReadAPTXML():
                         if (number_of_dithers is None) | (number_of_dithers == 'NONE'):
                             number_of_dithers = 1 * number_of_subpixel_positions
 
-                        exposure_dict[dither_key_name] = np.int(number_of_dithers)
+                        exposure_dict[dither_key_name] = int(number_of_dithers)
                         exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
 
                         for exposure_parameter in exposure:
@@ -2376,7 +2376,7 @@ class ReadAPTXML():
             astrometric_exp_dict = {}
             astrometric_exposures = copy.deepcopy(self.empty_exposures_dictionary)
 
-            astrometric_exp_dict[dither_key_name] = np.int(number_of_astrometric_dithers)
+            astrometric_exp_dict[dither_key_name] = int(number_of_astrometric_dithers)
             astrometric_exp_dict['number_of_dithers'] = astrometric_exp_dict[dither_key_name]
             astrometric_exp_dict[filter_key_name] = ta_filter
             astrometric_exp_dict['ReadoutPattern'] = astrom_readout_pattern
@@ -2424,7 +2424,7 @@ class ReadAPTXML():
                 exposure_dict = {}
 
                 # Load dither information into dictionary
-                exposure_dict[dither_key_name] = np.int(number_of_dithers)
+                exposure_dict[dither_key_name] = int(number_of_dithers)
                 exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
                 exposure_dict['ReadoutPattern'] = element.find(ncc + 'ReadoutPattern').text
                 exposure_dict['Groups'] = element.find(ncc + 'Groups').text
@@ -2645,7 +2645,7 @@ class ReadAPTXML():
                 exposure_dict = {}
 
                 # Load dither information into dictionary
-                exposure_dict[dither_key_name] = np.int(number_of_dithers)
+                exposure_dict[dither_key_name] = int(number_of_dithers)
                 exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
                 exposure_dict['ReadoutPattern'] = element.find(mc + 'ReadoutPattern').text
                 exposure_dict['Groups'] = element.find(mc + 'Groups').text
@@ -2926,8 +2926,8 @@ class ReadAPTXML():
         if subpix_dithers.upper() == 'NONE':
             subpix_dithers = 1
 
-        number_of_primary_dithers = np.int(primary_dithers)
-        number_of_subpixel_dithers = np.int(subpix_dithers)
+        number_of_primary_dithers = int(primary_dithers)
+        number_of_subpixel_dithers = int(subpix_dithers)
 
         # Combine primary and subpixel dithers
         number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
@@ -2938,7 +2938,7 @@ class ReadAPTXML():
         if direct_imaging.upper() == 'TRUE':
             image_dithers = template.find(ns + 'ImageDithers').text
             if image_dithers.upper() != 'NONE':
-                number_of_direct_dithers = np.int(image_dithers)
+                number_of_direct_dithers = int(image_dithers)
             else:
                 number_of_direct_dithers = 1
 
@@ -3006,11 +3006,11 @@ class ReadAPTXML():
                     direct_dict = {}
 
                     # Load dither information into dictionary
-                    exposure_dict[dither_key_name] = np.int(number_of_dithers)
+                    exposure_dict[dither_key_name] = int(number_of_dithers)
                     exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
 
                     if direct_imaging.upper() == 'TRUE':
-                        direct_dict[dither_key_name] = np.int(number_of_direct_dithers)
+                        direct_dict[dither_key_name] = int(number_of_direct_dithers)
                         direct_dict['number_of_dithers'] = direct_dict[dither_key_name]
 
                     # Store all entries in exposure_dict as lists, so that everything
@@ -3397,7 +3397,7 @@ class ReadAPTXML():
                 dither_direct = prime_template.find(prime_ns + 'DitherNirissWfssDirectImages').text
                 sdither_type_grism = prime_template.find(prime_ns + 'CoordinatedParallelSubpixelPositions').text
                 try:
-                    sdither_grism = str(np.int(sdither_type_grism[0]))
+                    sdither_grism = str(int(sdither_type_grism[0]))
                 except ValueError:
                     sdither_grism = prime_template.find(prime_ns + 'SubpixelPositions').text
             elif prime_instrument.upper() == 'MIRI':
@@ -3428,14 +3428,14 @@ class ReadAPTXML():
             # (e.g. '2-POINT-LARGE-NIRCam')
             dvalue = template.find(ns + 'PrimaryDithers').text
             try:
-                pdither_grism = str(np.int(dvalue))
+                pdither_grism = str(int(dvalue))
             except ValueError:
                 # When NIRISS is prime with NIRCam parallel, the PrimaryDithers field can be
                 # (e.g. '2-POINT-LARGE-NIRCAM'), where the first character is always the number
                 # of dither positions. Not sure how to save both this name as well as the DitherSize
                 # value. I don't think there are header keywords for both, with PATTTYPE being the
                 # only keyword for dither pattern names.
-                pdither_grism = str(np.int(dvalue[0]))
+                pdither_grism = str(int(dvalue[0]))
 
         # Check if this observation has parallels
         coordinated_parallel = obs.find(self.apt + 'CoordinatedParallel').text
