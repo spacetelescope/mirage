@@ -811,7 +811,7 @@ class AptInput:
                 elif line.split()[0] == 'JWST':
                     propid_header = line.split()[7]
                     try:
-                        propid = np.int(propid_header)
+                        propid = int(propid_header)
                     except ValueError:
                         # adopt value passed to function
                         pass
@@ -856,7 +856,7 @@ class AptInput:
                         # These have Exp values of 0. Sigh.
 
 
-                        if ((np.int(elements[1]) > 0) & ('NRC' in elements[4]
+                        if ((int(elements[1]) > 0) & ('NRC' in elements[4]
                                                          or 'NIS' in elements[4]
                                                          or 'FGS' in elements[4]
                                                          or 'NRS' in elements[4]
@@ -886,11 +886,11 @@ class AptInput:
                             # number to be constructed.
                             seq = '1'
                             seq_id.append(seq)
-                            tar.append(np.int(elements[0]))
-                            tile.append(np.int(elements[1]))
+                            tar.append(int(elements[0]))
+                            tile.append(int(elements[1]))
                             exnum = str(elements[2]).zfill(5)
                             exp.append(exnum)
-                            dith.append(np.int(elements[3]))
+                            dith.append(int(elements[3]))
 
                             ap = elements[4]
                             if ('GRISMR_WFSS' in elements[4]):
@@ -899,22 +899,22 @@ class AptInput:
                                 ap = ap.replace('GRISMC_WFSS', 'FULL')
 
                             aperture.append(ap)
-                            targ1.append(np.int(elements[5]))
+                            targ1.append(int(elements[5]))
                             targ2.append(elements[6])
                             ra.append(elements[7])
                             dec.append(elements[8])
                             basex.append(elements[9])
                             basey.append(elements[10])
-                            dithx.append(np.float(elements[11]))
-                            dithy.append(np.float(elements[12]))
-                            v2.append(np.float(elements[13]))
-                            v3.append(np.float(elements[14]))
-                            idlx.append(np.float(elements[15]))
-                            idly.append(np.float(elements[16]))
+                            dithx.append(float(elements[11]))
+                            dithy.append(float(elements[12]))
+                            v2.append(float(elements[13]))
+                            v3.append(float(elements[14]))
+                            idlx.append(float(elements[15]))
+                            idly.append(float(elements[16]))
                             level.append(elements[17])
                             type_str.append(elements[18])
-                            expar.append(np.int(elements[19]))
-                            dkpar.append(np.int(elements[20]))
+                            expar.append(int(elements[19]))
+                            dkpar.append(int(elements[20]))
 
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
@@ -1198,8 +1198,8 @@ def make_start_times(obs_info, offline=False):
 
         # Find the readpattern of the file
         readpatt = obs_info['ReadoutPattern'][i]
-        groups = np.int(obs_info['Groups'][i])
-        integrations = np.int(obs_info['Integrations'][i])
+        groups = int(obs_info['Groups'][i])
+        integrations = int(obs_info['Integrations'][i])
 
         if instrument.lower() in ['miri', 'nirspec']:
             nframe.append(0)
@@ -1219,8 +1219,8 @@ def make_start_times(obs_info, offline=False):
                                     .format(readpatt)))
 
             # Now get nframe and nskip so we know how many frames in a group
-            fpg = np.int(readpatt_def['nframe'][match2][0])
-            spg = np.int(readpatt_def['nskip'][match2][0])
+            fpg = int(readpatt_def['nframe'][match2][0])
+            spg = int(readpatt_def['nskip'][match2][0])
             nframe.append(fpg)
             nskip.append(spg)
 
@@ -1407,10 +1407,10 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
     for i in range(len(exposure_dict['Module'])):
         siaf_instrument = exposure_dict["Instrument"][i]
         aperture_name = exposure_dict['aperture'][i]
-        pointing_ra = np.float(exposure_dict['ra'][i])
-        pointing_dec = np.float(exposure_dict['dec'][i])
-        pointing_v2 = np.float(exposure_dict['v2'][i])
-        pointing_v3 = np.float(exposure_dict['v3'][i])
+        pointing_ra = float(exposure_dict['ra'][i])
+        pointing_dec = float(exposure_dict['dec'][i])
+        pointing_v2 = float(exposure_dict['v2'][i])
+        pointing_v3 = float(exposure_dict['v3'][i])
 
         # When we run across a LW grism TS aperture, save
         # the aperture name, because we'll need it when looking
@@ -1430,9 +1430,9 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
             intermediate_apertures.append(None)
 
         if 'pav3' in exposure_dict.keys():
-            pav3 = np.float(exposure_dict['pav3'][i])
+            pav3 = float(exposure_dict['pav3'][i])
         else:
-            pav3 = np.float(exposure_dict['PAV3'][i])
+            pav3 = float(exposure_dict['PAV3'][i])
 
         telescope_roll = pav3
 

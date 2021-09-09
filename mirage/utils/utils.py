@@ -1090,7 +1090,7 @@ def parse_RA_Dec(ra_string, dec_string):
     # First, a quick check to see if the inputs are in
     # decimal degrees already.
     try:
-        return np.float(ra_string), np.float(dec_string)
+        return float(ra_string), float(dec_string)
     except ValueError:
         pass
 
