@@ -78,6 +78,7 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
         The second element is a short string describing the
         result.
     """
+    absolute_upper_limit = 1.5
     result = True, 'correct'
     ndims = len(lib.data.shape)
     if ndims == 3:
@@ -85,7 +86,7 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
             total_signal = np.sum(lib.data[i, :, :])
             total_signal /= lib.meta['oversamp'][0]**2
             if total_signal > upper_limit:
-                if renorm_psfs_above_1:
+                if renorm_psfs_above_1 and total_signal < absolute_upper_limit:
                     lib.data[i, :, :] = lib.data[i, :, :] / total_signal
                 else:
                     result = False, 'too high'
