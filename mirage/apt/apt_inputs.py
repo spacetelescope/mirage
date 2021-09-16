@@ -594,10 +594,10 @@ class AptInput:
                     # we already know from the 'aperture' key in the input dictionary
                     detectors = [input_dictionary['aperture'][index][3:5]]
 
-                    # Reset the mode of the TA and initial confirmation image for coronagraphic
-                    # observations to be imaging
-                    if '_TA' in input_dictionary['aperture'][index] or '_FSTA' in input_dictionary['aperture'][index]:
-                        input_dictionary['Mode'][index] = 'imaging'
+                    # Reset the mode of the coronagraphic observations to be imaging, since
+                    # 'coron' is not a supported mode, and those running Mirage with these
+                    # files currently have to manually switch the mode over to 'imaging'
+                    input_dictionary['Mode'][index] = 'imaging'
 
                 n_detectors = len(detectors)
                 for key in input_dictionary:
