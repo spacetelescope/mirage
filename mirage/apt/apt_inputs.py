@@ -463,7 +463,7 @@ class AptInput:
                 matched_apertures = []
                 for mod in module:
                     good = [ap for ap in matched_allmod_apertures if 'NRC{}'.format(mod) in ap]
-
+                    matched_apertures.extend(good)
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
                     mode = input_dictionary['Mode'][index]
                     template = input_dictionary['APTTemplate'][index]
@@ -472,7 +472,7 @@ class AptInput:
                             # This block should catch full-frame observations
                             # in either imaging (including TS imaging) or
                             # wfss mode
-                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
+                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap if 'MASK' not in ap])
                             matched_apertures = []
                             detectors = []
                             for ap in matched_aps:
