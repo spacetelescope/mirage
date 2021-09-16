@@ -2254,10 +2254,23 @@ class ReadAPTXML():
             number_of_subpixel_dithers = int(subpix_dithers_pattern[0])
         else:
             number_of_subpixel_dithers = 1
-        number_of_astrometric_dithers = 0 # it's optional, and off by default
+        number_of_astrometric_dithers = 1 # it's optional, and off by default
 
         coronmask = template.find(ncc + 'CoronMask').text
 
+        # APT outputs the incorrect aperture name. It specifies
+        # SUB320 for both MASK430R and MASKLWB cases. Fix that here.
+        if subarray != 'FULL':
+            if coronmask == 'MASK430R':
+                subarray = 'SUB320{}430R'.format(mod)
+            elif coronmask == 'MASKLWB':
+                subarray = 'SUB320{}LWB'.format(mod)
+            elif coronmask == 'MASK335R':
+                subarray = 'SUB320{}335R'.format(mod)
+            elif coronmask == 'MASKSWB':
+                subarray = 'SUB640{}SWB'.format(mod)
+            elif coronmask == 'MASK210R':
+                subarray = 'SUB640{}210R'.format(mod)
 
         coron_sci_detector = 'A2' if coronmask=='MASK210R' else \
                        'A4' if coronmask=='MASKSWB' else 'A5'
@@ -2358,7 +2371,7 @@ class ReadAPTXML():
                 elif key == 'Tracking':
                     value = tracking
                 elif key == 'Mode':
-                    value = 'imaging'
+                    value = 'coron'
                 elif key == 'Module':
                     value = mod
                 elif key == 'Subarray':
@@ -2403,7 +2416,7 @@ class ReadAPTXML():
                 elif key == 'Tracking':
                     dir_value = tracking
                 elif (key == 'Mode'):
-                    dir_value = 'imaging'
+                    dir_value = 'coron'
                 elif key == 'Module':
                     dir_value = mod
                 elif key == 'Subarray':
@@ -2466,9 +2479,17 @@ class ReadAPTXML():
                     elif key == 'Subarray':
                         value = subarray
                     elif key == 'PrimaryDithers':
-                        value = primary_dithers_pattern
+                        value = number_of_primary_dithers
+                        print('num primary: ', value)
                     elif key == 'SubpixelPositions':
+                        value = number_of_subpixel_dithers
+                        print('num subpix: ', value)
+                    elif key == 'PrimaryDitherType':
+                        value = primary_dithers_pattern
+                        print('primary dither type: ', value)
+                    elif key == 'SubpixelDitherType':
                         value = subpix_dithers_pattern
+                        print('subpix dither type: ', value)
                     else:
                         value = str(None)
                     science_exposures[key].append(value)

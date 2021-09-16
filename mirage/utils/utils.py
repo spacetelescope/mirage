@@ -784,8 +784,17 @@ def get_subarray_info(params, subarray_table):
     """
     logger = logging.getLogger('mirage.utils.utils.get_subarray_info')
 
-    if params['Readout']['array_name'] in subarray_table['AperName']:
-        mtch = params['Readout']['array_name'] == subarray_table['AperName']
+    array_name = params['Readout']['array_name']
+    # For MASKSWB and MASKLWB apertures, the filter name is part of the aperture
+    # name. But the subarray definition file contains only an entry for the aperture
+    # name without the filter name. In that case, strip off the filter name here
+    # before checking the definition file
+    if '_MASKLWB' in array_name or '_MASKSWB' in array_name:
+        pieces = array_name.split('_')
+        array_name = '{}_{}'.format(pieces[0], pieces[1])
+
+    if array_name in subarray_table['AperName']:
+        mtch = array_name == subarray_table['AperName']
         namps = subarray_table['num_amps'].data[mtch][0]
         if namps != 0:
             params['Readout']['namp'] = int(namps)
@@ -800,16 +809,16 @@ def get_subarray_info(params, subarray_table):
                 else:
                     raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
                                       "'Readout':'namp' in the input yaml file to one of these values."
-                                      .format(params['Readout']['array_name'])))
+                                      .format(array_name)))
             except KeyError:
                 raise KeyError(("WARNING: 'Readout':'namp' not present in input yaml file. "
                                 "{} aperture requires the number of amps to be 1 or 4. Please set "
                                 "'Readout':'namp' in the input yaml file to one of these values."
-                                .format(params['Readout']['array_name'])))
+                                .format(array_name)))
     else:
         raise ValueError(("WARNING: subarray name {} not found in the "
                           "subarray dictionary {}."
-                          .format(params['Readout']['array_name'],
+                          .format(array_name,
                                   params['Reffiles']['subarray_defs'])))
     return params
 
@@ -1225,7 +1234,7 @@ def standardize_filters(instrument, filter_values):
     if instrument.lower() == 'fgs':
         return filter_values
     elif instrument.lower() == 'nircam':
-        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC', 'GDHS0', 'GDHS60']
+        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC', 'GDHS0', 'GDHS60', 'MASKRND', 'MASKBAR']
         reverse_nircam_2_filter_crosses = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in NIRCAM_2_FILTER_CROSSES]
         wlp8_combinations = ['{}/WLP8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
         wlm8_combinations = ['{}/WLM8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
