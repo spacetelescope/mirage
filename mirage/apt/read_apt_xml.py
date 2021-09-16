@@ -2278,11 +2278,11 @@ class ReadAPTXML():
 
 
         if using_lw: # Long wave channel is being used
-            long_pupil = 'MASKLWB' if coronmask=='MASKLWB' else 'MASKRND'
+            long_pupil = 'MASKBAR' if coronmask=='MASKLWB' else 'MASKRND'
             short_pupil = 'n/a'    # not even read out, no data downloaded
             filter_key_name = 'LongFilter'
         else: # Short wave channel
-            short_pupil = 'MASKSWB' if coronmask == 'MASKSWB' else 'MASKRND'
+            short_pupil = 'MASKBAR' if coronmask == 'MASKSWB' else 'MASKRND'
             long_pupil = 'n/a'
             filter_key_name = 'ShortFilter'
 
