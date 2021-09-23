@@ -873,7 +873,7 @@ class ReadAPTXML():
 
                             # NIRISS imaging mode does not contain a Pupil entry in the xml file.
                             # Determine which wheel the listed filter is in, and populate the
-                            # dictionary acordingly
+                            # dictionary accordingly
                             if instrument.lower() == 'niriss':
                                 if parameter_tag_stripped == 'Filter':
                                     filt_wave = int(exposure_parameter.text[1:4])
