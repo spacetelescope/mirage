@@ -247,6 +247,13 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         pad = 0.062 * 1024 * 1.5
         delta_lon = np.max(longitudes) - np.min(longitudes) + pad
         delta_lat = np.max(latitudes) - np.min(latitudes) + pad
+        # In the case of a single target we need to make the pad large
+        # enough to cover the entire FOV. Let's make it 6' x 6'
+        if (delta_lon == pad or delta_lat == pad):
+            pad = 6. * 60.
+            delta_lon = pad
+            delta_lat = pad
+
         full_width = max(delta_lon, delta_lat)
 
         if ((np.min(ralist) <= (catalog_splitting_threshold)) & (np.max(ralist) >= (360.-catalog_splitting_threshold))):
@@ -268,6 +275,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         starting_index = 1
 
         if point_source:
+            ptsrc_cat = None
             for i, instrument in enumerate(instrument_filter_dict):
                 logger.info('\n--- Creating {} point source catalog ---'.format(instrument))
                 filter_list = list(set(instrument_filter_dict[instrument]))
@@ -276,9 +284,9 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                                                         instrument=instrument, filters=filter_list,
                                                         ra_column_name=ra_column_name, dec_column_name=dec_column_name,
                                                         starting_index=starting_index, wise_catalog=wise_catalog)
-                if i == 0:
+                if ptsrc_cat is None:
                     ptsrc_cat = copy.deepcopy(tmp_cat)
-                else:
+                elif ptsrc_cat is not None and tmp_cat is not None:
                     ptsrc_cat = combine_catalogs(ptsrc_cat, tmp_cat, starting_index=starting_index)
 
             starting_index += len(ptsrc_cat)
@@ -303,6 +311,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
             ptsrc_cat = None
 
         if extragalactic:
+            galaxy_cat = None
             for i, instrument in enumerate(instrument_filter_dict):
                 logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
                 filter_list = list(set(instrument_filter_dict[instrument]))
@@ -310,9 +319,9 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
                                                       filter_list, boxflag=False, brightlimit=14.0,
                                                       seed=galaxy_seed, starting_index=starting_index)
 
-                if i == 0:
+                if galaxy_cat is None:
                     galaxy_cat = copy.deepcopy(tmp_cat)
-                else:
+                elif galaxy_cat is not None and tmp_cat is not None:
                     galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
 
             starting_index += len(galaxy_cat)
@@ -2397,8 +2406,8 @@ def galaxy_background(ra0, dec0, v3rotangle, box_width, instrument, filters,
     nfilters = len(filter_names)
     if nfilters < 1:
         logger.error('Error matching filters to standard list.  Inputs are:')
-        logger.error('Instrument: ', instrument)
-        logger.error('Filter names: ', filters)
+        logger.error('Instrument: {}'.format(instrument))
+        logger.error('Filter names: {}'.format(filters))
         return None, None
     # add 8 to these indexes to get the columns in the GODDS-S catalogue file
     #

@@ -871,6 +871,19 @@ class ReadAPTXML():
                             #     print('{} {}'.format(parameter_tag_stripped, exposure_parameter.text))
                             exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
+                            # NIRISS imaging mode does not contain a Pupil entry in the xml file.
+                            # Determine which wheel the listed filter is in, and populate the
+                            # dictionary acordingly
+                            if instrument.lower() == 'niriss':
+                                if parameter_tag_stripped == 'Filter':
+                                    filt_wave = int(exposure_parameter.text[1:4])
+                                    if filt_wave > 200:
+                                        exposure_dict['FilterWheel'] = exposure_parameter.text
+                                        exposure_dict['PupilWheel'] = 'CLEARP'
+                                    else:
+                                        exposure_dict['FilterWheel'] = 'CLEAR'
+                                        exposure_dict['PupilWheel'] = exposure_parameter.text
+
                         # fill dictionary to return
                         for key in self.APTObservationParams_keys:
                             if key in exposure_dict.keys():
@@ -3180,6 +3193,7 @@ class ReadAPTXML():
             ta_dict['Groups'] = ta_groups
             ta_dict['Integrations'] = 1
             ta_dict['FilterWheel'] = ta_filter
+            ta_dict['Filter'] = ta_filter
 
             if 'BRIGHT' in ta_mode.upper():
                 ta_dict['PupilWheel'] = 'NRM'
