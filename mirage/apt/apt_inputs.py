@@ -1116,7 +1116,7 @@ def get_filters(pointing_info):
             short_filters = np.array(pointing_info['FilterWheel'])[good]
             short_pupils = np.array(pointing_info['PupilWheel'])[good]
 
-            short_filter_only = np.where(short_pupils == 'CLEAR')[0]
+            short_filter_only = np.where(((short_pupils == 'CLEAR') | (short_pupils == 'CLEARP')))[0]
             filter_list = list(set(short_pupils))
 
             # Remove CLEAR and non-imaging elements if present
