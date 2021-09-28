@@ -609,10 +609,12 @@ class GrismTSO():
         # help align the split files between the seed image and the dark
         # object later (which is split by groups).
         if self.split_seed:
+            forced_ints_per_file = int(self.frames_per_int / self.numgroups) * (self.int_segment_indexes[1] - self.int_segment_indexes[0])
             split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.seed_dimensions[1],
                                                                                                 self.seed_dimensions[0],
                                                                                                 self.numgroups,
-                                                                                                self.numints)
+                                                                                                self.numints,
+                                                                                                force_delta_int=forced_ints_per_file)
 
             # In order to avoid the case of having a single integration
             # in the final file, which leads to rate rather than rateints
@@ -1135,8 +1137,8 @@ class GrismTSO():
                                                     '_tso_grism_sources.{}'.format(suffix))
         utils.write_yaml(tso_params, self.tso_paramfile)
 
-    @staticmethod
-    def tso_catalog_check(catalog, exp_time):
+    #@staticmethod
+    def tso_catalog_check(self, catalog, exp_time):
         """Check that the start and end times specified in the TSO catalog file (which are
         used to calculate the lightcurves) are long enough to encompass the entire exposure.
         If not, extend the end time to the required time.

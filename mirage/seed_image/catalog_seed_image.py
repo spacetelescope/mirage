@@ -231,10 +231,13 @@ class Catalog_seed():
             # help align the split files between the seed image and the dark
             # object later (which is split by groups).
             if split_seed:
+                delta_index = integration_segment_indexes[1] - integration_segment_indexes[0]
+                forced_ints_per_file = int(self.frames_per_integration / self.params['Readout']['ngroup']) * delta_index
                 split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.output_dims[1],
                                                                                                     self.output_dims[0],
                                                                                                     self.params['Readout']['ngroup'],
-                                                                                                    self.params['Readout']['nint'])
+                                                                                                    self.params['Readout']['nint'],
+                                                                                                    force_delta_int=forced_ints_per_file)
 
 
                 #print('\nOutputs:')
