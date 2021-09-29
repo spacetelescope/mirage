@@ -1047,7 +1047,7 @@ class GrismTSO():
         seed_header['SEGFRMST'] = self.segment_frame_start_number
         seed_header['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         seed_header['SEGINTST'] = self.segment_int_start_number
-        seed_header['SEGINTED'] = self.segment_int_start_number + self.segment_ints #integ - 1
+        seed_header['SEGINTED'] = self.segment_int_start_number + self.segment_ints
 
         # Frame and integration indexes of the part within the segment
         seed_header['PTINTSRT'] = self.part_int_start_number
@@ -1137,7 +1137,6 @@ class GrismTSO():
                                                     '_tso_grism_sources.{}'.format(suffix))
         utils.write_yaml(tso_params, self.tso_paramfile)
 
-    #@staticmethod
     def tso_catalog_check(self, catalog, exp_time):
         """Check that the start and end times specified in the TSO catalog file (which are
         used to calculate the lightcurves) are long enough to encompass the entire exposure.
