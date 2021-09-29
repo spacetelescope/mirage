@@ -983,7 +983,7 @@ class Catalog_seed():
         kw['SEGFRMST'] = self.segment_frame_start_number
         kw['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         kw['SEGINTST'] = self.segment_int_start_number
-        kw['SEGINTED'] = self.segment_int_start_number + integ - 1
+        kw['SEGINTED'] = self.segment_int_start_number + self.segment_ints  # integ - 1
 
         # Frame and integration indexes of the part within the segment
         kw['PTINTSRT'] = self.part_int_start_number
