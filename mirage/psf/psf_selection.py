@@ -86,9 +86,12 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
             total_signal = np.sum(lib.data[i, :, :])
             total_signal /= lib.meta['oversamp'][0]**2
             if total_signal > upper_limit:
-                if renorm_psfs_above_1 and total_signal < absolute_upper_limit:
+                if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
                     lib.data[i, :, :] = lib.data[i, :, :] / total_signal
-                else:
+                elif:
+                    # We will end up here if the total signal is above 1,
+                    # and renorm_psfs_above_1 is not set or if the signal is
+                    # above 1.5.
                     result = False, 'too high'
             elif total_signal < lower_limit:
                 result = False, 'too low'
@@ -97,9 +100,12 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
         total_signal = np.sum(lib.data)
         total_signal /= lib.meta['oversamp'][0]**2
         if total_signal > upper_limit:
-            if renorm_psfs_above_1:
+            if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
                     lib.data = lib.data / total_signal
             else:
+                # We will end up here if the total signal is above 1,
+                # and renorm_psfs_above_1 is not set or if the signal is
+                # above 1.5.
                 result = False, 'too high'
         elif total_signal < lower_limit:
             result = False, 'too low'
