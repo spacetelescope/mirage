@@ -88,7 +88,7 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
             if total_signal > upper_limit:
                 if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
                     lib.data[i, :, :] = lib.data[i, :, :] / total_signal
-                elif:
+                else:
                     # We will end up here if the total signal is above 1,
                     # and renorm_psfs_above_1 is not set or if the signal is
                     # above 1.5.
