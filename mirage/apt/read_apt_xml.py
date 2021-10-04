@@ -2480,16 +2480,12 @@ class ReadAPTXML():
                         value = subarray
                     elif key == 'PrimaryDithers':
                         value = number_of_primary_dithers
-                        print('num primary: ', value)
                     elif key == 'SubpixelPositions':
                         value = number_of_subpixel_dithers
-                        print('num subpix: ', value)
                     elif key == 'PrimaryDitherType':
                         value = primary_dithers_pattern
-                        print('primary dither type: ', value)
                     elif key == 'SubpixelDitherType':
                         value = subpix_dithers_pattern
-                        print('subpix dither type: ', value)
                     else:
                         value = str(None)
                     science_exposures[key].append(value)

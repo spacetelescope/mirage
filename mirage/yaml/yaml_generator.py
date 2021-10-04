@@ -913,16 +913,6 @@ class SimInput:
 
             # Note that changing the == below to 'is' results in an error
             pri_indexes = np.where(obs_entries == False)[0]
-
-            self.logger.info('\n\n\n')
-            self.logger.info(self.info['detector'])
-            self.logger.info(obs_indexes)
-            self.logger.info(obs_entries)
-            self.logger.info(pri_indexes)
-            self.logger.info('\n\n\n')
-
-
-
             prime_instrument = self.info['Instrument'][obs_indexes[pri_indexes[0]]]
 
             if prime_instrument.upper() == 'NIRCAM':
