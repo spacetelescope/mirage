@@ -1047,7 +1047,7 @@ class GrismTSO():
         seed_header['SEGFRMST'] = self.segment_frame_start_number
         seed_header['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         seed_header['SEGINTST'] = self.segment_int_start_number
-        seed_header['SEGINTED'] = self.segment_int_start_number + self.segment_ints
+        seed_header['SEGINTED'] = self.segment_int_start_number + self.segment_ints - 1
 
         # Frame and integration indexes of the part within the segment
         seed_header['PTINTSRT'] = self.part_int_start_number
