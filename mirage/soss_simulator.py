@@ -21,7 +21,7 @@ import yaml
 import astropy.units as q
 import astropy.constants as ac
 from astropy.io import fits
-from astropy.modeling.models import BlackBody1D, Voigt1D, Gaussian1D, Lorentz1D
+from astropy.modeling.models import BlackBody, Voigt1D, Gaussian1D, Lorentz1D
 from astropy.modeling.blackbody import FLAM
 import astropy.table as at
 from astropy.time import Time, TimeDelta
@@ -204,7 +204,7 @@ class SossSim():
         self.lines.add_row([name, profile, x_0, amplitude, fwhm, line])
 
     @run_required
-    def add_noise(self, skip_dark=False):
+    def add_noise(self, override_refs=None, skip_dark=False):
         """
         Run the signal data through the ramp generator
         """
@@ -269,7 +269,7 @@ class SossSim():
             obs.segmap = segmap
             obs.seedheader = seedinfo
             obs.paramfile = self.paramfile
-            obs.create()
+            obs.create(override_refs=override_refs)
 
             if nfiles > 1:
                 os.system('mv {} {}'.format(seedfile, seedfile.replace('_seed_image.fits', '_seg{}_part001_seed_image.fits'.format(str(n + 1).zfill(3)))))

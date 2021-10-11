@@ -9,7 +9,7 @@ dependencies:
 - numpy
 - pip:
     - asdf==2.7.2
-    - astropy==4.2
+    - astropy==4.3.1
     - astroquery==0.4.1
     - bokeh>=2.2.3
     - batman-package==2.4.8

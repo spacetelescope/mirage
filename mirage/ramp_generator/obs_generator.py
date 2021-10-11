@@ -1049,10 +1049,14 @@ class Observation():
         return crhits, crs_perframe
 
     @logging_functions.log_fail
-    def create(self):
+    def create(self, override_refs=None):
         """MAIN FUNCTION"""
         # Read in the parameter file
         self.read_parameter_file()
+
+        # Override reference files
+        if override_refs is not None:
+            self.params['Reffiles'].update(override_refs)
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
