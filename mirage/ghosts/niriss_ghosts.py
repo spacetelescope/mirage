@@ -167,7 +167,7 @@ def get_ghost(x, y, flux, filter_name, pupil_name, gap_file, shift=0, log_skippe
     return xgs, ygs, flux_gs
 
 
-def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_file, log_skipped_filters=False):
+def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_file, filter_value_ghost, log_skipped_filters=False):
     """Works only for NIRISS. Given a row from a source catalog, create a ghost source
     catalog containing the magnitudes of the ghost associated with the source in all
     filters contained in the original catalog.
@@ -191,6 +191,9 @@ def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_
         If False, notices of skipped magnitude translations will not be logged.
         This is convenient for catalogs with lots of sources, because otherwise
         there can be many repeats of the message.
+
+    filter_value_ghost : str
+        CLEAR or GR150, to select frac50 of ghosts from gap_summary_file.
 
     Returns
     -------
@@ -237,7 +240,9 @@ def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_
                                             vegamag_zeropoint=vegazeropoint)
 
         # Get the count rate associated with the ghost
-        _, _, ghost_countrate = get_ghost(1024, 1024, countrate, filter_value, pupil_value, gap_summary_file,
+        if filter_value_ghost[0] == 'G':
+            filter_value_ghost = 'GR150'
+        _, _, ghost_countrate = get_ghost(1024, 1024, countrate, filter_value_ghost, pupil_value, gap_summary_file,
                                           log_skipped_filters=log_skipped_filters)
 
         # Convert count rate to magnitude

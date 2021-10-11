@@ -57,7 +57,8 @@ import yaml
 from . import read_apt_xml
 from ..logging import logging_functions
 from ..utils import siaf_interface, constants, utils
-from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils.constants import NIRCAM_UNSUPPORTED_PUPIL_VALUES, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, \
+                                   NIRCAM_LW_GRISMTS_APERTURES, NIRCAM_SW_GRISMTS_APERTURES
 
 
 classpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
@@ -810,7 +811,7 @@ class AptInput:
                 elif line.split()[0] == 'JWST':
                     propid_header = line.split()[7]
                     try:
-                        propid = np.int(propid_header)
+                        propid = int(propid_header)
                     except ValueError:
                         # adopt value passed to function
                         pass
@@ -855,7 +856,7 @@ class AptInput:
                         # These have Exp values of 0. Sigh.
 
 
-                        if ((np.int(elements[1]) > 0) & ('NRC' in elements[4]
+                        if ((int(elements[1]) > 0) & ('NRC' in elements[4]
                                                          or 'NIS' in elements[4]
                                                          or 'FGS' in elements[4]
                                                          or 'NRS' in elements[4]
@@ -885,11 +886,11 @@ class AptInput:
                             # number to be constructed.
                             seq = '1'
                             seq_id.append(seq)
-                            tar.append(np.int(elements[0]))
-                            tile.append(np.int(elements[1]))
+                            tar.append(int(elements[0]))
+                            tile.append(int(elements[1]))
                             exnum = str(elements[2]).zfill(5)
                             exp.append(exnum)
-                            dith.append(np.int(elements[3]))
+                            dith.append(int(elements[3]))
 
                             ap = elements[4]
                             if ('GRISMR_WFSS' in elements[4]):
@@ -898,22 +899,22 @@ class AptInput:
                                 ap = ap.replace('GRISMC_WFSS', 'FULL')
 
                             aperture.append(ap)
-                            targ1.append(np.int(elements[5]))
+                            targ1.append(int(elements[5]))
                             targ2.append(elements[6])
                             ra.append(elements[7])
                             dec.append(elements[8])
                             basex.append(elements[9])
                             basey.append(elements[10])
-                            dithx.append(np.float(elements[11]))
-                            dithy.append(np.float(elements[12]))
-                            v2.append(np.float(elements[13]))
-                            v3.append(np.float(elements[14]))
-                            idlx.append(np.float(elements[15]))
-                            idly.append(np.float(elements[16]))
+                            dithx.append(float(elements[11]))
+                            dithy.append(float(elements[12]))
+                            v2.append(float(elements[13]))
+                            v3.append(float(elements[14]))
+                            idlx.append(float(elements[15]))
+                            idly.append(float(elements[16]))
                             level.append(elements[17])
                             type_str.append(elements[18])
-                            expar.append(np.int(elements[19]))
-                            dkpar.append(np.int(elements[20]))
+                            expar.append(int(elements[19]))
+                            dkpar.append(int(elements[20]))
 
                             # For the moment we assume that the instrument being simulated is not being
                             # run in parallel, so the parallel proposal number will be all zeros,
@@ -1115,10 +1116,16 @@ def get_filters(pointing_info):
             short_filters = np.array(pointing_info['FilterWheel'])[good]
             short_pupils = np.array(pointing_info['PupilWheel'])[good]
 
-            short_filter_only = np.where(short_pupils == 'CLEAR')[0]
+            short_filter_only = np.where(((short_pupils == 'CLEAR') | (short_pupils == 'CLEARP')))[0]
             filter_list = list(set(short_pupils))
-            filter_list.remove('CLEAR')
-            filter_list.append(list(set(short_filters[short_filter_only])))
+
+            # Remove CLEAR and non-imaging elements if present
+            niriss_clears = ['CLEAR', 'CLEARP', 'None', 'NRM', 'GR700XD', 'GR150R', 'GR150C']
+            for clear in niriss_clears:
+                if clear in filter_list:
+                    filter_list.remove(clear)
+
+            filter_list.extend(list(set(short_filters[short_filter_only])))
 
         filters[inst.upper()] = filter_list
     return filters
@@ -1191,8 +1198,8 @@ def make_start_times(obs_info, offline=False):
 
         # Find the readpattern of the file
         readpatt = obs_info['ReadoutPattern'][i]
-        groups = np.int(obs_info['Groups'][i])
-        integrations = np.int(obs_info['Integrations'][i])
+        groups = int(obs_info['Groups'][i])
+        integrations = int(obs_info['Integrations'][i])
 
         if instrument.lower() in ['miri', 'nirspec']:
             nframe.append(0)
@@ -1212,8 +1219,8 @@ def make_start_times(obs_info, offline=False):
                                     .format(readpatt)))
 
             # Now get nframe and nskip so we know how many frames in a group
-            fpg = np.int(readpatt_def['nframe'][match2][0])
-            spg = np.int(readpatt_def['nskip'][match2][0])
+            fpg = int(readpatt_def['nframe'][match2][0])
+            spg = int(readpatt_def['nskip'][match2][0])
             nframe.append(fpg)
             nskip.append(spg)
 
@@ -1382,39 +1389,50 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
     exposure_dict : dict
         Modified exposure dictionary with updated RA, Dec values for the pointing
     """
-    sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64',
-                            'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64']
+    #sw_grismts_apertures = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64', 'NRCA1_GRISMTS',
+    #                        'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64', 'NRCA3_GRISMTS']
 
-    lw_grismts_apertures = ['NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2',
-                            'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W']
+    #lw_grismts_apertures = ['NRCA5_GRISM256_F277W', 'NRCA5_GRISM128_F277W', 'NRCA5_GRISM64_F277W', 'NRCA5_GRISM_F277W',
+    #                        'NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2', 'NRCA5_GRISM_F322W2',
+    #                        'NRCA5_GRISM256_F356W', 'NRCA5_GRISM128_F356W', 'NRCA5_GRISM64_F356W', 'NRCA5_GRISM_F356W',
+    #                        'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W', 'NRCA5_GRISM_F444W']
 
-    intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
+    #intermediate_lw_grismts_apertures = ['NRCA5_TAGRISMTS_SCI_F444W', 'NRCA5_TAGRISMTS_SCI_F322W2']
 
     aperture_ra = []
     aperture_dec = []
+    intermediate_apertures = []
 
     lw_grismts_aperture = None
     for i in range(len(exposure_dict['Module'])):
         siaf_instrument = exposure_dict["Instrument"][i]
         aperture_name = exposure_dict['aperture'][i]
-        pointing_ra = np.float(exposure_dict['ra'][i])
-        pointing_dec = np.float(exposure_dict['dec'][i])
-        pointing_v2 = np.float(exposure_dict['v2'][i])
-        pointing_v3 = np.float(exposure_dict['v3'][i])
+        pointing_ra = float(exposure_dict['ra'][i])
+        pointing_dec = float(exposure_dict['dec'][i])
+        pointing_v2 = float(exposure_dict['v2'][i])
+        pointing_v3 = float(exposure_dict['v3'][i])
 
         # When we run across a LW grism TS aperture, save
         # the aperture name, because we'll need it when looking
         # at the accompanying SW apertuers to follow. THIS
         # RELIES ON THE LW ENTRY COMING BEFORE THE SW ENTRIES.
-        if aperture_name in lw_grismts_apertures:
+        # Also note that F277W, F322W2, and F356W all use the same
+        # intermeidate aperture, since their nominal apertures
+        # (i.e. NRCA5_GRISM64_F322W2, NRCA5_GRISM64_F277W) are all
+        # exactly the same as well.
+        if aperture_name in NIRCAM_LW_GRISMTS_APERTURES:
             lw_grismts_aperture = copy.deepcopy(aperture_name)
-            lw_filter = lw_grismts_aperture.split('_')[2]
-            lw_intermediate_aperture = [ap for ap in intermediate_lw_grismts_apertures if lw_filter in ap][0]
+            lw_intermediate_aperture = utils.get_lw_grism_tso_intermeidate_aperture(aperture_name)
+            intermediate_apertures.append(lw_intermediate_aperture)
+        elif aperture_name in NIRCAM_SW_GRISMTS_APERTURES:
+            intermediate_apertures.append(lw_intermediate_aperture)
+        else:
+            intermediate_apertures.append(None)
 
         if 'pav3' in exposure_dict.keys():
-            pav3 = np.float(exposure_dict['pav3'][i])
+            pav3 = float(exposure_dict['pav3'][i])
         else:
-            pav3 = np.float(exposure_dict['PAV3'][i])
+            pav3 = float(exposure_dict['PAV3'][i])
 
         telescope_roll = pav3
 
@@ -1423,8 +1441,12 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
         if 'NRCA5_GRISM' in aperture_name and 'WFSS' not in aperture_name:
             ra = pointing_ra
             dec = pointing_dec
+            #exposure_dict['aperture'][i] = lw_intermediate_aperture  This does not work, because the intermediate aperture is a small box, and mirage happily
+            #        creates a small square subarray when the seed image generator is run with this. we need something in catalog seed generator that knows
+            #        about the link between the grismts apertures and the intermediates and uses the intermediate in the Siaf instance. Also, there are
+            #        currently no intermediate apertures in pysiaf for the F277W, F356W filters. What happens (in APT/reality) in those cases?
         else:
-            if aperture_name in sw_grismts_apertures:
+            if aperture_name in NIRCAM_SW_GRISMTS_APERTURES:
                 # Special case. When looking at grism time series observation
                 # we force the pointing to be at the reference location of the
                 # LW *intermediate* aperture, rather than paying attention to
@@ -1438,7 +1460,8 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
                 lw_gts = siaf_instances[siaf_instrument][lw_intermediate_aperture]
                 pointing_v2 = lw_gts.V2Ref
                 pointing_v3 = lw_gts.V3Ref
-
+                aperture.V2Ref = pointing_v2
+                aperture.V3Ref = pointing_v3
 
             local_roll, attitude_matrix, fullframesize, subarray_boundaries = \
                 siaf_interface.get_siaf_information(siaf_instances[siaf_instrument], aperture_name,
@@ -1452,6 +1475,7 @@ def ra_dec_update(exposure_dict, siaf_instances, verbose=False):
         aperture_ra.append(ra)
         aperture_dec.append(dec)
 
+    exposure_dict['grismts_intermediate_aperture'] = intermediate_apertures
     exposure_dict['ra_ref'] = aperture_ra
     exposure_dict['dec_ref'] = aperture_dec
     return exposure_dict

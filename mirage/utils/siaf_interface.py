@@ -322,4 +322,4 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
     # we also want integer values as these will be indexes
     x_corner = np.array([np.ceil(x_corner[0]) - 1, np.floor(x_corner[1]) - 1])
     y_corner = np.array([np.ceil(y_corner[0]) - 1, np.floor(y_corner[1]) - 1])
-    return x_corner.astype(np.int), y_corner.astype(np.int)
+    return x_corner.astype(int), y_corner.astype(int)

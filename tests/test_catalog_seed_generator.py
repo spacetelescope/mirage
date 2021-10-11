@@ -91,7 +91,7 @@ def test_overlap_coordinates_full_frame():
 
     # Create a point sources table
     tab = Table()
-    tab['index'] = np.arange(10).astype(np.int) + 1
+    tab['index'] = np.arange(10).astype(int) + 1
     tab['pixelx'] = [1000, 50, 1000, 1900, -0.5, 1033.587, 622.63, 1523.75, 1013.413, 1124.371]
     tab['pixely'] = [1000, 400, 25, 2000, -0.5, 1023.425, 1024.223, 1013.25, 223.575, 1822.72]
     tab['RA_degrees'] = [12.008729, 11.999914, 12.003422, 11.995729, 12.000036, 11.99918, 12.008729,
@@ -178,7 +178,7 @@ def test_overlap_coordinates_subarray():
 
     # Create a point sources table
     tab = Table()
-    tab['index'] = np.arange(5).astype(np.int) + 1
+    tab['index'] = np.arange(5).astype(int) + 1
     tab['pixelx'] = [200, 50, 200, 350, -0.5]
     tab['pixely'] = [200, 200, 25, 350, -0.5]
     tab['RA_degrees'] = [12.008729, 11.999914, 12.003422, 11.995729, 11.995729]
