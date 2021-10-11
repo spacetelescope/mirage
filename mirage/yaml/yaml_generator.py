@@ -365,7 +365,7 @@ class SimInput:
         self.info['movingTargToTrack'] = [None] * n_exposures
 
         for i in range(n_exposures):
-            if np.int(self.info['detector'][i][-1]) < 5:
+            if int(self.info['detector'][i][-1]) < 5:
                 filtkey = 'ShortFilter'
                 pupilkey = 'ShortPupil'
             else:
@@ -849,19 +849,19 @@ class SimInput:
 
             # break dither number into numbers for primary
             # and subpixel dithers
-            tot_dith = np.int(file_dict['dither'])
-            # primarytot = np.int(file_dict['PrimaryDithers'])
-            primarytot = np.int(file_dict['number_of_dithers'])
+            tot_dith = int(file_dict['dither'])
+            # primarytot = int(file_dict['PrimaryDithers'])
+            primarytot = int(file_dict['number_of_dithers'])
 
             if isinstance(file_dict['SubpixelPositions'], str) and file_dict['SubpixelPositions'].upper() == 'NONE':
                 subpixtot = 1
             else:
                 try:
-                    subpixtot = np.int(file_dict['SubpixelPositions'])
+                    subpixtot = int(file_dict['SubpixelPositions'])
                 except:
-                    subpixtot = np.int(file_dict['SubpixelPositions'][0])
+                    subpixtot = int(file_dict['SubpixelPositions'][0])
             primary_dither = np.ceil(1. * tot_dith / subpixtot)
-            file_dict['primary_dither_num'] = np.int(primary_dither)
+            file_dict['primary_dither_num'] = int(primary_dither)
             subpix_dither = (tot_dith-1) % subpixtot
             file_dict['subpix_dither_num'] = subpix_dither + 1
 
@@ -898,8 +898,8 @@ class SimInput:
             all_obs_files = [m for m in self.info['yamlfile'] if m[7:10] == obs]
             total_files = len(all_obs_files)
 
-            obs_id_int = np.array([np.int(ele) for ele in self.info['ObservationID']])
-            obs_indexes = np.where(obs_id_int == np.int(obs))[0]
+            obs_id_int = np.array([int(ele) for ele in self.info['ObservationID']])
+            obs_indexes = np.where(obs_id_int == int(obs))[0]
             obs_entries = np.array(self.info['ParallelInstrument'])[obs_indexes]
             coord_par = self.info['CoordinatedParallel'][obs_indexes[0]]
             if coord_par:
@@ -1002,7 +1002,7 @@ class SimInput:
             # If kernel is 4 dimensional, extract the 3x3 kernel associated
             # with a single pixel
             if len(kernel.shape) == 4:
-                kernel = kernel[:, :, np.int(kshape[2]/2), np.int(kshape[2]/2)]
+                kernel = kernel[:, :, int(kshape[2]/2), int(kshape[2]/2)]
 
             if kernel[1, 1] < 1.0:
                 return (ifile, False)
@@ -1962,7 +1962,7 @@ class SimInput:
             pupilkey = 'PupilWheel'
             catkey = ''
         else:
-            if np.int(input['detector'][-1]) < 5:
+            if int(input['detector'][-1]) < 5:
                 filtkey = 'ShortFilter'
                 pupilkey = 'ShortPupil'
                 catkey = 'sw'
@@ -2012,6 +2012,7 @@ class SimInput:
                     full_ap = full_ap_new[0]
 
             f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
+            f.write('  intermediate_aperture: {}   # Name of intermediate aperture used in NIRCam Grism time series obs.\n'.format(input['grismts_intermediate_aperture']))
             f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
             f.write('  pupil: {}        # Pupil element for simulated data (CLEAR, GRISMC, etc)\n'.format(input[pupilkey]))
             f.write('\n')
@@ -2221,7 +2222,7 @@ class SimInput:
             # f.write("  obs_template: '{}'  # Observation template\n".format(input['obs_template']))
             f.write("  primary_dither_type: {}  # Primary dither pattern name\n".format(input['PrimaryDitherType']))
             f.write("  total_primary_dither_positions: {}  # Total number of primary dither positions\n".format(input['PrimaryDithers']))
-            f.write("  primary_dither_position: {}  # Primary dither position number\n".format(np.int(input['primary_dither_num'])))
+            f.write("  primary_dither_position: {}  # Primary dither position number\n".format(int(input['primary_dither_num'])))
             f.write("  subpix_dither_type: {}  # Subpixel dither pattern name\n".format(input['SubpixelDitherType']))
             # For WFSS we need to strip out the '-Points' from
             # the number of subpixel positions entry
@@ -2240,7 +2241,7 @@ class SimInput:
             # except:
             #     val = input['SubpixelPositions']
             f.write("  total_subpix_dither_positions: {}  # Total number of subpixel dither positions\n".format(val))
-            f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(np.int(input['subpix_dither_num'])))
+            f.write("  subpix_dither_position: {}  # Subpixel dither position number\n".format(int(input['subpix_dither_num'])))
             f.write("  xoffset: {}  # Dither pointing offset in x (arcsec)\n".format(input['idlx']))
             f.write("  yoffset: {}  # Dither pointing offset in y (arcsec)\n".format(input['idly']))
 

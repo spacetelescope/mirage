@@ -72,5 +72,5 @@ def test_filenames(temporary_directory):
 
             Table([yam.info['yamlfile']]).pprint(max_lines=-1)
 
-            exposure_numbers = np.array([np.int(s.split('_')[2]) for s in yam.info['yamlfile']])
+            exposure_numbers = np.array([int(s.split('_')[2]) for s in yam.info['yamlfile']])
             assert np.max(exposure_numbers) <= 18

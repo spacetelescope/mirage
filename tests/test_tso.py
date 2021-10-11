@@ -24,7 +24,7 @@ def test_add_tso_sources():
     background_seed_image = np.zeros((10, 10))
     background_seed_image[1:4, 1:4] = 100
 
-    background_seg_map = np.zeros((10, 10)).astype(np.int)
+    background_seg_map = np.zeros((10, 10)).astype(int)
     background_seg_map[1:4, 1:4] = 2
 
     tso_seed = np.zeros((10, 10))

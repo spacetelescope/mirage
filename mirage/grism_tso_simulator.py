@@ -364,9 +364,6 @@ class GrismTSO():
             # If the user has provided a 2D array of lightcurves, plus associated 1D arrays of
             # times and wavelengths, then interpolate those lightcurves onto the grid of frame
             # times and transmission spectrum wavelengths.
-            print(len(lightcurve_wavelengths), len(lightcurve_times), self.lightcurves.shape)
-
-
             lc_function = interp2d(lightcurve_wavelengths, lightcurve_times, self.lightcurves)
             lightcurves = lc_function(transmission_spectrum['Wavelength'], times)
 
@@ -526,7 +523,9 @@ class GrismTSO():
                 # requested subarray if necessary
                 if orig_parameters['Readout']['array_name'] not in self.fullframe_apertures:
                     self.logger.info("Dispersed seed image size: {}".format(segment_seed.shape))
-                    segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
+
+                    # segment_seed has already been cropped, so no need to crop here...
+                    #segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
                     #gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
 
                 # Segmentation map will be centered in a frame that is larger
@@ -537,6 +536,8 @@ class GrismTSO():
                 dy = int((segy - tso_direct.nominal_dims[0]) / 2)
                 segbounds = [tso_direct.subarray_bounds[0] + dx, tso_direct.subarray_bounds[1] + dy,
                              tso_direct.subarray_bounds[2] + dx, tso_direct.subarray_bounds[3] + dy]
+
+
                 tso_segmentation_map = utils.crop_to_subarray(tso_segmentation_map, segbounds)
 
                 # Convert seed image to ADU/sec to be consistent

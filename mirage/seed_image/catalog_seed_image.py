@@ -51,7 +51,8 @@ from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
-                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE
+                              LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
+                              NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -784,7 +785,7 @@ class Catalog_seed():
         else:
             self.logger.info(('No transmission file given. Assuming full transmission for all pixels, '
                               'not including flat field effects. (no e.g. occulters blocking any pixels).'))
-            if self.params['Inst']['mode'].lower() == 'imaging':
+            if self.params['Inst']['mode'].lower() in ['imaging', 'ami', 'ts_imaging']:
                 transmission = np.ones((2048, 2048))
                 header = {'NOMXSTRT': 0, 'NOMYSTRT': 0}
             elif self.params['Inst']['mode'].lower() == 'pom':
@@ -1688,7 +1689,10 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
+                if not self.use_intermediate_aperture:
+                    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
+                else:
+                    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, ra, dec)
 
                 xposang = self.calc_x_position_angle(pixelv2, pixelv3, entry['pos_angle'])
 
@@ -2159,7 +2163,8 @@ class Catalog_seed():
             extended.write(temp_ext_filename, format='ascii', overwrite=True)
 
             extlist, extstamps, ext_ghosts_file = self.getExtendedSourceList(temp_ext_filename, ghost_search=True)
-            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps)
+            conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
+            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
@@ -2705,7 +2710,7 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, self.params['Readout']['filter'], log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -3705,7 +3710,10 @@ class Catalog_seed():
         pixely : float
             Y coordinate value in the aperture corresponding to the input location
         """
-        loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
+        if not self.use_intermediate_aperture:
+            loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
+        else:
+            loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, ra, dec)
 
         if self.coord_transform is not None:
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
@@ -3718,6 +3726,7 @@ class Catalog_seed():
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
             pixely -= 1
+
         return pixelx, pixely
 
     def object_separation(self, radec1, radec2, wcs):
@@ -3786,7 +3795,10 @@ class Catalog_seed():
             # since SIAF works in a 1-indexed coordinate system.
             loc_v2, loc_v3 = self.siaf.sci_to_tel(pixelx + 1, pixely + 1)
 
-        ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
+        if not self.use_intermediate_aperture:
+            ra, dec = pysiaf.utils.rotations.pointing(self.attitude_matrix, loc_v2, loc_v3)
+        else:
+            ra, dec = pysiaf.utils.rotations.pointing(self.intermediate_attitude_matrix, loc_v2, loc_v3)
 
         # Translate the RA/Dec floats to strings
         ra_str, dec_str = self.makePos(ra, dec)
@@ -3954,7 +3966,7 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(source, self.params['Reffiles']['flux_cal'], magsystem,
-                                                                              NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
+                                                                              NIRISS_GHOST_GAP_FILE, self.params['Readout']['filter'], log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -4409,7 +4421,7 @@ class Catalog_seed():
         # For WFSS simulations, we ignore the grism
         search_filter = self.params['Readout']['filter']
         if self.params['Readout']['filter'].upper() in ['GR150R', 'GR150C']:
-            search_filter = 'CLEAR'
+            search_filter = 'GR150'
 
         ghost_pixelx, ghost_pixely, ghost_countrate = get_ghost(pixel_x, pixel_y,
                                                                 count_rate,
@@ -4673,7 +4685,7 @@ class Catalog_seed():
                     ghost_filename.append(gfile)
 
                     ghost_src, skipped_non_niriss = source_mags_to_ghost_mags(values, self.params['Reffiles']['flux_cal'],
-                                                                              magsys, NIRISS_GHOST_GAP_FILE, log_skipped_filters=False)
+                                                                              magsys, NIRISS_GHOST_GAP_FILE, self.params['Readout']['filter'], log_skipped_filters=False)
 
                     if ghost_mags is None:
                         ghost_mags = copy.deepcopy(ghost_src)
@@ -4780,7 +4792,10 @@ class Catalog_seed():
 
         # Add later: check for WCS and use that
         # if no WCS:
-        pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
+        if not self.use_intermediate_aperture:
+            pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
+        else:
+            pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, right_ascention, declination)
         x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
         rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
@@ -5136,6 +5151,10 @@ class Catalog_seed():
                                                                        self.ra, self.dec,
                                                                        self.params['Telescope']['rotation'])
 
+        # If the exposure uses one of the grism time series apertures, then read/determine
+        # the intermediate aperture to use, and get associated SIAF information
+        self.determine_intermediate_aperture(instrument_siaf)
+
         self.logger.info('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
         # Set the background value if the high/medium/low settings
         # are used
@@ -5422,6 +5441,61 @@ class Catalog_seed():
             self.logger.warning(("ERROR: {} for {} is not within reasonable bounds. "
                                  "Setting to {}".format(value, typ, default)))
             return default
+
+    def determine_intermediate_aperture(self, siaf_info):
+        """If we are using one of the Grism time series apertures, then we need
+        to pay attention to the intermediate aperture that APT uses. This aperture
+        is not listed in the APT pointing file, but the V2, V3 reference values in
+        the pointing file refer to the intermediate aperture. This aperture is used
+        to place the target at the proper location such that once the grism is placed
+        in the beam, the trace will land at the reference location of the aperture
+        that is specified in the pointing file. For Mirage's purposes, we need to keep
+        track of this intermediate aperture and its V2, V3 reference location so that
+        we can create the correct undispersed seed image. The shift from the intermediate
+        aperture source locations to the dispersed locations is contained in the
+        configuration files in the GRISM_NIRCAM and GRISM_NIRISS repos.
+
+        This function determines what the intermediate aperture name is, if any,
+        and gets the associated SIAF information.
+
+        Parameters
+        ----------
+        siaf_info : pysiaf.Siaf
+            Instrument-level SIAF object
+        """
+        self.use_intermediate_aperture = False
+        try:
+            if self.params['Readout']['intermediate_aperture'].lower() != 'none':
+                self.logger.info(('Grism time series aperture in use. Using the intermediate aperture {} '
+                                  'to determine source locations on the detector for the undispersed seed image.'
+                                  .format(self.params['Readout']['intermediate_aperture'])))
+                self.use_intermediate_aperture = True
+        except KeyError as exc:
+            # Protect against running older yaml files where the intermediate_aperture field
+            # is not present.
+            if self.params['Readout']['array_name'] in NIRCAM_LW_GRISMTS_APERTURES:
+                self.params['Readout']['intermediate_aperture'] = get_lw_grism_tso_intermeidate_aperture(self.params['Readout']['array_name'])
+                self.logger.info(('Readout:intermediate_aperture field is not present in the input yaml file. Since '
+                                  'this is a LW channel exposure, Mirage can determine the intermediate aperture and '
+                                  'use it going forward.'))
+                self.use_intermediate_aperture = True
+
+            elif self.params['Readout']['array_name'] in NIRCAM_SW_GRISMTS_APERTURES:
+                self.logger.error('Readout:intermediate_aperture field is not present in the input yaml file.')
+                exc.args = ((('Readout:intermediate_aperture field is not present in the input yaml file. '
+                                  'For SW channel simulations that use grism time series apertures, there is no '
+                                  'way to determine the intermediate aperture without this yaml entry. Please add '
+                                  'this field to your yaml file with the appropriate '
+                                  'aperture name, or re-run the yaml_generator with the latest version of Mirage.')), )
+                raise exc
+
+        if self.use_intermediate_aperture:
+            self.intermediate_siaf = siaf_info[self.params['Readout']['intermediate_aperture']]
+            self.intermediate_local_roll, self.intermediate_attitude_matrix, _, \
+            _ = siaf_interface.get_siaf_information(siaf_info,
+                                                    self.params['Readout']['intermediate_aperture'],
+                                                    self.ra, self.dec,
+                                                    self.params['Telescope']['rotation'])
 
     def read_distortion_reffile(self):
         """Read in the CRDS-format distortion reference file and save

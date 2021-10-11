@@ -73,6 +73,14 @@ NIRCAM_FILTERS = NIRCAM_CLEAR_CROSSING_FILTERS + NIRCAM_2_FILTER_CROSSES + NIRCA
                 ['{}/WLM8'.format(element) for element in NIRCAM_WL8_CROSSING_FILTERS] + \
                 ['WLM8/{}'.format(element) for element in NIRCAM_WL8_CROSSING_FILTERS]
 
+NIRCAM_SW_GRISMTS_APERTURES = ['NRCA1_GRISMTS256', 'NRCA1_GRISMTS128', 'NRCA1_GRISMTS64', 'NRCA1_GRISMTS',
+                               'NRCA3_GRISMTS256', 'NRCA3_GRISMTS128', 'NRCA3_GRISMTS64', 'NRCA3_GRISMTS']
+
+NIRCAM_LW_GRISMTS_APERTURES = ['NRCA5_GRISM256_F277W', 'NRCA5_GRISM128_F277W', 'NRCA5_GRISM64_F277W', 'NRCA5_GRISM_F277W',
+                               'NRCA5_GRISM256_F322W2', 'NRCA5_GRISM128_F322W2', 'NRCA5_GRISM64_F322W2', 'NRCA5_GRISM_F322W2',
+                               'NRCA5_GRISM256_F356W', 'NRCA5_GRISM128_F356W', 'NRCA5_GRISM64_F356W', 'NRCA5_GRISM_F356W',
+                               'NRCA5_GRISM256_F444W', 'NRCA5_GRISM128_F444W', 'NRCA5_GRISM64_F444W', 'NRCA5_GRISM_F444W']
+
 # For consistency with NIRCam/NIRISS filters
 FGS_FILTERS = ["GUIDER1", "GUIDER2"]
 
@@ -128,6 +136,7 @@ NIRISS_GRISM_THROUGHPUT_FACTOR = 0.8
 # in psf_selection.py when performing a sanity check on the input PSF signal
 NIRISS_NRM_PSF_THROUGHPUT_REDUCTION = 0.17
 NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION = 0.84
+NIRCAM_WLP12_PSF_THROUGHPUT_REDUCTION = 0.5
 
 # PSF normalization check - default min and max allowed values for the
 # total signal in the PSF divided by the square of the oversampling factor.
