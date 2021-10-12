@@ -1194,7 +1194,7 @@ def read_yaml(filename):
         with open(filename, 'r') as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
     except FileNotFoundError as e:
-            logging.error(e)
+        logging.error(e)
     return data
 
 

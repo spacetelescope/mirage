@@ -609,10 +609,12 @@ class GrismTSO():
         # help align the split files between the seed image and the dark
         # object later (which is split by groups).
         if self.split_seed:
+            forced_ints_per_file = int(self.frames_per_int / self.numgroups) * (self.int_segment_indexes[1] - self.int_segment_indexes[0])
             split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.seed_dimensions[1],
                                                                                                 self.seed_dimensions[0],
                                                                                                 self.numgroups,
-                                                                                                self.numints)
+                                                                                                self.numints,
+                                                                                                force_delta_int=forced_ints_per_file)
 
             # In order to avoid the case of having a single integration
             # in the final file, which leads to rate rather than rateints
@@ -1045,7 +1047,7 @@ class GrismTSO():
         seed_header['SEGFRMST'] = self.segment_frame_start_number
         seed_header['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         seed_header['SEGINTST'] = self.segment_int_start_number
-        seed_header['SEGINTED'] = self.segment_int_start_number + integ - 1
+        seed_header['SEGINTED'] = self.segment_int_start_number + self.segment_ints - 1
 
         # Frame and integration indexes of the part within the segment
         seed_header['PTINTSRT'] = self.part_int_start_number
@@ -1135,8 +1137,7 @@ class GrismTSO():
                                                     '_tso_grism_sources.{}'.format(suffix))
         utils.write_yaml(tso_params, self.tso_paramfile)
 
-    @staticmethod
-    def tso_catalog_check(catalog, exp_time):
+    def tso_catalog_check(self, catalog, exp_time):
         """Check that the start and end times specified in the TSO catalog file (which are
         used to calculate the lightcurves) are long enough to encompass the entire exposure.
         If not, extend the end time to the required time.

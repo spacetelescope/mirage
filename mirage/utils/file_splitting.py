@@ -21,7 +21,7 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
-                     pixel_limit=FILE_SPLITTING_LIMIT):
+                     pixel_limit=FILE_SPLITTING_LIMIT, force_delta_int=None):
     """Determine the frame and/or integration numbers where a file
     should be split in order to keep the file size reasonable.
 
@@ -46,6 +46,10 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
     pixel_limit : int
         Proxy for file size limit. Number of pixel read outs to treat
         as the upper limit to be contained in a single file.
+
+    force_delta_int : int
+        If provided, this forces the number of integrations in each
+        file
 
     Returns
     -------
@@ -94,7 +98,10 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
         split = True
         logger.info('Splitting by integration:')
         group_list = np.array([0, groups])
-        delta_int = int(pixel_limit / pix_per_int)
+        if not force_delta_int:
+            delta_int = int(pixel_limit / pix_per_int)
+        else:
+            delta_int = force_delta_int
         integration_list = np.arange(0, integrations, delta_int).astype(int)
         integration_list = np.append(integration_list, integrations)
         logger.info('integration_list: {}'.format(integration_list))
