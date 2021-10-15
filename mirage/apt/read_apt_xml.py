@@ -231,7 +231,7 @@ class ReadAPTXML():
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
                                    'NircamGrismTimeSeries', 'NircamTimeSeries', 'NircamCoron',
                                    'NirissExternalCalibration', 'NirissWfss', 'NirissAmi', 'NirissImaging', # NIRISS
-                                   'NirspecImaging', 'NirspecInternalLamp', 'NirspecMOS', # NIRSpec
+                                   'NirspecImaging', 'NirspecInternalLamp', 'NirspecMOS', 'NirspecIFUSpectroscopy', # NIRSpec
                                    'MiriMRS', 'MiriImaging', 'MiriCoron', # MIRI
                                    'FgsExternalCalibration',  # FGS
                                    ]
@@ -361,6 +361,11 @@ class ReadAPTXML():
                                                                                      verbose=verbose, prime_template=template_name)
 
                         exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
+
+            elif template_name == 'NirspecIFUSpectroscopy':
+                print('observation_number: ', observation_number)
+                exposures_dictionary = self.read_nirspec_ifu(template, template_name, obs,
+                                                                    proposal_parameter_dictionary)
 
             # If template is WFSC Commissioning
             elif template_name in ['WfscCommissioning']:
@@ -2188,6 +2193,144 @@ class ReadAPTXML():
         for key in self.APTObservationParams_keys:
             value = 'placeholder'
             if len(exposures_dictionary[key]) == 0:
+                exposures_dictionary[key] = [value] * n_entries
+
+        return exposures_dictionary
+
+    def read_nirspec_ifu(self, template, template_name, obs, proposal_parameter_dictionary):
+        """Parse a NIRSpec IFU mode observation template when MIRI is prime.
+
+        Parameters
+        ----------
+        template : lxml.etree._Element
+            Template section from APT xml
+
+        template_name : str
+            The type of template (e.g. 'NirspecMOS')
+
+        obs : lxml.etree._Element
+            Observation section from APT xml
+
+        proposal_param_dict : dict
+            Dictionary of proposal level information from the xml file
+            (e.g. PI, Science Category, etc)
+
+         Returns
+        -------
+        exposures_dictionary : dict
+            Dictionary containing details on all exposures contained within
+            the template. These details include things like filter, pupil,
+            readout pattern, subarray, etc. Specifically for Grism Time Series,
+            there will be entries for the TA exposure and the Time Series
+            exposure.
+        """
+        instrument = 'NIRSpec'
+        parallel_instrument = False
+
+        exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
+        ns = "{{{}/Template/{}}}".format(self.apt.replace('{','').replace('}',''), template_name)
+
+        # Check the target type in order to decide whether the tracking should be
+        # sidereal or non-sidereal
+        tracking = self.get_tracking_type(obs)
+
+        # Determine if there is an aperture override
+        override = obs.find('.//' + self.apt + 'FiducialPointOverride')
+        FiducialPointOverride = True if override is not None else False
+
+        # TA info
+        ta_dithers = 1
+        ta_method = template.find(ns + 'TaMethod').text
+        if ta_method == 'VERIFY_ONLY':
+            num_ta = 1
+        elif ta_method == 'NONE':
+            num_ta = 0
+            ta_dithers = 0
+        elif ta_method == 'WATA':
+            num_ta = 2
+        else:
+            raise ValueError("Unrecognized TaMethod")
+
+        # Set up exposures_dictionary
+        # Other than dither information, we only need enough information
+        # for placeholder entries.
+        exposures_dictionary = copy.deepcopy(self.empty_exposures_dictionary)
+
+        # Get dither information
+        number_of_subpixel_dithers = 1
+        dithertype = template.find(ns + 'DitherType').text
+        if dithertype.lower() == 'none':
+            number_of_primary_dithers = 1
+        elif dithertype.lower() == 'cycling':
+            number_of_primary_dithers = template.find(ns + 'NumberOfPoints').text
+        elif dithertype.lower() == 'sparse-cycling':
+            points = template.find(ns + 'Points').text
+            number_of_primary_dithers = len(points.split(','))
+        elif '-point-' in dithertype.lower():
+            number_of_primary_dithers = int(dithertype[0])
+        number_of_dithers = str(int(number_of_primary_dithers) * int(number_of_subpixel_dithers))
+
+        # Locate all the exposures
+        exposures = template.findall('.//' + ns + 'Exposure')
+        num_exposures = len(exposures)
+        total_exposures = num_ta + num_exposures
+
+        # Create and populate exposure dictionary
+        exposures_dictionary = {}
+        keys_to_populate = ['ProposalID', 'ObservationID', 'ObservationName', 'Instrument', 'TargetID',
+                            'APTTemplate', 'CoordinatedParallel', 'ParallelInstrument', 'PrimaryDitherType',
+                            'PrimaryDithers', 'SubpixelPositions', 'ImageDithers', 'number_of_dithers',
+                            'SubpixelDitherType', 'FiducialPointOverride', 'ParallelInstrument', 'Tracking',
+                            'Groups', 'Integrations']
+        for key in keys_to_populate:
+            exposures_dictionary[key] = []
+
+        # Add TA exposures if present
+        if ta_dithers > 0:
+            exposures_dictionary['ProposalID'].extend([proposal_parameter_dictionary['ProposalID']] * num_ta)
+            exposures_dictionary['ObservationID'].extend([proposal_parameter_dictionary['ObservationID']] * num_ta)
+            exposures_dictionary['ObservationName'].extend([proposal_parameter_dictionary['ObservationName']] * num_ta)
+            exposures_dictionary['Instrument'].extend([instrument] * num_ta)
+            exposures_dictionary['TargetID'].extend([obs.find(self.apt + 'TargetID').text.split(' ')[1]] * num_ta)
+            exposures_dictionary['APTTemplate'].extend([template_name] * num_ta)
+            exposures_dictionary['CoordinatedParallel'].extend([False] * num_ta)
+            exposures_dictionary['ParallelInstrument'].extend([False] * num_ta)
+            exposures_dictionary["PrimaryDitherType"].extend([dithertype] * num_ta)
+            exposures_dictionary['PrimaryDithers'].extend([ta_dithers] * num_ta)
+            exposures_dictionary['SubpixelPositions'].extend([number_of_subpixel_dithers] * num_ta)
+            exposures_dictionary['ImageDithers'].extend([ta_dithers] * num_ta)
+            exposures_dictionary['number_of_dithers'].extend([ta_dithers] * num_ta)
+            exposures_dictionary['SubpixelDitherType'].extend(['None'] * num_ta)
+            exposures_dictionary['FiducialPointOverride'].extend([str(False)] * num_ta)
+            exposures_dictionary['Tracking'].extend([tracking] * num_ta)
+            exposures_dictionary['Groups'].extend([1] * num_ta)
+            exposures_dictionary['Integrations'].extend([1] * num_ta)
+
+        # Add exposures
+        exposures_dictionary['ProposalID'].extend([proposal_parameter_dictionary['ProposalID']] * num_exposures)
+        exposures_dictionary['ObservationID'].extend([proposal_parameter_dictionary['ObservationID']] * num_exposures)
+        exposures_dictionary['ObservationName'].extend([proposal_parameter_dictionary['ObservationName']] * num_exposures)
+        exposures_dictionary['Instrument'].extend([instrument] * num_exposures)
+        exposures_dictionary['TargetID'].extend([obs.find(self.apt + 'TargetID').text.split(' ')[1]] * num_exposures)
+        exposures_dictionary['APTTemplate'].extend([template_name] * num_exposures)
+        exposures_dictionary['CoordinatedParallel'].extend([False] * num_exposures)
+        exposures_dictionary['ParallelInstrument'].extend([False] * num_exposures)
+        exposures_dictionary["PrimaryDitherType"].extend([dithertype] * num_exposures)
+        exposures_dictionary['PrimaryDithers'].extend([number_of_primary_dithers] * num_exposures)
+        exposures_dictionary['SubpixelPositions'].extend([number_of_subpixel_dithers] * num_exposures)
+        exposures_dictionary['ImageDithers'].extend([number_of_dithers] * num_exposures)
+        exposures_dictionary['number_of_dithers'].extend([number_of_dithers] * num_exposures)
+        exposures_dictionary['SubpixelDitherType'].extend(['None'] * num_exposures)
+        exposures_dictionary['FiducialPointOverride'].extend([str(False)] * num_exposures)
+        exposures_dictionary['Tracking'].extend([tracking] * num_exposures)
+        exposures_dictionary['Groups'].extend([1] * num_exposures)
+        exposures_dictionary['Integrations'].extend([1] * num_exposures)
+
+        # Populate other keywords with None
+        n_entries = len(exposures_dictionary['Instrument'])
+        for key in self.APTObservationParams_keys:
+            value = 'placeholder'
+            if key not in exposures_dictionary:
                 exposures_dictionary[key] = [value] * n_entries
 
         return exposures_dictionary

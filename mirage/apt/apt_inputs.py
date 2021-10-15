@@ -301,6 +301,14 @@ class AptInput:
         pointing_dictionary = self.get_pointing_info(self.pointing_file, propid=self.apt_xml_dict['ProposalID'][0],
                                                      skipped_obs_from_xml=self.skip_observations)
 
+
+
+        for i in range(len(self.apt_xml_dict['Instrument'])):
+            print(self.apt_xml_dict['ObservationID'][i], self.apt_xml_dict['Instrument'][i])
+        stop
+
+
+
         # Check that the .xml and .pointing files agree
         assert len(self.apt_xml_dict['ProposalID']) == len(pointing_dictionary['obs_num']),\
             ('Inconsistent table size from XML file ({}) and pointing file ({}). Something was not '
