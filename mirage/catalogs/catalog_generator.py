@@ -590,22 +590,61 @@ class MovingExtendedCatalog(ExtendedCatalog, MovingPointSourceCatalog):
         self.table = pad_table_comments(tab)
 
 
-class NonSiderealCatalog(MovingPointSourceCatalog):
+class NonSiderealCatalog(MovingPointSourceCatalog, GalaxyCatalog, ExtendedCatalog):
     def __init__(self, ra=[], dec=[], x=[], y=[], ra_velocity=[], dec_velocity=[], x_velocity=[],
-                 y_velocity=[], object_type=[], ephemeris_file=[], starting_index=1, niriss_ghost_stamp=[]):
-        # Add location information
-        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
-                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
-                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file,
-                                          niriss_ghost_stamp=niriss_ghost_stamp)
-
+                 y_velocity=[], object_type=[], ephemeris_file=[], starting_index=1, niriss_ghost_stamp=[],
+                 filenames=[], position_angle=[], ellipticity=[], radius=[], sersic_index=[],
+                 radius_units='arcsec'):
         # List of the type of sources in the non-sidereal catalog
         valid_objects = ['pointSource', 'galaxies', 'extended']
+
+        # The non-sidereal catalog should have only a single source in it. But to
+        # work with the base classes, we need to make sure entries are lists
+        ra = make_list(ra)
+        dec = make_list(dec)
+        x = make_list(x)
+        y = make_list(y)
+        ra_velocity = make_list(ra_velocity)
+        dec_velocity = make_list(dec_velocity)
+        x_velocity = make_list(x_velocity)
+        y_velocity = make_list(y_velocity)
+        object_type = make_list(object_type)
+        ephemeris_file = make_list(ephemeris_file)
+        niriss_ghost_stamp = make_list(niriss_ghost_stamp)
+        filenames = make_list(filenames)
+        position_angle = make_list(position_angle)
+        ellipticity = make_list(ellipticity)
+        radius = make_list(radius)
+        sersic_index = make_list(sersic_index)
+
         for obj in object_type:
             if obj not in valid_objects:
                 raise ValueError(("WARNING: object_type list members must be one of: {}"
                                   .format(obj, valid_objects)))
         self.object_type = object_type
+
+        # Add location information. Make RA, Dec lists consistent if ephemeris file has been
+        # provided
+        MovingPointSourceCatalog.__init__(self, ra=ra, dec=dec, x=x, y=y, ra_velocity=ra_velocity,
+                                          dec_velocity=dec_velocity, x_velocity=x_velocity,
+                                          y_velocity=y_velocity, ephemeris_file=ephemeris_file,
+                                          starting_index=starting_index,
+                                          niriss_ghost_stamp=niriss_ghost_stamp)
+
+        if len(position_angle) == 0:
+            position_angle = [0] * len(filenames)
+
+
+        if object_type[0] == 'extended':
+            ExtendedCatalog.__init__(self, ra=self._ra, dec=self._dec, x=x, y=y, filenames=filenames,
+                                              position_angle=position_angle, starting_index=starting_index,
+                                              niriss_ghost_stamp=niriss_ghost_stamp)
+
+        elif object_type[0] == 'galaxies':
+            GalaxyCatalog.__init__(self, ra=self._ra, dec=self._dec, x=x, y=y, ellipticity=ellipticity, radius=radius,
+                                         sersic_index=sersic_index, position_angle=position_angle,
+                                         radius_units=radius_units, starting_index=starting_index,
+                                         niriss_ghost_stamp=niriss_ghost_stamp)
 
     def create_table(self):
         """Create an astropy table containing the catalog
@@ -616,6 +655,24 @@ class NonSiderealCatalog(MovingPointSourceCatalog):
                                           niriss_ghost_stamp=self._niriss_ghost_stamp)
         obj_col = Column(self.object_type, name='object')
         tab.add_column(obj_col, index=1)
+
+        # Add filename column
+        if self.object_type[0] == 'extended':
+            file_col = Column(self._filenames, name='filename')
+            tab.add_column(file_col, index=6)
+            pa_col = Column(self._pos_angle, name='pos_angle')
+            tab.add_column(pa_col, index=7)
+
+        # Add position_angle column
+        if self.object_type[0] == 'galaxies':
+            rad_col = Column(self._radius, name='radius')
+            tab.add_column(rad_col, index=6)
+            sersic_col = Column(self._sersic_index, name='sersic_index')
+            tab.add_column(sersic_col, index=6)
+            pa_col = Column(self._pos_angle, name='pos_angle')
+            tab.add_column(pa_col, index=7)
+            ell_col = Column(self._ellipticity, name='ellipticity')
+            tab.add_column(ell_col, index=7)
 
         # Make sure there are at least 4 comment lines at the top
         self.table = pad_table_comments(tab)
@@ -1040,6 +1097,24 @@ def get_inst_filter_from_colname(column_name):
     else:
         filter_name = parts[1].lower()
     return instrument, filter_name
+
+
+def make_list(var):
+    """Check if the input is a list. If not, convert
+    to a list
+
+    Parameters
+    ----------
+    var : str, float, list
+
+    Returns
+    -------
+    var : list
+    """
+    if not isinstance(var, list):
+        return [var]
+    else:
+        return var
 
 
 def pad_table_comments(input_table):
