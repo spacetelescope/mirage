@@ -3299,8 +3299,6 @@ class ReadAPTXML():
                             value = template_name
                         elif key == 'Tracking':
                             value = tracking
-                        #elif (key == 'Mode'):
-                            #value = mode
                         elif key == 'Module':
                             value = mod
                         elif key == 'Subarray':
