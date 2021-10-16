@@ -1255,6 +1255,18 @@ class SimInput:
         #for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
         for element in unique:
             targ, inst = element
+
+            print('ELEMENT: ', element)
+
+            # Skip unsupported instruments
+            if inst in ['NIRSpec', 'MIRI']:
+                continue
+
+
+
+            print('self.catalogs is')
+            print(self.catalogs)
+
             ns_catalog = get_nonsidereal_catalog_name(self.catalogs, targ, inst)
             catalog_table, pos_in_xy, vel_in_xy = read_nonsidereal_catalog(ns_catalog)
 

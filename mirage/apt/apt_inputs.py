@@ -305,7 +305,7 @@ class AptInput:
 
         for i in range(len(self.apt_xml_dict['Instrument'])):
             print(self.apt_xml_dict['ObservationID'][i], self.apt_xml_dict['Instrument'][i])
-        stop
+
 
 
 
