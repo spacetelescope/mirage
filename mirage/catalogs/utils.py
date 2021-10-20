@@ -87,7 +87,7 @@ def determine_used_cats(obs_mode, cat_dict):
     cats : list
         List of catalogs that will be used for the given observing mode
     """
-    if obs_mode in ['imaging', 'pom', 'ami']:
+    if obs_mode in ['imaging', 'pom', 'ami', 'coron']:
         possible_cats = [cat_dict[entry] for entry in IMAGING_ALLOWED_CATALOGS]
     elif obs_mode == 'wfss':
         possible_cats = [cat_dict[entry] for entry in WFSS_ALLOWED_CATALOGS]
