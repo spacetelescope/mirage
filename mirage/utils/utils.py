@@ -373,6 +373,21 @@ def crop_to_subarray(data, bounds):
                               "dimensions of the input array."))
 
 
+def ensure_ascii(in_string):
+    """Remove any non-ASCII characters from the input string
+
+    Parameters
+    ----------
+    in_string : str
+        Input string
+
+    output_string : str
+        String with non-ASCII characters removed
+    """
+    encoded_string = in_string.encode('ascii', 'ignore')
+    return encoded_string.decode()
+
+
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """

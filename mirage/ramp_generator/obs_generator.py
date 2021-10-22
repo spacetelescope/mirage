@@ -2862,8 +2862,8 @@ class Observation():
         outModel.meta.observation.activity_id = self.params['Output']['activity_id']
         outModel.meta.observation.exposure_number = self.params['Output']['exposure_number']
 
-        outModel.meta.program.pi_name = self.params['Output']['PI_Name']
-        outModel.meta.program.title = self.params['Output']['title']
+        outModel.meta.program.pi_name = utils.ensure_ascii(self.params['Output']['PI_Name'])
+        outModel.meta.program.title = utils.ensure_ascii(self.params['Output']['title'])
         outModel.meta.program.category = self.params['Output']['Proposal_category']
         outModel.meta.program.sub_category = 'UNKNOWN'
         outModel.meta.program.science_category = self.params['Output']['Science_category']
@@ -3164,8 +3164,8 @@ class Observation():
         outModel[0].header['ACT_ID'] = self.params['Output']['activity_id']
         outModel[0].header['EXPOSURE'] = self.params['Output']['exposure_number']
 
-        outModel[0].header['PI_NAME'] = self.params['Output']['PI_Name']
-        outModel[0].header['TITLE'] = self.params['Output']['title']
+        outModel[0].header['PI_NAME'] = utils.ensure_ascii(self.params['Output']['PI_Name'])
+        outModel[0].header['TITLE'] = utils.ensure_ascii(self.params['Output']['title'])
         outModel[0].header['CATEGORY'] = self.params['Output']['Proposal_category']
         outModel[0].header['SUBCAT'] = 'UNKNOWN'
         outModel[0].header['SCICAT'] = self.params['Output']['Science_category']
