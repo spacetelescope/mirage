@@ -78,7 +78,7 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
         The second element is a short string describing the
         result.
     """
-    absolute_upper_limit = 1.5
+    absolute_upper_limit = 1.1
     result = True, 'correct'
     ndims = len(lib.data.shape)
     if ndims == 3:
