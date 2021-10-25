@@ -91,7 +91,7 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
                 else:
                     # We will end up here if the total signal is above 1,
                     # and renorm_psfs_above_1 is not set or if the signal is
-                    # above 1.5.
+                    # above the absolute_upper_limit.
                     result = False, 'too high'
             elif total_signal < lower_limit:
                 result = False, 'too low'
@@ -105,7 +105,7 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_abov
             else:
                 # We will end up here if the total signal is above 1,
                 # and renorm_psfs_above_1 is not set or if the signal is
-                # above 1.5.
+                # above the absolute_upper_limit.
                 result = False, 'too high'
         elif total_signal < lower_limit:
             result = False, 'too low'
