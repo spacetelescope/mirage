@@ -232,8 +232,8 @@ class ReadAPTXML():
                                    'WfscCoarsePhasing', 'WfscFinePhasing',
                                    'NircamGrismTimeSeries', 'NircamTimeSeries', 'NircamCoron',
                                    'NirissExternalCalibration', 'NirissWfss', 'NirissAmi', 'NirissImaging', # NIRISS
-                                   'NirspecImaging', 'NirspecInternalLamp', 'NirspecMOS', 'NirspecIFUSpectroscopy', # NIRSpec
-                                   'MiriMRS', 'MiriImaging', 'MiriCoron', # MIRI
+                                   'NirspecImaging', 'NirspecInternalLamp', 'NirspecMOS', # NIRSpec
+                                   'MiriImaging', 'MiriCoron', # MIRI
                                    'FgsExternalCalibration',  # FGS
                                    ]
             if template_name not in known_APT_templates:
@@ -1081,7 +1081,9 @@ class ReadAPTXML():
                     value = str(None)
                 if (key == 'Mode'):
                     value = 'imaging'
-                exposures_dictionary[key].append(value)
+                # The pointing file skips reading in the TA image, so
+                # let's skip that here as well.
+                #exposures_dictionary[key].append(value)
         else:
             pass
 
