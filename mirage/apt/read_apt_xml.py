@@ -3296,6 +3296,10 @@ class ReadAPTXML():
                         parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
                         exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
+                    exposure_dict['Mode'] = 'imaging'
+                    if 'GR150' in exposure_dict['FilterWheel']:
+                        exposure_dict['Mode'] = 'wfss'
+
                     # Fill dictionary to return
                     for key in self.APTObservationParams_keys:
                         if key in exposure_dict.keys():
@@ -3312,8 +3316,6 @@ class ReadAPTXML():
                             value = template_name
                         elif key == 'Tracking':
                             value = tracking
-                        elif (key == 'Mode'):
-                            value = 'imaging'
                         elif key == 'Module':
                             value = mod
                         elif key == 'Subarray':
