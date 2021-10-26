@@ -146,11 +146,6 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
                     obs_cats[obs_number]['niriss'][CAT_TYPE_MAPPING[key2]] = cats[key1][key2]
                     obs_cats[obs_number]['fgs'][CAT_TYPE_MAPPING[key2]] = cats[key1][key2]
 
-
-                    print('obs_catds for ', obs_number)
-                    print(obs_cats[obs_number])
-                    print('\n')
-
                     #except KeyError:
                     #    # If a given target doesn't have a specific type of catalog listed, then
                     #    # keep the pre-populated default

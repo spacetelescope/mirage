@@ -201,7 +201,8 @@ class ReadAPTXML():
             else:
                 self.target_type[t_name] = 'sidereal'
         self.logger.info('target_info:')
-        self.logger.info('{}'.format(self.target_info))
+        for item in self.target_info.items():
+            self.logger.info('    {}'.format(item))
 
         # Get parameters for each observation  - - - - - - - - - - - - - - - -
 
@@ -351,7 +352,6 @@ class ReadAPTXML():
                         exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
 
             elif template_name == 'MiriMRS':
-                print('OBS num: ', observation_number)
                 exposures_dictionary = self.read_miri_mrs_template(template, template_name, obs,
                                                                    proposal_parameter_dictionary)
 
@@ -368,7 +368,6 @@ class ReadAPTXML():
                         exposures_dictionary = append_dictionary(exposures_dictionary, parallel_exposures_dictionary, braid=True)
 
             elif template_name == 'NirspecIFUSpectroscopy':
-                print('observation_number: ', observation_number)
                 exposures_dictionary = self.read_nirspec_ifu(template, template_name, obs,
                                                                     proposal_parameter_dictionary)
 
@@ -744,7 +743,6 @@ class ReadAPTXML():
             # loop over filter configurations
             for filter_config_index, filter_config in enumerate(filter_configs):
                 filter_config_dict = {}
-                # print('Filter config index {}'.format(filter_config_index))
                 for element in filter_config:
                     key = element.tag.split(ns)[1]
                     value = element.text
@@ -838,10 +836,6 @@ class ReadAPTXML():
                         number_of_primary_dithers = 1
                     else:
                         if template_name == 'MiriMRS':
-                            #dither_key = 'MrsDitherSpecification'
-                            #print(element_tag_stripped)
-                            #stop
-                            #dith_num = int(element.text.split(' ')[-1])
                             dither_options = self.get_miri_mrs_dither_options(template, ns)
                             number_of_primary_dithers = dither_options[dith_num - 1]
                         else:
@@ -1098,7 +1092,6 @@ class ReadAPTXML():
         for exposure in exposures:
             # Need to get dither info for each exposure
             dith = exposure.find(ns + 'Dither').text
-            print('dith: ', dith)
             if dith.lower() != 'none':
                 number_of_primary_dithers = dither_config_dict[dith]
             else:
