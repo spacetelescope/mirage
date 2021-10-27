@@ -2267,10 +2267,23 @@ class ReadAPTXML():
             number_of_subpixel_dithers = int(subpix_dithers_pattern[0])
         else:
             number_of_subpixel_dithers = 1
-        number_of_astrometric_dithers = 0 # it's optional, and off by default
+        number_of_astrometric_dithers = 1 # it's optional, and off by default
 
         coronmask = template.find(ncc + 'CoronMask').text
 
+        # APT outputs the incorrect aperture name. It specifies
+        # SUB320 for both MASK430R and MASKLWB cases. Fix that here.
+        if subarray != 'FULL':
+            if coronmask == 'MASK430R':
+                subarray = 'SUB320{}430R'.format(mod)
+            elif coronmask == 'MASKLWB':
+                subarray = 'SUB320{}LWB'.format(mod)
+            elif coronmask == 'MASK335R':
+                subarray = 'SUB320{}335R'.format(mod)
+            elif coronmask == 'MASKSWB':
+                subarray = 'SUB640{}SWB'.format(mod)
+            elif coronmask == 'MASK210R':
+                subarray = 'SUB640{}210R'.format(mod)
 
         coron_sci_detector = 'A2' if coronmask=='MASK210R' else \
                        'A4' if coronmask=='MASKSWB' else 'A5'
@@ -2278,11 +2291,11 @@ class ReadAPTXML():
 
 
         if using_lw: # Long wave channel is being used
-            long_pupil = 'MASKLWB' if coronmask=='MASKLWB' else 'MASKRND'
+            long_pupil = 'MASKBAR' if coronmask=='MASKLWB' else 'MASKRND'
             short_pupil = 'n/a'    # not even read out, no data downloaded
             filter_key_name = 'LongFilter'
         else: # Short wave channel
-            short_pupil = 'MASKSWB' if coronmask == 'MASKSWB' else 'MASKRND'
+            short_pupil = 'MASKBAR' if coronmask == 'MASKSWB' else 'MASKRND'
             long_pupil = 'n/a'
             filter_key_name = 'ShortFilter'
 
@@ -2371,7 +2384,7 @@ class ReadAPTXML():
                 elif key == 'Tracking':
                     value = tracking
                 elif key == 'Mode':
-                    value = 'imaging'
+                    value = 'coron'
                 elif key == 'Module':
                     value = mod
                 elif key == 'Subarray':
@@ -2416,7 +2429,7 @@ class ReadAPTXML():
                 elif key == 'Tracking':
                     dir_value = tracking
                 elif (key == 'Mode'):
-                    dir_value = 'imaging'
+                    dir_value = 'coron'
                 elif key == 'Module':
                     dir_value = mod
                 elif key == 'Subarray':
@@ -2479,8 +2492,12 @@ class ReadAPTXML():
                     elif key == 'Subarray':
                         value = subarray
                     elif key == 'PrimaryDithers':
-                        value = primary_dithers_pattern
+                        value = number_of_primary_dithers
                     elif key == 'SubpixelPositions':
+                        value = number_of_subpixel_dithers
+                    elif key == 'PrimaryDitherType':
+                        value = primary_dithers_pattern
+                    elif key == 'SubpixelDitherType':
                         value = subpix_dithers_pattern
                     else:
                         value = str(None)
@@ -3279,6 +3296,10 @@ class ReadAPTXML():
                         parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
                         exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
+                    exposure_dict['Mode'] = 'imaging'
+                    if 'GR150' in exposure_dict['FilterWheel']:
+                        exposure_dict['Mode'] = 'wfss'
+
                     # Fill dictionary to return
                     for key in self.APTObservationParams_keys:
                         if key in exposure_dict.keys():
@@ -3295,8 +3316,6 @@ class ReadAPTXML():
                             value = template_name
                         elif key == 'Tracking':
                             value = tracking
-                        elif (key == 'Mode'):
-                            value = 'imaging'
                         elif key == 'Module':
                             value = mod
                         elif key == 'Subarray':

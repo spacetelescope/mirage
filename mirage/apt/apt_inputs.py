@@ -437,7 +437,7 @@ class AptInput:
 
         for index, instrument in enumerate(input_dictionary['Instrument']):
             instrument = instrument.lower()
-            if instrument == 'nircam':
+            if instrument == 'nircam' and input_dictionary['Mode'][index] != 'coron':
                 # NIRCam case: Expand for detectors. Create one entry in each list for each
                 # detector, rather than a single entry for 'ALL' or 'BSALL'
 
@@ -464,16 +464,15 @@ class AptInput:
                 for mod in module:
                     good = [ap for ap in matched_allmod_apertures if 'NRC{}'.format(mod) in ap]
                     matched_apertures.extend(good)
-
                 if sub in ['FULL', 'SUB160', 'SUB320', 'SUB640', 'SUB64P', 'SUB160P', 'SUB400P', 'FULLP']:
                     mode = input_dictionary['Mode'][index]
                     template = input_dictionary['APTTemplate'][index]
                     if (sub == 'FULL'):
-                        if mode in ['imaging', 'ts_imaging', 'wfss', 'coron']:
+                        if mode in ['imaging', 'ts_imaging', 'wfss']:
                             # This block should catch full-frame observations
                             # in either imaging (including TS imaging) or
                             # wfss mode
-                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap])
+                            matched_aps = np.array([ap for ap in matched_apertures if 'GRISM' not in ap if 'MASK' not in ap])
                             matched_apertures = []
                             detectors = []
                             for ap in matched_aps:
@@ -588,6 +587,17 @@ class AptInput:
 
                 elif instrument == 'miri':
                     detectors = ['MIR']
+
+                elif instrument == 'nircam' and input_dictionary['Mode'][index] == 'coron':
+                    # For coronagraphic observations, there is no need to expand for detectors.
+                    # Coronographic observations will always use only a single detector, which
+                    # we already know from the 'aperture' key in the input dictionary
+                    detectors = [input_dictionary['aperture'][index][3:5]]
+
+                    # Reset the mode of the coronagraphic observations to be imaging, since
+                    # 'coron' is not a supported mode, and those running Mirage with these
+                    # files currently have to manually switch the mode over to 'imaging'
+                    input_dictionary['Mode'][index] = 'imaging'
 
                 n_detectors = len(detectors)
                 for key in input_dictionary:
@@ -1234,6 +1244,12 @@ def make_start_times(obs_info, offline=False):
 
             # Get the number of amps from the subarray definition file
             match = aperture == subarray_def['AperName']
+
+            if np.sum(match) == 0:
+                if '_MASKLWB' in aperture or '_MASKSWB' in aperture:
+                    apsplit = aperture.split('_')
+                    no_filter = '{}_{}'.format(apsplit[0], apsplit[1])
+                    match = no_filter == subarray_def['AperName']
 
             # needed for NIRCam case
             if np.sum(match) == 0:
