@@ -141,15 +141,9 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
             # this case the catalog names are the same for all instruments
             for obs_number in obs_nums[match]:
                 for key2 in keys2:
-                    #try:
                     obs_cats[obs_number]['nircam'][CAT_TYPE_MAPPING[key2]] = cats[key1][key2]
                     obs_cats[obs_number]['niriss'][CAT_TYPE_MAPPING[key2]] = cats[key1][key2]
                     obs_cats[obs_number]['fgs'][CAT_TYPE_MAPPING[key2]] = cats[key1][key2]
-
-                    #except KeyError:
-                    #    # If a given target doesn't have a specific type of catalog listed, then
-                    #    # keep the pre-populated default
-                    #    pass
         else:
             # Dictionary contains instrument names
             # Loop over observation numbers that use this target and
