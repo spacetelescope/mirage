@@ -52,8 +52,7 @@ DOCS_REQUIRE = [
     'sphinx-rtd-theme',
     'stsci-rtd-theme',
     'extension-helpers',
-    #'jupyter-core==4.8.2',
-    'virtualenv==20.9.0'
+    'jupyter-core==4.8.2',
 ]
 TESTS_REQUIRE = [
     'pytest',
