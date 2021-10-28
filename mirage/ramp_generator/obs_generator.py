@@ -2965,6 +2965,14 @@ class Observation():
         # The subarray name needs to come from the "Name" column in the
         # subarray definitions dictionary
         mtch = self.subdict["AperName"] == self.params["Readout"]['array_name']
+        if not any(mtch):
+            if '_MASKLWB' in self.params["Readout"]['array_name'] or '_MASKSWB' in self.params["Readout"]['array_name']:
+                pieces = self.params["Readout"]['array_name'].split('_')
+                arrname = '{}_{}'.format(pieces[0], pieces[1])
+                mtch = self.subdict["AperName"] == arrname
+                if not any(mtch):
+                    raise ValueError('Unrecognized aperture name: {}'.format(self.params["Readout"]['array_name']))
+
         outModel.meta.subarray.name = str(self.subdict["Name"].data[mtch][0])
 
         # subarray_bounds indexed to zero, but values in header should be

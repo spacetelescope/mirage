@@ -2003,18 +2003,9 @@ class SimInput:
             if instrument.lower() in ['niriss', 'fgs']:
                 full_ap = input['aperture']
 
-            subarray_definitions = self.config_information['global_subarray_definitions'][instrument.lower()]
-
-
-            if full_ap not in subarray_definitions['AperName']:
-                full_ap_new = [apername for apername, name in
-                               np.array(subarray_definitions['AperName', 'Name']) if
-                               (full_ap in apername) or (full_ap in name)]
-                if len(full_ap_new) > 1 or len(full_ap_new) == 0:
-                    raise ValueError('Cannot match {} with valid aperture name for observation {}.'
-                                     .format(full_ap, input['obs_num']))
-                else:
-                    full_ap = full_ap_new[0]
+            possible_apertures = pysiaf.Siaf(instrument).apernames
+            if full_ap not in possible_apertures:
+                raise ValueError('Unrecognized aperture name: {}'.format(full_ap))
 
             f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
             f.write('  intermediate_aperture: {}   # Name of intermediate aperture used in NIRCam Grism time series obs.\n'.format(input['grismts_intermediate_aperture']))
