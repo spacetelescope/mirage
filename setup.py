@@ -51,8 +51,7 @@ DOCS_REQUIRE = [
     'sphinx-automodapi',
     'sphinx-rtd-theme',
     'stsci-rtd-theme',
-    'extension-helpers',
-    'jupyter-core==4.9.1rc0',
+    'extension-helpers'
 ]
 TESTS_REQUIRE = [
     'pytest',
