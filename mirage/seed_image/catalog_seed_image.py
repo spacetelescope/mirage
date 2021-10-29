@@ -1159,7 +1159,7 @@ class Catalog_seed():
         Create a seed EXPOSURE in the case where the instrument is tracking
         a non-sidereal target
         """
-        # Only attemp to add ghosts to NIRISS observations where the
+        # Only attempt to add ghosts to NIRISS observations where the
         # user has requested it.
         add_ghosts = False
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
@@ -1254,11 +1254,34 @@ class Catalog_seed():
 
         # Add in the other objects which are not being tracked on
         # (i.e. the sidereal targets)
+        print('FIX ME: opaque_target needs to be a user input')
+        opaque_target = True
         if len(mtt_data_list) > 0:
             for i in range(len(mtt_data_list)):
-                non_sidereal_ramp += mtt_data_list[i]
-                # non_sidereal_zero += mtt_zero_list[i]
+                #non_sidereal_ramp += mtt_data_list[i]
+
+                # If the tracked target is opaque (e.g. a planet, astroid, etc),
+                # the background (trailed) objects will only be added to the pixels that
+                # do not contain the tracked target. (i.e. we shouldn't see background
+                # stars that are behind Jupiter).
+                if opaque_target:
+                    # Find pixels that do not contain the tracked target
+                    # (Note that the segmap here is 2D but the seed images are 4D)
+                    self.logger.info('Tracked non-sidereal target is opaque. Background sources behind the target will not be added.')
+                    outside_target = nonsidereal_segmap == 0
+
+                    # Add signal from background targets only to those pixels that
+                    # are not part of the tracked target
+                    for integ in range(ns_int):
+                        for framenum in range(non_sidereal_ramp.shape[1]):
+                            print('INTEG, FRAME:', integ, framenum)
+                            ns_tmp_frame = non_sidereal_ramp[integ, framenum, :, :]
+                            bcgd_srcs_frame = mtt_data_list[i][integ, framenum, :, :]
+                            ns_tmp_frame[outside_target] = ns_tmp_frame[outside_target] + bcgd_srcs_frame[outside_target]
+                            non_sidereal_ramp[integ, framenum, :, :] = ns_tmp_frame
+
         if mtt_data_segmap is not None:
+            print('NEED TO FIX THE SEGMAP TO OMIT SOURCES BEHIND THE TRACKED TARGET')
             nonsidereal_segmap += mtt_data_segmap
         return non_sidereal_ramp, nonsidereal_segmap
 
@@ -1612,7 +1635,7 @@ class Catalog_seed():
                 rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
                                                     magsys, entry[mag_column],
                                                     photfnu=self.photfnu,
-                                                    photflam=self.photflam)
+                                                    photflam=self.photflam, vegamag_zeropoint=self.vegazeropoint)
             else:
                 rate = 1.0
 
@@ -2166,8 +2189,14 @@ class Catalog_seed():
             extended.write(temp_ext_filename, format='ascii', overwrite=True)
 
             extlist, extstamps, ext_ghosts_file = self.getExtendedSourceList(temp_ext_filename, ghost_search=True)
-            conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
-            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
+            if len(extlist) > 0:
+                conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
+                extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
+            else:
+                yd, xd = self.output_dims
+                #extCRImage = np.zeros((self.params['Readout']['nint'], self.frames_per_integration, yd, xd))
+                extCRImage = np.zeros((yd, xd))
+                extSegmap = np.zeros((yd, xd)).astype(np.int64)
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
