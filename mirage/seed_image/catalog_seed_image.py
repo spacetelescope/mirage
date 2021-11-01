@@ -1052,7 +1052,7 @@ class Catalog_seed():
         mov_targs_ramps = []
         mov_targs_segmap = None
 
-        # Only attemp to add ghosts to NIRISS observations where the
+        # Only attempt to add ghosts to NIRISS observations where the
         # user has requested it.
         add_ghosts = False
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
@@ -1254,7 +1254,15 @@ class Catalog_seed():
 
         # Add in the other objects which are not being tracked on
         # (i.e. the sidereal targets)
-        print('FIX ME: opaque_target needs to be a user input')
+        # For the moment, we consider all non-sidereal targets to be opaque.
+        # That is, if they occult any background sources, the signal from those
+        # background sources will not be added to the scene. This is controlled
+        # using the segmentation map. Any pixels there classified as containing
+        # the non-sidereal target will not have signal from background sources
+        # added. I can't think of any non-sidereal targets that would not be
+        # opaque, so for now we will leave this hardwired to be on. If there is
+        # some issue down the road, we can turn this into a user input in the
+        # yaml file.
         opaque_target = True
         if len(mtt_data_list) > 0:
             for i in range(len(mtt_data_list)):
@@ -1267,22 +1275,25 @@ class Catalog_seed():
                 if opaque_target:
                     # Find pixels that do not contain the tracked target
                     # (Note that the segmap here is 2D but the seed images are 4D)
-                    self.logger.info('Tracked non-sidereal target is opaque. Background sources behind the target will not be added.')
+                    self.logger.info(('Tracked non-sidereal target is opaque. Background sources behind the target will not be added. '
+                                      'If background sources are being suppressed in too many pixels (e.g. within the diffraction '
+                                      'spikes of the primary target), try setting "signal_low_limit_for_segmap" in the input yaml '
+                                      'file to a larger value. This will reduce the number of pixels associated with the primary '
+                                      'target in the segmentation map, which defines the pixels where background targets will not '
+                                      'be added.'))
                     outside_target = nonsidereal_segmap == 0
 
                     # Add signal from background targets only to those pixels that
                     # are not part of the tracked target
                     for integ in range(ns_int):
                         for framenum in range(non_sidereal_ramp.shape[1]):
-                            print('INTEG, FRAME:', integ, framenum)
                             ns_tmp_frame = non_sidereal_ramp[integ, framenum, :, :]
                             bcgd_srcs_frame = mtt_data_list[i][integ, framenum, :, :]
                             ns_tmp_frame[outside_target] = ns_tmp_frame[outside_target] + bcgd_srcs_frame[outside_target]
                             non_sidereal_ramp[integ, framenum, :, :] = ns_tmp_frame
 
         if mtt_data_segmap is not None:
-            print('NEED TO FIX THE SEGMAP TO OMIT SOURCES BEHIND THE TRACKED TARGET')
-            nonsidereal_segmap += mtt_data_segmap
+            nonsidereal_segmap[outside_target] += mtt_data_segmap[outside_target]
         return non_sidereal_ramp, nonsidereal_segmap
 
     def readMTFile(self, filename):
