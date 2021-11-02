@@ -50,7 +50,7 @@ classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
 logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
-def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
+def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_above_1=True):
     """Check that the gridded PSF library is properly normalized. We expect
     the total signal of the PSF to be roughly 1.0 (minus up to several percent
     since it should be normalized to 1.0 at the pupil).
@@ -66,6 +66,11 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
     upper_limit : float
         Upper limit for the total signal in the PSF
 
+    renorm_psfs_above_1 : bool
+        If True, any PSFs that have a normalized signal > 1.0
+        will be renormalized down to 1.0. In this case, the result
+        will be set to 'correct'
+
     Returns
     -------
     result : tup
@@ -74,19 +79,37 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
         The second element is a short string describing the
         result.
     """
+    absolute_upper_limit = 1.1
+    result = True, 'correct'
     ndims = len(lib.data.shape)
     if ndims == 3:
-        total_signal = np.sum(lib.data[0, :, :])
+        for i in range(lib.data.shape[0]):
+            total_signal = np.sum(lib.data[i, :, :])
+            total_signal /= lib.meta['oversamp'][0]**2
+            if total_signal > upper_limit:
+                if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
+                    lib.data[i, :, :] = lib.data[i, :, :] / total_signal
+                else:
+                    # We will end up here if the total signal is above 1,
+                    # and renorm_psfs_above_1 is not set or if the signal is
+                    # above the absolute_upper_limit.
+                    result = False, 'too high'
+            elif total_signal < lower_limit:
+                result = False, 'too low'
+
     elif ndims == 2:
         total_signal = np.sum(lib.data)
-    total_signal /= lib.meta['oversamp'][0]**2
-
-    if total_signal > upper_limit:
-        result = False, 'too high'
-    elif total_signal < lower_limit:
-        result = False, 'too low'
-    else:
-        result = True, 'correct'
+        total_signal /= lib.meta['oversamp'][0]**2
+        if total_signal > upper_limit:
+            if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
+                    lib.data = lib.data / total_signal
+            else:
+                # We will end up here if the total signal is above 1,
+                # and renorm_psfs_above_1 is not set or if the signal is
+                # above the absolute_upper_limit.
+                result = False, 'too high'
+        elif total_signal < lower_limit:
+            result = False, 'too low'
     return result
 
 
@@ -381,7 +404,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # Check that the gridded PSF library is normalized as expected
     check_max = PSF_NORM_MAX * grid_min_factor
     check_min = PSF_NORM_MIN * grid_min_factor
-    correct_norm, reason = check_normalization(library, lower_limit=check_min, upper_limit=check_max)
+    correct_norm, reason = check_normalization(library, lower_limit=check_min, upper_limit=check_max, renorm_psfs_above_1=True)
     if correct_norm:
         return library
     else:
