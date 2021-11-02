@@ -51,7 +51,7 @@ DOCS_REQUIRE = [
     'sphinx-automodapi',
     'sphinx-rtd-theme',
     'stsci-rtd-theme',
-    'extension-helpers',
+    'extension-helpers'
 ]
 TESTS_REQUIRE = [
     'pytest',
