@@ -22,7 +22,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 
 	Inst_:
 	  instrument_: NIRCam          #Instrument name
-	  mode_: imaging               #Observation mode (e.g. imaging, WFSS, moving_target)
+	  mode_: imaging               #Observation mode (e.g. imaging, wfss)
 	  use_JWST_pipeline_: False    #Use pipeline in data transformations
 
 	Readout_:
@@ -88,7 +88,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  movingTargetList_: None                         #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.
 	  movingTargetSersic_: None                       #ascii file containing a list of 2D sersic profiles to have moving through the field
 	  movingTargetExtended_: None                     #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
-	  movingTargetToTrack_: None                      #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+	  movingTargetToTrack_: None                      #Catalog containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if tracking_ is set to "non-sidereal"
 	  tso_imaging_catalog_: None                      #Catalog listing TSO source to be used for imaging TSO simulations
 	  tso_grism_catalog_: None                        #Catalog listing TSO source to be used for grism TSO observations
 	  zodiacal_:  None                                #Zodiacal light count rate image file
