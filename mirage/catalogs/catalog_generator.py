@@ -596,7 +596,7 @@ class NonSiderealCatalog(MovingPointSourceCatalog, GalaxyCatalog, ExtendedCatalo
                  filenames=[], position_angle=[], ellipticity=[], radius=[], sersic_index=[],
                  radius_units='arcsec'):
         # List of the type of sources in the non-sidereal catalog
-        valid_objects = ['pointSource', 'galaxies', 'extended']
+        valid_objects = ['pointSource', 'sersic', 'extended']
 
         # The non-sidereal catalog should have only a single source in it. But to
         # work with the base classes, we need to make sure entries are lists
@@ -620,7 +620,7 @@ class NonSiderealCatalog(MovingPointSourceCatalog, GalaxyCatalog, ExtendedCatalo
         for obj in object_type:
             if obj not in valid_objects:
                 raise ValueError(("WARNING: object_type list members must be one of: {}"
-                                  .format(obj, valid_objects)))
+                                  .format(valid_objects)))
         self.object_type = object_type
 
         # Add location information. Make RA, Dec lists consistent if ephemeris file has been
@@ -640,7 +640,7 @@ class NonSiderealCatalog(MovingPointSourceCatalog, GalaxyCatalog, ExtendedCatalo
                                               position_angle=position_angle, starting_index=starting_index,
                                               niriss_ghost_stamp=niriss_ghost_stamp)
 
-        elif object_type[0] == 'galaxies':
+        elif object_type[0] == 'sersic':
             GalaxyCatalog.__init__(self, ra=self._ra, dec=self._dec, x=x, y=y, ellipticity=ellipticity, radius=radius,
                                          sersic_index=sersic_index, position_angle=position_angle,
                                          radius_units=radius_units, starting_index=starting_index,
@@ -664,7 +664,7 @@ class NonSiderealCatalog(MovingPointSourceCatalog, GalaxyCatalog, ExtendedCatalo
             tab.add_column(pa_col, index=7)
 
         # Add position_angle column
-        if self.object_type[0] == 'galaxies':
+        if self.object_type[0] == 'sersic':
             rad_col = Column(self._radius, name='radius')
             tab.add_column(rad_col, index=6)
             sersic_col = Column(self._sersic_index, name='sersic_index')
