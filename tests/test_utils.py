@@ -15,6 +15,20 @@ Use
 from mirage.utils import utils
 
 
+def test_ensure_ascii():
+    """Test the function that makes sure a string contains only ascii characters.
+    Motivation for this was the APT title of proposal 1373, which contained a
+    non-standard apostrophe that was causing problems in Mirage
+    """
+    s = "This is fine"
+    assert utils.ensure_ascii(s) == s
+
+    # The title from program 1373
+    s = "ERS observations of the Jovian System as a demonstration of JWST’s capabilities for Solar System science"
+    expected = "ERS observations of the Jovian System as a demonstration of JWSTs capabilities for Solar System science"
+    assert utils.ensure_ascii(s) == expected
+
+
 def test_make_mag_column_names():
     instrument = 'nircam'
     filters = ['F090W/CLEAR', 'F090W/WLP8', 'WLM8/F115W', 'F322W2/F323N', 'F444W/F405N', 'F470N/F444W', 'F444W/CLEAR', 'CLEAR/F150W']
