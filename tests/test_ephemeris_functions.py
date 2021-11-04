@@ -42,11 +42,20 @@ def test_read_ephemeris_file():
     """Read in an ephemeris and return interpolation funcations. Development
     was based on an ephemeris file from Hoirzons.
     """
-    ephemeris_file = os.path.join(data_dir, 'horizons_results.txt')
-    ephem = ephemeris_tools.read_ephemeris_file(ephemeris_file)
+    files = ['horizons_results.txt', 'horizons_results_jupiter.txt']
+    times = [datetime.datetime(2020, 10, 1), datetime.datetime(2022, 7, 11, 0, 2, 0)]
+    ras = [24.299791666666664, 7.885875]
+    decs = [6.131916666666666, 1.98519444444]
 
-    check_time = datetime.datetime(2020, 10, 1)
-    match = ephem['Time'] == check_time
+    for efile, time, ra, dec in zip(files, times, ras, decs):
+        ephemeris_file = os.path.join(data_dir, efile)
+        ephem = ephemeris_tools.read_ephemeris_file(ephemeris_file)
 
-    assert np.isclose(ephem[match]['RA'].data[0], 24.299791666666664, atol=1e-9)
-    assert np.isclose(ephem[match]['Dec'].data[0], 6.131916666666666, atol=1e-9)
+        check_time = datetime.datetime(2020, 10, 1)
+        match = ephem['Time'] == time
+
+        assert np.isclose(ephem[match]['RA'].data[0], ra, atol=1e-9)
+        assert np.isclose(ephem[match]['Dec'].data[0], dec, atol=1e-9)
+        cols = ['Time', 'RA', 'Dec']
+        for col in cols:
+            assert col in ephem.colnames

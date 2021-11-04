@@ -114,11 +114,13 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
     # note present
     obs_cats = {}
     for number in obs_nums:
-        obs_cats[number] = {'nircam': {}, 'niriss': {}, 'fgs': {}}
+        obs_cats[number] = {'nircam': {}, 'niriss': {}, 'fgs': {}, 'miri':{}, 'nirspec': {}}
         for cat_type in POSSIBLE_CATS:
             obs_cats[number]['nircam'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
             obs_cats[number]['niriss'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
             obs_cats[number]['fgs'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
+            obs_cats[number]['miri'][CAT_TYPE_MAPPING[cat_type]] = 'None'
+            obs_cats[number]['nirspec'][CAT_TYPE_MAPPING[cat_type]] = 'None'
 
     # Loop over the keys in the top level of the input dictionary
     for key1 in cats:

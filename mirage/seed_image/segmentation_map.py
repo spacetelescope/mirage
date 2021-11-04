@@ -14,19 +14,28 @@ class SegMap():
         self.xdim = 2048
         self.ydim = 2048
         self.zdim = None
+        self.intdim = None
 
     def initialize_map(self):
-        if self.zdim is None:
+        if self.zdim is None and self.intdim is None:
             self.segmap = np.zeros((self.ydim, self.xdim), dtype=np.int64)
-        else:
+        elif self.zdim is not None and self.intdim is None:
             self.segmap = np.zeros((self.zdim, self.ydim, self.xdim), dtype=np.int64)
+        elif self.zdim is not None and self.intdim is not None:
+            self.segmap = np.zeros((self.intdim, self.zdim, self.ydim, self.xdim), dtype=np.int64)
 
     def add_object_basic(self, ystart, yend, xstart, xend, number):
         # Add an object to the segmentation map
         # in simplest way possible. All pixels
         # in the box are set to the index number
         # regardless of signal
-        self.segmap[ystart:yend, xstart:xend] = number
+        ndim = len(self.segmap.shape)
+        if ndim == 2:
+            self.segmap[ystart:yend, xstart:xend] = number
+        elif ndim == 3:
+            self.segmap[:, ystart:yend, xstart:xend] = number
+        elif ndim == 4:
+            self.segmap[:, :, ystart:yend, xstart:xend] = number
 
     def add_object_perccut(self, image, ystart, xstart, number, perc):
         # Add an object to the segmentation map

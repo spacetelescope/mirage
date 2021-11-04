@@ -110,14 +110,12 @@ def read_ephemeris_file(filename):
             start_line = i
         if use_line:
             try:
-                date_val, time_val, ra_h, ra_m, ra_s, dec_d, dec_m, dec_s, mag, surf, delta, deldot, sot, junk, sto = newline.split(' ')
-
+                date_val, time_val, ra_h, ra_m, ra_s, dec_d, dec_m, dec_s, *others = newline.split(' ')
                 ra_str = '{}h{}m{}s'.format(ra_h, ra_m, ra_s)
                 dec_str = '{}d{}m{}s'.format(dec_d, dec_m, dec_s)
                 location = SkyCoord(ra_str, dec_str, frame='icrs')
                 ra.append(location.ra.value)
                 dec.append(location.dec.value)
-
                 dt = datetime.strptime("{} {}".format(date_val, time_val), "%Y-%b-%d %H:%M")
                 time.append(dt)
             except:

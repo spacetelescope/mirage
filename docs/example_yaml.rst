@@ -88,7 +88,6 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  movingTargetList_: None                         #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.
 	  movingTargetSersic_: None                       #ascii file containing a list of 2D sersic profiles to have moving through the field
 	  movingTargetExtended_: None                     #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
-	  movingTargetConvolveExtended_: True             #convolve the extended moving targets with PSF before adding.
 	  movingTargetToTrack_: None                      #Catalog containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if tracking_ is set to "non-sidereal"
 	  tso_imaging_catalog_: None                      #Catalog listing TSO source to be used for imaging TSO simulations
 	  tso_grism_catalog_: None                        #Catalog listing TSO source to be used for grism TSO observations
@@ -803,15 +802,6 @@ Moving extended source catalog file
 *simSignals:movingTargetExtended*
 
 Similar to the :ref:`extended <extended>` target list, this is an ascii file listing extended targets to move through the background of the image. A description and example of this file are shown in the :ref:`Moving Extended <moving_extended>` section of the :ref:`Catalogs <catalogs>` page.
-
-.. _movingTargetConvolveExtended:
-
-Convolve moving extended targets with PSF
-+++++++++++++++++++++++++++++++++++++++++
-
-*simSignals:movingTargetConvolveExtended*
-
-Set this input to True if you wish to convolve the images listed in **movingTargetExtended** with the instrumental PSF prior to adding them to the simulated data.
 
 .. _movingTargetToTrack:
 

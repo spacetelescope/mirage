@@ -1052,7 +1052,7 @@ class Catalog_seed():
         mov_targs_ramps = []
         mov_targs_segmap = None
 
-        # Only attemp to add ghosts to NIRISS observations where the
+        # Only attempt to add ghosts to NIRISS observations where the
         # user has requested it.
         add_ghosts = False
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
@@ -1159,7 +1159,7 @@ class Catalog_seed():
         Create a seed EXPOSURE in the case where the instrument is tracking
         a non-sidereal target
         """
-        # Only attemp to add ghosts to NIRISS observations where the
+        # Only attempt to add ghosts to NIRISS observations where the
         # user has requested it.
         add_ghosts = False
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
@@ -1254,12 +1254,46 @@ class Catalog_seed():
 
         # Add in the other objects which are not being tracked on
         # (i.e. the sidereal targets)
+        # For the moment, we consider all non-sidereal targets to be opaque.
+        # That is, if they occult any background sources, the signal from those
+        # background sources will not be added to the scene. This is controlled
+        # using the segmentation map. Any pixels there classified as containing
+        # the non-sidereal target will not have signal from background sources
+        # added. I can't think of any non-sidereal targets that would not be
+        # opaque, so for now we will leave this hardwired to be on. If there is
+        # some issue down the road, we can turn this into a user input in the
+        # yaml file.
+        opaque_target = True
         if len(mtt_data_list) > 0:
             for i in range(len(mtt_data_list)):
-                non_sidereal_ramp += mtt_data_list[i]
-                # non_sidereal_zero += mtt_zero_list[i]
+                #non_sidereal_ramp += mtt_data_list[i]
+
+                # If the tracked target is opaque (e.g. a planet, astroid, etc),
+                # the background (trailed) objects will only be added to the pixels that
+                # do not contain the tracked target. (i.e. we shouldn't see background
+                # stars that are behind Jupiter).
+                if opaque_target:
+                    # Find pixels that do not contain the tracked target
+                    # (Note that the segmap here is 2D but the seed images are 4D)
+                    self.logger.info(('Tracked non-sidereal target is opaque. Background sources behind the target will not be added. '
+                                      'If background sources are being suppressed in too many pixels (e.g. within the diffraction '
+                                      'spikes of the primary target), try setting "signal_low_limit_for_segmap" in the input yaml '
+                                      'file to a larger value. This will reduce the number of pixels associated with the primary '
+                                      'target in the segmentation map, which defines the pixels where background targets will not '
+                                      'be added.'))
+                    outside_target = nonsidereal_segmap == 0
+
+                    # Add signal from background targets only to those pixels that
+                    # are not part of the tracked target
+                    for integ in range(ns_int):
+                        for framenum in range(non_sidereal_ramp.shape[1]):
+                            ns_tmp_frame = non_sidereal_ramp[integ, framenum, :, :]
+                            bcgd_srcs_frame = mtt_data_list[i][integ, framenum, :, :]
+                            ns_tmp_frame[outside_target] = ns_tmp_frame[outside_target] + bcgd_srcs_frame[outside_target]
+                            non_sidereal_ramp[integ, framenum, :, :] = ns_tmp_frame
+
         if mtt_data_segmap is not None:
-            nonsidereal_segmap += mtt_data_segmap
+            nonsidereal_segmap[outside_target] += mtt_data_segmap[outside_target]
         return non_sidereal_ramp, nonsidereal_segmap
 
     def readMTFile(self, filename):
@@ -1612,7 +1646,7 @@ class Catalog_seed():
                 rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
                                                     magsys, entry[mag_column],
                                                     photfnu=self.photfnu,
-                                                    photflam=self.photflam)
+                                                    photflam=self.photflam, vegamag_zeropoint=self.vegazeropoint)
             else:
                 rate = 1.0
 
@@ -2166,8 +2200,14 @@ class Catalog_seed():
             extended.write(temp_ext_filename, format='ascii', overwrite=True)
 
             extlist, extstamps, ext_ghosts_file = self.getExtendedSourceList(temp_ext_filename, ghost_search=True)
-            conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
-            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
+            if len(extlist) > 0:
+                conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
+                extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
+            else:
+                yd, xd = self.output_dims
+                #extCRImage = np.zeros((self.params['Readout']['nint'], self.frames_per_integration, yd, xd))
+                extCRImage = np.zeros((yd, xd))
+                extSegmap = np.zeros((yd, xd)).astype(np.int64)
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
@@ -4813,6 +4853,11 @@ class Catalog_seed():
         segmentation.xdim = xd
         segmentation.ydim = yd
         segmentation.initialize_map()
+
+        if extConvolutions[0]:
+            self.logger.info('Convolving extended sources with PSF prior to adding to seed image.')
+        else:
+            self.logger.info('Extended sources will not be convolved with the PSF.')
 
         # Loop over the entries in the source list
         for entry, stamp, convolution in zip(extSources, extStamps, extConvolutions):

@@ -1255,6 +1255,11 @@ class SimInput:
         #for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
         for element in unique:
             targ, inst = element
+
+            # Skip unsupported instruments
+            if inst in ['NIRSpec', 'MIRI']:
+                continue
+
             ns_catalog = get_nonsidereal_catalog_name(self.catalogs, targ, inst)
             catalog_table, pos_in_xy, vel_in_xy = read_nonsidereal_catalog(ns_catalog)
 
@@ -2122,8 +2127,6 @@ class SimInput:
                      'the field\n'.format(MovingTargetSersic)))
             f.write(('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets '
                      '(planets, moons, etc)\n'.format(MovingTargetExtended)))
-            f.write(('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'
-                     .format(MovingTargetConvolveExtended)))
             f.write(('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during '
                      'observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to '
                      '"moving_target" \n'.format(MovingTargetToTrack)))
