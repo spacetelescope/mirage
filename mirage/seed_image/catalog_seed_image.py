@@ -4854,10 +4854,11 @@ class Catalog_seed():
         segmentation.ydim = yd
         segmentation.initialize_map()
 
-        if extConvolutions[0]:
-            self.logger.info('Convolving extended sources with PSF prior to adding to seed image.')
-        else:
-            self.logger.info('Extended sources will not be convolved with the PSF.')
+        if len(extConvolutions) > 0:
+            if extConvolutions[0]:
+                self.logger.info('Convolving extended sources with PSF prior to adding to seed image.')
+            else:
+                self.logger.info('Extended sources will not be convolved with the PSF.')
 
         # Loop over the entries in the source list
         for entry, stamp, convolution in zip(extSources, extStamps, extConvolutions):
