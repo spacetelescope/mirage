@@ -2862,8 +2862,8 @@ class Observation():
         outModel.meta.observation.activity_id = self.params['Output']['activity_id']
         outModel.meta.observation.exposure_number = self.params['Output']['exposure_number']
 
-        outModel.meta.program.pi_name = self.params['Output']['PI_Name']
-        outModel.meta.program.title = self.params['Output']['title']
+        outModel.meta.program.pi_name = utils.ensure_ascii(self.params['Output']['PI_Name'])
+        outModel.meta.program.title = utils.ensure_ascii(self.params['Output']['title'])
         outModel.meta.program.category = self.params['Output']['Proposal_category']
         outModel.meta.program.sub_category = 'UNKNOWN'
         outModel.meta.program.science_category = self.params['Output']['Science_category']
@@ -2943,12 +2943,12 @@ class Observation():
 
         num_primary_dithers = self.params['Output']['total_primary_dither_positions']
         if isinstance(self.params['Output']['total_primary_dither_positions'], str):
-            num_primary_dithers = np.int(self.params['Output']['total_primary_dither_positions'][0])
+            num_primary_dithers = int(self.params['Output']['total_primary_dither_positions'][0])
 
         outModel.meta.dither.primary_type = self.params['Output']['primary_dither_type'].upper()
         outModel.meta.dither.position_number = self.params['Output']['primary_dither_position']
         outModel.meta.dither.total_points = num_primary_dithers
-        outModel.meta.dither.dither_points = str(self.params['Output']['total_primary_dither_positions'])
+        outModel.meta.dither.dither_points = int(self.params['Output']['total_primary_dither_positions'])
         outModel.meta.dither.pattern_size = 'DEFAULT'
         outModel.meta.dither.subpixel_type = self.params['Output']['subpix_dither_type']
         outModel.meta.dither.subpixel_number = self.params['Output']['subpix_dither_position']
@@ -2965,6 +2965,14 @@ class Observation():
         # The subarray name needs to come from the "Name" column in the
         # subarray definitions dictionary
         mtch = self.subdict["AperName"] == self.params["Readout"]['array_name']
+        if not any(mtch):
+            if '_MASKLWB' in self.params["Readout"]['array_name'] or '_MASKSWB' in self.params["Readout"]['array_name']:
+                pieces = self.params["Readout"]['array_name'].split('_')
+                arrname = '{}_{}'.format(pieces[0], pieces[1])
+                mtch = self.subdict["AperName"] == arrname
+                if not any(mtch):
+                    raise ValueError('Unrecognized aperture name: {}'.format(self.params["Readout"]['array_name']))
+
         outModel.meta.subarray.name = str(self.subdict["Name"].data[mtch][0])
 
         # subarray_bounds indexed to zero, but values in header should be
@@ -3164,8 +3172,8 @@ class Observation():
         outModel[0].header['ACT_ID'] = self.params['Output']['activity_id']
         outModel[0].header['EXPOSURE'] = self.params['Output']['exposure_number']
 
-        outModel[0].header['PI_NAME'] = self.params['Output']['PI_Name']
-        outModel[0].header['TITLE'] = self.params['Output']['title']
+        outModel[0].header['PI_NAME'] = utils.ensure_ascii(self.params['Output']['PI_Name'])
+        outModel[0].header['TITLE'] = utils.ensure_ascii(self.params['Output']['title'])
         outModel[0].header['CATEGORY'] = self.params['Output']['Proposal_category']
         outModel[0].header['SUBCAT'] = 'UNKNOWN'
         outModel[0].header['SCICAT'] = self.params['Output']['Science_category']
@@ -3247,6 +3255,7 @@ class Observation():
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']
         outModel[0].header['NUMDTHPT'] = num_primary_dithers
         outModel[0].header['NDITHPTS'] = str(self.params['Output']['total_primary_dither_positions'])
+        outModel[0].header['NRIMDTPT'] = int(self.params['Output']['total_primary_dither_positions'])
         outModel[0].header['PATTSIZE'] = 'DEFAULT'
         outModel[0].header['SUBPXTYP'] = self.params['Output']['subpix_dither_type']
         outModel[0].header['SUBPXNUM'] = self.params['Output']['subpix_dither_position']

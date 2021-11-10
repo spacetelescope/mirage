@@ -51,7 +51,7 @@ DOCS_REQUIRE = [
     'sphinx-automodapi',
     'sphinx-rtd-theme',
     'stsci-rtd-theme',
-    'extension-helpers',
+    'extension-helpers'
 ]
 TESTS_REQUIRE = [
     'pytest',
@@ -90,7 +90,7 @@ setup(
     setup_requires=['setuptools_scm'],
     install_requires=[
         'asdf>=2.1.0',
-        'astropy>=4.0',
+        'astropy>=4.3.1',
         'astroquery>=0.3.8',
         'bokeh>=2.2.3',
         'batman-package',
@@ -102,7 +102,7 @@ setup(
         'ipython',
         'jinja2==2.11.3',
         'jupyter',
-        'jwst==1.1.0',
+        'jwst',
         'jwst-backgrounds>=1.1.1',
         'lxml>=3.6.4',
         'matplotlib>=3.0.0',

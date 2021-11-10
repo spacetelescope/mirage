@@ -114,11 +114,13 @@ def catalog_dictionary_per_observation(cats, obs_nums, targets, defaults):
     # note present
     obs_cats = {}
     for number in obs_nums:
-        obs_cats[number] = {'nircam': {}, 'niriss': {}, 'fgs': {}}
+        obs_cats[number] = {'nircam': {}, 'niriss': {}, 'fgs': {}, 'miri':{}, 'nirspec': {}}
         for cat_type in POSSIBLE_CATS:
             obs_cats[number]['nircam'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
             obs_cats[number]['niriss'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
             obs_cats[number]['fgs'][CAT_TYPE_MAPPING[cat_type]] = defaults[CAT_TYPE_MAPPING[cat_type]]
+            obs_cats[number]['miri'][CAT_TYPE_MAPPING[cat_type]] = 'None'
+            obs_cats[number]['nirspec'][CAT_TYPE_MAPPING[cat_type]] = 'None'
 
     # Loop over the keys in the top level of the input dictionary
     for key1 in cats:
@@ -387,7 +389,7 @@ def expand_for_dithers(indict, verbose=True):
 
     # complication here is to handle cases with unsupported instruments (MIRI, NIRSpec) in parallel
     for i, row in enumerate(table['row']):
-        number_of_dithers = np.int(table['number_of_dithers'][i])
+        number_of_dithers = int(table['number_of_dithers'][i])
         expand_prime_dithers_only = False
         expand_parallel_dithers = False
 
@@ -437,7 +439,7 @@ def expand_for_dithers(indict, verbose=True):
                 expanded_table = vstack((expanded_table, dither_table))
 
     # set number of dithers to 1 after expansion
-    expanded_table['number_of_dithers'] = np.ones(len(expanded_table)).astype(np.int)
+    expanded_table['number_of_dithers'] = np.ones(len(expanded_table)).astype(int)
 
     # NIRCam cannot handle when PrimaryDithers=None
     for index, value in enumerate(expanded_table['PrimaryDithers']):
@@ -685,7 +687,7 @@ def get_observation_dict(xml_file, yaml_file, catalogs,
             ]
         observation_rows = np.where(np.array(xml_dict['ObservationID']) == observation_number)[0]
         for index in observation_rows:
-            number_of_dithers = np.int(xml_dict['number_of_dithers'][index])
+            number_of_dithers = int(xml_dict['number_of_dithers'][index])
             instrument = xml_dict['Instrument'][index]
             for dither_index in range(number_of_dithers):
 

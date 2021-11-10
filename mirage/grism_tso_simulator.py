@@ -364,9 +364,6 @@ class GrismTSO():
             # If the user has provided a 2D array of lightcurves, plus associated 1D arrays of
             # times and wavelengths, then interpolate those lightcurves onto the grid of frame
             # times and transmission spectrum wavelengths.
-            print(len(lightcurve_wavelengths), len(lightcurve_times), self.lightcurves.shape)
-
-
             lc_function = interp2d(lightcurve_wavelengths, lightcurve_times, self.lightcurves)
             lightcurves = lc_function(transmission_spectrum['Wavelength'], times)
 
@@ -526,7 +523,9 @@ class GrismTSO():
                 # requested subarray if necessary
                 if orig_parameters['Readout']['array_name'] not in self.fullframe_apertures:
                     self.logger.info("Dispersed seed image size: {}".format(segment_seed.shape))
-                    segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
+
+                    # segment_seed has already been cropped, so no need to crop here...
+                    #segment_seed = utils.crop_to_subarray(segment_seed, tso_direct.subarray_bounds)
                     #gain = utils.crop_to_subarray(gain, tso_direct.subarray_bounds)
 
                 # Segmentation map will be centered in a frame that is larger
@@ -537,6 +536,8 @@ class GrismTSO():
                 dy = int((segy - tso_direct.nominal_dims[0]) / 2)
                 segbounds = [tso_direct.subarray_bounds[0] + dx, tso_direct.subarray_bounds[1] + dy,
                              tso_direct.subarray_bounds[2] + dx, tso_direct.subarray_bounds[3] + dy]
+
+
                 tso_segmentation_map = utils.crop_to_subarray(tso_segmentation_map, segbounds)
 
                 # Convert seed image to ADU/sec to be consistent
@@ -608,10 +609,12 @@ class GrismTSO():
         # help align the split files between the seed image and the dark
         # object later (which is split by groups).
         if self.split_seed:
+            forced_ints_per_file = int(self.frames_per_int / self.numgroups) * (self.int_segment_indexes[1] - self.int_segment_indexes[0])
             split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes = find_file_splits(self.seed_dimensions[1],
                                                                                                 self.seed_dimensions[0],
                                                                                                 self.numgroups,
-                                                                                                self.numints)
+                                                                                                self.numints,
+                                                                                                force_delta_int=forced_ints_per_file)
 
             # In order to avoid the case of having a single integration
             # in the final file, which leads to rate rather than rateints
@@ -1044,7 +1047,7 @@ class GrismTSO():
         seed_header['SEGFRMST'] = self.segment_frame_start_number
         seed_header['SEGFRMED'] = self.segment_frame_start_number + grps - 1
         seed_header['SEGINTST'] = self.segment_int_start_number
-        seed_header['SEGINTED'] = self.segment_int_start_number + integ - 1
+        seed_header['SEGINTED'] = self.segment_int_start_number + self.segment_ints - 1
 
         # Frame and integration indexes of the part within the segment
         seed_header['PTINTSRT'] = self.part_int_start_number
@@ -1134,8 +1137,7 @@ class GrismTSO():
                                                     '_tso_grism_sources.{}'.format(suffix))
         utils.write_yaml(tso_params, self.tso_paramfile)
 
-    @staticmethod
-    def tso_catalog_check(catalog, exp_time):
+    def tso_catalog_check(self, catalog, exp_time):
         """Check that the start and end times specified in the TSO catalog file (which are
         used to calculate the lightcurves) are long enough to encompass the entire exposure.
         If not, extend the end time to the required time.

@@ -21,7 +21,7 @@ logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
 
 def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
-                     pixel_limit=FILE_SPLITTING_LIMIT):
+                     pixel_limit=FILE_SPLITTING_LIMIT, force_delta_int=None):
     """Determine the frame and/or integration numbers where a file
     should be split in order to keep the file size reasonable.
 
@@ -46,6 +46,10 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
     pixel_limit : int
         Proxy for file size limit. Number of pixel read outs to treat
         as the upper limit to be contained in a single file.
+
+    force_delta_int : int
+        If provided, this forces the number of integrations in each
+        file
 
     Returns
     -------
@@ -75,7 +79,7 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
     # i.e. splitting within an integration
     if pix_per_int > pixel_limit:
         split = True
-        delta_group = np.int(pixel_limit / pix_per_group)
+        delta_group = int(pixel_limit / pix_per_group)
         # If calculations are being done using frames rather than groups,
         # make sure that we don't split in the middle of a group. Force
         # the splits to be between groups.
@@ -84,18 +88,21 @@ def find_file_splits(xdim, ydim, groups, integrations, frames_per_group=None,
                 closest_multiple = delta_group // frames_per_group
                 delta_group = closest_multiple * frames_per_group
 
-        group_list = np.arange(0, groups, delta_group).astype(np.int)
+        group_list = np.arange(0, groups, delta_group).astype(int)
         group_list = np.append(group_list, groups)
         logger.info('Splitting within each integration:')
-        integration_list = np.arange(integrations + 1).astype(np.int)
+        integration_list = np.arange(integrations + 1).astype(int)
         logger.info('integration_list: {}'.format(integration_list))
         logger.info('group_list: {}'.format(group_list))
     elif observation > pixel_limit:
         split = True
         logger.info('Splitting by integration:')
         group_list = np.array([0, groups])
-        delta_int = np.int(pixel_limit / pix_per_int)
-        integration_list = np.arange(0, integrations, delta_int).astype(np.int)
+        if not force_delta_int:
+            delta_int = int(pixel_limit / pix_per_int)
+        else:
+            delta_int = force_delta_int
+        integration_list = np.arange(0, integrations, delta_int).astype(int)
         integration_list = np.append(integration_list, integrations)
         logger.info('integration_list: {}'.format(integration_list))
         logger.info('group_list: {}'.format(group_list))

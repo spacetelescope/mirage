@@ -33,6 +33,7 @@ from glob import glob
 import logging
 import os
 import warnings
+import pdb
 
 from astropy.io import fits
 import numpy as np
@@ -42,14 +43,14 @@ from mirage.logging import logging_functions
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \
                                    LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, PSF_NORM_MIN, \
                                    PSF_NORM_MAX, NIRISS_NRM_PSF_THROUGHPUT_REDUCTION, \
-                                   NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION
+                                   NIRISS_CLEARP_PSF_THROUGHPUT_REDUCTION, NIRCAM_WLP12_PSF_THROUGHPUT_REDUCTION
 from mirage.utils.utils import expand_environment_variable, standardize_filters
 
 classdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 log_config_file = os.path.join(classdir, 'logging', LOG_CONFIG_FILENAME)
 logging_functions.create_logger(log_config_file, STANDARD_LOGFILE_NAME)
 
-def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
+def check_normalization(lib, lower_limit=0.80, upper_limit=1.0, renorm_psfs_above_1=True):
     """Check that the gridded PSF library is properly normalized. We expect
     the total signal of the PSF to be roughly 1.0 (minus up to several percent
     since it should be normalized to 1.0 at the pupil).
@@ -65,6 +66,11 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
     upper_limit : float
         Upper limit for the total signal in the PSF
 
+    renorm_psfs_above_1 : bool
+        If True, any PSFs that have a normalized signal > 1.0
+        will be renormalized down to 1.0. In this case, the result
+        will be set to 'correct'
+
     Returns
     -------
     result : tup
@@ -73,19 +79,37 @@ def check_normalization(lib, lower_limit=0.80, upper_limit=1.0):
         The second element is a short string describing the
         result.
     """
+    absolute_upper_limit = 1.1
+    result = True, 'correct'
     ndims = len(lib.data.shape)
     if ndims == 3:
-        total_signal = np.sum(lib.data[0, :, :])
+        for i in range(lib.data.shape[0]):
+            total_signal = np.sum(lib.data[i, :, :])
+            total_signal /= lib.meta['oversamp'][0]**2
+            if total_signal > upper_limit:
+                if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
+                    lib.data[i, :, :] = lib.data[i, :, :] / total_signal
+                else:
+                    # We will end up here if the total signal is above 1,
+                    # and renorm_psfs_above_1 is not set or if the signal is
+                    # above the absolute_upper_limit.
+                    result = False, 'too high'
+            elif total_signal < lower_limit:
+                result = False, 'too low'
+
     elif ndims == 2:
         total_signal = np.sum(lib.data)
-    total_signal /= lib.meta['oversamp'][0]**2
-
-    if total_signal > upper_limit:
-        result = False, 'too high'
-    elif total_signal < lower_limit:
-        result = False, 'too low'
-    else:
-        result = True, 'correct'
+        total_signal /= lib.meta['oversamp'][0]**2
+        if total_signal > upper_limit:
+            if renorm_psfs_above_1 and total_signal <= absolute_upper_limit:
+                    lib.data = lib.data / total_signal
+            else:
+                # We will end up here if the total signal is above 1,
+                # and renorm_psfs_above_1 is not set or if the signal is
+                # above the absolute_upper_limit.
+                result = False, 'too high'
+        elif total_signal < lower_limit:
+            result = False, 'too low'
     return result
 
 
@@ -185,6 +209,11 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
                               'in the pupil wheel.'))
         pupil = save_filt
 
+    elif (inst.upper() == 'NIRCAM') and (pupil.upper() in ['WLP4', 'WLM4', 'WLP12']):
+        # If there is a weak lens listed in the library file's pupil value,
+        # disentangle it into the correct filter and pupil values
+        filt, pupil = fix_weak_lens_filter_pupil_values(filt, pupil)
+
     opd_file = header['OPD_FILE']
     if default_psf:
         if 'predicted' in opd_file:
@@ -211,6 +240,42 @@ def confirm_gridded_properties(filename, instrument, detector, filtername, pupil
             return full_filename
     else:
         return None
+
+
+def fix_weak_lens_filter_pupil_values(filter_value, pupil_value):
+    """By default, WebbPSF modifies weak lens-related filter
+    and pupil values that are in the headers of the gridded PSF
+    library files. In cases where WLP4 (which is in the filter wheel)
+    is used in combination with one of the +/-8 weak lenses (in the
+    pupil wheel), WebbPSF will 'add' them together, and report a
+    pupil value of WLM4 or WLP12. It will also set the filter value
+    to F212N (becuase WLP4 has a F212N-like coating on it). For our
+    purposes, we need to know exactly what is in the filter and pupil
+    wheels. This function disentangles those values.
+
+    Parameters
+    ----------
+    filter_value : str
+        Value from the FILTER header keyword in the PSF library file
+
+    pupil_value : str
+        Value from the PUPIL header keyword in the PSF library file
+    """
+    save_filt = copy(filter_value)
+    file_filt = 'WLP4' ## it's built in filter wheel
+    save_pupil = copy(pupil_value)
+
+    # Reverse engineer if it was paired with CLEAR, WLP8 or WLM8
+    if save_pupil == 'WLP4':
+        file_pupil = 'CLEAR'
+    elif save_pupil == 'WLP12':
+        file_pupil = 'WLP8'
+    elif save_pupil == 'WLM4':
+        file_pupil = 'WLM8'
+    else:
+        raise ValueError(('The pupil paired with WLP4, {}, does not '
+                          'match expectations'.format(save_pupil)))
+    return file_filt, file_pupil
 
 
 def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefront_error,
@@ -289,6 +354,13 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
                 filename_pupil = 'mask_nrm'
                 grid_min_factor = NIRISS_NRM_PSF_THROUGHPUT_REDUCTION
         elif instrument.lower() == 'nircam':
+            # In the case of a WLP4+WLP8 observation, the gridded PSF library field
+            # of view is small enough (and the PSF is large enough) that a significant
+            # fraction of the flux is outside the field of view (of the PSF "core" library.
+            # In this case, we need to loosen then requirement for the minimum normalized
+            # flux in the array.
+            if ((filtername.lower() == 'wlp4') & (pupilname.lower() == 'wlp8')):
+                grid_min_factor = NIRCAM_WLP12_PSF_THROUGHPUT_REDUCTION
             filename_filter = filtername
             filename_pupil = pupilname if 'GDHS' not in pupilname else 'clear'  # for WFSC team practice purposes we don't produce DHS "PSFs"
 
@@ -310,6 +382,8 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # PSF model properties don't match what's expected, then resort to
     # opening and examining all files in the library.
     if library_file is None:
+        logger.info(("No matching gridded PSF library file found based on filename pattern. Checking "
+                 "library files' metadata. This will be slower."))
         library_file = get_library_file(instrument, detector, filtername, pupilname,
                                         wavefront_error, wavefront_error_group, library_path)
 
@@ -330,7 +404,7 @@ def get_gridded_psf_library(instrument, detector, filtername, pupilname, wavefro
     # Check that the gridded PSF library is normalized as expected
     check_max = PSF_NORM_MAX * grid_min_factor
     check_min = PSF_NORM_MIN * grid_min_factor
-    correct_norm, reason = check_normalization(library, lower_limit=check_min, upper_limit=check_max)
+    correct_norm, reason = check_normalization(library, lower_limit=check_min, upper_limit=check_max, renorm_psfs_above_1=True)
     if correct_norm:
         return library
     else:
@@ -467,6 +541,11 @@ def get_library_file(instrument, detector, filt, pupil, wfe, wfe_group,
                                       'in the pupil wheel.'))
                 file_pupil = save_filt
 
+            elif (file_inst.upper() == 'NIRCAM') and (file_pupil.upper() in ['WLP4', 'WLM4', 'WLP12']):
+                # If there is a weak lens listed in the library file's pupil value,
+                # disentangle it into the correct filter and pupil values
+                file_filt, file_pupil = fix_weak_lens_filter_pupil_values(file_filt, file_pupil)
+
             if segment_id is None and not itm_sim:
                 opd = header['OPD_FILE']
                 if 'requirements' in opd:
@@ -592,6 +671,8 @@ def get_psf_wings(instrument, detector, filtername, pupilname, wavefront_error, 
     # PSF model properties don't match what's expected, then resort to
     # opening and examining all files in the library.
     if wings_file is None:
+        logger.info(("No matching gridded PSF wing library file found based on filename pattern. Checking "
+                     "library files' metadata. This will be slower."))
         # Find the file containing the PSF wings
         wings_file = get_library_file(instrument, detector, filtername, pupilname,
                                       wavefront_error, wavefront_error_group, library_path, wings=True)

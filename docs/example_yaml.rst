@@ -22,7 +22,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 
 	Inst_:
 	  instrument_: NIRCam          #Instrument name
-	  mode_: imaging               #Observation mode (e.g. imaging, WFSS, moving_target)
+	  mode_: imaging               #Observation mode (e.g. imaging, wfss)
 	  use_JWST_pipeline_: False    #Use pipeline in data transformations
 
 	Readout_:
@@ -30,6 +30,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  ngroup_: 6               #Number of groups in integration
 	  nint_: 1                 #Number of integrations per exposure
 	  array_name_: NRCB5_FULL  #Name of array (FULL, SUB160, SUB64P, etc)
+	  intermediate_aperture_: None  # Name of intermediate aperture used in NIRCam Grism time series obs.
 	  filter_: F250M           #Filter of simulated data (F090W, F322W2, etc)
 	  pupil_: CLEAR            #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
@@ -87,8 +88,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  movingTargetList_: None                         #Name of file containing a list of point source moving targets (e.g. KBOs, asteroids) to add.
 	  movingTargetSersic_: None                       #ascii file containing a list of 2D sersic profiles to have moving through the field
 	  movingTargetExtended_: None                     #ascii file containing a list of stamp images to add as moving targets (planets, moons, etc)
-	  movingTargetConvolveExtended_: True             #convolve the extended moving targets with PSF before adding.
-	  movingTargetToTrack_: None                      #File containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to "moving_target"
+	  movingTargetToTrack_: None                      #Catalog containing a single moving target which JWST will track during observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if tracking_ is set to "non-sidereal"
 	  tso_imaging_catalog_: None                      #Catalog listing TSO source to be used for imaging TSO simulations
 	  tso_grism_catalog_: None                        #Catalog listing TSO source to be used for grism TSO observations
 	  zodiacal_:  None                                #Zodiacal light count rate image file
@@ -247,6 +247,16 @@ Array Name
 *Readout:array_name*
 
 This is the name of the aperture used for the simulated data. Generally, this is composed of the name of the detector combined with the name of the subarray used. For example, a full frame observation using NIRCam's A1 detector has an **array_name** of 'NRCA1_FULL', while a full frame NIRISS observation will have an array_name of ‘NIS_CEN’. The list of possible array_name values are given in the **subarray_defs** input file described below. The **array_name** is used to identify several other characteristics of the simulated data, including the detector to use, as well as the proper array dimensions and location on the detector.
+
+
+.. _intermediate_aperture:
+
+Intermediate Aperture
++++++++++++++++++++++
+
+*Readout:intermediate_aperture*
+
+This is the name of the intermediate aperture designated by APT to control the telescope pointing during Grism Time Series observations. The intermediate aperture specifies the location of the target prior to inserting the grism into the beam. When the grism is placed in the beam, the target's trace will be offset from this location by a few tens of rows. The intermediate aperture is defined such that the target's trace will land at the reference location of the user-specified aperture. This is only used for Grism Time Series observations, including the shortwave imaging mode data that accompany the dispersed longwave data. For all other observations, this will be set to None, and ignored.
 
 .. _filter:
 
@@ -792,15 +802,6 @@ Moving extended source catalog file
 *simSignals:movingTargetExtended*
 
 Similar to the :ref:`extended <extended>` target list, this is an ascii file listing extended targets to move through the background of the image. A description and example of this file are shown in the :ref:`Moving Extended <moving_extended>` section of the :ref:`Catalogs <catalogs>` page.
-
-.. _movingTargetConvolveExtended:
-
-Convolve moving extended targets with PSF
-+++++++++++++++++++++++++++++++++++++++++
-
-*simSignals:movingTargetConvolveExtended*
-
-Set this input to True if you wish to convolve the images listed in **movingTargetExtended** with the instrumental PSF prior to adding them to the simulated data.
 
 .. _movingTargetToTrack:
 

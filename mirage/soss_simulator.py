@@ -21,8 +21,7 @@ import yaml
 import astropy.units as q
 import astropy.constants as ac
 from astropy.io import fits
-from astropy.modeling.models import BlackBody1D, Voigt1D, Gaussian1D, Lorentz1D
-from astropy.modeling.blackbody import FLAM
+from astropy.modeling.models import BlackBody, Voigt1D, Gaussian1D, Lorentz1D
 import astropy.table as at
 from astropy.time import Time, TimeDelta
 from astropy.coordinates import SkyCoord
@@ -38,7 +37,7 @@ from mirage.dark import dark_prep
 from mirage.logging import logging_functions
 from mirage.ramp_generator import obs_generator
 from mirage.reference_files import crds_tools
-from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+from mirage.utils.constants import FLAMBDA_CGS_UNITS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from mirage.utils import utils, file_io
 from mirage.psf import soss_trace
 from mirage.yaml import yaml_generator
@@ -708,6 +707,10 @@ class SossSim():
         # Save paramfile
         self._paramfile = pfile
 
+        # Only first order if F277W
+        if self.filter == 'F277W':
+            self.orders = [1]
+
         # Set the dependent quantities
         self.wave = hu.wave_solutions(self.subarray)
         self.avg_wave = np.mean(self.wave, axis=1)
@@ -1203,9 +1206,9 @@ class SossBlackbodySim(SossSim):
             Scale the flux by the given factor
         """
         # Generate a blackbody at the given temperature
-        bb = BlackBody1D(temperature=teff * q.K)
+        bb = BlackBody(temperature=teff * q.K)
         wav = np.linspace(0.5, 2.9, 1000) * q.um
-        flux = bb(wav).to(FLAM, q.spectral_density(wav)) * 1E-8 * scale
+        flux = (bb(wav) * q.sr / bb.bolometric_flux.value).to(FLAMBDA_CGS_UNITS, q.spectral_density(wav)) * 1E-8 * scale
 
         # Initialize base class
         super().__init__(ngrps=ngrps, nints=nints, star=[wav, flux], subarray=subarray, filter=filter, **kwargs)

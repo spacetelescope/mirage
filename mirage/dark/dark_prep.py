@@ -725,9 +725,20 @@ class DarkPrep():
         xdim = self.subarray_bounds[2] - self.subarray_bounds[0] + 1
         ydim = self.subarray_bounds[3] - self.subarray_bounds[1] + 1
         if self.file_splitting:
+            # Mimic what is done in catalog_seed_image, so that we get the same answer. First,
+            # split the file based on frames (i.e. RAPID). After that, split based on groups.
+            frames_per_group = self.frames_per_integration / self.numgroups
+            split_seed_frames, seg_ind, int_ind = find_file_splits(xdim, ydim, self.frames_per_integration,
+                                                                   self.numints, frames_per_group=frames_per_group)
+
+
+
+            forced_ints_per_file = int(self.frames_per_integration / self.numgroups) * (int_ind[1] - int_ind[0])
             split_seed, group_segment_indexes, integration_segment_indexes = find_file_splits(xdim, ydim,
                                                                                               self.params['Readout']['ngroup'],
-                                                                                              self.params['Readout']['nint'])
+                                                                                              self.params['Readout']['nint'],
+                                                                                              force_delta_int=forced_ints_per_file)
+            self.logger.info('File splitting enabled. Starting integration numbers for all file segments: {}'.format(integration_segment_indexes))
         else:
             self.logger.info('File-splitting disabled. Output will be forced into a single file.')
             split_seed = False

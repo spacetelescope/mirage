@@ -373,6 +373,21 @@ def crop_to_subarray(data, bounds):
                               "dimensions of the input array."))
 
 
+def ensure_ascii(in_string):
+    """Remove any non-ASCII characters from the input string
+
+    Parameters
+    ----------
+    in_string : str
+        Input string
+
+    output_string : str
+        String with non-ASCII characters removed
+    """
+    encoded_string = in_string.encode('ascii', 'ignore')
+    return encoded_string.decode()
+
+
 def ensure_dir_exists(fullpath):
     """Creates dirs from ``fullpath`` if they do not already exist.
     """
@@ -578,6 +593,37 @@ def get_all_reffiles(param_dict):
     return mapping
 
 
+def get_lw_grism_tso_intermeidate_aperture(aperture):
+    """Grism time series observations use an intermediate aperture in
+    order to place the undispersed target at the correct location such
+    that, once the grism is in the beam, the trace lands at row 34 on
+    the detector. In the APT pointing file, the requested aperture is
+    listed (i.e. NRCA5_GRISM64_F444W), but the V2, V3 values for the
+    reference location are actually those of the intermediate aperture
+    (i.e. NRCA5_TAGRISMTS_SCI_F444W'). This function will return the
+    name of the intermediate aperture given the name of the requested
+    aperture.
+
+    Parameters
+    ----------
+    aperture : str
+        Name of the requested aperture
+
+    Returns
+    -------
+    intermediate_aperture : str
+        Name of the intermediate aperture
+    """
+    lw_filter = aperture.split('_')[2]
+    if lw_filter in ['F277W', 'F322W2', 'F356W']:
+        intermediate_aperture = 'NRCA5_TAGRISMTS_SCI_F322W2'
+    elif lw_filter == 'F444W':
+        intermediate_aperture = 'NRCA5_TAGRISMTS_SCI_F444W'
+    else:
+        raise ValueError('Unrecognized Grism TSO LW filter: {}. What intermediate aperture is used?'.format(lw_filter))
+    return intermediate_aperture
+
+
 def get_siaf():
     '''Return a dictionary that holds the contents of the SIAF config
     file.
@@ -753,8 +799,17 @@ def get_subarray_info(params, subarray_table):
     """
     logger = logging.getLogger('mirage.utils.utils.get_subarray_info')
 
-    if params['Readout']['array_name'] in subarray_table['AperName']:
-        mtch = params['Readout']['array_name'] == subarray_table['AperName']
+    array_name = params['Readout']['array_name']
+    # For MASKSWB and MASKLWB apertures, the filter name is part of the aperture
+    # name. But the subarray definition file contains only an entry for the aperture
+    # name without the filter name. In that case, strip off the filter name here
+    # before checking the definition file
+    if '_MASKLWB' in array_name or '_MASKSWB' in array_name:
+        pieces = array_name.split('_')
+        array_name = '{}_{}'.format(pieces[0], pieces[1])
+
+    if array_name in subarray_table['AperName']:
+        mtch = array_name == subarray_table['AperName']
         namps = subarray_table['num_amps'].data[mtch][0]
         if namps != 0:
             params['Readout']['namp'] = int(namps)
@@ -769,16 +824,16 @@ def get_subarray_info(params, subarray_table):
                 else:
                     raise ValueError(("WARNING: {} requires the number of amps to be 1 or 4. Please set "
                                       "'Readout':'namp' in the input yaml file to one of these values."
-                                      .format(params['Readout']['array_name'])))
+                                      .format(array_name)))
             except KeyError:
                 raise KeyError(("WARNING: 'Readout':'namp' not present in input yaml file. "
                                 "{} aperture requires the number of amps to be 1 or 4. Please set "
                                 "'Readout':'namp' in the input yaml file to one of these values."
-                                .format(params['Readout']['array_name'])))
+                                .format(array_name)))
     else:
         raise ValueError(("WARNING: subarray name {} not found in the "
                           "subarray dictionary {}."
-                          .format(params['Readout']['array_name'],
+                          .format(array_name,
                                   params['Reffiles']['subarray_defs'])))
     return params
 
@@ -1059,7 +1114,7 @@ def parse_RA_Dec(ra_string, dec_string):
     # First, a quick check to see if the inputs are in
     # decimal degrees already.
     try:
-        return np.float(ra_string), np.float(dec_string)
+        return float(ra_string), float(dec_string)
     except ValueError:
         pass
 
@@ -1163,7 +1218,7 @@ def read_yaml(filename):
         with open(filename, 'r') as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
     except FileNotFoundError as e:
-            logging.error(e)
+        logging.error(e)
     return data
 
 
@@ -1194,7 +1249,7 @@ def standardize_filters(instrument, filter_values):
     if instrument.lower() == 'fgs':
         return filter_values
     elif instrument.lower() == 'nircam':
-        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC', 'GDHS0', 'GDHS60']
+        pw_values = NIRCAM_PUPIL_WHEEL_FILTERS + ['CLEAR', 'GRISMR', 'GRISMC', 'GDHS0', 'GDHS60', 'MASKRND', 'MASKBAR']
         reverse_nircam_2_filter_crosses = ['{}/{}'.format(ele.split('/')[1], ele.split('/')[0]) for ele in NIRCAM_2_FILTER_CROSSES]
         wlp8_combinations = ['{}/WLP8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]
         wlm8_combinations = ['{}/WLM8'.format(ele) for ele in NIRCAM_WL8_CROSSING_FILTERS]

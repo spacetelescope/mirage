@@ -149,7 +149,15 @@ def test_2mass_catalog_generation():
     two_mass_mirage, two_mass_query_results = create_catalog.get_2MASS_ptsrc_catalog(80.4, -69.8, 120)
     comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/TwoMass_test.cat')
     comparison_table = ascii.read(comparison_file)
-    assert all(two_mass_mirage.ra == comparison_table['x_or_RA'].data)
+    assert two_mass_query_results.colnames == ['ra', 'dec', 'clon', 'clat', 'err_maj', 'err_min', 'err_ang',
+                                               'designation', 'j_m', 'j_cmsig', 'j_msigcom', 'j_snr', 'h_m',
+                                               'h_cmsig', 'h_msigcom', 'h_snr', 'k_m', 'k_cmsig', 'k_msigcom',
+                                               'k_snr', 'ph_qual', 'rd_flg', 'bl_flg', 'cc_flg', 'ndet', 'gal_contam',
+                                               'mp_flg', 'hemis', 'xdate', 'scan', 'glon', 'glat', 'a', 'dist_opt',
+                                               'phi_opt', 'b_m_opt', 'vr_m_opt', 'nopt_mchs', 'ext_key', 'j_h', 'h_k', 'j_k']
+    assert two_mass_mirage.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', '2mass_j_m_magnitude',
+                                              '2mass_h_m_magnitude', '2mass_k_m_magnitude']
+    assert len(two_mass_mirage.ra) == len(comparison_table['x_or_RA'].data)
 
 
 def test_catalog_combination():
@@ -525,4 +533,51 @@ def test_determine_used_cats():
     tsogrism_cats = utils.determine_used_cats('ts_grism', catalogs)
     tsogrism_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'grism_tso.cat']
     assert tsogrism_cats == tsogrism_truth
+
+
+def test_nonsidereal_extended_source_catalog():
+    """Test the creation of non-sidereal source catalogs
+    """
+    filename = 'Jupiter_stamp.fits'
+    ephemeris_file = 'horizons_results.txt'
+    ns = catalog_generator.NonSiderealCatalog(object_type=['extended'], ephemeris_file=[ephemeris_file],
+                                              filenames=filename)
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f360m')
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f405n')
+    expected_cols = ['index', 'object', 'x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity',
+                     'filename', 'pos_angle', 'nircam_f360m_clear_magnitude', 'ephemeris_file',
+                     'nircam_f444w_f405n_magnitude']
+    for col in expected_cols:
+        assert col in ns.table.colnames
+    assert ns.table['object'] == 'extended'
+
+
+def test_nonsidereal_sersic_source_catalog():
+    """Test the creation of non-sidereal source catalogs
+    """
+    ephemeris_file = 'horizons_results.txt'
+    ns = catalog_generator.NonSiderealCatalog(object_type=['sersic'], ephemeris_file=[ephemeris_file], ellipticity=[0.02], radius=[0.3], sersic_index=[1.4],
+                 position_angle=[49.])
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f360m')
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f405n')
+    expected_cols = ['index', 'object', 'x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity',
+                     'sersic_index', 'ellipticity', 'pos_angle', 'radius', 'nircam_f360m_clear_magnitude',
+                     'ephemeris_file', 'nircam_f444w_f405n_magnitude']
+    for col in expected_cols:
+        assert col in ns.table.colnames
+    assert ns.table['object'] == 'sersic'
+
+
+def test_nonsidereal_point_source_catalog():
+    """Test the creation of non-sidereal source catalogs
+    """
+    ephemeris_file = 'horizons_results.txt'
+    ns = catalog_generator.NonSiderealCatalog(object_type=['pointSource'], ephemeris_file=[ephemeris_file])
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f360m')
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f405n')
+    expected_cols = ['index', 'object', 'x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity',
+                     'nircam_f360m_clear_magnitude', 'ephemeris_file', 'nircam_f444w_f405n_magnitude']
+    for col in expected_cols:
+        assert col in ns.table.colnames
+    assert ns.table['object'] == 'pointSource'
 
