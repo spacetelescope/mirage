@@ -49,9 +49,10 @@ import pysiaf
 
 import mirage
 from mirage.logging import logging_functions
-from mirage.ramp_generator import unlinearize
+from mirage.ramp_generator import unlinearize, moving_target_position_table
 from mirage.reference_files import crds_tools
-from mirage.utils import read_fits, utils, siaf_interface
+from mirage.seed_image import ephemeris_tools
+from mirage.utils import file_io, read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, \
                                    STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT
@@ -2363,7 +2364,7 @@ class Observation():
         # the future.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            baseday = Time('2020-01-01T00:00:00')
+            baseday = Time('2000-01-01T00:00:00')
 
         # Integration start times
         rampdelta = TimeDelta(ramptime, format='sec')
@@ -3024,6 +3025,51 @@ class Observation():
             outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, self.rampexptime,
                                                        n_int, n_group, n_y, n_x)
 
+
+        print('GROUP TABLE:')
+        print(outModel.group)
+
+
+        # If this is a moving target exposure, populate the moving-target-specific metadata,
+        # as well as the MOVING_TARGET_POSITION file extension
+        if self.params['Telescope']['tracking'] == 'non-sidereal':
+            # Read in catalog with the tracked non-sidereal target
+            nonsidereal_cat, pixFlag, velFlag, magsys = file_io.readMTFile(self.params['simSignals']['movingTargetToTrack'])
+            if nonsidereal_cat['ephemeris_file'] != 'None':
+                # Ephemeris file provided. Read in and create an interpolation
+                # function. Note that the time in the read-in ephemeris is a
+                # datetime object.
+                #ephem = ephemeris_tools.read_ephemeris_file(nonsidereal_cat['ephemeris_file'].data[0])
+                #ra_interp_function, dec_interp_function = ephemeris_tools.create_interpol_function(ephem)
+                ra_interp_function, dec_interp_function = ephemeris_tools.get_ephemeris(nonsidereal_cat['ephemeris_file'].data[0])
+            else:
+                # No ephemeris file
+                raise ValueError("Moving target table with no ephemeris not yet supported.")
+
+            # We need to populate the MT_RA and MT_DEC keywords, which list the target RA and Dec at the
+            # mid-time of the exposure.
+            #mid_time_astropy = Time(outModel.meta.exposure.mid_time, format='mjd')
+            #isot = mid_time_astropy.isot
+            #date_val, time_val = isot.split('T')
+            #time_val_parts = time_val.split(':')
+            #fullsec = float(time_val.split(':')[2])
+            #microsec = '{}'.format(int((fullsec - int(fullsec)) * 1e6))
+            #new_time_val = '{}:{}:{}:{}'.format(time_val_parts[0], time_val_parts[1], int(fullsec), microsec)
+            #mid_time_datetime = datetime.strptime("{} {}".format(date_val, new_time_val), "%Y-%m-%d %H:%M:%S:%f")
+            print('CHECK:', outModel.meta.exposure.mid_time)
+
+
+            mid_time_datetime = moving_target_position_table.obstime_to_datetime(outModel.meta.exposure.mid_time)
+            mid_time_calstamp = ephemeris_tools.to_timestamp(mid_time_datetime)
+            outModel.meta.wcsinfo.mt_ra = ra_interp_function([mid_time_calstamp])[0]
+            outModel.meta.wcsinfo.mt_dec = dec_interp_function([mid_time_calstamp])[0]
+
+            # Now populate the moving_target_position table, which will be in a separate extension
+            ephem_interp_function = (ra_interp_function, dec_interp_function)
+            outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
+                                                                                               self.siaf.XSciRef, self.siaf.YSciRef)
+
+        # Save the datamodel
         outModel.save(filename)
 
         # Now we need to adjust the datamodl header keyword
