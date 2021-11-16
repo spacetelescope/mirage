@@ -2875,6 +2875,7 @@ class Observation():
         outModel.meta.target.catalog_name = 'UNKNOWN'
         outModel.meta.target.ra = self.params['Output']['target_ra']
         outModel.meta.target.dec = self.params['Output']['target_dec']
+        outModel.meta.target.type = 'FIXED'
         outModel.meta.target.proposer_name = self.params['Output']['target_name']
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
@@ -3018,6 +3019,23 @@ class Observation():
         outModel.meta.exposure.mid_time = ct.mjd + outModel.meta.exposure.exposure_time/3600./24./2.
         outModel.meta.exposure.duration = self.get_duration()
 
+        # JWST ephemeris information
+        outModel.meta.ephemeris.reference_frame = 'EME2000'
+        #outModel.meta.ephemeris.type =
+        #outModel.meta.ephemeris.time =
+        #outModel.meta.ephemeris.spatial_x_bary =
+        #outModel.meta.ephemeris.spatial_y_bary =
+        #outModel.meta.ephemeris.spatial_z_bary =
+        #outModel.meta.ephemeris.spatial_x_geo =
+        #outModel.meta.ephemeris.spatial_y_geo =
+        #outModel.meta.ephemeris.spatial_z_geo =
+        #outModel.meta.ephemeris.velocity_x_bary =
+        #outModel.meta.ephemeris.velocity_y_bary =
+        #outModel.meta.ephemeris.velocity_z_bary =
+        #outModel.meta.ephemeris.velocity_x_geo =
+        #outModel.meta.ephemeris.velocity_y_geo =
+        #outModel.meta.ephemeris.velocity_z_geo =
+
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel.data.shape
         with warnings.catch_warnings():
@@ -3025,14 +3043,11 @@ class Observation():
             outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, self.rampexptime,
                                                        n_int, n_group, n_y, n_x)
 
-
-        print('GROUP TABLE:')
-        print(outModel.group)
-
-
         # If this is a moving target exposure, populate the moving-target-specific metadata,
         # as well as the MOVING_TARGET_POSITION file extension
         if self.params['Telescope']['tracking'] == 'non-sidereal':
+            outModel.meta.target.type = 'MOVING'
+
             # Read in catalog with the tracked non-sidereal target
             nonsidereal_cat, pixFlag, velFlag, magsys = file_io.readMTFile(self.params['simSignals']['movingTargetToTrack'])
             if nonsidereal_cat['ephemeris_file'] != 'None':
