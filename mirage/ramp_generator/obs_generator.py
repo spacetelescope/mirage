@@ -2982,6 +2982,14 @@ class Observation():
         outModel.meta.subarray.xsize = self.subarray_bounds[2]-self.subarray_bounds[0]+1
         outModel.meta.subarray.ysize = self.subarray_bounds[3]-self.subarray_bounds[1]+1
 
+        outModel.meta.aperture.name = self.params['Readout']['array_name']
+
+        try:
+            outModel.meta.aperture.pps_name = self.params['Inst']['PPS_aperture']
+        except KeyError:
+            # To allow for old yaml files with no PPS_aperture entry
+            pass
+
         nlrefpix = max(4-self.subarray_bounds[0], 0)
         nbrefpix = max(4-self.subarray_bounds[1], 0)
         nrrefpix = max(self.subarray_bounds[2]-(self.ffsize-4), 0)
