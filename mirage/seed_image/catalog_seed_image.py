@@ -41,6 +41,7 @@ from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import ExtendedCatalog, TSO_GRISM_INDEX
 from mirage.catalogs.utils import catalog_index_check, determine_used_cats
+from mirage.reference_files.downloader import download_file
 from mirage.seed_image import tso, ephemeris_tools
 from ..ghosts.niriss_ghosts import determine_ghost_stamp_filename, get_ghost, source_mags_to_ghost_mags
 from ..logging import logging_functions
@@ -52,7 +53,7 @@ from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
-                              NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
+                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -5205,6 +5206,18 @@ class Catalog_seed():
         self.determine_intermediate_aperture(instrument_siaf)
 
         self.logger.info('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
+
+        # If optical ghosts are to be added, make sure the ghost gap file is present in the
+        # config directory. This will be downloaded from the niriss_ghost github repo if
+        # the file is not already present.
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            if not os.path.isfile(NIRISS_GHOST_GAP_FILE):
+                self.logger.info('NIRISS ghost gap file not present in config directory. Downloading...')
+                config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
+                download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir)
+            else:
+                self.logger.info('Existing NIRISS ghost gap file present in config directory. Skipping download.')
+
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']
