@@ -5211,12 +5211,9 @@ class Catalog_seed():
         # config directory. This will be downloaded from the niriss_ghost github repo if
         # the file is not already present.
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
-            if not os.path.isfile(NIRISS_GHOST_GAP_FILE):
-                self.logger.info('NIRISS ghost gap file not present in config directory. Downloading...')
-                config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
-                download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir)
-            else:
-                self.logger.info('Existing NIRISS ghost gap file present in config directory. Skipping download.')
+            self.logger.info('Downloading NIRISS ghost gap file...')
+            config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
+            download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir, force=True)
 
         # Set the background value if the high/medium/low settings
         # are used
