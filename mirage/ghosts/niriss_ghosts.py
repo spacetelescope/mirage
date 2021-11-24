@@ -8,6 +8,8 @@ import numpy as np
 from astropy.io import fits, ascii
 from astropy.table import Table
 
+from niriss_ghost.utils import get_ghost
+
 from mirage.utils.constants import DEFAULT_NIRISS_PTSRC_GHOST_FILE
 from mirage.utils.flux_cal import fluxcal_info
 from mirage.utils.utils import countrate_to_magnitude, magnitude_to_countrate
