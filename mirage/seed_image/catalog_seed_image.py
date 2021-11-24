@@ -5208,8 +5208,8 @@ class Catalog_seed():
         self.logger.info('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
 
         # If optical ghosts are to be added, make sure the ghost gap file is present in the
-        # config directory. This will be downloaded from the niriss_ghost github repo if
-        # the file is not already present.
+        # config directory. This will be downloaded from the niriss_ghost github repo regardless of whether
+        # the file is already present, in order to ensure we have the latest copy.
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
             self.logger.info('Downloading NIRISS ghost gap file...')
             config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
