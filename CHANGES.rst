@@ -1,3 +1,12 @@
+Unreleased
+==========
+
+NIRISS Ghosts
+-------------
+
+Update to new version of NIRISS ghost gap file. (#751)
+
+
 2.2.0
 =====
 
