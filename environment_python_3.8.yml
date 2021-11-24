@@ -31,3 +31,4 @@ dependencies:
     - synphot==1.0.1
     - pyyaml==5.4.1
     - webbpsf==0.9.1
+    - git+https://github.com/spacetelescope/niriss_ghost
