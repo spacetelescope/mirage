@@ -13,10 +13,13 @@ Use
 
 from astropy.table import Table
 import numpy as np
+import os
 import pytest
 
 from mirage.ghosts import niriss_ghosts
-from mirage.utils.constants import DEFAULT_NIRISS_PTSRC_GHOST_FILE, NIRISS_GHOST_GAP_FILE
+from mirage.reference_files.downloader import download_file
+from mirage.utils.constants import DEFAULT_NIRISS_PTSRC_GHOST_FILE, NIRISS_GHOST_GAP_FILE, \
+                                   NIRISS_GHOST_GAP_URL
 
 
 def test_determine_ghost_stamp_filename():
@@ -87,6 +90,10 @@ def test_get_gap():
     expected_ys = [937.200]
     expected_fracs = [1.100]
 
+    if not os.path.isfile(NIRISS_GHOST_GAP_FILE):
+        config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
+        download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir, force=True)
+
     for filt, pup, ex_x, ex_y, ex_f in zip(filts, pupils, expected_xs, expected_ys, expected_fracs):
         x, y, f = niriss_ghosts.get_gap(filt, pup, NIRISS_GHOST_GAP_FILE)
         assert np.isclose(x, ex_x)
@@ -104,6 +111,10 @@ def test_get_ghost():
     x = 100
     y = 100
     flux = 500
+
+    if not os.path.isfile(NIRISS_GHOST_GAP_FILE):
+        config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
+        download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir, force=True)
 
     filt = 'CLEAR'
     pupil = 'F090W'
