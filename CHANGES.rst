@@ -1,3 +1,13 @@
+Unreleased
+==========
+
+Headers
+-------
+
+Populate the NOUTPUTS header keyword in saved uncal and linear files. This is needed in order to find the correct CRDS reference files in some cases. (#756)
+
+
+
 2.2.0
 =====
 
