@@ -31,6 +31,7 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  nint_: 1                 #Number of integrations per exposure
 	  array_name_: NRCB5_FULL  #Name of array (FULL, SUB160, SUB64P, etc)
 	  intermediate_aperture_: None  # Name of intermediate aperture used in NIRCam Grism time series obs.
+	  PPS_aperture_: NRCB5_FULL  # Original aperture value supplied by PPS.
 	  filter_: F250M           #Filter of simulated data (F090W, F322W2, etc)
 	  pupil_: CLEAR            #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
@@ -257,6 +258,17 @@ Intermediate Aperture
 *Readout:intermediate_aperture*
 
 This is the name of the intermediate aperture designated by APT to control the telescope pointing during Grism Time Series observations. The intermediate aperture specifies the location of the target prior to inserting the grism into the beam. When the grism is placed in the beam, the target's trace will be offset from this location by a few tens of rows. The intermediate aperture is defined such that the target's trace will land at the reference location of the user-specified aperture. This is only used for Grism Time Series observations, including the shortwave imaging mode data that accompany the dispersed longwave data. For all other observations, this will be set to None, and ignored.
+
+
+.. _PPS_aperture:
+
+PPS_aperture
+++++++++++++
+
+*Readout:PPS_aperture*
+
+This is the name of the aperture as supplied by PPS (i.e. in the APT pointing file). The value of this may include apertures that are not specific to one detector (e.g. NRCBS_FULL).
+
 
 .. _filter:
 
