@@ -2990,6 +2990,7 @@ class Observation():
         outModel.meta.exposure.nframes = self.params['Readout']['nframe']
         outModel.meta.exposure.ngroups = self.params['Readout']['ngroup']
         outModel.meta.exposure.nints = self.params['Readout']['nint']
+        outModel.meta.exposure.noutputs = self.params['Readout']['namp']
 
         # TODO: Putting this try/except here because SOSS mode mysteriously breaks it (Joe)
         try:
