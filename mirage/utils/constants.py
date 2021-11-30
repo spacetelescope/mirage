@@ -9,6 +9,7 @@ Use
 import os
 import pkg_resources
 
+from astropy.time import Time
 import astropy.units as u
 import numpy as np
 
@@ -175,3 +176,7 @@ DEFAULT_NIRISS_PTSRC_GHOST_FILE = os.path.join(os.path.expandvars('$MIRAGE_DATA'
 # For the June 2021 update to the zeropoints (based on updated NIRCam gain values), we used
 # alpha_lyr_stis_010.fits from synphot.
 VEGA_SPECTRUM = 'http://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_010.fits'
+
+# The base time to use when populating the group times and moving target locations tables.
+# Times are reported relative to this basetime
+TABLE_BASETIME = Time('2000-01-01T00:00:00')

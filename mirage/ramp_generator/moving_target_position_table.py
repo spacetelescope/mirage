@@ -3,6 +3,8 @@
 """Functions relating to the addition of the moving_target_positions table to the uncal file
 in cases where we are dealing with a moving target.
 
+Here is an example of a moving target position table:
+
 h = fits.open('example_OTB_file_uncal.fits')
 h['MOVING_TARGET_POSITION'].data
 Out[5]:
@@ -37,14 +39,14 @@ ColDefs(
 )
 
 """
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from datetime import datetime
 import numpy as np
 
 from mirage.seed_image.ephemeris_tools import to_timestamp
 
 
-def create_mt_pos_entry(endday, endmilli, endsubmilli, movtarg_x, movtarg_y, refpix_ra, refpix_dec,
+def create_mt_pos_entry(time_string, movtarg_x, movtarg_y, refpix_ra, refpix_dec,
                         movtarg_ra, movtarg_dec, mt_x_helio, mt_y_helio, mt_z_helio, jwst_x_helio,
                         jwst_y_helio, jwst_z_helio, mt_x_jwst, mt_y_jwst, mt_z_jwst, mt_jwst_distance,
                         mt_sun_distance, phase_angle):
@@ -54,14 +56,9 @@ def create_mt_pos_entry(endday, endmilli, endsubmilli, movtarg_x, movtarg_y, ref
 
         Parameters
         ----------
-        endday : int
-            Days since Jan 1 2000
-
-        endmilli : integer
-            Milliseconds of the day for given time
-
-        endsubmilli : int
-            Time since last millisecond?
+        time_string : str
+            Time of the entry in isot format
+            (e.g. '2022-12-18T00:11:41.996')
 
         movtarg_x : float
             The X location of the moving target in the aperture
@@ -123,9 +120,7 @@ def create_mt_pos_entry(endday, endmilli, endsubmilli, movtarg_x, movtarg_y, ref
             Input values organized into format needed for group entry in
             JWST formatted file
         """
-        base_mjd = 51544  # Corresponds to Jan 1, 2000
-        milliday = endmilli / 86400000.  # 86,400,000 millisecs per day
-        mjd_day = base_mjd + endday + milliday
+        mjd_day = Time(time_string).mjd
 
         position = np.ndarray(
             (1, ),
@@ -188,7 +183,7 @@ def create_mt_pos_entry(endday, endmilli, endsubmilli, movtarg_x, movtarg_y, ref
         return position
 
 
-def populate_moving_target_table(grouptable, ephem_interp_func, refpix_x, refpix_y):
+def populate_moving_target_table(grouptable, ephem_interp_func, movtarg_x, movtarg_y, refpix_ra, refpix_dec):
     """Given an instance of the Group table from a datamodel, along with
     an interpolation function for the target's RA and Dec, construct a
     basic moving_target_position table that can be added to the
@@ -208,6 +203,18 @@ def populate_moving_target_table(grouptable, ephem_interp_func, refpix_x, refpix
         interpolation functions that will give the RA, Dec of the target
         at an input time
 
+    movtarg_x : float
+        The x-coordinate of the location of the moving target (pixels).
+
+    movtarg_y : float
+        The y-coordinate of the location of the moving target (pixels).
+
+    refpix_ra : float
+        RA value corresponding to the aperture's reference location (deg)
+
+    refpix_dec : float
+        Dec value corresponding to the aperture's reference location (deg)
+
     Returns
     -------
     mt_position : numpy.array
@@ -218,10 +225,9 @@ def populate_moving_target_table(grouptable, ephem_interp_func, refpix_x, refpix
     ra_func, dec_func = ephem_interp_func
 
     # Create the table with a first row populated by garbage
-    mt_position = create_mt_pos_entry(1000, 0, 0., 1024, 1024, 0., 0., 0., 0.,
+    mt_position = create_mt_pos_entry('2000-01-01', 1024, 1024, 0., 0., 0., 0.,
                                       999., 999., 999., 888., 888., 888.,
                                       777., 777., 777., 1234., 1234., 90.)
-    base_mjd = 51544  # Corresponds to Jan 1, 2000
 
     # Dummy data to use for the time being
     mt_y_helio = 5.30e8
@@ -238,13 +244,13 @@ def populate_moving_target_table(grouptable, ephem_interp_func, refpix_x, refpix
     phase_angle = 9.77
 
     for line in grouptable:
-        print('LINE:', line)
-        line_day_mjd = base_mjd + line[0][2] + line[0][3]/86400000.
-        line_day_datetime = obstime_to_datetime(line_day_mjd)
+        line_day = Time(line[0][5])
+        line_day_datetime = obstime_to_datetime(line_day.mjd)
         line_day_calstamp = to_timestamp(line_day_datetime)
         interp_ra = ra_func(line_day_calstamp)
         interp_dec = dec_func(line_day_calstamp)
-        entry = create_mt_pos_entry(line[0][2], line[0][3], line[0][4], refpix_x, refpix_y, interp_ra, interp_dec,
+
+        entry = create_mt_pos_entry(line[0][5], movtarg_x, movtarg_y, refpix_ra, refpix_dec,
                         interp_ra, interp_dec, mt_x_helio, mt_y_helio, mt_z_helio, jwst_x_helio,
                         jwst_y_helio, jwst_z_helio, mt_x_jwst, mt_y_jwst, mt_z_jwst, mt_jwst_distance,
                         mt_sun_distance, phase_angle)

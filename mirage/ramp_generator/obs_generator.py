@@ -55,7 +55,8 @@ from mirage.seed_image import ephemeris_tools
 from mirage.utils import file_io, read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, \
-                                   STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT
+                                   STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT, \
+                                   TABLE_BASETIME
 from mirage.utils.timer import Timer
 
 
@@ -2332,7 +2333,7 @@ class Observation():
             Exposure time of a single group (seconds)
 
         ramptime : float
-            Exposure time of the entire exposure (seconds)
+            Exposure time of one integration (seconds)
 
         numint : int
             Number of integrations in data
@@ -2359,13 +2360,6 @@ class Observation():
         comptext = 'Normal Completion'
         numgap = 0
 
-        # Ignore warnings as astropy.time.Time will give a warning
-        # related to unknown leap seconds if the date is too far in
-        # the future.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            baseday = Time('2000-01-01T00:00:00')
-
         # Integration start times
         rampdelta = TimeDelta(ramptime, format='sec')
         groupdelta = TimeDelta(grouptime, format='sec')
@@ -2374,20 +2368,22 @@ class Observation():
         for integ in range(numint):
             groups = np.arange(1, numgroup+1)
             groupends = intstarts[integ] + (np.arange(1, numgroup+1)*groupdelta)
-            endday = (groupends - baseday).jd
+            endday = (groupends - TABLE_BASETIME).jd
 
             # If the integration has a single group, force endday to be an array
             if isinstance(endday, float):
                 endday = np.array([endday])
-            enddayint = [np.int(s) for s in endday]
+            enddayint = [int(s) for s in endday]
 
             # Now to get end_milliseconds, we need milliseconds from the beginning
             # of the day
             inday = TimeDelta(endday - enddayint, format='jd')
             endmilli = inday.sec * 1000.
 
-            # Submilliseconds - just use a random number
-            endsubmilli = np.random.randint(0, 1000, len(endmilli))
+            # Submilliseconds
+            endmilli_int = [int(s) for s in endmilli]
+            endsubmilli = (endmilli - endmilli_int) * 1000
+            endsubmilli = [int(s) for s in endsubmilli]
 
             # Group end time. need to remove : and - and make lowercase t
             groupending = groupends.isot
@@ -2403,7 +2399,7 @@ class Observation():
                 barycentric = np.array([barycentric])
                 heliocentric = np.array([heliocentric])
 
-            for grp, day, milli, submilli, grpstr, bary, helio in zip(groups, endday, endmilli,
+            for grp, day, milli, submilli, grpstr, bary, helio in zip(groups, enddayint, endmilli_int,
                                                                       endsubmilli, groupending,
                                                                       barycentric, heliocentric):
                 entry = self.create_group_entry(integ+1, grp, day, milli, submilli, grpstr, nx, ny,
@@ -3054,8 +3050,6 @@ class Observation():
                 # Ephemeris file provided. Read in and create an interpolation
                 # function. Note that the time in the read-in ephemeris is a
                 # datetime object.
-                #ephem = ephemeris_tools.read_ephemeris_file(nonsidereal_cat['ephemeris_file'].data[0])
-                #ra_interp_function, dec_interp_function = ephemeris_tools.create_interpol_function(ephem)
                 ra_interp_function, dec_interp_function = ephemeris_tools.get_ephemeris(nonsidereal_cat['ephemeris_file'].data[0])
             else:
                 # No ephemeris file
@@ -3063,17 +3057,6 @@ class Observation():
 
             # We need to populate the MT_RA and MT_DEC keywords, which list the target RA and Dec at the
             # mid-time of the exposure.
-            #mid_time_astropy = Time(outModel.meta.exposure.mid_time, format='mjd')
-            #isot = mid_time_astropy.isot
-            #date_val, time_val = isot.split('T')
-            #time_val_parts = time_val.split(':')
-            #fullsec = float(time_val.split(':')[2])
-            #microsec = '{}'.format(int((fullsec - int(fullsec)) * 1e6))
-            #new_time_val = '{}:{}:{}:{}'.format(time_val_parts[0], time_val_parts[1], int(fullsec), microsec)
-            #mid_time_datetime = datetime.strptime("{} {}".format(date_val, new_time_val), "%Y-%m-%d %H:%M:%S:%f")
-            print('CHECK:', outModel.meta.exposure.mid_time)
-
-
             mid_time_datetime = moving_target_position_table.obstime_to_datetime(outModel.meta.exposure.mid_time)
             mid_time_calstamp = ephemeris_tools.to_timestamp(mid_time_datetime)
             outModel.meta.wcsinfo.mt_ra = ra_interp_function([mid_time_calstamp])[0]
@@ -3081,8 +3064,15 @@ class Observation():
 
             # Now populate the moving_target_position table, which will be in a separate extension
             ephem_interp_function = (ra_interp_function, dec_interp_function)
+            starttime_datetime = moving_target_position_table.obstime_to_datetime(outModel.meta.exposure.start_time)
+            starttime_calstamp = ephemeris_tools.to_timestamp(starttime_datetime)
+            mt_start_ra = ra_interp_function([starttime_calstamp])[0]
+            mt_start_dec = dec_interp_function([starttime_calstamp])[0]
+            mt_v2, mt_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, mt_start_ra, mt_start_dec)
+            mt_x, mt_y = self.siaf.tel_to_sci(mt_v2, mt_v3)
             outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
-                                                                                               self.siaf.XSciRef, self.siaf.YSciRef)
+                                                                                               mt_x, mt_y, self.params['Telescope']['ra'],
+                                                                                               self.params['Telescope']['dec'])
 
         # Save the datamodel
         outModel.save(filename)
