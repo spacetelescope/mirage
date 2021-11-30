@@ -207,7 +207,7 @@ def download_file(url, file_name, output_directory='./', force=False):
     url : str
         URL to the file to be downloaded
 
-    filename : str
+    file_name : str
         Name of file to save the downloaded file into
 
     output_directory : str
