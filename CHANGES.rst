@@ -10,6 +10,13 @@ Remove the NIRISS ghost gap file from the Mirage repository. Download the file f
 NIRISS simulation including ghosts is run. (#753)
 
 
+Headers
+-------
+
+Populate the NOUTPUTS header keyword in saved uncal and linear files. This is needed in order to find the correct CRDS reference files in some cases. (#756)
+
+
+
 2.2.0
 =====
 
