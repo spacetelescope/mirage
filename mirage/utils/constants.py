@@ -12,6 +12,8 @@ import pkg_resources
 import astropy.units as u
 import numpy as np
 
+import niriss_ghost
+
 instrument_abbreviations = {'nircam': 'NRC',
                             'fgs': 'FGS',
                             'niriss': 'NIS',
@@ -166,7 +168,7 @@ STANDARD_LOGFILE_NAME = 'mirage_latest.log'
 # Default stamp image to use for ghost sources resulting from point sources
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
 CONFIG_DIR = os.path.join(MODULE_PATH, 'config')
-NIRISS_GHOST_GAP_FILE = os.path.join(CONFIG_DIR, 'niriss_ghost_gap_summary.txt')
+NIRISS_GHOST_GAP_FILE = os.path.join(niriss_ghost.__path__, 'niriss_ghost_gap_summary.txt')
 DEFAULT_NIRISS_PTSRC_GHOST_FILE = os.path.join(os.path.expandvars('$MIRAGE_DATA'), 'niriss/ghosts/', 'niriss_ghost_cen.fits')
 
 # Vega spectrum to use when translating/normalizing input spectra to a given vegamag

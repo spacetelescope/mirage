@@ -35,6 +35,7 @@ from astropy.modeling.models import Shift, Sersic2D, Sersic1D, Polynomial2D, Map
 from astropy.stats import sigma_clipped_stats
 import astropy.units as u
 import pysiaf
+from niriss_ghost.utils import get_ghost
 
 from . import moving_targets
 from . import segmentation_map as segmap
@@ -42,7 +43,7 @@ import mirage
 from mirage.catalogs.catalog_generator import ExtendedCatalog, TSO_GRISM_INDEX
 from mirage.catalogs.utils import catalog_index_check, determine_used_cats
 from mirage.seed_image import tso, ephemeris_tools
-from ..ghosts.niriss_ghosts import determine_ghost_stamp_filename, get_ghost, source_mags_to_ghost_mags
+from ..ghosts.niriss_ghosts import determine_ghost_stamp_filename, source_mags_to_ghost_mags
 from ..logging import logging_functions
 from ..reference_files import crds_tools
 from ..utils import backgrounds
