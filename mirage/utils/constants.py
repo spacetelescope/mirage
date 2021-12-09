@@ -168,6 +168,7 @@ STANDARD_LOGFILE_NAME = 'mirage_latest.log'
 MODULE_PATH = pkg_resources.resource_filename('mirage', '')
 CONFIG_DIR = os.path.join(MODULE_PATH, 'config')
 NIRISS_GHOST_GAP_FILE = os.path.join(CONFIG_DIR, 'niriss_ghost_gap_summary.txt')
+NIRISS_GHOST_GAP_URL = 'https://raw.githubusercontent.com/spacetelescope/niriss_ghost/main/niriss_ghost/niriss_ghost_gap_summary.txt'
 DEFAULT_NIRISS_PTSRC_GHOST_FILE = os.path.join(os.path.expandvars('$MIRAGE_DATA'), 'niriss/ghosts/', 'niriss_ghost_cen.fits')
 
 # Vega spectrum to use when translating/normalizing input spectra to a given vegamag
