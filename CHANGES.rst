@@ -4,6 +4,8 @@ Unreleased
 Headers
 -------
 
+Populate the PPS_APER header keyword in saved uncal and linear files. This information comes from the APT pointing file. (#752)
+
 Populate the NOUTPUTS header keyword in saved uncal and linear files. This is needed in order to find the correct CRDS reference files in some cases. (#756)
 
 
