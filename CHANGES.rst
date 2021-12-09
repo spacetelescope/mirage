@@ -10,8 +10,14 @@ Remove the NIRISS ghost gap file from the Mirage repository. Download the file f
 NIRISS simulation including ghosts is run. (#753)
 
 
-Headers
--------
+Moving Targets
+--------------
+
+Populate the MOVING_TARGET_POSITION table extension in the output files. (#749)
+
+
+Output File Headers
+-------------------
 
 Populate the PPS_APER header keyword in saved uncal and linear files. This information comes from the APT pointing file. (#752)
 
