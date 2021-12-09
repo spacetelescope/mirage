@@ -1297,71 +1297,6 @@ class Catalog_seed():
             nonsidereal_segmap[outside_target] += mtt_data_segmap[outside_target]
         return non_sidereal_ramp, nonsidereal_segmap
 
-    def readMTFile(self, filename):
-        """
-        Read in moving target list file
-
-        Arguments:
-        ----------
-        filename : str
-            name of moving target catalog file
-
-        Returns:
-        --------
-        returns : obj
-            Table containing moving target entries
-            pixelflag (boolean) -- If true, locations are in units of
-                pixels. If false, locations are RA, Dec
-            pixelvelflag (boolean) -- If true, moving target velocities
-                are in units of pixels/hour. If false, arcsec/hour
-            magsys -- magnitude system of the moving target magnitudes
-        """
-        mtlist = ascii.read(filename, comment='#')
-
-        # Convert all relevant columns to floats
-        for col in mtlist.colnames:
-            if mtlist[col].dtype in ['int64', 'int']:
-                mtlist[col] = mtlist[col].data * 1.
-
-        # Check to see whether the position is in x,y or ra,dec
-        pixelflag = False
-        try:
-            if 'position_pixels' in mtlist.meta['comments'][0:4]:
-                pixelflag = True
-        except:
-            pass
-
-        # If present, check whether the velocity entries are pix/sec
-        # or arcsec/sec.
-        pixelvelflag = False
-        try:
-            if 'velocity_pixels' in mtlist.meta['comments'][0:4]:
-                pixelvelflag = True
-        except:
-            pass
-
-        # If present, check whether the radius entries (for galaxies)
-        # are in arcsec or pixels. If in arcsec, change to pixels
-        if 'radius' in mtlist.colnames:
-            if 'radius_pixels' not in mtlist.meta['comments'][0:4]:
-                mtlist['radius'] /= self.siaf.XSciScale
-
-        # If galaxies are present, change position angle from degrees
-        # to radians
-        if 'pos_angle' in mtlist.colnames:
-            mtlist['pos_angle'] = mtlist['pos_angle'] * np.pi / 180.
-
-        # Check to see if magnitude system is specified in comments
-        # If not, assume AB mags
-        msys = 'abmag'
-
-        condition = ('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
-        if condition:
-            msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
-            msys = msys.lower()
-
-        return mtlist, pixelflag, pixelvelflag, msys.lower()
-
     def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False, non_sidereal_ra_interp_function=None,
@@ -1420,7 +1355,7 @@ class Catalog_seed():
             Segmentation map is based on the final frame in the seed image.
         """
         # Read input file - should be able to use for all modes
-        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(filename)
+        mtlist, pixelFlag, pixvelflag, magsys = file_io.readMTFile(filename)
 
         # If there is no ephemeris file given and no x_or_RA_velocity
         # column (i.e. we have a catalog of sidereal sources), then
@@ -2054,7 +1989,7 @@ class Catalog_seed():
         totalSegList = []
 
         # Read in file containing targets
-        targs, pixFlag, velFlag, magsys = self.readMTFile(file)
+        targs, pixFlag, velFlag, magsys = file_io.readMTFile(file)
 
         # We can only track one moving target at a time
         if len(targs) != 1:
