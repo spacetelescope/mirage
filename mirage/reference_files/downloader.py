@@ -198,7 +198,7 @@ DISK_USAGE = {'nircam': {'crs': 1.1, 'psfs': 23, 'raw_darks': 79, 'lin_darks': 3
               'niriss': {'crs': 0.26, 'psfs': 0.87, 'raw_darks': 31, 'lin_darks': 121, 'soss': 0.26},
               'fgs': {'crs': 0.31, 'psfs': .04, 'raw_darks': 11, 'lin_darks': 39}}
 
-def download_file(url, file_name, output_directory='./'):
+def download_file(url, file_name, output_directory='./', force=False):
     """Download into the current working directory the
     file from Box given the direct URL
 
@@ -206,6 +206,15 @@ def download_file(url, file_name, output_directory='./'):
     ----------
     url : str
         URL to the file to be downloaded
+
+    file_name : str
+        Name of file to save the downloaded file into
+
+    output_directory : str
+        Name of directory into which the file is saved
+
+    force : bool
+        If True, the file is downloaded even if a local copy is already present
 
     Returns
     -------
@@ -215,7 +224,7 @@ def download_file(url, file_name, output_directory='./'):
     download_filename = os.path.join(output_directory, file_name)
 
     # Only download the file if it doesn't already exist
-    if not os.path.isfile(download_filename):
+    if ((not os.path.isfile(download_filename)) or (force is True)):
         print('Downloading: {}'.format(file_name))
         with requests.get(url, stream=True) as response:
             if response.status_code != 200:

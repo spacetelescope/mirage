@@ -1,6 +1,15 @@
 Unreleased
 ==========
 
+NIRISS Ghosts
+-------------
+
+Update to new version of NIRISS ghost gap file. (#751)
+
+Remove the NIRISS ghost gap file from the Mirage repository. Download the file from the niriss_ghost repository whenever a
+NIRISS simulation including ghosts is run. (#753)
+
+
 Headers
 -------
 
