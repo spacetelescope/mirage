@@ -254,7 +254,7 @@ def test_get_segment_offset_local_stored(test_library_file):
     library_list = [''] * 18
     library_list[11] = segment_file
     x_arcsec, y_arcsec = get_segment_offset(12, DETECTOR, library_list)
-    assert (x_arcsec, y_arcsec) == (-7.412675266715986, -7.905276016530717), \
+    assert np.all(np.isclose((x_arcsec, y_arcsec), (-7.412675266715986, -7.905276016530717), atol=1e-14)), \
         'Incorrect conversion of segment offsets'
 
 
