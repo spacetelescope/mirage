@@ -2007,8 +2007,9 @@ class SimInput:
             if full_ap not in possible_apertures:
                 raise ValueError('Unrecognized aperture name: {}'.format(full_ap))
 
-            f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
+            f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc)\n'.format(full_ap))
             f.write('  intermediate_aperture: {}   # Name of intermediate aperture used in NIRCam Grism time series obs.\n'.format(input['grismts_intermediate_aperture']))
+            f.write('  PPS_aperture: {}  # Original aperture value supplied by PPS.\n'.format(input['pps_aperture']))
             f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
             f.write('  pupil: {}        # Pupil element for simulated data (CLEAR, GRISMC, etc)\n'.format(input[pupilkey]))
             f.write('\n')

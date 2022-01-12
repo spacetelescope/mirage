@@ -41,6 +41,7 @@ from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import ExtendedCatalog, TSO_GRISM_INDEX
 from mirage.catalogs.utils import catalog_index_check, determine_used_cats
+from mirage.reference_files.downloader import download_file
 from mirage.seed_image import tso, ephemeris_tools
 from ..ghosts.niriss_ghosts import determine_ghost_stamp_filename, get_ghost, source_mags_to_ghost_mags
 from ..logging import logging_functions
@@ -52,7 +53,7 @@ from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
-                              NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
+                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -1296,71 +1297,6 @@ class Catalog_seed():
             nonsidereal_segmap[outside_target] += mtt_data_segmap[outside_target]
         return non_sidereal_ramp, nonsidereal_segmap
 
-    def readMTFile(self, filename):
-        """
-        Read in moving target list file
-
-        Arguments:
-        ----------
-        filename : str
-            name of moving target catalog file
-
-        Returns:
-        --------
-        returns : obj
-            Table containing moving target entries
-            pixelflag (boolean) -- If true, locations are in units of
-                pixels. If false, locations are RA, Dec
-            pixelvelflag (boolean) -- If true, moving target velocities
-                are in units of pixels/hour. If false, arcsec/hour
-            magsys -- magnitude system of the moving target magnitudes
-        """
-        mtlist = ascii.read(filename, comment='#')
-
-        # Convert all relevant columns to floats
-        for col in mtlist.colnames:
-            if mtlist[col].dtype in ['int64', 'int']:
-                mtlist[col] = mtlist[col].data * 1.
-
-        # Check to see whether the position is in x,y or ra,dec
-        pixelflag = False
-        try:
-            if 'position_pixels' in mtlist.meta['comments'][0:4]:
-                pixelflag = True
-        except:
-            pass
-
-        # If present, check whether the velocity entries are pix/sec
-        # or arcsec/sec.
-        pixelvelflag = False
-        try:
-            if 'velocity_pixels' in mtlist.meta['comments'][0:4]:
-                pixelvelflag = True
-        except:
-            pass
-
-        # If present, check whether the radius entries (for galaxies)
-        # are in arcsec or pixels. If in arcsec, change to pixels
-        if 'radius' in mtlist.colnames:
-            if 'radius_pixels' not in mtlist.meta['comments'][0:4]:
-                mtlist['radius'] /= self.siaf.XSciScale
-
-        # If galaxies are present, change position angle from degrees
-        # to radians
-        if 'pos_angle' in mtlist.colnames:
-            mtlist['pos_angle'] = mtlist['pos_angle'] * np.pi / 180.
-
-        # Check to see if magnitude system is specified in comments
-        # If not, assume AB mags
-        msys = 'abmag'
-
-        condition = ('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
-        if condition:
-            msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
-            msys = msys.lower()
-
-        return mtlist, pixelflag, pixelvelflag, msys.lower()
-
     def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
                            trackingPixVelFlag=False, non_sidereal_ra_interp_function=None,
@@ -1419,7 +1355,7 @@ class Catalog_seed():
             Segmentation map is based on the final frame in the seed image.
         """
         # Read input file - should be able to use for all modes
-        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(filename)
+        mtlist, pixelFlag, pixvelflag, magsys = file_io.readMTFile(filename)
 
         # If there is no ephemeris file given and no x_or_RA_velocity
         # column (i.e. we have a catalog of sidereal sources), then
@@ -2053,7 +1989,7 @@ class Catalog_seed():
         totalSegList = []
 
         # Read in file containing targets
-        targs, pixFlag, velFlag, magsys = self.readMTFile(file)
+        targs, pixFlag, velFlag, magsys = file_io.readMTFile(file)
 
         # We can only track one moving target at a time
         if len(targs) != 1:
@@ -5205,6 +5141,15 @@ class Catalog_seed():
         self.determine_intermediate_aperture(instrument_siaf)
 
         self.logger.info('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
+
+        # If optical ghosts are to be added, make sure the ghost gap file is present in the
+        # config directory. This will be downloaded from the niriss_ghost github repo regardless of whether
+        # the file is already present, in order to ensure we have the latest copy.
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            self.logger.info('Downloading NIRISS ghost gap file...')
+            config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
+            download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir, force=True)
+
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']

@@ -49,12 +49,14 @@ import pysiaf
 
 import mirage
 from mirage.logging import logging_functions
-from mirage.ramp_generator import unlinearize
+from mirage.ramp_generator import unlinearize, moving_target_position_table
 from mirage.reference_files import crds_tools
-from mirage.utils import read_fits, utils, siaf_interface
+from mirage.seed_image import ephemeris_tools
+from mirage.utils import file_io, read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, \
-                                   STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT
+                                   STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT, \
+                                   TABLE_BASETIME
 from mirage.utils.timer import Timer
 
 
@@ -2331,7 +2333,7 @@ class Observation():
             Exposure time of a single group (seconds)
 
         ramptime : float
-            Exposure time of the entire exposure (seconds)
+            Exposure time of one integration (seconds)
 
         numint : int
             Number of integrations in data
@@ -2358,13 +2360,6 @@ class Observation():
         comptext = 'Normal Completion'
         numgap = 0
 
-        # Ignore warnings as astropy.time.Time will give a warning
-        # related to unknown leap seconds if the date is too far in
-        # the future.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            baseday = Time('2020-01-01T00:00:00')
-
         # Integration start times
         rampdelta = TimeDelta(ramptime, format='sec')
         groupdelta = TimeDelta(grouptime, format='sec')
@@ -2373,20 +2368,22 @@ class Observation():
         for integ in range(numint):
             groups = np.arange(1, numgroup+1)
             groupends = intstarts[integ] + (np.arange(1, numgroup+1)*groupdelta)
-            endday = (groupends - baseday).jd
+            endday = (groupends - TABLE_BASETIME).jd
 
             # If the integration has a single group, force endday to be an array
             if isinstance(endday, float):
                 endday = np.array([endday])
-            enddayint = [np.int(s) for s in endday]
+            enddayint = [int(s) for s in endday]
 
             # Now to get end_milliseconds, we need milliseconds from the beginning
             # of the day
             inday = TimeDelta(endday - enddayint, format='jd')
             endmilli = inday.sec * 1000.
 
-            # Submilliseconds - just use a random number
-            endsubmilli = np.random.randint(0, 1000, len(endmilli))
+            # Submilliseconds
+            endmilli_int = [int(s) for s in endmilli]
+            endsubmilli = (endmilli - endmilli_int) * 1000
+            endsubmilli = [int(s) for s in endsubmilli]
 
             # Group end time. need to remove : and - and make lowercase t
             groupending = groupends.isot
@@ -2402,7 +2399,7 @@ class Observation():
                 barycentric = np.array([barycentric])
                 heliocentric = np.array([heliocentric])
 
-            for grp, day, milli, submilli, grpstr, bary, helio in zip(groups, endday, endmilli,
+            for grp, day, milli, submilli, grpstr, bary, helio in zip(groups, enddayint, endmilli_int,
                                                                       endsubmilli, groupending,
                                                                       barycentric, heliocentric):
                 entry = self.create_group_entry(integ+1, grp, day, milli, submilli, grpstr, nx, ny,
@@ -2870,10 +2867,16 @@ class Observation():
         outModel.meta.program.continuation_id = 0
 
         outModel.meta.aperture.name = self.params['Readout']['array_name']
+        try:
+            outModel.meta.aperture.pps_name = self.params['Inst']['PPS_aperture']
+        except KeyError:
+            # To allow for old yaml files with no PPS_aperture entry
+            pass
 
         outModel.meta.target.catalog_name = 'UNKNOWN'
         outModel.meta.target.ra = self.params['Output']['target_ra']
         outModel.meta.target.dec = self.params['Output']['target_dec']
+        outModel.meta.target.type = 'FIXED'
         outModel.meta.target.proposer_name = self.params['Output']['target_name']
         outModel.meta.coordinates.reference_frame = 'ICRS'
 
@@ -2990,6 +2993,7 @@ class Observation():
         outModel.meta.exposure.nframes = self.params['Readout']['nframe']
         outModel.meta.exposure.ngroups = self.params['Readout']['ngroup']
         outModel.meta.exposure.nints = self.params['Readout']['nint']
+        outModel.meta.exposure.noutputs = self.params['Readout']['namp']
 
         # TODO: Putting this try/except here because SOSS mode mysteriously breaks it (Joe)
         try:
@@ -3017,6 +3021,23 @@ class Observation():
         outModel.meta.exposure.mid_time = ct.mjd + outModel.meta.exposure.exposure_time/3600./24./2.
         outModel.meta.exposure.duration = self.get_duration()
 
+        # JWST ephemeris information
+        outModel.meta.ephemeris.reference_frame = 'EME2000'
+        #outModel.meta.ephemeris.type =
+        #outModel.meta.ephemeris.time =
+        #outModel.meta.ephemeris.spatial_x_bary =
+        #outModel.meta.ephemeris.spatial_y_bary =
+        #outModel.meta.ephemeris.spatial_z_bary =
+        #outModel.meta.ephemeris.spatial_x_geo =
+        #outModel.meta.ephemeris.spatial_y_geo =
+        #outModel.meta.ephemeris.spatial_z_geo =
+        #outModel.meta.ephemeris.velocity_x_bary =
+        #outModel.meta.ephemeris.velocity_y_bary =
+        #outModel.meta.ephemeris.velocity_z_bary =
+        #outModel.meta.ephemeris.velocity_x_geo =
+        #outModel.meta.ephemeris.velocity_y_geo =
+        #outModel.meta.ephemeris.velocity_z_geo =
+
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel.data.shape
         with warnings.catch_warnings():
@@ -3024,6 +3045,42 @@ class Observation():
             outModel.group = self.populate_group_table(ct, outModel.meta.exposure.group_time, self.rampexptime,
                                                        n_int, n_group, n_y, n_x)
 
+        # If this is a moving target exposure, populate the moving-target-specific metadata,
+        # as well as the MOVING_TARGET_POSITION file extension
+        if self.params['Telescope']['tracking'] == 'non-sidereal':
+            outModel.meta.target.type = 'MOVING'
+
+            # Read in catalog with the tracked non-sidereal target
+            nonsidereal_cat, pixFlag, velFlag, magsys = file_io.readMTFile(self.params['simSignals']['movingTargetToTrack'])
+            if nonsidereal_cat['ephemeris_file'] != 'None':
+                # Ephemeris file provided. Read in and create an interpolation
+                # function. Note that the time in the read-in ephemeris is a
+                # datetime object.
+                ra_interp_function, dec_interp_function = ephemeris_tools.get_ephemeris(nonsidereal_cat['ephemeris_file'].data[0])
+            else:
+                # No ephemeris file
+                raise ValueError("Moving target table with no ephemeris not yet supported.")
+
+            # We need to populate the MT_RA and MT_DEC keywords, which list the target RA and Dec at the
+            # mid-time of the exposure.
+            mid_time_datetime = moving_target_position_table.obstime_to_datetime(outModel.meta.exposure.mid_time)
+            mid_time_calstamp = ephemeris_tools.to_timestamp(mid_time_datetime)
+            outModel.meta.wcsinfo.mt_ra = ra_interp_function([mid_time_calstamp])[0]
+            outModel.meta.wcsinfo.mt_dec = dec_interp_function([mid_time_calstamp])[0]
+
+            # Now populate the moving_target_position table, which will be in a separate extension
+            ephem_interp_function = (ra_interp_function, dec_interp_function)
+            starttime_datetime = moving_target_position_table.obstime_to_datetime(outModel.meta.exposure.start_time)
+            starttime_calstamp = ephemeris_tools.to_timestamp(starttime_datetime)
+            mt_start_ra = ra_interp_function([starttime_calstamp])[0]
+            mt_start_dec = dec_interp_function([starttime_calstamp])[0]
+            mt_v2, mt_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, mt_start_ra, mt_start_dec)
+            mt_x, mt_y = self.siaf.tel_to_sci(mt_v2, mt_v3)
+            outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
+                                                                                               mt_x, mt_y, self.params['Telescope']['ra'],
+                                                                                               self.params['Telescope']['dec'])
+
+        # Save the datamodel
         outModel.save(filename)
 
         # Now we need to adjust the datamodl header keyword

@@ -1,3 +1,30 @@
+2.2.1
+=====
+
+NIRISS Ghosts
+-------------
+
+Update to new version of NIRISS ghost gap file. (#751)
+
+Remove the NIRISS ghost gap file from the Mirage repository. Download the file from the niriss_ghost repository whenever a
+NIRISS simulation including ghosts is run. (#753)
+
+
+Moving Targets
+--------------
+
+Populate the MOVING_TARGET_POSITION table extension in the output files. (#749)
+
+
+Output File Headers
+-------------------
+
+Populate the PPS_APER header keyword in saved uncal and linear files. This information comes from the APT pointing file. (#752)
+
+Populate the NOUTPUTS header keyword in saved uncal and linear files. This is needed in order to find the correct CRDS reference files in some cases. (#756)
+
+
+
 2.2.0
 =====
 
