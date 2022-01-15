@@ -1,3 +1,12 @@
+2.2.2
+=====
+
+Moving Targets
+--------------
+
+Updated the MOVING_TARGET_POSITION table from detector -> sci. (#757)
+
+
 2.2.1
 =====
 

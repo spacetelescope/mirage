@@ -126,8 +126,8 @@ def create_mt_pos_entry(time_string, movtarg_x, movtarg_y, refpix_ra, refpix_dec
             (1, ),
             dtype=[
                 ('time', '>f8'),
-                ('mt_detector_x', '>i4'),
-                ('mt_detector_y', '>i4'),
+                ('mt_sci_x', '>i4'),
+                ('mt_sci_y', '>i4'),
                 ('ref_pixel_RA', '>f8'),
                 ('ref_pixel_Dec', '>f8'),
                 ('mt_apparent_RA', '>f8'),
@@ -154,8 +154,8 @@ def create_mt_pos_entry(time_string, movtarg_x, movtarg_y, refpix_ra, refpix_dec
             ]
         )
         position[0]['time'] = mjd_day
-        position[0]['mt_detector_x'] = movtarg_x
-        position[0]['mt_detector_y'] = movtarg_y
+        position[0]['mt_sci_x'] = movtarg_x
+        position[0]['mt_sci_y'] = movtarg_y
         position[0]['ref_pixel_RA'] = refpix_ra
         position[0]['ref_pixel_Dec'] = refpix_dec
         position[0]['mt_apparent_RA'] = movtarg_ra
