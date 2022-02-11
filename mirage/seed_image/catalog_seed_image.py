@@ -4093,7 +4093,7 @@ class Catalog_seed():
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
-                       ellip=ellipticity, theta=position_angle+np.pi/2)
+                       ellip=ellipticity, theta=position_angle*np.pi/2)
 
         x_half_length = x_full_length // 2
         xmin = int(0 - x_half_length)
@@ -4343,9 +4343,7 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-        north_to_east_V3ang = rotations.posangle(self.attitude_matrix, v2_value, v3_value)
-        x_posang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - position_angle
-                         + 90. - self.params['Telescope']['rotation'])
+        x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)  # TEST!!!
         return x_posang
 
     def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type, log_skipped_filters=True):
