@@ -4343,7 +4343,7 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-        x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)  # TEST!!!
+        x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)
         return x_posang
 
     def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type, log_skipped_filters=True):
