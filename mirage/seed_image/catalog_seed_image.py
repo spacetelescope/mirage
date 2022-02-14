@@ -1662,11 +1662,6 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                #if not self.use_intermediate_aperture:
-                #    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
-                #else:
-                #    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, ra, dec)
-
                 xposang = self.calc_x_position_angle(entry['pos_angle'])
 
                 # First create the galaxy
@@ -4092,10 +4087,8 @@ class Catalog_seed():
         # Create model. Add 90 degrees to the position_angle because the definition
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
-        print('GALAXY, position angle when creating 2D sersic: ', position_angle*180./np.pi)
-
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
-                       ellip=ellipticity, theta=position_angle) #+np.pi/2)
+                       ellip=ellipticity, theta=position_angle)
 
         x_half_length = x_full_length // 2
         xmin = int(0 - x_half_length)
@@ -4110,9 +4103,6 @@ class Catalog_seed():
 
         # Create model instance
         stamp = mod(x_stamp, y_stamp)
-
-
-
 
         # Check the total signal in the stamp. In some cases (high ellipticity, high sersic index)
         # a source centered at or close to the pixel center results in a bad scaling from Sersic2D.
