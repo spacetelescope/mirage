@@ -364,6 +364,7 @@ def test_gal_rotations(pav3, galaxy_pos_angs, expected_galaxy_pos_angs):
     #expected_galaxy_pos_angs = [-270.7911916590788, -300.7911916590788, -190.79119165907878]
 
     c = catalog_seed_image.Catalog_seed()
+    c.use_intermediate_aperture = False
     inst_siaf = siaf_interface.get_instance('nircam')
     c.siaf = inst_siaf[aperture]
     c.local_roll, c.attitude_matrix, c.ffsize, \
@@ -388,6 +389,7 @@ def test_ext_rotations(pav3, ext_pos_angs, expected_ext_pos_angs):
     pointing_dec = 45.008818
 
     c = catalog_seed_image.Catalog_seed()
+    c.use_intermediate_aperture = False
     inst_siaf = siaf_interface.get_instance('nircam')
     c.siaf = inst_siaf[aperture]
     c.local_roll, c.attitude_matrix, c.ffsize, \
