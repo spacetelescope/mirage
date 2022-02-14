@@ -10,6 +10,7 @@ the test_mirage_subarray_source_location subdirectory
 
 import numpy as np
 import pysiaf
+import pytest
 
 from mirage.seed_image import catalog_seed_image
 from mirage.utils import siaf_interface
@@ -344,3 +345,60 @@ def test_locations():
             # differences hopefully won't be caught
             assert np.allclose(xvals_from_siaf, reference_file_values['{}_{}'.format(instrument, aperture)][0], atol=0.5)
             assert np.allclose(yvals_from_siaf, reference_file_values['{}_{}'.format(instrument, aperture)][1], atol=0.5)
+
+
+@pytest.mark.parametrize("pav3,galaxy_pos_angs,expected_galaxy_pos_angs", [
+    (0., [0., 30., -80.], [-270.7911916590788, -300.7911916590788, -190.79119165907878]),
+    (30., [0., 30., -80.], [59.27713939017512, 29.277139390175122, 139.27713939017514])
+    ])
+def test_gal_rotations(pav3, galaxy_pos_angs, expected_galaxy_pos_angs):
+    """Test the rotations used to place galaxy and extended sources in the correct
+    orientation
+    """
+    #pav3 = 0.
+    aperture = 'NRCB2_FULL'
+    pointing_ra = 12.008818
+    pointing_dec = 45.008818
+
+    #galaxy_pos_angs = [0., 30., -80.]
+    #expected_galaxy_pos_angs = [-270.7911916590788, -300.7911916590788, -190.79119165907878]
+
+    c = catalog_seed_image.Catalog_seed()
+    inst_siaf = siaf_interface.get_instance('nircam')
+    c.siaf = inst_siaf[aperture]
+    c.local_roll, c.attitude_matrix, c.ffsize, \
+                c.subarray_bounds = siaf_interface.get_siaf_information(inst_siaf,
+                                                                        aperture,
+                                                                        pointing_ra, pointing_dec,
+                                                                        pav3)
+    gal_x_pas = [c.calc_x_position_angle(pa) for pa in galaxy_pos_angs]
+    assert np.all(np.isclose(gal_x_pas, expected_galaxy_pos_angs))
+
+
+@pytest.mark.parametrize("pav3,ext_pos_angs,expected_ext_pos_angs", [
+    (0., [0., 30., 330., -30.], [359.9664210290788, 389.9664210290788, 689.9664210290788, 329.9664210290788]),
+    (30., [0., 30., 330., -30.], [29.898089979824874, 59.898089979824874, 359.8980899798249, -0.10191002017512574])
+    ])
+def test_ext_rotations(pav3, ext_pos_angs, expected_ext_pos_angs):
+    """Test the rotations used to place galaxy and extended sources in the correct
+    orientation
+    """
+    aperture = 'NRCB2_FULL'
+    pointing_ra = 12.008818
+    pointing_dec = 45.008818
+
+    c = catalog_seed_image.Catalog_seed()
+    inst_siaf = siaf_interface.get_instance('nircam')
+    c.siaf = inst_siaf[aperture]
+    c.local_roll, c.attitude_matrix, c.ffsize, \
+                c.subarray_bounds = siaf_interface.get_siaf_information(inst_siaf,
+                                                                        aperture,
+                                                                        pointing_ra, pointing_dec,
+                                                                        pav3)
+
+    ext_x_pas = [c.calc_x_position_angle_extended(pa) for pa in ext_pos_angs]
+    assert np.all(np.isclose(ext_x_pas, expected_ext_pos_angs))
+
+
+
+
