@@ -834,13 +834,26 @@ class SossSim():
             # Input data
             sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Input Stellar Spectrum')
             pfig = None
+            tfig = None
 
             # Plot the data from the 'planet' attribute
             if self.planet is not None:
 
-                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], legend='Input Planet Transmission', color='green')
+                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], ylabel='Transmission', legend='Input Planet Transmission', color='green')
 
-            show(column(list(filter(None, [sfig, pfig]))))
+            # Plot the transit model
+            if self.tmodel is not None:
+
+                mod = batman.TransitModel(self.tmodel, self.time.jd)
+                flux = mod.light_curve(self.tmodel)
+                tfig = plotting.plot_spectrum(self.time.jd, flux, xlabel='Time [JD]', ylabel='Transmission', legend='Theoretical Lightcurve')
+
+                # Print the transit model params
+                print('Input Transit Model Parameters\n------------------------------')
+                for key, val in self.tmodel.__dict__.items():
+                    print('{}: {}'.format(key, val))
+
+            show(column(list(filter(None, [sfig, pfig, tfig]))))
 
         else:
 
@@ -1200,6 +1213,7 @@ class SossSpecSim(SossSim):
         if add_planet:
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
+            self.tmodel.t0 = np.mean(self.time.jd)
 
         # Run the simulation
         if run:
@@ -1242,6 +1256,7 @@ class SossBlackbodySim(SossSim):
         if add_planet:
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
+            self.tmodel.t0 = np.mean(self.time.jd)
 
         # Run the simulation
         if run:
@@ -1294,14 +1309,15 @@ class SossModelSim(SossSim):
         # Initialize base class
         super().__init__(ngrps=ngrps, nints=nints, star=[wav, flx], subarray=subarray, filter=filter, **kwargs)
 
-        # # Add planet
-        # if add_planet:
-        #     self.planet = hu.PLANET_DATA
-        #     self.tmodel = hu.transit_params(self.time.jd)
-        #
-        # # Run the simulation
-        # if run:
-        #     self.create()
+        # Add planet
+        if add_planet:
+            self.planet = hu.PLANET_DATA
+            self.tmodel = hu.transit_params(self.time.jd)
+            self.tmodel.t0 = np.mean(self.time.jd)
+
+        # Run the simulation
+        if run:
+            self.create()
 
 
 class SossSeedSim(SossSim):
