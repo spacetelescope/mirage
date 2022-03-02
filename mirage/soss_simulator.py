@@ -855,13 +855,14 @@ class SossSim():
         # Plot the data from the 'star' attribute
         if self.star is not None:
 
-            sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Stellar spectrum')
+            # Input data
+            sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Input Stellar Spectrum')
             pfig = None
 
             # Plot the data from the 'planet' attribute
             if self.planet is not None:
 
-                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], legend='Planet Transmission', color='green')
+                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], legend='Input Planet Transmission', color='green')
 
             show(column(list(filter(None, [sfig, pfig]))))
 
