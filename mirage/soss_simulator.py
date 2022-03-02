@@ -30,8 +30,8 @@ import batman
 from bokeh.plotting import show
 from hotsoss import utils as hu, plotting, locate_trace
 import numpy as np
-import synphot as sphot
 
+from mirage.catalogs import model_atmosphere as ma
 from mirage.seed_image import save_seed, segmentation_map
 from mirage.dark import dark_prep
 from mirage.logging import logging_functions
@@ -263,6 +263,8 @@ class SossSim():
             # Combine into final observation
             self.logger.info('Running observation generator for segment {}/{}'.format(n, nfiles))
             obs = obs_generator.Observation(offline=self.offline)
+            obs.input['STAR'] = self.star
+            obs.input['PLANET'] = self.planet
             obs.linDark = dfile
             obs.seed = seed_seg
             obs.segmap = segmap
@@ -1251,7 +1253,7 @@ class SossBlackbodySim(SossSim):
 
 class SossModelSim(SossSim):
     """Generate a SossSim object with a theoretical ATLAS or PHOENIX stellar spectrum of choice"""
-    def __init__(self, ngrps=2, nints=2, teff=5700.0, logg=4.0, feh=0.0, alpha=0.0, jmag=9.0, models='ck04models', filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
+    def __init__(self, ngrps=2, nints=2, teff=5700.0, logg=4.0, feh=0.0, alpha=0.0, jmag=9.0, stellar_model='phoenix', filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
         """Get the test data and load the object
 
         Parameters
@@ -1283,36 +1285,26 @@ class SossModelSim(SossSim):
         scale: int, float
             Scale the flux by the given factor
         """
-        # # Retrieve PHOENIX or ATLAS stellar models:
-        # if stellar_model.lower() == 'phoenix':
-        #     w, f = model_atmospheres.get_phoenix_model(feh, alpha, teff, logg)
-        # elif stellar_model.lower() == 'atlas':
-        #     w, f = model_atmospheres.get_atlas_model(feh, teff, logg)
-        #
-        # # Now scale model spectrum to user-input J-band:
-        # f = model_atmospheres.scale_spectrum(w, f, jmag)
+        # Retrieve stellar model
+        if stellar_model.lower() == 'phoenix':
+            wav, flx = ma.get_phoenix_model(feh, alpha, teff, logg)
+        elif stellar_model.lower() == 'atlas':
+            wav, flx = ma.get_atlas_model(feh, teff, logg)
 
-        # TODO: Retrieve stellar model (https://synphot.readthedocs.io/en/latest/#id13)
-        # TODO: and trash the whole model_atmospheres.py module
-        spectrum = sphot.icat(models, teff, feh, logg) # TODO: Where is icat function?
-        bandpass = sphot.spectrum.SpectralElement.from_filter('2mass_j')
-        obs = sphot.observation.Observation(spectrum, bandpass)
-
-        sp_norm = spectrum.normalize(jmag, band=obs.bandpass)
-        w = sp_norm.waveset
-        f = sp_norm(w)
+        # Scale model spectrum to user-input J-band
+        flx = ma.scale_spectrum(wav, flx, jmag)
 
         # Initialize base class
-        super().__init__(ngrps=ngrps, nints=nints, star=[w, f], subarray=subarray, filter=filter, **kwargs)
+        super().__init__(ngrps=ngrps, nints=nints, star=[wav, flx], subarray=subarray, filter=filter, **kwargs)
 
-        # Add planet
-        if add_planet:
-            self.planet = hu.PLANET_DATA
-            self.tmodel = hu.transit_params(self.time.jd)
-
-        # Run the simulation
-        if run:
-            self.create()
+        # # Add planet
+        # if add_planet:
+        #     self.planet = hu.PLANET_DATA
+        #     self.tmodel = hu.transit_params(self.time.jd)
+        #
+        # # Run the simulation
+        # if run:
+        #     self.create()
 
 
 class SossSeedSim(SossSim):

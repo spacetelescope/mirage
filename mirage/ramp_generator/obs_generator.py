@@ -92,6 +92,9 @@ class Observation():
         self.paramfile = 'None'
         self.params = None
 
+        # Dict to store arbitrary observation inputs
+        self.input = {}
+
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
         # (used for WFSS mode), as well as the coordinate
@@ -3368,6 +3371,10 @@ class Observation():
         outModel[0].header['EXPMID'] = ct.mjd + outModel[0].header['EFFEXPTM']/3600./24./2.
 
         outModel[0].header['DURATION'] = self.get_duration()
+
+        # Add input data if available
+        for name, data in self.input.items():
+            outmodel[name].data = data
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
