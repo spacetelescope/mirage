@@ -28,6 +28,7 @@ from astropy.coordinates import SkyCoord
 from astroquery.simbad import Simbad
 import batman
 from bokeh.plotting import show
+from bokeh.layouts import column
 from hotsoss import utils as hu, plotting, locate_trace
 import numpy as np
 
@@ -871,6 +872,25 @@ class SossSim():
             show(fig)
         else:
             return fig
+
+    def plot_input(self):
+        """
+        Plot the 1d stellar spectrum used as input
+        """
+        if self.star is not None:
+
+            sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Stellar spectrum')
+            pfig = None
+
+            if self.planet is not None:
+
+                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], legend='Planet Transmission', color='green')
+
+            show(column(list(filter(None, [sfig, pfig]))))
+
+        else:
+
+            print("No input to plot. Please set SossSim.star attribute with 1D data.")
 
     def _read_parameter_file(self, pfile):
         """Read in the yaml parameter file"""
