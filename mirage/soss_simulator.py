@@ -848,9 +848,9 @@ class SossSim():
         else:
             return fig
 
-    def plot_input(self):
+    def plot_input(self, **kwargs):
         """
-        Plot the 1d stellar spectrum and planet transmission spectrum used as input where available
+        Plot the 1d stellar spectrum, planet transmission spectrum, and transit lightcurve used as input where available
         """
         # Plot the data from the 'star' attribute
         if self.star is not None:
@@ -868,13 +868,19 @@ class SossSim():
             # Plot the transit model
             if self.tmodel is not None:
 
-                mod = batman.TransitModel(self.tmodel, self.time.jd)
-                flux = mod.light_curve(self.tmodel)
+                # Set orbital parameters with kwargs (e.g. rp=0.5 to see lightcurve at that planetary radius)
+                tmod = copy(self.tmodel)
+                for key, val in kwargs.items():
+                    setattr(tmod, key, val)
+
+                # Make the transit model
+                mod = batman.TransitModel(tmod, self.time.jd)
+                flux = mod.light_curve(tmod)
                 tfig = plotting.plot_spectrum(self.time.jd, flux, xlabel='Time [JD]', ylabel='Transmission', legend='Theoretical Lightcurve')
 
                 # Print the transit model params
                 print('Input Transit Model Parameters\n------------------------------')
-                for key, val in self.tmodel.__dict__.items():
+                for key, val in tmod.__dict__.items():
                     print('{}: {}'.format(key, val))
 
             show(column(list(filter(None, [sfig, pfig, tfig]))))
@@ -1240,7 +1246,6 @@ class SossSpecSim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
-            self.tmodel.rp = 0.1
 
         # Run the simulation
         if run:
@@ -1284,7 +1289,6 @@ class SossBlackbodySim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
-            self.tmodel.rp = 0.1
 
         # Run the simulation
         if run:
@@ -1342,7 +1346,6 @@ class SossModelSim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
-            self.tmodel.rp = 0.1
 
         # Run the simulation
         if run:
