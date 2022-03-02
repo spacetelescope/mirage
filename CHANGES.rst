@@ -1,6 +1,12 @@
 (Unreleased)
 ============
 
+Catalogs
+--------
+
+Update the import location of Irsa from astroquery.irsa to the new location of astroquery.ipac.irsa (#772)
+
+
 Dark Current
 ------------
 
