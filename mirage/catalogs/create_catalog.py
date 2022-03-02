@@ -20,7 +20,7 @@ from astropy.io import ascii
 from astropy.table import Table, join
 import astropy.units as u
 from astroquery.gaia import Gaia
-from astroquery.irsa import Irsa
+from astroquery.ipac.irsa import Irsa
 from pysiaf.utils.projection import deproject_from_tangent_plane
 
 from mirage.apt.apt_inputs import get_filters, ra_dec_update
