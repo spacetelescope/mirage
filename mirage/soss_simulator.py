@@ -824,6 +824,27 @@ class SossSim():
         else:
             return fig
 
+    def plot_input(self):
+        """
+        Plot the 1d stellar spectrum and planet transmission spectrum used as input where available
+        """
+        # Plot the data from the 'star' attribute
+        if self.star is not None:
+
+            sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Stellar spectrum')
+            pfig = None
+
+            # Plot the data from the 'planet' attribute
+            if self.planet is not None:
+
+                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], legend='Planet Transmission', color='green')
+
+            show(column(list(filter(None, [sfig, pfig]))))
+
+        else:
+
+            print("No input to plot. Please set SossSim.star attribute with 1D data.")
+
     @run_required
     def plot_ramp(self, order=None, noise=True, draw=True):
         """
@@ -848,25 +869,6 @@ class SossSim():
             show(fig)
         else:
             return fig
-
-    def plot_input(self):
-        """
-        Plot the 1d stellar spectrum used as input
-        """
-        if self.star is not None:
-
-            sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Stellar spectrum')
-            pfig = None
-
-            if self.planet is not None:
-
-                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], legend='Planet Transmission', color='green')
-
-            show(column(list(filter(None, [sfig, pfig]))))
-
-        else:
-
-            print("No input to plot. Please set SossSim.star attribute with 1D data.")
 
     def _read_parameter_file(self, pfile):
         """Read in the yaml parameter file"""
