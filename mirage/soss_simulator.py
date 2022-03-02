@@ -1240,6 +1240,7 @@ class SossSpecSim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.rp = 0.1
 
         # Run the simulation
         if run:
@@ -1283,6 +1284,7 @@ class SossBlackbodySim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.rp = 0.1
 
         # Run the simulation
         if run:
@@ -1340,6 +1342,7 @@ class SossModelSim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.rp = 0.1
 
         # Run the simulation
         if run:
