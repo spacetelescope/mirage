@@ -1,4 +1,9 @@
 #!/usr/stsci/pyssg/Python-2.7/bin/python
+"""
+Module to download and normalize stellar model atmospheres for soss_simulator.SossModelSim class
+
+Author: Nestor Espinoza
+"""
 
 import numpy as np
 import os
