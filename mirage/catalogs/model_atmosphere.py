@@ -461,7 +461,7 @@ def spec_integral(input_w, input_f, wT, TT):
     else:
         w, f = input_w, input_f
 
-    interp_spectra = interpolate.interp1d(w, f)
+    interp_spectra = interpolate.interp1d(w, f, fill_value='extrapolate')
     numerator = np.trapz(wT * interp_spectra(wT) * TT, x=wT)
     denominator = np.trapz(wT * TT, x=wT)
 
