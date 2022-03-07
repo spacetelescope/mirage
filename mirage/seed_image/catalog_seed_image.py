@@ -41,6 +41,7 @@ from . import segmentation_map as segmap
 import mirage
 from mirage.catalogs.catalog_generator import ExtendedCatalog, TSO_GRISM_INDEX
 from mirage.catalogs.utils import catalog_index_check, determine_used_cats
+from mirage.reference_files.downloader import download_file
 from mirage.seed_image import tso, ephemeris_tools
 from ..ghosts.niriss_ghosts import determine_ghost_stamp_filename, get_ghost, source_mags_to_ghost_mags
 from ..logging import logging_functions
@@ -52,7 +53,7 @@ from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
-                              NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
+                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -1052,7 +1053,7 @@ class Catalog_seed():
         mov_targs_ramps = []
         mov_targs_segmap = None
 
-        # Only attemp to add ghosts to NIRISS observations where the
+        # Only attempt to add ghosts to NIRISS observations where the
         # user has requested it.
         add_ghosts = False
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
@@ -1159,7 +1160,7 @@ class Catalog_seed():
         Create a seed EXPOSURE in the case where the instrument is tracking
         a non-sidereal target
         """
-        # Only attemp to add ghosts to NIRISS observations where the
+        # Only attempt to add ghosts to NIRISS observations where the
         # user has requested it.
         add_ghosts = False
         if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
@@ -1254,78 +1255,47 @@ class Catalog_seed():
 
         # Add in the other objects which are not being tracked on
         # (i.e. the sidereal targets)
+        # For the moment, we consider all non-sidereal targets to be opaque.
+        # That is, if they occult any background sources, the signal from those
+        # background sources will not be added to the scene. This is controlled
+        # using the segmentation map. Any pixels there classified as containing
+        # the non-sidereal target will not have signal from background sources
+        # added. I can't think of any non-sidereal targets that would not be
+        # opaque, so for now we will leave this hardwired to be on. If there is
+        # some issue down the road, we can turn this into a user input in the
+        # yaml file.
+        opaque_target = True
         if len(mtt_data_list) > 0:
             for i in range(len(mtt_data_list)):
-                non_sidereal_ramp += mtt_data_list[i]
-                # non_sidereal_zero += mtt_zero_list[i]
+                #non_sidereal_ramp += mtt_data_list[i]
+
+                # If the tracked target is opaque (e.g. a planet, astroid, etc),
+                # the background (trailed) objects will only be added to the pixels that
+                # do not contain the tracked target. (i.e. we shouldn't see background
+                # stars that are behind Jupiter).
+                if opaque_target:
+                    # Find pixels that do not contain the tracked target
+                    # (Note that the segmap here is 2D but the seed images are 4D)
+                    self.logger.info(('Tracked non-sidereal target is opaque. Background sources behind the target will not be added. '
+                                      'If background sources are being suppressed in too many pixels (e.g. within the diffraction '
+                                      'spikes of the primary target), try setting "signal_low_limit_for_segmap" in the input yaml '
+                                      'file to a larger value. This will reduce the number of pixels associated with the primary '
+                                      'target in the segmentation map, which defines the pixels where background targets will not '
+                                      'be added.'))
+                    outside_target = nonsidereal_segmap == 0
+
+                    # Add signal from background targets only to those pixels that
+                    # are not part of the tracked target
+                    for integ in range(ns_int):
+                        for framenum in range(non_sidereal_ramp.shape[1]):
+                            ns_tmp_frame = non_sidereal_ramp[integ, framenum, :, :]
+                            bcgd_srcs_frame = mtt_data_list[i][integ, framenum, :, :]
+                            ns_tmp_frame[outside_target] = ns_tmp_frame[outside_target] + bcgd_srcs_frame[outside_target]
+                            non_sidereal_ramp[integ, framenum, :, :] = ns_tmp_frame
+
         if mtt_data_segmap is not None:
-            nonsidereal_segmap += mtt_data_segmap
+            nonsidereal_segmap[outside_target] += mtt_data_segmap[outside_target]
         return non_sidereal_ramp, nonsidereal_segmap
-
-    def readMTFile(self, filename):
-        """
-        Read in moving target list file
-
-        Arguments:
-        ----------
-        filename : str
-            name of moving target catalog file
-
-        Returns:
-        --------
-        returns : obj
-            Table containing moving target entries
-            pixelflag (boolean) -- If true, locations are in units of
-                pixels. If false, locations are RA, Dec
-            pixelvelflag (boolean) -- If true, moving target velocities
-                are in units of pixels/hour. If false, arcsec/hour
-            magsys -- magnitude system of the moving target magnitudes
-        """
-        mtlist = ascii.read(filename, comment='#')
-
-        # Convert all relevant columns to floats
-        for col in mtlist.colnames:
-            if mtlist[col].dtype in ['int64', 'int']:
-                mtlist[col] = mtlist[col].data * 1.
-
-        # Check to see whether the position is in x,y or ra,dec
-        pixelflag = False
-        try:
-            if 'position_pixels' in mtlist.meta['comments'][0:4]:
-                pixelflag = True
-        except:
-            pass
-
-        # If present, check whether the velocity entries are pix/sec
-        # or arcsec/sec.
-        pixelvelflag = False
-        try:
-            if 'velocity_pixels' in mtlist.meta['comments'][0:4]:
-                pixelvelflag = True
-        except:
-            pass
-
-        # If present, check whether the radius entries (for galaxies)
-        # are in arcsec or pixels. If in arcsec, change to pixels
-        if 'radius' in mtlist.colnames:
-            if 'radius_pixels' not in mtlist.meta['comments'][0:4]:
-                mtlist['radius'] /= self.siaf.XSciScale
-
-        # If galaxies are present, change position angle from degrees
-        # to radians
-        if 'pos_angle' in mtlist.colnames:
-            mtlist['pos_angle'] = mtlist['pos_angle'] * np.pi / 180.
-
-        # Check to see if magnitude system is specified in comments
-        # If not, assume AB mags
-        msys = 'abmag'
-
-        condition = ('stmag' in mtlist.meta['comments'][0:4]) | ('vegamag' in mtlist.meta['comments'][0:4])
-        if condition:
-            msys = [l for l in mtlist.meta['comments'][0:4] if 'mag' in l][0]
-            msys = msys.lower()
-
-        return mtlist, pixelflag, pixelvelflag, msys.lower()
 
     def movingTargetInputs(self, filename, input_type, MT_tracking=False,
                            tracking_ra_vel=None, tracking_dec_vel=None,
@@ -1385,7 +1355,7 @@ class Catalog_seed():
             Segmentation map is based on the final frame in the seed image.
         """
         # Read input file - should be able to use for all modes
-        mtlist, pixelFlag, pixvelflag, magsys = self.readMTFile(filename)
+        mtlist, pixelFlag, pixvelflag, magsys = file_io.readMTFile(filename)
 
         # If there is no ephemeris file given and no x_or_RA_velocity
         # column (i.e. we have a catalog of sidereal sources), then
@@ -1612,7 +1582,7 @@ class Catalog_seed():
                 rate = utils.magnitude_to_countrate(self.instrument, self.params['Readout']['filter'],
                                                     magsys, entry[mag_column],
                                                     photfnu=self.photfnu,
-                                                    photflam=self.photflam)
+                                                    photflam=self.photflam, vegamag_zeropoint=self.vegazeropoint)
             else:
                 rate = 1.0
 
@@ -2019,7 +1989,7 @@ class Catalog_seed():
         totalSegList = []
 
         # Read in file containing targets
-        targs, pixFlag, velFlag, magsys = self.readMTFile(file)
+        targs, pixFlag, velFlag, magsys = file_io.readMTFile(file)
 
         # We can only track one moving target at a time
         if len(targs) != 1:
@@ -2166,8 +2136,14 @@ class Catalog_seed():
             extended.write(temp_ext_filename, format='ascii', overwrite=True)
 
             extlist, extstamps, ext_ghosts_file = self.getExtendedSourceList(temp_ext_filename, ghost_search=True)
-            conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
-            extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
+            if len(extlist) > 0:
+                conv = [self.params['simSignals']['PSFConvolveExtended']] * len(extlist)
+                extCRImage, extSegmap = self.make_extended_source_image(extlist, extstamps, conv)
+            else:
+                yd, xd = self.output_dims
+                #extCRImage = np.zeros((self.params['Readout']['nint'], self.frames_per_integration, yd, xd))
+                extCRImage = np.zeros((yd, xd))
+                extSegmap = np.zeros((yd, xd)).astype(np.int64)
 
             totalCRList.append(extCRImage)
             totalSegList.append(extSegmap)
@@ -4814,6 +4790,12 @@ class Catalog_seed():
         segmentation.ydim = yd
         segmentation.initialize_map()
 
+        if len(extConvolutions) > 0:
+            if extConvolutions[0]:
+                self.logger.info('Convolving extended sources with PSF prior to adding to seed image.')
+            else:
+                self.logger.info('Extended sources will not be convolved with the PSF.')
+
         # Loop over the entries in the source list
         for entry, stamp, convolution in zip(extSources, extStamps, extConvolutions):
             stamp_dims = stamp.shape
@@ -5159,6 +5141,15 @@ class Catalog_seed():
         self.determine_intermediate_aperture(instrument_siaf)
 
         self.logger.info('SIAF: Requested {}   got {}'.format(self.params['Readout']['array_name'], self.siaf.AperName))
+
+        # If optical ghosts are to be added, make sure the ghost gap file is present in the
+        # config directory. This will be downloaded from the niriss_ghost github repo regardless of whether
+        # the file is already present, in order to ensure we have the latest copy.
+        if self.params['Inst']['instrument'].lower() == 'niriss' and self.params['simSignals']['add_ghosts']:
+            self.logger.info('Downloading NIRISS ghost gap file...')
+            config_dir, ghost_file = os.path.split(NIRISS_GHOST_GAP_FILE)
+            download_file(NIRISS_GHOST_GAP_URL, ghost_file, output_directory=config_dir, force=True)
+
         # Set the background value if the high/medium/low settings
         # are used
         bkgdrate_options = ['high', 'medium', 'low']

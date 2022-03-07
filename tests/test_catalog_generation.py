@@ -534,3 +534,50 @@ def test_determine_used_cats():
     tsogrism_truth = ['ptsrc.cat', 'galaxies.cat', 'extended.cat', 'grism_tso.cat']
     assert tsogrism_cats == tsogrism_truth
 
+
+def test_nonsidereal_extended_source_catalog():
+    """Test the creation of non-sidereal source catalogs
+    """
+    filename = 'Jupiter_stamp.fits'
+    ephemeris_file = 'horizons_results.txt'
+    ns = catalog_generator.NonSiderealCatalog(object_type=['extended'], ephemeris_file=[ephemeris_file],
+                                              filenames=filename)
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f360m')
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f405n')
+    expected_cols = ['index', 'object', 'x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity',
+                     'filename', 'pos_angle', 'nircam_f360m_clear_magnitude', 'ephemeris_file',
+                     'nircam_f444w_f405n_magnitude']
+    for col in expected_cols:
+        assert col in ns.table.colnames
+    assert ns.table['object'] == 'extended'
+
+
+def test_nonsidereal_sersic_source_catalog():
+    """Test the creation of non-sidereal source catalogs
+    """
+    ephemeris_file = 'horizons_results.txt'
+    ns = catalog_generator.NonSiderealCatalog(object_type=['sersic'], ephemeris_file=[ephemeris_file], ellipticity=[0.02], radius=[0.3], sersic_index=[1.4],
+                 position_angle=[49.])
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f360m')
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f405n')
+    expected_cols = ['index', 'object', 'x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity',
+                     'sersic_index', 'ellipticity', 'pos_angle', 'radius', 'nircam_f360m_clear_magnitude',
+                     'ephemeris_file', 'nircam_f444w_f405n_magnitude']
+    for col in expected_cols:
+        assert col in ns.table.colnames
+    assert ns.table['object'] == 'sersic'
+
+
+def test_nonsidereal_point_source_catalog():
+    """Test the creation of non-sidereal source catalogs
+    """
+    ephemeris_file = 'horizons_results.txt'
+    ns = catalog_generator.NonSiderealCatalog(object_type=['pointSource'], ephemeris_file=[ephemeris_file])
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f360m')
+    ns.add_magnitude_column([2.0], magnitude_system='abmag', instrument='nircam', filter_name='f405n')
+    expected_cols = ['index', 'object', 'x_or_RA', 'y_or_Dec', 'x_or_RA_velocity', 'y_or_Dec_velocity',
+                     'nircam_f360m_clear_magnitude', 'ephemeris_file', 'nircam_f444w_f405n_magnitude']
+    for col in expected_cols:
+        assert col in ns.table.colnames
+    assert ns.table['object'] == 'pointSource'
+

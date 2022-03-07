@@ -204,16 +204,16 @@ class SossSim():
         self.lines.add_row([name, profile, x_0, amplitude, fwhm, line])
 
     @run_required
-    def add_noise(self):
+    def add_noise(self, override_refs=None, skip_dark=False):
         """
         Run the signal data through the ramp generator
         """
-        self.message("Starting noise generator...")
+        self.logger.info("Starting noise generator...")
         start = time.time()
 
         # Generate segmentation map with correct dimensions
-        self.segmap = segmentation_map.SegMap()
-        self.segmap.ydim = self.nrows
+        segmap = segmentation_map.SegMap()
+        segmap.ydim = self.nrows
 
         # Prepare dark current exposure if needed.
         if self.override_dark is None:
@@ -221,24 +221,44 @@ class SossSim():
             d = dark_prep.DarkPrep(offline=self.offline)
             d.paramfile = self.paramfile
             d.prepare()
-            use_darks = d.dark_files
+            self.use_darks = d.dark_files
         else:
-            self.logger.info('\noverride_dark is set. Skipping call to dark_prep and using these files instead.')
-            use_darks = self.override_dark
+            self.logger.info('Override_dark is set. Skipping call to dark_prep.')
+            self.use_darks = self.override_dark
 
         # Make a seed files split like the dark file
-        if isinstance(use_darks, str):
-            use_darks = [use_darks]
+        if isinstance(self.use_darks, str):
+            self.use_darks = [self.use_darks]
+
+        # Set darks to all zeros if skip_dark
+        if skip_dark:
+            self.logger.info('skip_dark is set. Setting dark frames to all zeroes.')
+            for dfile in self.use_darks:
+                hdu = fits.open(dfile)
+                hdu[1].data *= 0.
+                hdu[2].data *= 0.
+                hdu[3].data *= 0.
+                hdu[4].data *= 0.
+                hdu.flush()
+                hdu.close()
 
         nint = 0
-        nfiles = len(use_darks)
+        nfiles = len(self.use_darks)
         self.tso = np.empty_like(self.tso_ideal)
-        for n, dfile in enumerate(use_darks):
+        self.obs = []
+        for n, dfile in enumerate(self.use_darks):
+            self.logger.info('Using dark file {}/{}: {}'.format(n + 1, len(self.use_darks), dfile))
             dhead = fits.getheader(dfile)
             dnint = dhead['NINTS']
 
-            # Save the raw signal as a seed image
-            seed_seg = self.tso_ideal[nint:nint + dnint, :, :, :]
+            # Get the appropriate seed image segment
+            seed_seg = self.tso_ideal[nint:nint + dnint, :, :, :].astype(np.float64)
+
+            # NaNs and infs break np.random.poisson
+            seed_seg[np.where(np.isnan(seed_seg))] = 0.
+            seed_seg[np.where(np.isinf(seed_seg))] = 0.
+
+            # Save the seed image segment to file
             seedfile, seedinfo = save_seed.save(seed_seg, self.paramfile, self.params, True, False, 1., 2048, (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1, frametime=self.frame_time)
 
             # Combine into final observation
@@ -254,10 +274,10 @@ class SossSim():
             # Add simulation data
             obs.linDark = dfile
             obs.seed = seed_seg
-            obs.segmap = self.segmap
+            obs.segmap = segmap
             obs.seedheader = seedinfo
             obs.paramfile = self.paramfile
-            obs.create()
+            obs.create(override_refs=override_refs)
 
             if nfiles > 1:
                 os.system('mv {} {}'.format(seedfile, seedfile.replace('_seed_image.fits', '_seg{}_part001_seed_image.fits'.format(str(n + 1).zfill(3)))))
@@ -265,13 +285,15 @@ class SossSim():
             # Save ramp to tso attribute
             self.tso[nint:nint + dnint, :, :, :] = obs.raw_outramp
 
+            # Save obs object
+            self.obs.append(obs)
+
             # Pickup where last segment left off
             nint += dnint
 
         # Log it
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
-        print(obs.output_files)
 
         return obs.output_files
 
@@ -333,15 +355,14 @@ class SossSim():
         self._reset_psfs()
 
         # Logging
-        self.logger.info('\n\nRunning soss_simulator....\n')
-        self.logger.info('Using parameter file: ')
-        self.logger.info('{}'.format(self.paramfile))
+        self.logger.info('Running soss_simulator....')
+        self.logger.info('Using parameter file: {}'.format(self.paramfile or 'None'))
         begin = time.time()
 
         # Make a simulation of all ones to save time
         if self.test:
 
-            self.message("Generating test simulation of shape {}...".format(self.dims))
+            self.logger.info("Generating test simulation of shape {}...".format(self.dims))
             self.tso_order1_ideal = self.tso_order2_ideal = np.ones((self.nints * self.ngrps, 256, 2048))
 
         # Make a true simulation
@@ -362,11 +383,13 @@ class SossSim():
             n_chunks = len(time_chunks)
 
             # Iterate over chunks
-            self.message('Simulating {target} in {title}\nConfiguration: {subarray} + {filter}\nGroups: {ngrps}, Integrations: {nints}\n'.format(**self.info))
+            self.logger.info('Simulating {} in {}'.format(self.target, self.title))
+            self.logger.info('Configuration: {} + {}'.format(self.subarray, self.filter))
+            self.logger.info('Groups: {}, Integrations: {}'.format(self.ngrps, self.nints))
             for chunk, (time_chunk, inttime_chunk) in enumerate(zip(time_chunks, inttime_chunks)):
 
                 # Run multiprocessing to generate lightcurves
-                self.message('Constructing frames for chunk {}/{}...'.format(chunk + 1, n_chunks))
+                self.logger.info('Constructing frames for chunk {}/{}...'.format(chunk + 1, n_chunks))
                 start = time.time()
 
                 # Get transit model for the current time chunk
@@ -393,7 +416,7 @@ class SossSim():
                     pool = ThreadPool(n_jobs)
                     func = partial(soss_trace.psf_lightcurve, time=time_chunk)
                     data = list(zip(psfs, tmodels))
-                    lightcurves = np.asarray(pool.starmap(func, data), dtype=np.float16)
+                    lightcurves = np.asarray(pool.starmap(func, data), dtype=np.float64)
                     pool.close()
                     pool.join()
                     del pool
@@ -421,7 +444,7 @@ class SossSim():
                     # Clear memory
                     del frames, lightcurves, psfs
 
-                self.message('Chunk {}/{} finished: {} {}'.format(chunk + 1, n_chunks, round(time.time() - start, 3), 's'))
+                self.logger.info('Chunk {}/{} finished: {} {}'.format(chunk + 1, n_chunks, round(time.time() - start, 3), 's'))
 
         # Trim SUBSTRIP256 array if SUBSTRIP96
         if self.subarray == 'SUBSTRIP96':
@@ -474,7 +497,7 @@ class SossSim():
                 temp.insert(-1, planethdu)
             temp.flush()
 
-        self.message('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
+        self.logger.info('Total time: {} {}'.format(round(time.time() - begin, 3), 's'))
 
     @property
     def filter(self):
@@ -1054,7 +1077,7 @@ class SossSim():
         """
         # Check if the star has been set
         if spectrum is None:
-            self.message("No star to simulate! Please set the self.star attribute!")
+            self.logger.info("No star to simulate! Please set the self.star attribute!")
             self._star = None
 
         else:
@@ -1090,8 +1113,10 @@ class SossSim():
             if spec_min > sim_min or spec_max < sim_max:
                 print("Wavelength range of input spectrum ({} - {}) does not cover the {} - {} range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
 
-            # Good to go
-            self._star = spectrum
+            # Good to go (Poisson statistics in obs_generator require float16)
+            non_nan = np.invert(np.isnan(spectrum[1]))
+            non_inf = np.invert(np.isinf(spectrum[1]))
+            self._star = [i[non_nan * non_inf] for i in spectrum]
 
     @property
     def subarray(self):

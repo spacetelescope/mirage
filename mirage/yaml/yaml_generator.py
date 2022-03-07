@@ -1255,6 +1255,11 @@ class SimInput:
         #for targ, inst in zip(nonsidereal_targs, nonsidereal_instruments):
         for element in unique:
             targ, inst = element
+
+            # Skip unsupported instruments
+            if inst in ['NIRSpec', 'MIRI']:
+                continue
+
             ns_catalog = get_nonsidereal_catalog_name(self.catalogs, targ, inst)
             catalog_table, pos_in_xy, vel_in_xy = read_nonsidereal_catalog(ns_catalog)
 
@@ -2002,8 +2007,9 @@ class SimInput:
             if full_ap not in possible_apertures:
                 raise ValueError('Unrecognized aperture name: {}'.format(full_ap))
 
-            f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc) overrides subarray_bounds below\n'.format(full_ap))
+            f.write('  array_name: {}    # Name of array (FULL, SUB160, SUB64P, etc)\n'.format(full_ap))
             f.write('  intermediate_aperture: {}   # Name of intermediate aperture used in NIRCam Grism time series obs.\n'.format(input['grismts_intermediate_aperture']))
+            f.write('  PPS_aperture: {}  # Original aperture value supplied by PPS.\n'.format(input['pps_aperture']))
             f.write('  filter: {}       # Filter of simulated data (F090W, F322W2, etc)\n'.format(input[filtkey]))
             f.write('  pupil: {}        # Pupil element for simulated data (CLEAR, GRISMC, etc)\n'.format(input[pupilkey]))
             f.write('\n')
@@ -2122,8 +2128,6 @@ class SimInput:
                      'the field\n'.format(MovingTargetSersic)))
             f.write(('  movingTargetExtended: {}      #ascii file containing a list of stamp images to add as moving targets '
                      '(planets, moons, etc)\n'.format(MovingTargetExtended)))
-            f.write(('  movingTargetConvolveExtended: {}       #convolve the extended moving targets with PSF before adding.\n'
-                     .format(MovingTargetConvolveExtended)))
             f.write(('  movingTargetToTrack: {} #File containing a single moving target which JWST will track during '
                      'observation (e.g. a planet, moon, KBO, asteroid)	This file will only be used if mode is set to '
                      '"moving_target" \n'.format(MovingTargetToTrack)))

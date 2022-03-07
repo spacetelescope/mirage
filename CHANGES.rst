@@ -1,15 +1,162 @@
-Unreleased
-==========
+(Unreleased)
+============
+
+Dark Current
+------------
+
+Correct bug that was causing metadata from raw darks to not be read in correctly. Allow input raw darks with no ZEROFRAME extension as long as they were collected with a RAPID readout pattern. (#762)
+
+
+Moving Targets
+--------------
+
+Updated the MOVING_TARGET_POSITION table from detector -> sci. (#757)
+
+
+2.2.1
+=====
+
+NIRISS Ghosts
+-------------
+
+Update to new version of NIRISS ghost gap file. (#751)
+
+Remove the NIRISS ghost gap file from the Mirage repository. Download the file from the niriss_ghost repository whenever a
+NIRISS simulation including ghosts is run. (#753)
+
+
+Moving Targets
+--------------
+
+Populate the MOVING_TARGET_POSITION table extension in the output files. (#749)
+
+
+Output File Headers
+-------------------
+
+Populate the PPS_APER header keyword in saved uncal and linear files. This information comes from the APT pointing file. (#752)
+
+Populate the NOUTPUTS header keyword in saved uncal and linear files. This is needed in order to find the correct CRDS reference files in some cases. (#756)
+
+
+
+2.2.0
+=====
+
+
+APT Reader
+----------
 
 Update NIRSpec MOS APT xml reader to make use of ConfigurationPointing fields, in order to determine order and number of exposures. (#707)
 
+Be sure that the number of primary dithers as read from the xml file is an integer, in order to correctly populate the new NRIMDTPT
+header keyword. (#718)
+
+Set the observation mode to "wfss" for NIRISS observations that use the External Calibration template and use a grism. (#737)
+
+
+Documentation
+-------------
+
+Remove mentions of outdated mode name from documentation. "moving_target" is not a mode. Instead, refer to "non-sidereal" tracking. (#740)
+
+Use a newer ReadTheDocs build image in order to avoid build errors associated with new version of jupyter-core. (#745)
+
+
+Example Notebooks
+-----------------
+
+Add missing function definition in imaging mode notebook. (#735)
+
+
+NIRCam Coronagraphic Modes
+--------------------------
+
+Correctly populate the array_name entry of the input yaml file for NIRCam coronagraphic observations. This aperture name is needed when
+running coronagraphic simuations.  While Mirage still does not directly support coronagraphic simuations, extended images can be used to
+create a coronagraphic scene. (#728)
+
+
+NIRCam TSO Simulations
+----------------------
+
+Fix the location of the target in the TSO apertures. The location of the dispersed source is dictated by the intermediate aperture
+location in APT, rather than the imaging aperture. (#722)
+
+
+NIRISS Simulations
+------------------
+
+Add F158M to the list of filters for which ghosts can be added. Update the ghost positions for WFSS simualations,
+to better reflect ground testing results. (#714)
+
+
+Non-sidereal target simulations
+-------------------------------
+
 Add PSF convolution keyword when making an extended source image with a moving target simulation. (#706)
+
+Updates to the non-sidereal catalog creation method such that users can input the type of source to use for the tracked target. Remove
+the movingTargetConvolveExtended entry from the yaml file since it was not being used. Convolution of any extended taget (sidereal,
+non-sidereal, tracked, untracked) with the PSF are all controlled by the PSFConvolveExtended yaml entry. Tracked, non-sidereal sources
+are now considered opaque. That is, background sources that fall behind the tracked non-sidereal target will not be added to the seed
+image. (#743)
+
+
+Outputs
+-------
 
 Following changes in jwst version 1.2.3, replace the NDITHPTS header keyword with NRIMDTPT. (#705)
 
-Create a pom transmission image composed of all 1's for NIRISS AMI and NIRCam imaging TSO simulations, as is done now for regular imaging simulations. (#701)
+Correct the file-splitting calculations when creating data with a non-RAPID readout pattern. (#731)
+
+
+Packaging
+---------
+
+Remove secondary dependencies from environment files and requirements.txt. (#733)
+
+
+PSF Libraries
+-------------
+
+Fix bug that was preventing Mirage from finding the correct gridded PSF library for WLP4 simulations. (#724)
+
+In cases where the total signal in a gridded PSF library is greater than 1.0 but less than 1.1, renormalize the PSF to have a total
+signal of 1.0. PSFs with total signals greater than 1.1 will raise an exception. The renormalization is done because in some cases,
+WebbPSF will create a PSF with a total signal just slightly greater than 1.0. (#725)
+
+
+Source Catalogs
+---------------
+
+Remove CLEAR and CLEARP from the list of filters read in from the pointing file during source catalog creation. (#710)
+
+Fix bug that was causing inconsistencies in the crossmatching of sources between the 2MASS/Gaia/WISE catalogs. (#726)
+
+Fix a bug that was placing NIRISS filter/pupil names in the wrong entry of the exposure dictionary when using for_proposal()
+to create source catalogs. (#730)
+
+Subarray Apertures
+------------------
+
+Correct the subarray name associated with the NRCB5_MASKLWB aperture name in APT. (#744)
+
+
+SOSS Mode Simulations
+---------------------
 
 Prevent the SOSS simulator from looking for a non-existing 2nd order with F277W. (#700)
+
+Update SOSS simulator to use astropy's BlackBody model rather than the deprecated BlackBody1D. (#720)
+
+
+Transmission Image
+------------------
+
+Create a pom transmission image composed of all 1's for NIRISS AMI and NIRCam imaging TSO simulations, as is done now for regular imaging simulations. (#701)
+
+
 
 
 2.1.0
