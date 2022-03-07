@@ -244,8 +244,14 @@ class SossSim():
             # Combine into final observation
             self.logger.info('Running observation generator for segment {}/{}'.format(n, nfiles))
             obs = obs_generator.Observation(offline=self.offline)
-            obs.input['STAR'] = self.star
-            obs.input['PLANET'] = self.planet
+
+            # # Add input data
+            # obs.input = [fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.star[0].value, format='D'), fits.Column(name='FLUX', array=self.star[1].value, format='D')], name='STAR')]
+            # if self.planet is not None:
+            #     planetheader = {k: v for k, v in self.tmodel.__dict__.items() if k not in ['t', 't_supersample', 'ds']}
+            #     obs.input.append(fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.planet[0].value, format='D'), fits.Column(name='TRANSMISSION', array=self.planet[1], format='D')], name='PLANET'))#, header=planetheader))
+
+            # Add simulation data
             obs.linDark = dfile
             obs.seed = seed_seg
             obs.segmap = self.segmap
@@ -265,6 +271,9 @@ class SossSim():
         # Log it
         self.logger.info('\nSOSS simulator complete')
         self.message('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
+        print(obs.output_files)
+
+        return obs.output_files
 
     def create(self, n_jobs=-1, noise=True, override_dark=None, **kwargs):
         """
@@ -435,10 +444,35 @@ class SossSim():
             setattr(self, order_name, getattr(self, order_name).reshape(self.dims).astype(np.float64))
 
         # Make ramps and add noise to the observations
+        obs_files = []
         if noise:
-            self.add_noise(**kwargs)
+            obs_files = self.add_noise(**kwargs)
         else:
             self.tso = self.tso_ideal
+
+        # Add input data if available
+        for ofile in obs_files:
+            temp = fits.open(ofile, mode='update')
+            starhdr = fits.Header()
+            starhdr.append(('WUNIT', 'um', 'Wavelength unit'))
+            starhdr.append(('FUNIT', 'erg/s/cm2/A', 'Flux density unit'))
+            starhdu = fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.star[0].value, format='D'), fits.Column(name='FLUX', array=self.star[1].value, format='D')], header=starhdr, name='STAR')
+            temp.insert(-1, starhdu)
+            if self.planet is not None:
+                planethdr = fits.Header()
+                planethdr.append(('WUNIT', 'um', 'Wavelength unit'))
+                planethdr.append(('T0', self.tmodel.t0, 'Transit center [JD]'))
+                planethdr.append(('A', self.tmodel.a, 'Semimajor-axis [a/R*]'))
+                planethdr.append(('INC', self.tmodel.inc, 'Inclination [deg]'))
+                planethdr.append(('ECC', self.tmodel.ecc, 'Eccentricity'))
+                planethdr.append(('OMEGA', self.tmodel.w, 'Omega value'))
+                planethdr.append(('LD', self.tmodel.limb_dark, 'Limb darkening profile used'))
+                planethdr.append(('TEFF', self.tmodel.teff, 'Effective temperature [K]'))
+                planethdr.append(('LOGG', self.tmodel.logg, 'Log surface gravity [dex]'))
+                planethdr.append(('FEH', self.tmodel.feh, 'Metallicity'))
+                planethdu = fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.planet[0].value, format='D'), fits.Column(name='TRANSMISSION', array=self.planet[1], format='D')], header=planethdr, name='PLANET')
+                temp.insert(-1, planethdu)
+            temp.flush()
 
         self.message('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
 
@@ -1228,7 +1262,7 @@ class SossSpecSim(SossSim):
 
 class SossBlackbodySim(SossSim):
     """Generate a SossSim object with a blackbody spectrum"""
-    def __init__(self, ngrps=2, nints=2, teff=1800, filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
+    def __init__(self, ngrps=2, nints=2, teff=1800, jmag=9.0, filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, **kwargs):
         """Get the test data and load the object
 
         Parameters
@@ -1239,6 +1273,8 @@ class SossBlackbodySim(SossSim):
             The number of integrations for the exposure
         teff: int
             The effective temperature [K] of the test source
+        jmag: float
+            The J band magnitude to scale to
         filter: str
             The name of the filter to use, ['CLEAR', 'F277W']
         subarray: str
@@ -1247,24 +1283,26 @@ class SossBlackbodySim(SossSim):
             Run the simulation after initialization
         add_planet: bool
             Add a transiting exoplanet
-        scale: int, float
-            Scale the flux by the given factor
         """
         # Generate a blackbody at the given temperature
         bb = BlackBody(temperature=teff * q.K)
         wav = np.linspace(0.5, 2.9, 1000) * q.um
-        flux = (bb(wav) * q.sr / bb.bolometric_flux.value).to(FLAMBDA_CGS_UNITS, q.spectral_density(wav)) * 1E-8 * scale
+        flx = (bb(wav) * q.sr / bb.bolometric_flux.value).to(FLAMBDA_CGS_UNITS, q.spectral_density(wav))
+
+        # Scale model spectrum to user-input J-band
+        flx = ma.scale_spectrum(wav, flx, jmag)
 
         # Initialize base class
-        super().__init__(ngrps=ngrps, nints=nints, star=[wav, flux], subarray=subarray, filter=filter, **kwargs)
+        super().__init__(ngrps=ngrps, nints=nints, star=[wav, flx], subarray=subarray, filter=filter, **kwargs)
 
         # Add planet
         if add_planet:
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.teff = teff
 
-        # Run the simulation
+            # Run the simulation
         if run:
             self.create()
 
@@ -1320,8 +1358,12 @@ class SossModelSim(SossSim):
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
             self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.teff = teff
+            self.tmodel.logg = logg
+            self.tmodel.feh = feh
+            self.tmodel.alpha = alpha
 
-        # Run the simulation
+            # Run the simulation
         if run:
             self.create()
 

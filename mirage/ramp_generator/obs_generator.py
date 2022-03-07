@@ -89,9 +89,7 @@ class Observation():
         self.offline = offline
         self.paramfile = 'None'
         self.params = None
-
-        # Dict to store arbitrary observation inputs
-        self.input = {}
+        self.output_files = []
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -3029,6 +3027,9 @@ class Observation():
 
         outModel.save(filename)
 
+        # Save list of output files
+        self.output_files.append(filename)
+
         # Now we need to adjust the datamodl header keyword
         # If we leave it as Level1bModel, the pipeline doesn't
         # work properly
@@ -3311,10 +3312,6 @@ class Observation():
 
         outModel[0].header['DURATION'] = self.get_duration()
 
-        # Add input data if available
-        for name, data in self.input.items():
-            outmodel[name].data = data
-
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
         with warnings.catch_warnings():
@@ -3322,6 +3319,10 @@ class Observation():
             outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], self.rampexptime,
                                                                    n_int, n_group, n_y, n_x)
         outModel.writeto(filename, overwrite=True)
+
+        # Save list of output files
+        self.output_files.append(filename)
+
         return filename
 
     def resets_before_exp(self):
