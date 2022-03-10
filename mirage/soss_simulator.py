@@ -496,7 +496,7 @@ class SossSim():
                 temp.insert(-1, planethdu)
             temp.flush()
 
-        self..logger.info('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
+        self.logger.info('Total time: {} {}'.format(round(time.time() - begin, 3), 's'))
 
     @property
     def filter(self):
