@@ -51,7 +51,7 @@ DOCS_REQUIRE = [
     'sphinx-automodapi',
     'sphinx-rtd-theme',
     'stsci-rtd-theme',
-    'extension-helpers',
+    'extension-helpers'
 ]
 TESTS_REQUIRE = [
     'pytest',
@@ -100,7 +100,7 @@ setup(
         'h5py>=2.8.0',
         'hotsoss==0.1.7',
         'ipython',
-        'jinja2==2.11.3',
+        'jinja2==3.0.3',
         'jupyter',
         'jwst',
         'jwst-backgrounds>=1.1.1',
@@ -109,7 +109,7 @@ setup(
         'NIRCAM_Gsim',
         'numpy',
         'photutils>=0.7.2',
-        'pysiaf>=0.6.1',
+        'pysiaf==0.13.0',
         'scipy>=1.1.0',
         'synphot>=0.2.0',
         'webbpsf>=0.9.0',

@@ -117,8 +117,13 @@ class Read_fits():
         #zeros, then set it to None here
         #self.zeroframe = h.zeroframe
         if np.all(h.zeroframe == 0):
-            logger.info("Zeroframe in {} is all zeros. Returning None.".format(self.file))
-            self.zeroframe = None
+            if 'RAPID' in h.meta.exposure.readpatt:
+                logger.info((f"Zeroframe in {os.path.basename(self.file)} is all zeros. Since the readpattern is RAPID, "
+                             "we grab a copy of the first group to be the zeroframe."))
+                self.zeroframe = h.data[:, 0, :, :]
+            else:
+                logger.info("Zeroframe in {} is all zeros. Returning None.".format(self.file))
+                self.zeroframe = None
         else:
             self.zeroframe = h.zeroframe
 
@@ -127,7 +132,7 @@ class Read_fits():
         self.header = {}
         for key in self.translate:
             try:
-                self.header[key] = h.meta[self.translate[key]]
+                self.header[key] = eval(f'h.meta.{self.translate[key]}')
             except:
                 self.header[key] = None
 

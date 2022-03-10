@@ -1016,7 +1016,7 @@ class DarkPrep():
                 objname = self.basename + '_linear_dark_prep_object.fits'
             objname = os.path.join(self.params['Output']['directory'], objname)
             hl.writeto(objname, overwrite=True)
-            self.logger.info(("Linearized dark frame plus superbias and reference"
+            self.logger.info(("Linearized dark frame plus superbias and reference "
                               "pixel signals, as well as zeroframe, saved to {}. "
                               "This can be used as input to the observation "
                               "generator.".format(objname)))

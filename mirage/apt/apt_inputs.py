@@ -769,6 +769,7 @@ class AptInput:
         exp = []
         dith = []
         aperture = []
+        pps_aperture = []
         targ1 = []
         targ2 = []
         ra = []
@@ -901,6 +902,7 @@ class AptInput:
                             exnum = str(elements[2]).zfill(5)
                             exp.append(exnum)
                             dith.append(int(elements[3]))
+                            pps_aperture.append(elements[4])
 
                             ap = elements[4]
                             if ('GRISMR_WFSS' in elements[4]):
@@ -937,7 +939,7 @@ class AptInput:
                             self.logger.info('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
                         pass
 
-        pointing = {'exposure': exp, 'dither': dith, 'aperture': aperture,
+        pointing = {'exposure': exp, 'dither': dith, 'aperture': aperture, 'pps_aperture': pps_aperture,
                     'targ1': targ1, 'targ2': targ2, 'ra': ra, 'dec': dec,
                     'basex': basex, 'basey': basey, 'dithx': dithx,
                     'dithy': dithy, 'v2': v2, 'v3': v3, 'idlx': idlx,
