@@ -286,7 +286,7 @@ class SossSim():
         self.logger.info('SOSS simulator complete')
         self.logger.info('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
-    def create(self, n_jobs=-1, noise=True, override_dark=None, **kwargs):
+    def create(self, n_jobs=-1, noise=True, override_dark=None, max_frames=50, **kwargs):
         """
         Create the simulated 4D ramp data given the initialized TSO object
 
@@ -294,10 +294,12 @@ class SossSim():
         ----------
         n_jobs: int
             The number of cores to use in multiprocessing
-        tparams: dict
-            The transit parameters of the system
-        supersample_factor: int
-            The
+        noise: bool
+            Include noise model in simulation
+        override_dark: str
+            The path to a dark file that should override the default dark
+        max_frames: int
+            The max number of frames to chunk the simulation into to save memory
 
         Example
         -------
@@ -362,7 +364,6 @@ class SossSim():
                 n_jobs = max_cores
 
             # Chunk along the time axis so results can be dumped into a file and then deleted
-            max_frames = 50
             nints_per_chunk = max_frames // self.ngrps
             nframes_per_chunk = self.ngrps * nints_per_chunk
 
