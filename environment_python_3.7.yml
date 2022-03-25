@@ -10,7 +10,7 @@ dependencies:
 - pip:
     - asdf==2.7.2
     - astropy==4.3.1
-    - astroquery==0.4.1
+    - astroquery==0.4.5
     - bokeh>=2.2.3
     - batman-package==2.4.8
     - crds==10.3.8
