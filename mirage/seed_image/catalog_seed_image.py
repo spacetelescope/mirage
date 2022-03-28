@@ -1639,7 +1639,7 @@ class Catalog_seed():
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
                 # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
-                stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
+                stamp = self.rotate_extended_image(stamp, entry['pos_angle'])
 
                 # If no magnitude is given, use the extended image as-is
                 if rate != 1.0:
@@ -1662,12 +1662,7 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                if not self.use_intermediate_aperture:
-                    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
-                else:
-                    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, ra, dec)
-
-                xposang = self.calc_x_position_angle(pixelv2, pixelv3, entry['pos_angle'])
+                xposang = self.calc_x_position_angle(entry['pos_angle'])
 
                 # First create the galaxy
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
@@ -4093,7 +4088,7 @@ class Catalog_seed():
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
-                       ellip=ellipticity, theta=position_angle+np.pi/2)
+                       ellip=ellipticity, theta=position_angle)
 
         x_half_length = x_full_length // 2
         xmin = int(0 - x_half_length)
@@ -4229,8 +4224,7 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            xposang = self.calc_x_position_angle(entry['V2'], entry['V3'], entry['pos_angle'])
-
+            xposang = self.calc_x_position_angle(entry['pos_angle'])
             sub_x = 0.
             sub_y = 0.
 
@@ -4321,19 +4315,13 @@ class Catalog_seed():
 
         return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
-    def calc_x_position_angle(self, v2_value, v3_value, position_angle):
-        """Calcuate the position angle of the source relative to the x
-        axis of the detector given the source's v2, v3 location and the
-        user-input position angle (degrees east of north).
+    def calc_x_position_angle(self, position_angle):
+        """For Sersic2D galaxies, calcuate the position angle of the source
+        relative to the x axis of the detector given the user-input position
+        angle (degrees east of north).
 
         Parameters
         ----------
-        v2_value : float
-            V2 location of source in units of arcseconds
-
-        v3_value : float
-            V3 location of source in units of arcseconds
-
         position_angle : float
             Position angle of source in degrees east of north
 
@@ -4343,9 +4331,38 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-        north_to_east_V3ang = rotations.posangle(self.attitude_matrix, v2_value, v3_value)
-        x_posang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - position_angle
-                         + 90. - self.params['Telescope']['rotation'])
+        x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)
+
+        # If we are using a Grism Time series aperture, then we need to use the intermediate
+        # aperture to determine the correct rotation. Currently, we should never be in
+        # here since grism TSO observations only support the use of point sources.
+        if self.use_intermediate_aperture:
+            x_posang = 0. - (self.intermediate_siaf.V3SciXAngle + self.intermediate_local_roll + position_angle)
+        return x_posang
+
+    def calc_x_position_angle_extended(self, position_angle):
+        """For extended sources from fits files with no WCS, calcuate the position
+        angle of the source relative to the x axis of the detector given the source's
+        v2, v3 location and the user-input position angle (degrees east of north).
+
+        Parameters
+        ----------
+        position_angle : float
+            Position angle of source in degrees east of north
+
+        Returns
+        -------
+        x_posang : float
+            Position angle of source relative to detector x
+            axis, in units of degrees
+        """
+        x_posang = self.local_roll + position_angle
+
+        # If we are using a Grism Time series aperture, then we need to use the intermediate
+        # aperture to determine the correct rotation. Currently, we should never be in
+        # here since grism TSO observations only support the use of point sources.
+        if self.use_intermediate_aperture:
+            x_posang = self.intermediate_local_roll + position_angle
         return x_posang
 
     def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type, log_skipped_filters=True):
@@ -4604,7 +4621,7 @@ class Catalog_seed():
             # print('extended source size:', ext_stamp.shape)
 
             # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
-            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'])
 
             eshape = np.array(ext_stamp.shape)
             if len(eshape) == 2:
@@ -4735,7 +4752,7 @@ class Catalog_seed():
 
         return extSourceList, all_stamps, ghost_catalog_file
 
-    def rotate_extended_image(self, stamp_image, pos_angle, right_ascention, declination):
+    def rotate_extended_image(self, stamp_image, pos_angle):
         """Given the user-input position angle for the extended source
         image, calculate the appropriate angle of the stamp image
         relative to the detector x axis, and rotate the stamp image.
@@ -4752,12 +4769,6 @@ class Catalog_seed():
             or string 'None' will result in no rotation, i.e. the input stamp is returned
             without modification.
 
-        right_ascention : float
-            RA of source, in decimal degrees
-
-        declination : float
-            Dec of source, in decimal degrees
-
         Returns
         -------
         rotated : numpy.ndarray
@@ -4770,12 +4781,8 @@ class Catalog_seed():
             return stamp_image
 
         # Add later: check for WCS and use that
-        # if no WCS:
-        if not self.use_intermediate_aperture:
-            pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
-        else:
-            pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, right_ascention, declination)
-        x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
+        x_pos_ang = self.calc_x_position_angle_extended(pos_angle)
+
         rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
 

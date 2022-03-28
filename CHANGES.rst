@@ -1,6 +1,12 @@
 (Unreleased)
 ============
 
+Catalogs
+--------
+
+Update the import location of Irsa from astroquery.irsa to the new location of astroquery.ipac.irsa (#772)
+
+
 Dark Current
 ------------
 
@@ -11,6 +17,11 @@ Moving Targets
 --------------
 
 Updated the MOVING_TARGET_POSITION table from detector -> sci. (#757)
+
+
+Galaxy and Extended Source Position Angles
+------------------------------------------
+Fixed a bug that was causing incorrect position angles of galaxy and extended sources when PAV3 was non-zero. (#767)
 
 
 2.2.1
