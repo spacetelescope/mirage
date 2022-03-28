@@ -265,12 +265,6 @@ class SossSim():
             self.logger.info('Running observation generator for segment {}/{}'.format(n, nfiles))
             obs = obs_generator.Observation(offline=self.offline)
 
-            # # Add input data
-            # obs.input = [fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.star[0].value, format='D'), fits.Column(name='FLUX', array=self.star[1].value, format='D')], name='STAR')]
-            # if self.planet is not None:
-            #     planetheader = {k: v for k, v in self.tmodel.__dict__.items() if k not in ['t', 't_supersample', 'ds']}
-            #     obs.input.append(fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.planet[0].value, format='D'), fits.Column(name='TRANSMISSION', array=self.planet[1], format='D')], name='PLANET'))#, header=planetheader))
-
             # Add simulation data
             obs.linDark = dfile
             obs.seed = seed_seg
@@ -291,7 +285,6 @@ class SossSim():
             # Pickup where last segment left off
             nint += dnint
 
-        # Log it
         self.logger.info('SOSS simulator complete')
         self.logger.info('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
