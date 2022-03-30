@@ -14,6 +14,7 @@ import glob
 import logging
 import os
 import copy
+import pickle
 import re
 import shutil
 from yaml.scanner import ScannerError
@@ -2962,9 +2963,7 @@ class Catalog_seed():
         # Create the empty image
         psfimage = np.zeros(self.output_dims)
 
-        # 
         seed_cube = {}
-        #
 
         if ptsrc_segmap is None:
             # Create empty segmentation map
@@ -3032,15 +3031,11 @@ class Catalog_seed():
                 # Add source to segmentation map
                 ptsrc_segmap.add_object_threshold(psf_to_add, j1, i1, entry['index'], self.segmentation_threshold)
 
-
-                import pickle
+                # Add source to seed cube file
                 stamp = np.zeros(psf_to_add.shape)
                 flag = psf_to_add >= self.segmentation_threshold
                 stamp[flag] = entry['index']
-                seed_cube[entry['index']] = [i1,j1,psf_to_add*1,stamp*1]
-
-
-
+                seed_cube[entry['index']] = [i1, j1, psf_to_add*1, stamp*1]
             except IndexError:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
@@ -3061,11 +3056,11 @@ class Catalog_seed():
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
                     self.logger.info(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(i, time_remaining, finish_time)))
-        
-        pickle.dump(seed_cube,open("%s_star_seed_cube.pickle" % (self.basename),"wb"),protocol=pickle.HIGHEST_PROTOCOL)
+
+        # Save the seed cube file of point sources
+        pickle.dump(seed_cube, open("%s_star_seed_cube.pickle" % (self.basename),"wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         return psfimage, ptsrc_segmap
- 
 
     def create_psf_stamp(self, x_location, y_location, psf_dim_x, psf_dim_y,
                          ignore_detector=False, segment_number=None):
@@ -4222,6 +4217,7 @@ class Catalog_seed():
         # final output image
         yd, xd = self.output_dims
 
+        # Seed cube for disperser
         seed_cube = {}
 
         # create the final galaxy countrate image
@@ -4321,11 +4317,11 @@ class Catalog_seed():
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
 
-                    import pickle
+                    # Add source to the seed cube
                     stamp = np.zeros(stamp_to_add.shape)
                     flag = stamp_to_add >= self.segmentation_threshold
                     stamp[flag] = entry['index']
-                    seed_cube[entry['index']] = [i1,j1,stamp_to_add*1,stamp*1]
+                    seed_cube[entry['index']] = [i1, j1, stamp_to_add*1, stamp*1]
 
                 else:
                     pass
@@ -4344,8 +4340,9 @@ class Catalog_seed():
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
                     self.logger.info(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
-        
-        pickle.dump(seed_cube,open("%s_galaxy_seed_cube.pickle" % (self.basename),"wb"),protocol=pickle.HIGHEST_PROTOCOL)
+
+        # Save the seed cube file of galaxy sources
+        pickle.dump(seed_cube, open("%s_galaxy_seed_cube.pickle" % (self.basename),"wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
@@ -4812,6 +4809,9 @@ class Catalog_seed():
         # Create the empty image
         yd, xd = self.output_dims
 
+        # Prepare for saving the seed cube
+        seed_cube = {}
+
         extimage = np.zeros(self.output_dims)
 
         # Create corresponding segmentation map
@@ -4906,7 +4906,17 @@ class Catalog_seed():
                 # Add source to segmentation map
                 segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'],
                                                   self.segmentation_threshold)
+
+                # Add source to seed cube
+                stamp = np.zeros(stamp_to_add.shape)
+                flag = stamp_to_add >= self.segmentation_threshold
+                stamp[flag] = entry['index']
+                seed_cube[entry['index']] = [i1, j1, stamp_to_add*1, stamp*1]
+
                 self.n_extend += 1
+
+        # Save the seed cube
+        pickle.dump(seed_cube, open("%s_extended_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         if self.n_extend == 0:
             self.logger.info("No extended sources present within the aperture.")
