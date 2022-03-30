@@ -21,7 +21,14 @@ Updated the MOVING_TARGET_POSITION table from detector -> sci. (#757)
 
 Galaxy and Extended Source Position Angles
 ------------------------------------------
+
 Fixed a bug that was causing incorrect position angles of galaxy and extended sources when PAV3 was non-zero. (#767)
+
+
+WFSS
+----
+
+Save "seed_cube" pickle files of point source, galaxy, and extended sources. These are then picked up by the disperser. This will allow overlapping sources to be treated correctly when everything is disersed. (#779)
 
 
 2.2.1
