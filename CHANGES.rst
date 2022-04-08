@@ -1,6 +1,12 @@
 (Unreleased)
 ============
 
+Packaging
+---------
+
+Update dependency list. Drop support for python 3.7. (#783)
+
+
 Catalogs
 --------
 
