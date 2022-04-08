@@ -10,5 +10,9 @@ include mirage/config/saturation.cfg
 include mirage/config/superbias.cfg
 include mirage/config/xtalk20150303g0.errorcut.txt
 include tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml
+include mirage/reference_files/jband_transmission.dat
+include mirage/reference_files/alpha_lyr_stis_009.fits
 include examples/niriss_soss_example_data/*
+exclude mirage/reference_files/stellarmodels/atlas/*
+exclude mirage/reference_files/stellarmodels/phoenix/*
 exclude mirage/version.py

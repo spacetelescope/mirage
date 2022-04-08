@@ -28,10 +28,11 @@ from astropy.coordinates import SkyCoord
 from astroquery.simbad import Simbad
 import batman
 from bokeh.plotting import show
+from bokeh.layouts import column
 from hotsoss import utils as hu, plotting, locate_trace
 import numpy as np
-import synphot as sphot
 
+from mirage.catalogs import model_atmosphere as ma
 from mirage.seed_image import save_seed, segmentation_map
 from mirage.dark import dark_prep
 from mirage.logging import logging_functions
@@ -263,6 +264,8 @@ class SossSim():
             # Combine into final observation
             self.logger.info('Running observation generator for segment {}/{}'.format(n, nfiles))
             obs = obs_generator.Observation(offline=self.offline)
+
+            # Add simulation data
             obs.linDark = dfile
             obs.seed = seed_seg
             obs.segmap = segmap
@@ -282,9 +285,10 @@ class SossSim():
             # Pickup where last segment left off
             nint += dnint
 
-        # Log it
         self.logger.info('SOSS simulator complete')
         self.logger.info('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
+
+        return obs.output_files
 
     def create(self, n_jobs=-1, noise=True, override_dark=None, **kwargs):
         """
@@ -456,12 +460,37 @@ class SossSim():
             setattr(self, order_name, getattr(self, order_name).reshape(self.dims).astype(np.float64))
 
         # Make ramps and add noise to the observations
+        obs_files = []
         if noise:
-            self.add_noise(**kwargs)
+            obs_files = self.add_noise(**kwargs)
         else:
             self.tso = self.tso_ideal
 
-        self.logger.info('Total time: {} {}'.format(round(time.time() - begin, 3), 's'))
+        # Add input data if available
+        for ofile in obs_files:
+            temp = fits.open(ofile, mode='update')
+            starhdr = fits.Header()
+            starhdr.append(('WUNIT', 'um', 'Wavelength unit'))
+            starhdr.append(('FUNIT', 'erg/s/cm2/A', 'Flux density unit'))
+            starhdu = fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.star[0].value, format='D'), fits.Column(name='FLUX', array=self.star[1].value, format='D')], header=starhdr, name='STAR')
+            temp.insert(-1, starhdu)
+            if self.planet is not None:
+                planethdr = fits.Header()
+                planethdr.append(('WUNIT', 'um', 'Wavelength unit'))
+                planethdr.append(('T0', self.tmodel.t0, 'Transit center [JD]'))
+                planethdr.append(('A', self.tmodel.a, 'Semimajor-axis [a/R*]'))
+                planethdr.append(('INC', self.tmodel.inc, 'Inclination [deg]'))
+                planethdr.append(('ECC', self.tmodel.ecc, 'Eccentricity'))
+                planethdr.append(('OMEGA', self.tmodel.w, 'Omega value'))
+                planethdr.append(('LD', self.tmodel.limb_dark, 'Limb darkening profile used'))
+                planethdr.append(('TEFF', self.tmodel.teff, 'Effective temperature [K]'))
+                planethdr.append(('LOGG', self.tmodel.logg, 'Log surface gravity [dex]'))
+                planethdr.append(('FEH', self.tmodel.feh, 'Metallicity'))
+                planethdu = fits.BinTableHDU.from_columns([fits.Column(name='WAVELENGTH', array=self.planet[0].value, format='D'), fits.Column(name='TRANSMISSION', array=self.planet[1], format='D')], header=planethdr, name='PLANET')
+                temp.insert(-1, planethdu)
+            temp.flush()
+
+        self.logger.info('\nTotal time: {} {}'.format(round(time.time() - begin, 3), 's'))
 
     @property
     def filter(self):
@@ -845,6 +874,47 @@ class SossSim():
         else:
             return fig
 
+    def plot_input(self, **kwargs):
+        """
+        Plot the 1d stellar spectrum, planet transmission spectrum, and transit lightcurve used as input where available
+        """
+        # Plot the data from the 'star' attribute
+        if self.star is not None:
+
+            # Input data
+            sfig = plotting.plot_spectrum(self.star[0], self.star[1], legend='Input Stellar Spectrum')
+            pfig = None
+            tfig = None
+
+            # Plot the data from the 'planet' attribute
+            if self.planet is not None:
+
+                pfig = plotting.plot_spectrum(self.planet[0], self.planet[1], ylabel='Transmission', legend='Input Planet Transmission', color='green')
+
+            # Plot the transit model
+            if self.tmodel is not None:
+
+                # Set orbital parameters with kwargs (e.g. rp=0.5 to see lightcurve at that planetary radius)
+                tmod = copy(self.tmodel)
+                for key, val in kwargs.items():
+                    setattr(tmod, key, val)
+
+                # Make the transit model
+                mod = batman.TransitModel(tmod, self.time.jd)
+                flux = mod.light_curve(tmod)
+                tfig = plotting.plot_spectrum(self.time.jd, flux, xlabel='Time [JD]', ylabel='Transmission', legend='Theoretical Lightcurve')
+
+                # Print the transit model params
+                print('Input Transit Model Parameters\n------------------------------')
+                for key, val in tmod.__dict__.items():
+                    print('{}: {}'.format(key, val))
+
+            show(column(list(filter(None, [sfig, pfig, tfig]))))
+
+        else:
+
+            print("No input to plot. Please set SossSim.star attribute with 1D data.")
+
     @run_required
     def plot_ramp(self, order=None, noise=True, draw=True):
         """
@@ -1201,6 +1271,7 @@ class SossSpecSim(SossSim):
         if add_planet:
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
+            self.tmodel.t0 = np.mean(self.time.jd)
 
         # Run the simulation
         if run:
@@ -1209,7 +1280,7 @@ class SossSpecSim(SossSim):
 
 class SossBlackbodySim(SossSim):
     """Generate a SossSim object with a blackbody spectrum"""
-    def __init__(self, ngrps=2, nints=2, teff=1800, filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
+    def __init__(self, ngrps=2, nints=2, teff=1800, jmag=9.0, filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, **kwargs):
         """Get the test data and load the object
 
         Parameters
@@ -1220,6 +1291,8 @@ class SossBlackbodySim(SossSim):
             The number of integrations for the exposure
         teff: int
             The effective temperature [K] of the test source
+        jmag: float
+            The J band magnitude to scale to
         filter: str
             The name of the filter to use, ['CLEAR', 'F277W']
         subarray: str
@@ -1228,30 +1301,33 @@ class SossBlackbodySim(SossSim):
             Run the simulation after initialization
         add_planet: bool
             Add a transiting exoplanet
-        scale: int, float
-            Scale the flux by the given factor
         """
         # Generate a blackbody at the given temperature
         bb = BlackBody(temperature=teff * q.K)
         wav = np.linspace(0.5, 2.9, 1000) * q.um
-        flux = (bb(wav) * q.sr / bb.bolometric_flux.value).to(FLAMBDA_CGS_UNITS, q.spectral_density(wav)) * 1E-8 * scale
+        flx = (bb(wav) * q.sr / bb.bolometric_flux.value).to(FLAMBDA_CGS_UNITS, q.spectral_density(wav))
+
+        # Scale model spectrum to user-input J-band
+        flx = ma.scale_spectrum(wav, flx, jmag)
 
         # Initialize base class
-        super().__init__(ngrps=ngrps, nints=nints, star=[wav, flux], subarray=subarray, filter=filter, **kwargs)
+        super().__init__(ngrps=ngrps, nints=nints, star=[wav, flx], subarray=subarray, filter=filter, **kwargs)
 
         # Add planet
         if add_planet:
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
+            self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.teff = teff
 
-        # Run the simulation
+            # Run the simulation
         if run:
             self.create()
 
 
 class SossModelSim(SossSim):
     """Generate a SossSim object with a theoretical ATLAS or PHOENIX stellar spectrum of choice"""
-    def __init__(self, ngrps=2, nints=2, teff=5700.0, logg=4.0, feh=0.0, alpha=0.0, jmag=9.0, models='ck04models', filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
+    def __init__(self, ngrps=2, nints=2, teff=5700.0, logg=4.0, feh=0.0, alpha=0.0, jmag=9.0, stellar_model='phoenix', filter='CLEAR', subarray='SUBSTRIP256', run=True, add_planet=False, scale=1., **kwargs):
         """Get the test data and load the object
 
         Parameters
@@ -1283,34 +1359,29 @@ class SossModelSim(SossSim):
         scale: int, float
             Scale the flux by the given factor
         """
-        # # Retrieve PHOENIX or ATLAS stellar models:
-        # if stellar_model.lower() == 'phoenix':
-        #     w, f = model_atmospheres.get_phoenix_model(feh, alpha, teff, logg)
-        # elif stellar_model.lower() == 'atlas':
-        #     w, f = model_atmospheres.get_atlas_model(feh, teff, logg)
-        #
-        # # Now scale model spectrum to user-input J-band:
-        # f = model_atmospheres.scale_spectrum(w, f, jmag)
+        # Retrieve stellar model
+        if stellar_model.lower() == 'phoenix':
+            wav, flx = ma.get_phoenix_model(feh, alpha, teff, logg)
+        elif stellar_model.lower() == 'atlas':
+            wav, flx = ma.get_atlas_model(feh, teff, logg)
 
-        # TODO: Retrieve stellar model (https://synphot.readthedocs.io/en/latest/#id13)
-        # TODO: and trash the whole model_atmospheres.py module
-        spectrum = sphot.icat(models, teff, feh, logg) # TODO: Where is icat function?
-        bandpass = sphot.spectrum.SpectralElement.from_filter('2mass_j')
-        obs = sphot.observation.Observation(spectrum, bandpass)
-
-        sp_norm = spectrum.normalize(jmag, band=obs.bandpass)
-        w = sp_norm.waveset
-        f = sp_norm(w)
+        # Scale model spectrum to user-input J-band
+        flx = ma.scale_spectrum(wav, flx, jmag)
 
         # Initialize base class
-        super().__init__(ngrps=ngrps, nints=nints, star=[w, f], subarray=subarray, filter=filter, **kwargs)
+        super().__init__(ngrps=ngrps, nints=nints, star=[wav, flx], subarray=subarray, filter=filter, **kwargs)
 
         # Add planet
         if add_planet:
             self.planet = hu.PLANET_DATA
             self.tmodel = hu.transit_params(self.time.jd)
+            self.tmodel.t0 = np.mean(self.time.jd)
+            self.tmodel.teff = teff
+            self.tmodel.logg = logg
+            self.tmodel.feh = feh
+            self.tmodel.alpha = alpha
 
-        # Run the simulation
+            # Run the simulation
         if run:
             self.create()
 
