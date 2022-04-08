@@ -1,6 +1,13 @@
 (Unreleased)
 ============
 
+Packaging
+---------
+
+Update dependency list. Drop support for python 3.7. (#783)
+Remove python 3.6 environment file. (#784)
+
+
 Catalogs
 --------
 
