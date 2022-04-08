@@ -4,7 +4,7 @@ There are two aspects to Mirage installation. First, the software itself must be
 must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`, as this is the latest stable version of the software.
 
 .. tip::
-    Mirage currently supports python 3.6, 3.7, 3.8, and 3.9. Support for 3.6 will be removed shortly, as the `jwst <https://github.com/spacetelescope/jwst>`_ package, which contains the JWST calibration pipeline, no longer supports 3.6.
+    Mirage currently supports python 3.8 and 3.9. Support for 3.6 and 3.7 has been removed, as the `jwst <https://github.com/spacetelescope/jwst>`_ package, which contains the JWST calibration pipeline, no longer supports python < 3.8.
 
 .. attention::
     **For those running Mac OSX 10.14:**
@@ -17,19 +17,14 @@ must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`,
 Install from Pypi
 -----------------
 
-Mirage is now hosted on `Pypi <https://pypi.org/project/mirage/>`_. To install the latest stable version of Mirage, use the commands below. In this example, we create
-a conda environment called "mirage" and then install the software into that environment. After installing Mirage, there are three packages which must be installed separately.
-These are: **jwst**, which is the JWST calibration pipeline software, and two packages that help to create dispersed data using the grisms.
+Mirage is hosted on `Pypi <https://pypi.org/project/mirage/>`_. To install the latest stable version of Mirage, use the commands below. In this example, we create
+a conda environment called "mirage" and then install the software into that environment.
 
 ::
 
-    conda create -n mirage python=3.7 -y
+    conda create -n mirage python=3.9 -y
     conda activate mirage
-    pip install healpy
     pip install mirage
-    pip install grismconf
-    pip install nircam_gsim
-    pip install jwst
 
 .. tip::
     Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
@@ -48,7 +43,7 @@ The installation procedure is nearly identical to the case of installing from Py
 
 ::
 
-    conda create -n mirage python=3.7 -y
+    conda create -n mirage python=3.9 -y
     conda activate mirage
     pip install git+https://github.com/spacetelescope/mirage
 
@@ -76,14 +71,10 @@ Installation can then be done via pip, which uses setup.py, or using the conda e
 To install using pip and setup.py:
 Create and activate a new environment. In this example we call the environment "mirage". Then move into the mirage directory, and install Mirage into the new environment::
 
-    conda create -n mirage python=3.7 -y
+    conda create -n mirage python=3.9 -y
     conda activate mirage
     cd mirage
-    pip install healpy
     pip install .
-    pip install grismconf
-    pip install nircam_gsim
-    pip install jwst
 
 .. tip::
     Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
@@ -99,38 +90,25 @@ Install via Environment File
 
 The Mirage repository also contains environment files, which can be used to create an environment with proper versions of all of Mirage's dependencies. After cloning the Mirage repository, the environment file (located within the top-level directory) can be used via the following commands. The *name* keyword is used to specify that the name of the environment. You can name the environment anything you like.
 
-Create a python 3.6 environment using the environment file, activate the environment, and install mirage::
+Create a python 3.8 environment using the environment file, activate the environment, and install mirage::
 
     cd mirage
-    conda env create -f environment_python_3.6.yml --name mirage_py3.6
-    conda activate mirage_py3.6
-    pip install .
-
-
-There are also environment files that can be used to create python 3.7, 3.8, or 3.9 environments::
-
-    cd mirage
-    conda env create -f environment_python_3.7.yml --name mirage_py3.7
-    conda activate mirage_py3.7
-    pip install .
-
-::
-
-    cd mirage
-    conda env create -f environment_python_3.8.yml --name mirage_py3.8
+    conda env create -f environment_python_3.8.yml
     conda activate mirage_py3.8
     pip install .
 
-::
+
+There is also an environment file that can be used to create python 3.9 environment::
 
     cd mirage
-    conda env create -f environment_python_3.9.yml --name mirage_py3.9
+    conda env create -f environment_python_3.9.yml
     conda activate mirage_py3.9
     pip install .
 
 
+
 .. tip::
-    For the python 3.6 and 3.7 cases, `webbpsf <https://webbpsf.readthedocs.io/en/latest/installation.html#requirements-installation>`_ is installed via conda. This means the associated data files will be downloaded and installed with the software itself. No manual installation of the data files is necessary. For the python 3.8 and 3.9 cases most packages, including webbpsf, are installed via pip (astroconda does not yet support python 3.8 and beyond). In this case you must `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_.
+    For the python 3.8 and 3.9 cases most packages, including webbpsf, are installed via pip (astroconda does not yet support python 3.8 and beyond). In this case you must `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_.
 
 
 .. _osx1014:
@@ -162,7 +140,7 @@ The installation errors are related to supporting Batman's ability to run calcul
     ::
 
         cd mirage
-        conda env create -f environment_python_3.7.yml --name mirage python=3.7
+        conda env create -f environment_python_3.9.yml
         conda activate mirage
         pip install .
         cd ../batman

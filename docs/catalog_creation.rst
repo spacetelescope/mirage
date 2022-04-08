@@ -95,8 +95,8 @@ The example below creates a galaxy catalog. The main difference compared to the 
 
 .. _create_catalogs:
 
-Create_catalogs - create catalogs using online astronomical databases
----------------------------------------------------------------------
+Create_catalog - create catalogs using online astronomical databases
+--------------------------------------------------------------------
 
 The functions in this module use `astroquery <https://astroquery.readthedocs.io/en/latest/>`_ to search astronomical databases and retrieve source lists for a given pointing. In this way, a user can quickly generate reasonably realistic catalogs of point sources and galaxies for a given pointing.
 
@@ -106,7 +106,7 @@ By default, Mirage will query the ALLWISE source catalog as part of the call to 
 
 ::
 
-    from mirage.catalogs import create_catalogs
+    from mirage.catalogs import create_catalog
 
     ra = 80.4  # degrees
     dec = -69.8  # degrees
