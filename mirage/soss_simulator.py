@@ -127,8 +127,10 @@ class SossSim():
         self._star = None
         self.ref_params = {"INSTRUME": "NIRISS", "READPATT": "NISRAPID", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
 
-        # Additional parmeters
+        # Additional parameters
         self.orders = orders
+        self.wave = hu.wave_solutions(subarray)
+        self.avg_wave = None
         self.groupgap = 0
         self.nframes = self.nsample = 1
         self.nresets = self.nresets1 = self.nresets2 = 1
@@ -289,6 +291,49 @@ class SossSim():
         self.logger.info('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
         return obs.output_files
+
+    @property
+    def avg_wave(self):
+        """
+        Getter for nominal wavelength value in each column for all orders
+        """
+        return self._avg_wave
+
+    @avg_wave.setter
+    def avg_wave(self, wave_sol):
+        """
+        Setter for the nominal wavelength value in each column for all orders
+
+        Parameters
+        ----------
+        wave_sol: sequence
+            The wavelength
+        """
+        if wave_sol is None:
+            self._avg_wave = np.mean(self.wave, axis=1)
+            self.wave_name = 'default'
+
+        else:
+
+            # Wave name provided
+            if isinstance(wave_sol, tuple):
+                wave_sol, self.wave_name = wave_sol
+
+            # No wave name provided
+            else:
+                self.wave_name = 'custom'
+
+            # Dimensions of input nominal wavelengths
+            dims = wave_sol.shape
+
+            # Make sure it is 2048 columns wide
+            if dims[-1] != 2048:
+                raise ValueError('{} columns provided but wavelength solutions must be 2048 pixels wide.'.format(dims[-1]))
+
+            # Set the attribute
+            self._avg_wave = wave_sol
+
+            # Generate new PSFs here!
 
     def create(self, n_jobs=-1, noise=True, override_dark=None, max_frames=50, **kwargs):
         """
@@ -530,8 +575,13 @@ class SossSim():
     def info(self):
         """Summary table for the observation settings"""
         # Pull out relevant attributes
-        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_datetime', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec']
+        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_datetime', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec', 't0', 'per', 'rp', 'a', 'inc', 'ecc', 'w', 'u', 'limb_dark', 'teff', 'logg', 'feh']
         settings = {key.strip('_'): val for key, val in self.__dict__.items() if key in track}
+
+        # Display orbital parameters if available
+        if getattr(self, '_tmodel', None) is not None:
+            settings.update({key: val for key, val in self._tmodel.__dict__.items() if key in track})
+
         return settings
 
     def message(self, message_text):
@@ -767,7 +817,6 @@ class SossSim():
 
         # Set the dependent quantities
         self.wave = hu.wave_solutions(self.subarray)
-        self.avg_wave = np.mean(self.wave, axis=1)
         self.coeffs = locate_trace.trace_polynomial(subarray=self.subarray)
 
         # Reset data, time and psfs
@@ -823,8 +872,8 @@ class SossSim():
             # Check the wavelength range
             spec_min = np.nanmin(spectrum[0][spectrum[0] > 0.])
             spec_max = np.nanmax(spectrum[0][spectrum[0] > 0.])
-            sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
-            sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
+            sim_min = np.nanmin(self.avg_wave[self.avg_wave > 0.]) * q.um
+            sim_max = np.nanmax(self.avg_wave[self.avg_wave > 0.]) * q.um
             if spec_min > sim_min or spec_max < sim_max:
                 print("Wavelength range of input spectrum ({} - {} um) does not cover the {} - {} um range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
 
@@ -1102,8 +1151,8 @@ class SossSim():
             # Check the wavelength range
             spec_min = np.nanmin(spectrum[0][spectrum[0] > 0.])
             spec_max = np.nanmax(spectrum[0][spectrum[0] > 0.])
-            sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
-            sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
+            sim_min = np.nanmin(self.avg_wave[self.avg_wave > 0.]) * q.um
+            sim_max = np.nanmax(self.avg_wave[self.avg_wave > 0.]) * q.um
             if spec_min > sim_min or spec_max < sim_max:
                 print("Wavelength range of input spectrum ({} - {}) does not cover the {} - {} range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
 
@@ -1140,7 +1189,6 @@ class SossSim():
 
         # Set the dependent quantities
         self.wave = hu.wave_solutions(subarr)
-        self.avg_wave = np.mean(self.wave, axis=1)
         self.coeffs = locate_trace.trace_polynomial(subarray=subarr)
 
         # Get correct reference files

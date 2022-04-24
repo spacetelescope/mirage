@@ -232,6 +232,7 @@ def generate_SOSS_psfs(filt):
 
         print("Could not import `webbpsf` package. Functionality limited. Generating dummy file.")
 
+
 def get_angle(pf, p0=np.array([0, 0]), pi=None):
     """Compute angle (in degrees) for pf-p0-pi corner
 
@@ -469,7 +470,7 @@ def put_psf_on_subarray(psf, y, frame_height=256):
     return frame
 
 
-def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False, mprocessing=True):
+def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False, mprocessing=True, wave_sol=None, dirname='custom'):
     """
     Generate/retrieve a data cube of shape (3, 2048, 76, 76) which is a
     76x76 pixel psf for 2048 wavelengths for each trace order. The PSFs
@@ -488,6 +489,10 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         Generate a new cube
     mprocessing: bool
         Use multiprocessing
+    wave_sol: sequence (optional)
+        The user provided wavelength solutions for orders 1 and 2
+    dirname: str (optional)
+        The target subdirectory name for the PSFs that use a custom wavelength solution
 
     Returns
     -------
@@ -498,8 +503,17 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
 
         print('Coffee time! This takes about 5 minutes.')
 
-        # Get the wavelengths
-        wavelengths = np.mean(utils.wave_solutions(subarray), axis=1)[:2 if filt == 'CLEAR' else 1]
+        # Default wavelengths
+        if wave_sol is None:
+            wavelengths = np.mean(utils.wave_solutions(subarray), axis=1)[:2 if filt == 'CLEAR' else 1]
+
+        # Or user provided
+        else:
+            if filt == 'CLEAR' and len(wavelengths) != 2:
+                raise TypeError("'wavelengths` arg must contain an array of wavelengths for order 1 and order 2")
+            wavelengths = wave_sol
+
+        # Get trace polynomial coefficients
         coeffs = locate_trace.trace_polynomial(subarray)
 
         # Get the file
@@ -599,7 +613,13 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
                     print('Finished in {} seconds.'.format(time.time()-start))
 
                     # Get the filepath
-                    file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
+                    if wave_sol is None:
+                        file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
+                    else:
+                        dirpath = os.path.join(PSF_DIR, dirname)
+                        if not os.path.exists(dirpath):
+                            os.system('mkdir {}'.format(dirpath))
+                        file = os.path.join(PSF_DIR, '{}/SOSS_{}_PSF_order{}_{}.npy'.format(dirname, filt, n+1, N+1))
 
                     # Delete the file if it exists
                     if os.path.isfile(file):
