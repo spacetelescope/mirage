@@ -469,18 +469,6 @@ Occulting spot image
 
 This feature is not yet supported and should be set to **None**.
 
-.. _pixelAreaMap:
-
-Pixel area map
-++++++++++++++
-
-*Reffiles:pixelAreaMap*
-
-Fits file containing the pixel area map for the detector to be simulated. If provided, the pixel area map is multiplied into the seed image at a point when the seed image contains only extended sources. Point sources have the pixel area map applied to them at the time the PSF libraries were created via `webbpsf <https://webbpsf.readthedocs.io/en/stable/>`_. The pixel area map file must be in the format of the `JWST pixel area map reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/photom/reference_files.html#area-reference-file>`_.
-
-.. hint::
-	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
-
 .. _transmission:
 
 Transmission Image
