@@ -435,8 +435,6 @@ class Observation():
         hdulist[0].header['DISTORTN'] = (self.params['Reffiles']['astrometric'],
                                          'Distortion reffile used by Mirage')
         hdulist[0].header['IPC'] = (self.params['Reffiles']['ipc'], 'IPC kernel used by Mirage')
-        hdulist[0].header['PIXARMAP'] = (self.params['Reffiles']['pixelAreaMap'],
-                                         'Pixel area map used by Mirage')
         hdulist[0].header['CROSSTLK'] = (self.params['Reffiles']['crosstalk'],
                                          'Crosstalk file used by Mirage')
         hdulist[0].header['FLUX_CAL'] = (self.params['Reffiles']['flux_cal'],
@@ -474,36 +472,6 @@ class Observation():
         hdulist[0].header['CRSEED'] = (self.params['cosmicRay']['seed'],
                                        'Random number generator seed for cosmic rays in Mirage')
         return hdulist
-
-    def add_pam(self, signalramp):
-        """ Apply Pixel Area Map to exposure
-
-        Paramters:
-        ----------
-        signalramp : numpy.ndarray
-            Array containing exposure
-
-        Returns
-        --------
-        signalramp : numpy.ndarary
-            Array after multiplying by the pixel area map
-        """
-        pixAreaMap = self.simple_get_image(self.params['Reffiles']['pixelAreaMap'])
-
-        # If we are making a grism direct image, we need to embed the true pixel area
-        # map in an array of the appropriate dimension, where any pixels outside the
-        # actual aperture are set to 1.0
-        if self.params['Output']['grism_source_image']:
-            mapshape = pixAreaMap.shape
-            g, yd, xd = signalramp.shape
-            pam = np.ones((yd, xd))
-            ys = self.coord_adjust['yoffset']
-            xs = self.coord_adjust['xoffset']
-            pam[ys:ys+mapshape[0], xs:xs+mapshape[1]] = np.copy(pixAreaMap)
-            pixAreaMap = pam
-
-        signalramp *= pixAreaMap
-        return signalramp
 
     def add_superbias_and_refpix(self, ramp, sbref):
         """Add superbias and reference pixel-associated
@@ -775,7 +743,6 @@ class Observation():
         self.runStep['fwpw'] = self.check_run_step(self.params['Reffiles']['filtpupilcombo'])
         self.runStep['linearized_darkfile'] = self.check_run_step(self.params['Reffiles']['linearized_darkfile'])
         self.runStep['badpixfile'] = self.check_run_step(self.params['Reffiles']['badpixmask'])
-        self.runStep['pixelAreaMap'] = self.check_run_step(self.params['Reffiles']['pixelAreaMap'])
 
         # NON-LINEARITY
         # Make sure the input accuracy is a float with reasonable bounds
@@ -1809,7 +1776,6 @@ class Observation():
                  ['Reffiles', 'linearity'],
                  ['Reffiles', 'saturation'],
                  ['Reffiles', 'ipc'],
-                 ['Reffiles', 'pixelAreaMap'],
                  ['Reffiles', 'gain']]
         plist = [['cosmicRay', 'path']]
         for ref in rlist:

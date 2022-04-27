@@ -50,7 +50,6 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  ipc_: crds                 #File containing IPC kernel to apply
 	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
-	  pixelAreaMap_: crds        #Pixel area map for the detector. Used to introduce distortion into the output ramp.
 	  transmission_: crds        # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
