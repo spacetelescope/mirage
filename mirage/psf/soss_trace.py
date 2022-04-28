@@ -4,6 +4,7 @@ A module to generate simulated 2D time-series SOSS data
 Authors: Joe Filippazzo
 """
 
+from copy import copy
 import os
 from pkg_resources import resource_filename
 import multiprocessing
@@ -470,7 +471,7 @@ def put_psf_on_subarray(psf, y, frame_height=256):
     return frame
 
 
-def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False, mprocessing=True, wave_sol=None, dirname='custom'):
+def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False, mprocessing=True, wave_sol=None, dirname='default'):
     """
     Generate/retrieve a data cube of shape (3, 2048, 76, 76) which is a
     76x76 pixel psf for 2048 wavelengths for each trace order. The PSFs
@@ -499,9 +500,17 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
     np.ndarray
         An array of the SOSS psf at 2048 wavelengths for each order
     """
+    # Check if it's a custom wavelength solution
+    psf_loc = copy(PSF_DIR)
+    if dirname != 'default':
+        dirpath = os.path.join(PSF_DIR, dirname)
+        if not os.path.exists(dirpath):
+            os.system('mkdir {}'.format(dirpath))
+        psf_loc = psf_loc.replace('soss_psfs', 'soss_psfs/{}'.format(dirname))
+
     if generate:
 
-        print('Coffee time! This takes about 5 minutes.')
+        print('This takes about 2 minutes.')
 
         # Default wavelengths
         if wave_sol is None:
@@ -509,8 +518,8 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
 
         # Or user provided
         else:
-            if filt == 'CLEAR' and len(wavelengths) != 2:
-                raise TypeError("'wavelengths` arg must contain an array of wavelengths for order 1 and order 2")
+            if wave_sol.shape != (3, 2048):
+                raise TypeError("'wave_sol' input must be an array of shape (3, 2048)")
             wavelengths = wave_sol
 
         # Get trace polynomial coefficients
@@ -528,7 +537,8 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         trace_cols = np.arange(2048)
 
         # Run datacube
-        for n, wavelength in enumerate(wavelengths):
+        # TODO: Add order 3 support
+        for n, wavelength in enumerate(wavelengths[:2, :]):
 
             # Evaluate the trace polynomial in each column to get the y-position of the trace center
             trace_centers = np.polyval(coeffs[n], trace_cols)
@@ -613,13 +623,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
                     print('Finished in {} seconds.'.format(time.time()-start))
 
                     # Get the filepath
-                    if wave_sol is None:
-                        file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
-                    else:
-                        dirpath = os.path.join(PSF_DIR, dirname)
-                        if not os.path.exists(dirpath):
-                            os.system('mkdir {}'.format(dirpath))
-                        file = os.path.join(PSF_DIR, '{}/SOSS_{}_PSF_order{}_{}.npy'.format(dirname, filt, n+1, N+1))
+                    file = os.path.join(psf_loc, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
 
                     # Delete the file if it exists
                     if os.path.isfile(file):
@@ -639,10 +643,12 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
 
         else:
 
+            print("Using SOSS PSF files located at {}".format(psf_loc))
+
             # Get the chunked data and concatenate
             full_data = []
             for chunk in [1, 2, 3, 4]:
-                file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
+                file = os.path.join(psf_loc, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
                 full_data.append(np.load(file))
 
             return np.concatenate(full_data, axis=0)

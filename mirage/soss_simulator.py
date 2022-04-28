@@ -170,6 +170,16 @@ class SossSim():
             The profile to use, ['voigt', 'lorentz', 'gaussian']
         name: str
             A name for the line
+
+        Examples
+        --------
+        from mirage.soss_simulator import SossBlackbodySim
+        import astropy.units as q
+        bb = SossBlackbodySim(run=False)
+        bb.add_line(2*q.um, max(bb.star[1])*1.5, 0.005*q.um)
+        bb.lines # See list of added lines
+        bb.create()
+        bb.plot(noise=False)
         """
         # Check the profile
         profiles = {'voigt': Voigt1D, 'gaussian': Gaussian1D, 'lorentz': Lorentz1D}
@@ -307,7 +317,7 @@ class SossSim():
         Parameters
         ----------
         wave_sol: sequence
-            The wavelength
+            The wavelength solutions. Must be an array of shape (2, 2048), or (3, 2048)
         """
         if wave_sol is None:
             self._avg_wave = np.mean(self.wave, axis=1)
@@ -330,10 +340,17 @@ class SossSim():
             if dims[-1] != 2048:
                 raise ValueError('{} columns provided but wavelength solutions must be 2048 pixels wide.'.format(dims[-1]))
 
+            # Ensure monotonically decreasing due to native trace orientation
+            wave_sol = np.sort(wave_sol, axis=1)[:, ::-1]
+
             # Set the attribute
             self._avg_wave = wave_sol
 
             # Generate new PSFs here!
+            soss_trace.SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=True, mprocessing=True, wave_sol=wave_sol, dirname=self.wave_name)
+
+            # Reset PSFs
+            self._reset_psfs()
 
     def create(self, n_jobs=-1, noise=True, override_dark=None, max_frames=50, **kwargs):
         """
@@ -1067,7 +1084,7 @@ class SossSim():
                 # that we can convert the flux at each wavelegth into [ADU/s]
                 response = self.frame_time / (response * q.mJy * ac.c / (wave * q.um)**2).to(self.star[1].unit)
                 flux = np.interp(wave, self.star[0].value, self.star[1].value, left=0, right=0) * self.star[1].unit * response
-                cube = soss_trace.SOSS_psf_cube(filt=self.filter, order=order, subarray=self.subarray) * flux[:, None, None]
+                cube = soss_trace.SOSS_psf_cube(filt=self.filter, order=order, subarray=self.subarray, dirname=self.wave_name) * flux[:, None, None]
                 setattr(self, 'order{}_response'.format(order), response)
                 setattr(self, 'order{}_psfs'.format(order), cube)
 
