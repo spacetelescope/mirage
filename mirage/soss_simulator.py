@@ -31,6 +31,7 @@ from bokeh.plotting import show
 from bokeh.layouts import column
 from hotsoss import utils as hu, plotting, locate_trace
 import numpy as np
+from scipy import ndimage
 
 from mirage.catalogs import model_atmosphere as ma
 from mirage.seed_image import save_seed, segmentation_map
@@ -144,6 +145,9 @@ class SossSim():
         self.subarray = subarray
         self.readpatt = 'NISRAPID'
         self.paramfile = paramfile
+
+        # Pupil wheel position to set trace tilt
+        self.PWCPOS = 245.883
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -517,9 +521,19 @@ class SossSim():
                 setattr(self, order_name, full)
                 del full
 
-        # Reshape into (nints, ngrps, y, x)
+        # Rotate and reshape data
         for order in self.orders:
+
+            # Name of order
             order_name = 'tso_order{}_ideal'.format(order)
+
+            # Rotate trace given relative pupil wheel position
+            pwpos = self.PWCPOS - 245.883
+            if pwpos != 0:
+                rot_order = ndimage.rotate(getattr(self, order_name), pwpos, axes=(-2, -1), reshape=False)
+                setattr(self, order_name, rot_order)
+
+            # Reshape into (nints, ngrps, y, x)
             setattr(self, order_name, getattr(self, order_name).reshape(self.dims).astype(np.float64))
 
         # Make ramps and add noise to the observations
