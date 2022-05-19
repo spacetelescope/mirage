@@ -1135,6 +1135,29 @@ class SossSim():
 
         return tso
 
+    def save_seed_image(self, filepath=None):
+        """
+        Save the seed image (no noise model) to a FITS file
+
+        Parameters
+        ----------
+        filepath: str (optional)
+            A custom filepath for the seed image
+        """
+        # Get the appropriate seed image segment
+        seed_seg = self.tso_ideal.astype(np.float64)
+
+        # NaNs and infs break np.random.poisson
+        seed_seg[np.where(np.isnan(seed_seg))] = 0.
+        seed_seg[np.where(np.isinf(seed_seg))] = 0.
+
+        # Write the file
+        seedfile, seedinfo = save_seed.save(seed_seg, self.paramfile, self.params, True, False, 1., 2048,
+                                            (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1,
+                                            frametime=self.frame_time, filename=filepath)
+
+        return seedfile
+
     @property
     def star(self):
         """Getter for the stellar data"""
