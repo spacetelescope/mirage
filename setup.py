@@ -100,7 +100,7 @@ setup(
         'h5py>=3.6.0',
         'hotsoss==0.1.7',
         'ipython',
-        'jinja2==3.1.1',
+        'jinja2==3.1.2',
         'jupyter',
         'jwst',
         'jwst-backgrounds>=1.1.2',
