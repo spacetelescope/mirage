@@ -60,8 +60,8 @@ def run_required(func):
     @wraps(func)
     def _run_required(*args, **kwargs):
         """Check that the 'tso' attribute is not None"""
-        if args[0].tso_order1_ideal is None:
-            print("No simulation found! Please run the 'simulate' method first.")
+        if args[0].tso_ideal is None:
+            print("No simulation found! Please run the 'create' method first.")
 
         else:
             return func(*args, **kwargs)
@@ -74,7 +74,7 @@ class SossSim():
     Generate NIRISS SOSS time series observations
     """
     def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None, filter='CLEAR',
-                 subarray='SUBSTRIP256', orders=[1, 2], paramfile=None, obs_date=None, target='New Target',
+                 subarray='SUBSTRIP256', orders=[1, 2, 3], paramfile=None, obs_date=None, target='New Target',
                  title=None, offline=True, test=False, override_dark=None, verbose=True):
         """
         Initialize the TSO object and do all pre-calculations
@@ -147,7 +147,7 @@ class SossSim():
         self.paramfile = paramfile
 
         # Pupil wheel position to set trace tilt
-        self.PWCPOS = 245.883
+        self.PWCPOS = 245.76
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -1337,14 +1337,16 @@ class SossSim():
     @property
     def tso_ideal(self):
         """Getter for TSO data without noise"""
-        if self.tso_order1_ideal is None:
+        # Get ideal data
+        ideal_data = [getattr(self, 'tso_order{}_ideal'.format(order)) for order in self.orders]
+
+        # If no data, return None
+        if len(ideal_data) == 0:
             return None
 
-        if 2 in self.orders:
-            return np.sum([self.tso_order1_ideal, self.tso_order2_ideal], axis=0)
-
+        # Otherwise, return the sum of the orders
         else:
-            return self.tso_order1_ideal
+            return np.sum([getattr(self, 'tso_order{}_ideal'.format(order)) for order in self.orders], axis=0)
 
 
 class SossSpecSim(SossSim):
