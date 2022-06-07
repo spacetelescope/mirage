@@ -8,7 +8,7 @@ After creating the seed image `mirage` moves on to preparing the input dark curr
 Adjust Number of Frames/Groups and Integrations
 -----------------------------------------------
 
-Frist the number of groups and integrations are adjusted to match the requested groups and integrations specified in the input yaml file. If the input dark has more groups or integrations than the requested output, the extras are removed. If additional groups or integrations are required above what is present in the dark file, then copies of existing groups/integrations are made and appended to the observation. In the case where extra groups are needed, copies of the existing groups are added to the signal in the final group of the existing dark, such that the dark current signals continue increasing in as they would in a longer integration.
+First the number of groups and integrations are adjusted to match the requested groups and integrations specified in the input yaml file. If the input dark has more groups or integrations than the requested output, the extras are removed. If additional groups or integrations are required above what is present in the dark file, then copies of existing groups/integrations are made and appended to the observation. In the case where extra groups are needed, copies of the existing groups are added to the signal in the final group of the existing dark, such that the dark current signals continue increasing in as they would in a longer integration.
 
 Put into Requested Readout Pattern
 ----------------------------------

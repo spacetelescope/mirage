@@ -467,8 +467,6 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                                'movingTargetExtended', 'movingTargetToTrack',
                                'psf_wing_threshold_file', 'zodiacal', 'scattered'],
                 'cosmicRay': ['path'],
-                'newRamp': ['dq_configfile', 'sat_configfile', 'superbias_configfile',
-                            'refpix_configfile', 'linear_configfile'],
                 'Output': ['file', 'directory']}
 
     all_config_files = {'nircam': {'Reffiles-subarray_defs': 'NIRCam_subarray_definitions.list',
@@ -478,12 +476,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                                    'Reffiles-filter_throughput': 'placeholder.txt',
                                    'Reffiles-filtpupilcombo': 'nircam_filter_pupil_pairings.list',
                                    'Reffiles-filter_wheel_positions': 'nircam_filter_and_pupil_wheel_positions.txt',
-                                   'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt',
-                                   'newRamp-dq_configfile': 'dq_init.cfg',
-                                   'newRamp-sat_configfile': 'saturation.cfg',
-                                   'newRamp-superbias_configfile': 'superbias.cfg',
-                                   'newRamp-refpix_configfile': 'refpix.cfg',
-                                   'newRamp-linear_configfile': 'linearity.cfg'},
+                                   'simSignals-psf_wing_threshold_file': 'nircam_psf_wing_rate_thresholds.txt'},
                         'niriss': {'Reffiles-subarray_defs': 'niriss_subarrays.list',
                                    'Reffiles-flux_cal': 'niriss_zeropoints.list',
                                    'Reffiles-crosstalk': 'niriss_xtalk_zeros.txt',
@@ -491,12 +484,7 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                                    'Reffiles-filter_throughput': 'placeholder.txt',
                                    'Reffiles-filtpupilcombo': 'niriss_dual_wheel_list.txt',
                                    'Reffiles-filter_wheel_positions': 'niriss_filter_and_pupil_wheel_positions.txt',
-                                   'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt',
-                                   'newRamp-dq_configfile': 'dq_init.cfg',
-                                   'newRamp-sat_configfile': 'saturation.cfg',
-                                   'newRamp-superbias_configfile': 'superbias.cfg',
-                                   'newRamp-refpix_configfile': 'refpix.cfg',
-                                   'newRamp-linear_configfile': 'linearity.cfg'},
+                                   'simSignals-psf_wing_threshold_file': 'niriss_psf_wing_rate_thresholds.txt'},
                         'fgs': {'Reffiles-subarray_defs': 'guider_subarrays.list',
                                 'Reffiles-flux_cal': 'guider_zeropoints.list',
                                 'Reffiles-crosstalk': 'guider_xtalk_zeros.txt',
@@ -504,12 +492,8 @@ def full_paths(params, module_path, crds_dictionary, offline=False):
                                 'Reffiles-filter_throughput': 'placeholder.txt',
                                 'Reffiles-filtpupilcombo': 'guider_filter_dummy.list',
                                 'Reffiles-filter_wheel_positions': 'dummy.txt',
-                                'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt',
-                                'newRamp-dq_configfile': 'dq_init.cfg',
-                                'newRamp-sat_configfile': 'saturation.cfg',
-                                'newRamp-superbias_configfile': 'superbias.cfg',
-                                'newRamp-refpix_configfile': 'refpix.cfg',
-                                'newRamp-linear_configfile': 'linearity.cfg'}}
+                                'simSignals-psf_wing_threshold_file': 'fgs_psf_wing_rate_thresholds.txt'}
+                        }
     config_files = all_config_files[params['Inst']['instrument'].lower()]
 
     for key1 in pathdict:

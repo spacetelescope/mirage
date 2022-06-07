@@ -19,6 +19,8 @@ Dark Current
 
 Correct bug that was causing metadata from raw darks to not be read in correctly. Allow input raw darks with no ZEROFRAME extension as long as they were collected with a RAPID readout pattern. (#762)
 
+Remove JWST calibration pipeline config files, as they are non longer supported by the pipeline. (#791)
+
 
 Moving Targets
 --------------
