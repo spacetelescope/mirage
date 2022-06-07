@@ -36,7 +36,7 @@ Add Poisson Noise
 Flat Field Effects
 ------------------
 
-If the user provides an illumination flat or pixel flat in the `Reffiles:illumflat` or `Reffiles:pixelflat` yaml file entries, these files are read in and multiplied into the seed exposure.
+If the user provides an illumination flat or pixel flat in the `Reffiles:illumflat` or `Reffiles:pixelflat` yaml file entries, these files are read in and multiplied into the seed exposure. This will adjust the sources' brightness to account for pixel-to-pixel effects, including differences in pixel area across the detector.
 
 IPC
 ---

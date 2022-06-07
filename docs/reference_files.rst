@@ -14,7 +14,7 @@ After installing Mirage, these reference files can be downloaded using the *down
 
   from mirage.reference_files import downloader
   download_path = '/path/into/which/files/are/downlaoded/'
-  downloader.download_reffiles(download_path, instrument='all', dark_type='linearized', skip_darks=False, single_dark=False, skip_cosmic_rays=False, skip_psfs=False, skip_grism=False)
+  downloader.download_reffiles(download_path, instrument='all', dark_type='linearized', skip_darks=False, single_dark=False, skip_cosmic_rays=False, skip_psfs=False)
 
 The ``instrument`` keyword controls which subset of reference files are downloaded. You can give it the name of a single instrument, a string containing a comma-separated list of instruments, or the string ``all``, which will download reference files for NIRCam, NIRISS, and FGS.
 

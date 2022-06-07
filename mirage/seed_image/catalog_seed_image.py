@@ -945,7 +945,6 @@ class Catalog_seed():
         kw['GAINFILE'] = self.params['Reffiles']['gain']
         kw['DISTORTN'] = self.params['Reffiles']['astrometric']
         kw['IPC'] = self.params['Reffiles']['ipc']
-        kw['PIXARMAP'] = self.params['Reffiles']['pixelAreaMap']
         kw['CROSSTLK'] = self.params['Reffiles']['crosstalk']
         kw['FLUX_CAL'] = self.params['Reffiles']['flux_cal']
         kw['FTHRUPUT'] = self.params['Reffiles']['filter_throughput']
@@ -5063,7 +5062,6 @@ class Catalog_seed():
         self.runStep['zodiacal'] = self.checkRunStep(self.params['simSignals']['zodiacal'])
         self.runStep['scattered'] = self.checkRunStep(self.params['simSignals']['scattered'])
         # self.runStep['fwpw'] = self.checkRunStep(self.params['Reffiles']['filtpupilcombo'])
-        self.runStep['pixelAreaMap'] = self.checkRunStep(self.params['Reffiles']['pixelAreaMap'])
 
         # Notify user if no catalogs are provided
         if self.params['simSignals']['pointsource'] == 'None':
@@ -5509,63 +5507,6 @@ class Catalog_seed():
         # else:
         #    coord_transform = self.simple_coord_transform()
         return coord_transform
-
-    """
-    def calculate_background(self, ra, dec, ffile, back_wave=None, back_sig=None, level='medium'):
-        '''Use the JWST background calculator to come up with
-        an appropriate background level for the observation.
-        Options for level include low, medium, high'''
-        from jwst_backgrounds import jbt
-        from astropy import units as u
-        from astropy.units.equivalencies import si, cgs
-
-        # Read in filter throughput file
-        filt_wav, filt_thru = file_io.read_filter_throughput(ffile)
-
-        # If the user wants a background signal from a particular day,
-        # then extract that array here
-        if self.params['simSignals']['use_dateobs_for_background']:
-            # Interpolate background to match filter wavelength grid
-            bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
-
-            # Combine
-            filt_bkgd = bkgd_interp * filt_thru
-
-            # Integrate over the filter bandpass
-            filt_integ = np.trapz(filt_thru, x=filt_wav)
-
-            # Integrate
-            bval = np.trapz(filt_bkgd, x=filt_wav) / filt_integ * u.MJy / u.steradian
-
-        else:
-            # If the user has requested background in terms of low/medium/high,
-            # then we need to examine all the background arrays.
-            # Loop over each day (in the background)
-            # info, convolve the background curve with the filter
-            # throughput curve, and then integrate. THEN, we can
-            # calculate the low/medium/high values.
-            bval = backgrounds.low_medium_high_background_value(ra, dec, level, filt_wav, filt_thru)
-            bval = bval * u.MJy / u.steradian
-
-        # Convert from MJy/str to ADU/sec
-        # then divide by area of pixel
-        flambda = cgs.erg / si.angstrom / si.cm ** 2 / si.s
-        # fnu = cgs.erg / si.Hz / si.cm ** 2 / si.s
-        photflam = self.photflam * flambda
-        # photnu = self.photfnu * fnu
-        pivot = self.pivot * u.micron
-        mjy = photflam.to(u.MJy, u.spectral_density(pivot))
-
-        # Divide by pixel area in steradians to get
-        # MJy/str per ADU/s
-        pixel_area = self.siaf.XSciScale * u.arcsec * self.siaf.YSciScale * u.arcsec
-        mjy_str = mjy / pixel_area.to(u.steradian)
-
-        # Convert the background signal from MJy/str
-        # to ADU/sec
-        bval /= mjy_str
-        return bval.value
-        """
 
     def saveSingleFits(self, image, name, key_dict=None, image2=None, image2type=None):
         # Save an array into the first extension of a fits file

@@ -1,6 +1,11 @@
 (Unreleased)
 ============
 
+CRDS Reference Files
+--------------------
+
+Remove references to the pixel area map from code and documentation, as this is no longer used. (#790)
+
 Packaging
 ---------
 

@@ -50,7 +50,6 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  ipc_: crds                 #File containing IPC kernel to apply
 	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
-	  pixelAreaMap_: crds        #Pixel area map for the detector. Used to introduce distortion into the output ramp.
 	  transmission_: crds        # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
@@ -462,18 +461,6 @@ Occulting spot image
 *Reffiles:occult*
 
 This feature is not yet supported and should be set to **None**.
-
-.. _pixelAreaMap:
-
-Pixel area map
-++++++++++++++
-
-*Reffiles:pixelAreaMap*
-
-Fits file containing the pixel area map for the detector to be simulated. If provided, the pixel area map is multiplied into the seed image at a point when the seed image contains only extended sources. Point sources have the pixel area map applied to them at the time the PSF libraries were created via `webbpsf <https://webbpsf.readthedocs.io/en/stable/>`_. The pixel area map file must be in the format of the `JWST pixel area map reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/photom/reference_files.html#area-reference-file>`_.
-
-.. hint::
-	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _transmission:
 
