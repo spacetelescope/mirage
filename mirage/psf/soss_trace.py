@@ -492,7 +492,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
     mprocessing: bool
         Use multiprocessing
     wave_sol: sequence (optional)
-        The user provided wavelength solutions for orders 1 and 2
+        The user provided wavelength solutions for orders 1, 2, and 3
     dirname: str (optional)
         The target subdirectory name for the PSFs that use a custom wavelength solution
 
@@ -538,12 +538,12 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         trace_cols = np.arange(2048)
 
         # Run datacube
-        for n, wavelength in enumerate(wavelengths[:3, :]):
+        for n, wavelength in enumerate(wavelengths):
 
             # Evaluate the trace polynomial in each column to get the y-position of the trace center
             trace_centers = np.polyval(coeffs[n], trace_cols)
 
-            # Don't calculate order2 for F277W or order 3 for either
+            # Don't calculate order2 or order 3 for F277W
             if n > 0 and filt.lower() == 'f277w':
                 pass
 
