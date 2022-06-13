@@ -16,7 +16,7 @@ matplotlib>=3.5.1
 nircam_gsim>=1.60
 numpy>=1.22.3
 photutils>=1.4.0
-pysiaf==0.15.0
+pysiaf==0.17.0
 pytest>=7.1.1
 scipy>=1.8.0
 sphinx>=4.5.0
