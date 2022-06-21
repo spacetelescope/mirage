@@ -31,6 +31,7 @@ from bokeh.plotting import show
 from bokeh.layouts import column
 from hotsoss import utils as hu, plotting, locate_trace
 import numpy as np
+from scipy import ndimage
 
 from mirage.catalogs import model_atmosphere as ma
 from mirage.seed_image import save_seed, segmentation_map
@@ -59,8 +60,8 @@ def run_required(func):
     @wraps(func)
     def _run_required(*args, **kwargs):
         """Check that the 'tso' attribute is not None"""
-        if args[0].tso_order1_ideal is None:
-            print("No simulation found! Please run the 'simulate' method first.")
+        if args[0].tso_ideal is None:
+            print("No simulation found! Please run the 'create' method first.")
 
         else:
             return func(*args, **kwargs)
@@ -73,7 +74,7 @@ class SossSim():
     Generate NIRISS SOSS time series observations
     """
     def __init__(self, ngrps=2, nints=1, star=None, planet=None, tmodel=None, filter='CLEAR',
-                 subarray='SUBSTRIP256', orders=[1, 2], paramfile=None, obs_date=None, target='New Target',
+                 subarray='SUBSTRIP256', orders=[1, 2, 3], paramfile=None, obs_date=None, target='New Target',
                  title=None, offline=True, test=False, override_dark=None, verbose=True):
         """
         Initialize the TSO object and do all pre-calculations
@@ -127,8 +128,10 @@ class SossSim():
         self._star = None
         self.ref_params = {"INSTRUME": "NIRISS", "READPATT": "NISRAPID", "EXP_TYPE": "NIS_SOSS", "DETECTOR": "NIS", "PUPIL": "GR700XD", "DATE-OBS": "2020-07-28", "TIME-OBS": "00:00:00", "INSTRUMENT": "NIRISS"}
 
-        # Additional parmeters
+        # Additional parameters
         self.orders = orders
+        self.wave = hu.wave_solutions(subarray)
+        self.avg_wave = None
         self.groupgap = 0
         self.nframes = self.nsample = 1
         self.nresets = self.nresets1 = self.nresets2 = 1
@@ -142,6 +145,9 @@ class SossSim():
         self.subarray = subarray
         self.readpatt = 'NISRAPID'
         self.paramfile = paramfile
+
+        # Pupil wheel position to set trace tilt
+        self.PWCPOS = 245.76
 
         # Set instance attributes for the target
         self.lines = at.Table(names=('name', 'profile', 'x_0', 'amp', 'fwhm', 'flux'), dtype=('S20', 'S20', float, float, 'O', 'O'))
@@ -168,6 +174,16 @@ class SossSim():
             The profile to use, ['voigt', 'lorentz', 'gaussian']
         name: str
             A name for the line
+
+        Examples
+        --------
+        from mirage.soss_simulator import SossBlackbodySim
+        import astropy.units as q
+        bb = SossBlackbodySim(run=False)
+        bb.add_line(2*q.um, max(bb.star[1])*1.5, 0.005*q.um)
+        bb.lines # See list of added lines
+        bb.create()
+        bb.plot(noise=False)
         """
         # Check the profile
         profiles = {'voigt': Voigt1D, 'gaussian': Gaussian1D, 'lorentz': Lorentz1D}
@@ -289,6 +305,56 @@ class SossSim():
         self.logger.info('Noise model finished: {} {}'.format(round(time.time() - start, 3), 's'))
 
         return obs.output_files
+
+    @property
+    def avg_wave(self):
+        """
+        Getter for nominal wavelength value in each column for all orders
+        """
+        return self._avg_wave
+
+    @avg_wave.setter
+    def avg_wave(self, wave_sol):
+        """
+        Setter for the nominal wavelength value in each column for all orders
+
+        Parameters
+        ----------
+        wave_sol: sequence
+            The wavelength solutions. Must be an array of shape (2, 2048), or (3, 2048)
+        """
+        if wave_sol is None:
+            self._avg_wave = np.mean(self.wave, axis=1)
+            self.wave_name = 'default'
+
+        else:
+
+            # Wave name provided
+            if isinstance(wave_sol, tuple):
+                wave_sol, self.wave_name = wave_sol
+
+            # No wave name provided
+            else:
+                self.wave_name = 'custom'
+
+            # Dimensions of input nominal wavelengths
+            dims = wave_sol.shape
+
+            # Make sure it is 2048 columns wide
+            if dims[-1] != 2048:
+                raise ValueError('{} columns provided but wavelength solutions must be 2048 pixels wide.'.format(dims[-1]))
+
+            # Ensure monotonically decreasing due to native trace orientation
+            wave_sol = np.sort(wave_sol, axis=1)[:, ::-1]
+
+            # Set the attribute
+            self._avg_wave = wave_sol
+
+            # Generate new PSFs here!
+            soss_trace.SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=True, mprocessing=True, wave_sol=wave_sol, dirname=self.wave_name)
+
+            # Reset PSFs
+            self._reset_psfs()
 
     def create(self, n_jobs=-1, noise=True, override_dark=None, max_frames=50, **kwargs):
         """
@@ -455,9 +521,19 @@ class SossSim():
                 setattr(self, order_name, full)
                 del full
 
-        # Reshape into (nints, ngrps, y, x)
+        # Rotate and reshape data
         for order in self.orders:
+
+            # Name of order
             order_name = 'tso_order{}_ideal'.format(order)
+
+            # Rotate trace given relative pupil wheel position
+            pwpos = self.PWCPOS - 245.883
+            if pwpos != 0:
+                rot_order = ndimage.rotate(getattr(self, order_name), pwpos, axes=(-2, -1), reshape=False)
+                setattr(self, order_name, rot_order)
+
+            # Reshape into (nints, ngrps, y, x)
             setattr(self, order_name, getattr(self, order_name).reshape(self.dims).astype(np.float64))
 
         # Make ramps and add noise to the observations
@@ -530,8 +606,13 @@ class SossSim():
     def info(self):
         """Summary table for the observation settings"""
         # Pull out relevant attributes
-        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_datetime', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec']
+        track = ['_ncols', '_nrows', '_nints', '_ngrps', '_nresets', '_subarray', '_filter', '_obs_datetime', '_orders', 'ld_profile', '_target', 'title', 'ra', 'dec', 't0', 'per', 'rp', 'a', 'inc', 'ecc', 'w', 'u', 'limb_dark', 'teff', 'logg', 'feh']
         settings = {key.strip('_'): val for key, val in self.__dict__.items() if key in track}
+
+        # Display orbital parameters if available
+        if getattr(self, '_tmodel', None) is not None:
+            settings.update({key: val for key, val in self._tmodel.__dict__.items() if key in track})
+
         return settings
 
     def message(self, message_text):
@@ -767,7 +848,6 @@ class SossSim():
 
         # Set the dependent quantities
         self.wave = hu.wave_solutions(self.subarray)
-        self.avg_wave = np.mean(self.wave, axis=1)
         self.coeffs = locate_trace.trace_polynomial(subarray=self.subarray)
 
         # Reset data, time and psfs
@@ -823,8 +903,8 @@ class SossSim():
             # Check the wavelength range
             spec_min = np.nanmin(spectrum[0][spectrum[0] > 0.])
             spec_max = np.nanmax(spectrum[0][spectrum[0] > 0.])
-            sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
-            sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
+            sim_min = np.nanmin(self.avg_wave[self.avg_wave > 0.]) * q.um
+            sim_max = np.nanmax(self.avg_wave[self.avg_wave > 0.]) * q.um
             if spec_min > sim_min or spec_max < sim_max:
                 print("Wavelength range of input spectrum ({} - {} um) does not cover the {} - {} um range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
 
@@ -1018,7 +1098,7 @@ class SossSim():
                 # that we can convert the flux at each wavelegth into [ADU/s]
                 response = self.frame_time / (response * q.mJy * ac.c / (wave * q.um)**2).to(self.star[1].unit)
                 flux = np.interp(wave, self.star[0].value, self.star[1].value, left=0, right=0) * self.star[1].unit * response
-                cube = soss_trace.SOSS_psf_cube(filt=self.filter, order=order, subarray=self.subarray) * flux[:, None, None]
+                cube = soss_trace.SOSS_psf_cube(filt=self.filter, order=order, subarray=self.subarray, dirname=self.wave_name) * flux[:, None, None]
                 setattr(self, 'order{}_response'.format(order), response)
                 setattr(self, 'order{}_psfs'.format(order), cube)
 
@@ -1054,6 +1134,29 @@ class SossSim():
             tso.shape = self.dims3
 
         return tso
+
+    def save_seed_image(self, filepath=None):
+        """
+        Save the seed image (no noise model) to a FITS file
+
+        Parameters
+        ----------
+        filepath: str (optional)
+            A custom filepath for the seed image
+        """
+        # Get the appropriate seed image segment
+        seed_seg = self.tso_ideal.astype(np.float64)
+
+        # NaNs and infs break np.random.poisson
+        seed_seg[np.where(np.isnan(seed_seg))] = 0.
+        seed_seg[np.where(np.isinf(seed_seg))] = 0.
+
+        # Write the file
+        seedfile, seedinfo = save_seed.save(seed_seg, self.paramfile, self.params, True, False, 1., 2048,
+                                            (self.nrows, self.ncols), {'xoffset': 0, 'yoffset': 0}, 1,
+                                            frametime=self.frame_time, filename=filepath)
+
+        return seedfile
 
     @property
     def star(self):
@@ -1102,8 +1205,8 @@ class SossSim():
             # Check the wavelength range
             spec_min = np.nanmin(spectrum[0][spectrum[0] > 0.])
             spec_max = np.nanmax(spectrum[0][spectrum[0] > 0.])
-            sim_min = np.nanmin(self.wave[self.wave > 0.]) * q.um
-            sim_max = np.nanmax(self.wave[self.wave > 0.]) * q.um
+            sim_min = np.nanmin(self.avg_wave[self.avg_wave > 0.]) * q.um
+            sim_max = np.nanmax(self.avg_wave[self.avg_wave > 0.]) * q.um
             if spec_min > sim_min or spec_max < sim_max:
                 print("Wavelength range of input spectrum ({} - {}) does not cover the {} - {} range needed for a complete simulation. Interpolation will be used at the edges.".format(spec_min, spec_max, sim_min, sim_max))
 
@@ -1140,7 +1243,6 @@ class SossSim():
 
         # Set the dependent quantities
         self.wave = hu.wave_solutions(subarr)
-        self.avg_wave = np.mean(self.wave, axis=1)
         self.coeffs = locate_trace.trace_polynomial(subarray=subarr)
 
         # Get correct reference files
@@ -1235,14 +1337,16 @@ class SossSim():
     @property
     def tso_ideal(self):
         """Getter for TSO data without noise"""
-        if self.tso_order1_ideal is None:
+        # Get ideal data
+        ideal_data = [getattr(self, 'tso_order{}_ideal'.format(order)) for order in self.orders]
+
+        # If no data, return None
+        if len(ideal_data) == 0:
             return None
 
-        if 2 in self.orders:
-            return np.sum([self.tso_order1_ideal, self.tso_order2_ideal], axis=0)
-
+        # Otherwise, return the sum of the orders
         else:
-            return self.tso_order1_ideal
+            return np.sum([getattr(self, 'tso_order{}_ideal'.format(order)) for order in self.orders], axis=0)
 
 
 class SossSpecSim(SossSim):

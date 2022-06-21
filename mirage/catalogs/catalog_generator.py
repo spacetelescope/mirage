@@ -121,7 +121,13 @@ class PointSourceCatalog():
         # Check the magnitude system from each and make sure they match
         current_mag_labels = list(self.magnitudes.keys())
         new_mag_labels = list(catalog_to_add.magnitudes.keys())
-        mag_sys = self.magnitudes[current_mag_labels[0]][0]
+
+        # Check if this is the first catalog
+        if len(self.magnitudes) > 0:
+            mag_sys = self.magnitudes[current_mag_labels[0]][0]
+        else:
+            mag_sys = catalog_to_add.magnitudes[new_mag_labels[0]][0]
+
         if mag_sys != catalog_to_add.magnitudes[new_mag_labels[0]][0]:
             logger.error("Magnitude systems of the two catalogs do not match. Cannot combine.")
 
