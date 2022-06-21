@@ -25,6 +25,8 @@ EXPTYPES = {"nircam": {"imaging": "NRC_IMAGE", "ts_imaging": "NRC_TSIMAGE",
                        "wfss": "NIS_WFSS", "soss": "NIS_SOSS"},
             "fgs": {"imaging": "FGS_IMAGE"}}
 
+DISPERSED_MODES = ['wfss', 'ts_grism']
+
 # Number of detector resets prior to the start of an exposure
 NUM_RESETS_BEFORE_EXP = {"nircam": {"full": 0, "sub": 1},
                          "niriss": {"full": 0, "sub": 1},

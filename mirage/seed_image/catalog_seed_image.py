@@ -14,6 +14,7 @@ import glob
 import logging
 import os
 import copy
+import pickle
 import re
 import shutil
 from yaml.scanner import ScannerError
@@ -53,7 +54,8 @@ from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
-                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
+                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES, \
+                              DISPERSED_MODES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -2955,6 +2957,9 @@ class Catalog_seed():
         # Create the empty image
         psfimage = np.zeros(self.output_dims)
 
+        # Create empty seed cube for possible WFSS dispersion
+        seed_cube = {}
+
         if ptsrc_segmap is None:
             # Create empty segmentation map
             ptsrc_segmap = segmap.SegMap()
@@ -3014,12 +3019,21 @@ class Catalog_seed():
                 self.timer.stop()
                 continue
 
+            self.logger.info("******************************* %s" % (self.basename))
+
             try:
                 psf_to_add = scaled_psf[l1:l2, k1:k2]
                 psfimage[j1:j2, i1:i2] += psf_to_add
 
                 # Add source to segmentation map
                 ptsrc_segmap.add_object_threshold(psf_to_add, j1, i1, entry['index'], self.segmentation_threshold)
+
+                if self.params['Inst']['mode'] in DISPERSED_MODES:
+                    # Add source to seed cube file
+                    stamp = np.zeros(psf_to_add.shape)
+                    flag = psf_to_add >= self.segmentation_threshold
+                    stamp[flag] = entry['index']
+                    seed_cube[entry['index']] = [i1, j1, psf_to_add*1, stamp*1]
             except IndexError:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
@@ -3040,6 +3054,10 @@ class Catalog_seed():
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
                     self.logger.info(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(i, time_remaining, finish_time)))
+
+        if self.params['Inst']['mode'] in DISPERSED_MODES:
+            # Save the seed cube file of point sources
+            pickle.dump(seed_cube, open("%s_star_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         return psfimage, ptsrc_segmap
 
@@ -4198,6 +4216,9 @@ class Catalog_seed():
         # final output image
         yd, xd = self.output_dims
 
+        # Seed cube for disperser
+        seed_cube = {}
+
         # create the final galaxy countrate image
         galimage = np.zeros((yd, xd))
 
@@ -4294,6 +4315,13 @@ class Catalog_seed():
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
 
+                    if self.params['Inst']['mode'] in DISPERSED_MODES:
+                        # Add source to the seed cube
+                        stamp = np.zeros(stamp_to_add.shape)
+                        flag = stamp_to_add >= self.segmentation_threshold
+                        stamp[flag] = entry['index']
+                        seed_cube[entry['index']] = [i1, j1, stamp_to_add*1, stamp*1]
+
                 else:
                     pass
                     # print("Source located entirely outside the field of view. Skipping.")
@@ -4311,6 +4339,10 @@ class Catalog_seed():
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
                     self.logger.info(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
+
+        if self.params['Inst']['mode'] in DISPERSED_MODES:
+            # Save the seed cube file of galaxy sources
+            pickle.dump(seed_cube, open("%s_galaxy_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
@@ -4790,6 +4822,9 @@ class Catalog_seed():
         yd, xd = self.output_dims
         extimage = np.zeros(self.output_dims)
 
+        # Prepare seed cube for extended sources
+        seed_cube = {}
+
         # Create corresponding segmentation map
         segmentation = segmap.SegMap()
         segmentation.xdim = xd
@@ -4882,7 +4917,19 @@ class Catalog_seed():
                 # Add source to segmentation map
                 segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'],
                                                   self.segmentation_threshold)
+
+                if self.params['Inst']['mode'] in DISPERSED_MODES:
+                    # Add source to seed cube
+                    stamp = np.zeros(stamp_to_add.shape)
+                    flag = stamp_to_add >= self.segmentation_threshold
+                    stamp[flag] = entry['index']
+                    seed_cube[entry['index']] = [i1, j1, stamp_to_add*1, stamp*1]
+
                 self.n_extend += 1
+
+        if self.params['Inst']['mode'] in DISPERSED_MODES:
+            # Save the seed cube
+            pickle.dump(seed_cube, open("%s_extended_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         if self.n_extend == 0:
             self.logger.info("No extended sources present within the aperture.")
