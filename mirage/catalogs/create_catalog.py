@@ -525,6 +525,7 @@ def get_2MASS_ptsrc_catalog(ra, dec, box_width):
         outputs will contain only JHK magnitudes for the returned sources.
     """
     twomass_cat, twomass_mag_cols = query_2MASS_ptsrc_catalog(ra, dec, box_width)
+    print(twomass_cat)
     twomass_mirage = mirage_ptsrc_catalog_from_table(twomass_cat, '2MASS', twomass_mag_cols)
     return twomass_mirage, twomass_cat
 
@@ -1251,6 +1252,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
         outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value,
                                     magnitude_system='vegamag')
         n1 = n1+1
+    print(outcat)
     return outcat
 
 
@@ -1938,7 +1940,8 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     outvalues = {}
     logger.info('Searching the GAIA DR2 catalog')
     for key in data.keys():
-        job = Gaia.launch_job_async(data[key]['query'], dump_to_file=False)
+        # job = Gaia.launch_job_async(data[key]['query'], dump_to_file=False) # Gaia.launch_job_async seems to be broken
+        job = Gaia.launch_job(data[key]['query'], dump_to_file=False)
         table = job.get_results()
         outvalues[key] = table
         logger.info('Retrieved {} sources for catalog {}'.format(len(table), key))
