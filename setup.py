@@ -109,7 +109,7 @@ setup(
         'nircam_gsim',
         'numpy',
         'photutils>=1.4.0',
-        'pysiaf==0.15.0',
+        'pysiaf==0.18.0',
         'scipy>=1.8.0',
         'synphot>=1.1.1',
         'webbpsf>=1.0.0',
