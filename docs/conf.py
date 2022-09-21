@@ -8,6 +8,8 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import stsci_rtd_theme
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -15,9 +17,7 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-import mirage
 from mirage import __version__
-import stsci_rtd_theme
 
 # -- Project information -----------------------------------------------------
 
@@ -86,8 +86,8 @@ nitpicky = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-#html_theme = 'alabaster'
-#html_theme = "sphinx_rtd_theme"
+# html_theme = 'alabaster'
+# html_theme = "sphinx_rtd_theme"
 html_theme = "stsci_rtd_theme"
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -99,7 +99,7 @@ html_theme = "stsci_rtd_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+# html_static_path = []
 html_theme_path = [stsci_rtd_theme.get_html_theme_path()]
 
 # Custom sidebar templates, must be a dictionary that maps document names
@@ -117,7 +117,6 @@ html_theme_path = [stsci_rtd_theme.get_html_theme_path()]
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'MIRAGEdoc'
-
 
 # -- Options for LaTeX output ------------------------------------------------
 
@@ -147,7 +146,6 @@ latex_documents = [
      'STScI  (Hilbert, Volk, Chambers, Sahlmann et al.)', 'manual'),
 ]
 
-
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
@@ -156,7 +154,6 @@ man_pages = [
     (master_doc, 'mirage', 'MIRAGE Documentation',
      [author], 1)
 ]
-
 
 # -- Options for Texinfo output ----------------------------------------------
 
@@ -168,6 +165,5 @@ texinfo_documents = [
      author, 'STScI  (Hilbert, Volk, Chambers, Sahlmann et al.)', 'One line description of project.',
      'Miscellaneous'),
 ]
-
 
 # -- Extension configuration -------------------------------------------------
