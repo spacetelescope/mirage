@@ -4049,8 +4049,8 @@ class Catalog_seed():
 
         # Using the position angle, calculate the size of the source in the
         # x and y directions
-        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
         num_pix = x_full_length * y_full_length
 
@@ -4068,8 +4068,8 @@ class Catalog_seed():
 
             # Using the position angle, calculate the size of the source in the
             # x and y directions
-            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
             num_pix = x_full_length * y_full_length
 
@@ -4114,6 +4114,11 @@ class Catalog_seed():
         sig_diff = np.absolute(1. - np.sum(stamp) / (total_counts * limit))
         if sig_diff > signal_matching_threshold:
             stamp = stamp / np.sum(stamp) * (total_counts * limit)
+
+        # Check to be sure the source is centered in the stamp. For some sub-pixel locations in combination
+        # with some rotation angles, the stamp image is shifted by a row and/or column from the center. In
+        # those cases, re-center.
+        #stamp = center_in_stamp(stamp)
 
         return stamp
 
@@ -4232,6 +4237,15 @@ class Catalog_seed():
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['countrate_e/s'], sub_x, sub_y)
 
+
+
+
+            h0 = fits.PrimaryHDU(stamp)
+
+
+
+
+
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
             # the psf size. This is so the upcoming convolution will
@@ -4251,6 +4265,13 @@ class Catalog_seed():
                 stamp = self.enlarge_stamp(stamp, psf_shape)
                 galdims = stamp.shape
 
+
+
+
+            h1 = fits.ImageHDU(stamp)
+
+
+
             # Get the PSF which will be convolved with the galaxy profile
             # The PSF should be centered in the pixel containing the galaxy center
             psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'], psf_shape[1], psf_shape[0],
@@ -4264,6 +4285,14 @@ class Catalog_seed():
             # Normalize the signal in the PSF stamp so that the final galaxy
             # signal will match the requested value
             psf_image = psf_image / np.sum(psf_image)
+
+
+
+
+            h2 = fits.ImageHDU(psf_image)
+
+
+
 
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
@@ -4286,12 +4315,30 @@ class Catalog_seed():
             # Make sure the stamp is at least partially on the detector
             if i1 is not None and i2 is not None and j1 is not None and j2 is not None:
                 # Convolve the galaxy image with the PSF image
-                stamp = s1.fftconvolve(stamp, psf_image, mode='same')
+                #stamp = s1.fftconvolve(stamp, psf_image, mode='same')
+                print('PSF convolution is turned off!!!')
+
+
+
+                h3 = fits.ImageHDU(stamp)
+
 
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     stamp_to_add = stamp[l1:l2, k1:k2]
                     galimage[j1:j2, i1:i2] += stamp_to_add
+
+
+                    h4 = fits.ImageHDU(stamp_to_add)
+                    hlist = fits.HDUList([h0,h3])
+                    hlist.writeto(f"gal_stamp_{entry['RA_degrees']}_{entry['Dec_degrees']}_{entry['ellipticity']}_{entry['pos_angle']}_{self.local_roll}_{entry['countrate_e/s']}_x{i1}_y{j1}.fits")
+                    if entry['index'] == 68:
+                        print('\n\n')
+                        print(f"gal_stamp_{entry['RA_degrees']}_{entry['Dec_degrees']}_{entry['ellipticity']}_{entry['pos_angle']}_{self.local_roll}_{entry['countrate_e/s']}_x{i1}_y{j1}.fits")
+                        print('\n\n')
+
+
+
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
 
@@ -4331,13 +4378,17 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-        x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)
+        #x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)
+        #x_posang = self.siaf.V3SciXAngle + self.local_roll + position_angle
+        x_posang = self.siaf.V3SciXAngle - self.local_roll + position_angle
 
         # If we are using a Grism Time series aperture, then we need to use the intermediate
         # aperture to determine the correct rotation. Currently, we should never be in
         # here since grism TSO observations only support the use of point sources.
         if self.use_intermediate_aperture:
-            x_posang = 0. - (self.intermediate_siaf.V3SciXAngle + self.intermediate_local_roll + position_angle)
+            #x_posang = 0. - (self.intermediate_siaf.V3SciXAngle + self.intermediate_local_roll + position_angle)
+            #############UPDATED BELOW TO MATCH UPDATE ABOVE!!##########
+            x_posang = self.intermediate_siaf.V3SciXAngle - self.intermediate_local_roll + position_angle
         return x_posang
 
     def calc_x_position_angle_extended(self, position_angle):
@@ -4356,6 +4407,10 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
+
+        #####DO WE NEED TO UPDATE THIS AS WELL????#####
+
+
         x_posang = self.local_roll + position_angle
 
         # If we are using a Grism Time series aperture, then we need to use the intermediate
@@ -5596,6 +5651,53 @@ class Catalog_seed():
                                                'settings to use. (YAML format).'))
         parser.add_argument("--param_example", help='If used, an example parameter file is output.')
         return parser
+
+
+def center_in_stamp(stamp_img):
+    """Add rows and/or columns to a stamp image in order to
+    center the source
+
+    Parameters
+    ----------
+    stamp_img : numpy.ndarray
+        2D image array
+
+    Returns
+    -------
+    stamp_img : numpy.ndarray
+        Modified image with rows and/or columns added
+    """
+    peak_loc = np.where(stamp_img == np.max(stamp_img))
+    yd, xd = stamp_img.shape
+    expectedx = xd // 2
+    expectedy = yd // 2
+
+    if peak_loc[0][0] != expectedy:
+        delta = peak_loc[0][0] - expectedy
+        if delta < 0:
+            # Add rows to the bottom
+            to_add = np.zeros((np.abs(delta)*2, xd))
+            stamp_img = np.r_[to_add, stamp_img]
+
+        elif delta > 0:
+            # Add rows to the top
+            to_add = np.zeros((delta*2, xd))
+            stamp_img = np.r_[stamp_img, to_add]
+        # Update dimensions
+        yd, xd = stamp_img.shape
+
+    if peak_loc[1][0] != expectedx:
+        delta = peak_loc[1][0] - expectedx
+        if delta < 0:
+            # Add columns to the left
+            to_add = np.zeros((yd, np.abs(delta)*2))
+            stamp_img = np.c_[to_add, stamp_img]
+
+        elif delta > 0:
+            # Add columns to the right
+            to_add = np.zeros((yd, delta*2))
+            stamp_img = np.c_[stamp_img, to_add]
+    return stamp_img
 
 
 if __name__ == '__main__':
