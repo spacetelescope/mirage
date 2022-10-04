@@ -270,7 +270,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         for_obs_str = for_obs_str[0:-1]
         xml_base = os.path.basename(xml_filename).split('.xml')[0]
         if out_dir is None:
-            out_dir = os.path.dirname(xml_filename)
+            out_dir = os.path.dirname(os.path.abspath(xml_filename))
 
         starting_index = 1
 
@@ -313,36 +313,43 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         if extragalactic:
             galaxy_cat = None
             for i, instrument in enumerate(instrument_filter_dict):
-                logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
-                filter_list = list(set(instrument_filter_dict[instrument]))
-                tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
-                                                      filter_list, boxflag=False, brightlimit=14.0,
-                                                      seed=galaxy_seed, starting_index=starting_index)
+                if instrument.lower() in ['nircam', 'niriss', 'fgs']:
+                    logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
+                    filter_list = list(set(instrument_filter_dict[instrument]))
+                    tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
+                                                          filter_list, boxflag=False, brightlimit=14.0,
+                                                          seed=galaxy_seed, starting_index=starting_index)
 
-                if galaxy_cat is None:
-                    galaxy_cat = copy.deepcopy(tmp_cat)
-                elif galaxy_cat is not None and tmp_cat is not None:
-                    galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
+                    if galaxy_cat is None:
+                        galaxy_cat = copy.deepcopy(tmp_cat)
+                    elif galaxy_cat is not None and tmp_cat is not None:
+                        galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
 
-            starting_index += len(galaxy_cat)
+            # Protect against cases where the sky area is too large and the background galaxy
+            # search says that it will not proceed
+            if galaxy_cat is not None:
+                starting_index += len(galaxy_cat)
 
-            if save_catalogs:
-                gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
+                if save_catalogs:
+                    gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
 
-                # Populate dictionary listing galaxy catalog name associated with each
-                # observation number
-                galaxy_catalog_mapping[str(observation)] = gal_catalog_name
-                for value in for_obs:
-                    galaxy_catalog_mapping[str(value)] = gal_catalog_name
+                    # Populate dictionary listing galaxy catalog name associated with each
+                    # observation number
+                    galaxy_catalog_mapping[str(observation)] = gal_catalog_name
+                    for value in for_obs:
+                        galaxy_catalog_mapping[str(value)] = gal_catalog_name
 
-                full_catalog_path = os.path.join(out_dir, gal_catalog_name)
-                galaxy_cat.save(full_catalog_path)
-                logger.info('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
-                galaxy_catalog_names.append(full_catalog_path)
+                    full_catalog_path = os.path.join(out_dir, gal_catalog_name)
+                    galaxy_cat.save(full_catalog_path)
+                    logger.info('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
+                    galaxy_catalog_names.append(full_catalog_path)
 
-            galaxy_catalog_list.append(galaxy_cat)
+                galaxy_catalog_list.append(galaxy_cat)
         else:
             galaxy_cat = None
+
+    logger.info((f'Catalog creation complete. Created point source catalogs: {ptsrc_catalog_names} ',
+                 f'and galaxy catalogs: {galaxy_catalog_names}'))
 
     return (ptsrc_catalog_list, galaxy_catalog_list, ptsrc_catalog_names, galaxy_catalog_names,
             ptsrc_catalog_mapping, galaxy_catalog_mapping)
