@@ -1662,7 +1662,7 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                xposang = self.calc_x_position_angle(entry['pos_angle'])
+                xposang = self.calc_x_position_angle(entry)
 
                 # First create the galaxy
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
@@ -4229,22 +4229,13 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            xposang = self.calc_x_position_angle(entry['pos_angle'])
+            xposang = self.calc_x_position_angle(entry)
             sub_x = 0.
             sub_y = 0.
 
             # First create the galaxy
             stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
                                        xposang*np.pi/180., entry['countrate_e/s'], sub_x, sub_y)
-
-
-
-
-            h0 = fits.PrimaryHDU(stamp)
-
-
-
-
 
             # If the stamp image is smaller than the PSF in either
             # dimension, embed the stamp in an array that matches
@@ -4265,13 +4256,6 @@ class Catalog_seed():
                 stamp = self.enlarge_stamp(stamp, psf_shape)
                 galdims = stamp.shape
 
-
-
-
-            h1 = fits.ImageHDU(stamp)
-
-
-
             # Get the PSF which will be convolved with the galaxy profile
             # The PSF should be centered in the pixel containing the galaxy center
             psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'], psf_shape[1], psf_shape[0],
@@ -4285,14 +4269,6 @@ class Catalog_seed():
             # Normalize the signal in the PSF stamp so that the final galaxy
             # signal will match the requested value
             psf_image = psf_image / np.sum(psf_image)
-
-
-
-
-            h2 = fits.ImageHDU(psf_image)
-
-
-
 
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
@@ -4315,29 +4291,12 @@ class Catalog_seed():
             # Make sure the stamp is at least partially on the detector
             if i1 is not None and i2 is not None and j1 is not None and j2 is not None:
                 # Convolve the galaxy image with the PSF image
-                #stamp = s1.fftconvolve(stamp, psf_image, mode='same')
-                print('PSF convolution is turned off!!!')
-
-
-
-                h3 = fits.ImageHDU(stamp)
-
+                stamp = s1.fftconvolve(stamp, psf_image, mode='same')
 
                 # Now add the stamp to the main image
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     stamp_to_add = stamp[l1:l2, k1:k2]
                     galimage[j1:j2, i1:i2] += stamp_to_add
-
-
-                    h4 = fits.ImageHDU(stamp_to_add)
-                    hlist = fits.HDUList([h0,h3])
-                    hlist.writeto(f"gal_stamp_{entry['RA_degrees']}_{entry['Dec_degrees']}_{entry['ellipticity']}_{entry['pos_angle']}_{self.local_roll}_{entry['countrate_e/s']}_x{i1}_y{j1}.fits")
-                    if entry['index'] == 68:
-                        print('\n\n')
-                        print(f"gal_stamp_{entry['RA_degrees']}_{entry['Dec_degrees']}_{entry['ellipticity']}_{entry['pos_angle']}_{self.local_roll}_{entry['countrate_e/s']}_x{i1}_y{j1}.fits")
-                        print('\n\n')
-
-
 
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
@@ -4362,34 +4321,35 @@ class Catalog_seed():
 
         return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
-    def calc_x_position_angle(self, position_angle):
+    def calc_x_position_angle(self, galaxy_entry):
         """For Sersic2D galaxies, calcuate the position angle of the source
         relative to the x axis of the detector given the user-input position
         angle (degrees east of north).
 
         Parameters
         ----------
-        position_angle : float
-            Position angle of source in degrees east of north
+        galaxy_entry : astropy.table.Row
+            Row of galaxy info from astropy Table of entries.
+            e.g. output from readGalaxyFile
 
         Returns
         -------
         x_posang : float
             Position angle of source relative to detector x
-            axis, in units of degrees
+            axis, in units degrees
         """
-        #x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)
-        #x_posang = self.siaf.V3SciXAngle + self.local_roll + position_angle
-        x_posang = self.siaf.V3SciXAngle - self.local_roll + position_angle
-
-        # If we are using a Grism Time series aperture, then we need to use the intermediate
-        # aperture to determine the correct rotation. Currently, we should never be in
-        # here since grism TSO observations only support the use of point sources.
-        if self.use_intermediate_aperture:
-            #x_posang = 0. - (self.intermediate_siaf.V3SciXAngle + self.intermediate_local_roll + position_angle)
-            #############UPDATED BELOW TO MATCH UPDATE ABOVE!!##########
-            x_posang = self.intermediate_siaf.V3SciXAngle - self.intermediate_local_roll + position_angle
-        return x_posang
+        # Note that this method also works for cases that make use of
+        # an intermediate aperture (e.g. grism time series, although
+        # grism time series obs at the moment only support point sources
+        # currently.)
+        ra_center = galaxy_entry["RA_degrees"]
+        dec_center = galaxy_entry["Dec_degrees"]
+        center = SkyCoord(ra_center, dec_center, unit=u.deg)
+        offset = center.directional_offset_by(galaxy_entry['pos_angle'] * u.deg, 1. * u.arcsec)
+        offset_x, offset_y = self.RADecToXY_astrometric(offset.ra, offset.dec)
+        dx = offset_x - galaxy_entry['pixelx']
+        dy = offset_y - galaxy_entry['pixely']
+        return np.degrees(np.arctan2(dy, dx))
 
     def calc_x_position_angle_extended(self, position_angle):
         """For extended sources from fits files with no WCS, calcuate the position
@@ -4407,10 +4367,6 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-
-        #####DO WE NEED TO UPDATE THIS AS WELL????#####
-
-
         x_posang = self.local_roll + position_angle
 
         # If we are using a Grism Time series aperture, then we need to use the intermediate
