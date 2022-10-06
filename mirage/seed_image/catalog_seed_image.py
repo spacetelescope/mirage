@@ -4115,11 +4115,6 @@ class Catalog_seed():
         if sig_diff > signal_matching_threshold:
             stamp = stamp / np.sum(stamp) * (total_counts * limit)
 
-        # Check to be sure the source is centered in the stamp. For some sub-pixel locations in combination
-        # with some rotation angles, the stamp image is shifted by a row and/or column from the center. In
-        # those cases, re-center.
-        #stamp = center_in_stamp(stamp)
-
         return stamp
 
     def crop_galaxy_stamp(self, stamp, threshold):
@@ -5607,53 +5602,6 @@ class Catalog_seed():
                                                'settings to use. (YAML format).'))
         parser.add_argument("--param_example", help='If used, an example parameter file is output.')
         return parser
-
-
-def center_in_stamp(stamp_img):
-    """Add rows and/or columns to a stamp image in order to
-    center the source
-
-    Parameters
-    ----------
-    stamp_img : numpy.ndarray
-        2D image array
-
-    Returns
-    -------
-    stamp_img : numpy.ndarray
-        Modified image with rows and/or columns added
-    """
-    peak_loc = np.where(stamp_img == np.max(stamp_img))
-    yd, xd = stamp_img.shape
-    expectedx = xd // 2
-    expectedy = yd // 2
-
-    if peak_loc[0][0] != expectedy:
-        delta = peak_loc[0][0] - expectedy
-        if delta < 0:
-            # Add rows to the bottom
-            to_add = np.zeros((np.abs(delta)*2, xd))
-            stamp_img = np.r_[to_add, stamp_img]
-
-        elif delta > 0:
-            # Add rows to the top
-            to_add = np.zeros((delta*2, xd))
-            stamp_img = np.r_[stamp_img, to_add]
-        # Update dimensions
-        yd, xd = stamp_img.shape
-
-    if peak_loc[1][0] != expectedx:
-        delta = peak_loc[1][0] - expectedx
-        if delta < 0:
-            # Add columns to the left
-            to_add = np.zeros((yd, np.abs(delta)*2))
-            stamp_img = np.c_[to_add, stamp_img]
-
-        elif delta > 0:
-            # Add columns to the right
-            to_add = np.zeros((yd, delta*2))
-            stamp_img = np.c_[stamp_img, to_add]
-    return stamp_img
 
 
 if __name__ == '__main__':
