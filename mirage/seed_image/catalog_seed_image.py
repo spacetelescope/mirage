@@ -4331,7 +4331,7 @@ class Catalog_seed():
         -------
         x_posang : float
             Position angle of source relative to detector x
-            axis, in units degrees
+            axis, in units of degrees
         """
         # Note that this method also works for cases that make use of
         # an intermediate aperture (e.g. grism time series, although
