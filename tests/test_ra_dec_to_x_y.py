@@ -8,6 +8,7 @@ Values were calculated using run_all_apertures.py in
 the test_mirage_subarray_source_location subdirectory
 """
 
+from astropy.table import Table
 import numpy as np
 import pysiaf
 import pytest
@@ -348,8 +349,8 @@ def test_locations():
 
 
 @pytest.mark.parametrize("pav3,galaxy_pos_angs,expected_galaxy_pos_angs", [
-    (0., [0., 30., -80.], [-270.7911916590788, -300.7911916590788, -190.79119165907878]),
-    (30., [0., 30., -80.], [59.27713939017512, 29.277139390175122, 139.27713939017514])
+    (0., [0., 30., -80.], [90.1101252253335, 120.60294962655526, 8.463848460849974]),
+    (30., [0., 30., -80.], [59.46543695693042, 90.1798908477186, -21.71832856291518])
     ])
 def test_gal_rotations(pav3, galaxy_pos_angs, expected_galaxy_pos_angs):
     """Test the rotations used to place galaxy and extended sources in the correct
@@ -363,12 +364,21 @@ def test_gal_rotations(pav3, galaxy_pos_angs, expected_galaxy_pos_angs):
     c.use_intermediate_aperture = False
     inst_siaf = siaf_interface.get_instance('nircam')
     c.siaf = inst_siaf[aperture]
+    c.coord_transform = None
     c.local_roll, c.attitude_matrix, c.ffsize, \
                 c.subarray_bounds = siaf_interface.get_siaf_information(inst_siaf,
                                                                         aperture,
                                                                         pointing_ra, pointing_dec,
                                                                         pav3)
-    gal_x_pas = [c.calc_x_position_angle(pa) for pa in galaxy_pos_angs]
+    pa_table = Table()
+    pa_table['RA_degrees'] = [pointing_ra] * len(galaxy_pos_angs)
+    pa_table['Dec_degrees'] = [pointing_dec] * len(galaxy_pos_angs)
+    pa_table['pos_angle'] = galaxy_pos_angs
+    pa_table['pixelx'] = [1024] * len(galaxy_pos_angs)
+    pa_table['pixely'] = [1024] * len(galaxy_pos_angs)
+    gal_x_pas = [c.calc_x_position_angle(row) for row in pa_table]
+
+    #gal_x_pas = [c.calc_x_position_angle(pa) for pa in galaxy_pos_angs]
 
     print(gal_x_pas)
     print(expected_galaxy_pos_angs)
