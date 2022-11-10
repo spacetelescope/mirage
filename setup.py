@@ -92,7 +92,7 @@ setup(
         'asdf>=2.13.0',
         'astropy>=5.1.1',
         'astroquery>=0.4.6',
-        'bokeh>=3.0.1',
+        'bokeh==2.4.3',
         'batman-package',
         'crds>=11.16.16',
         'grismconf',

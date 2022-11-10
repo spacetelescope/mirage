@@ -12,7 +12,7 @@ dependencies:
     - astropy==5.1.1
     - astroquery==0.4.6
     - batman-package==2.4.9
-    - bokeh>=3.0.1
+    - bokeh==2.4.3
     - crds==11.16.16
     - grismconf==1.32
     - hotsoss==0.1.7
