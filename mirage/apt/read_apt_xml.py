@@ -2320,7 +2320,13 @@ class ReadAPTXML():
         # If there are nods, treat those as subpixel dithers. But we won't
         # know about those until we are inside the exposure loop below.
 
-        dithertype = template.find(ns + 'DitherType').text
+        try:
+            dithertype = template.find(ns + 'DitherType').text
+        except AttributeError:
+            # In some cases where there is no dither, the DitherType entry
+            # is not present at all.
+            dithertype = 'none'
+
         if dithertype.lower() == 'none':
             number_of_primary_dithers = 1
         elif 'point-with-nircam' in dithertype.lower():
