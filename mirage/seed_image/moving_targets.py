@@ -386,7 +386,7 @@ class MovingTarget():
 
         for i in range(xdim):
             for j in range(ydim):
-                substamp[factory*j:factory*(j+1), factorx*i:factorx*(i+1)] = image[j, i]
+                substamp[factory*j:factory*(j+1), factorx*i:factorx*(i+1)] = image[j, i] / (factorx * factory)
         return substamp
 
     def equidistantXY(self,xstart, ystart, xend, yend, dist):
