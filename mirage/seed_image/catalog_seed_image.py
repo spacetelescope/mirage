@@ -1663,7 +1663,7 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                xposang = self.calc_x_position_angle(entry['pos_angle'])
+                xposang = self.calc_x_position_angle(entry)
 
                 # First create the galaxy
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
@@ -4066,8 +4066,8 @@ class Catalog_seed():
 
         # Using the position angle, calculate the size of the source in the
         # x and y directions
-        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
         num_pix = x_full_length * y_full_length
 
@@ -4085,8 +4085,8 @@ class Catalog_seed():
 
             # Using the position angle, calculate the size of the source in the
             # x and y directions
-            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
             num_pix = x_full_length * y_full_length
 
@@ -4244,7 +4244,7 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            xposang = self.calc_x_position_angle(entry['pos_angle'])
+            xposang = self.calc_x_position_angle(entry)
             sub_x = 0.
             sub_y = 0.
 
@@ -4312,6 +4312,7 @@ class Catalog_seed():
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     stamp_to_add = stamp[l1:l2, k1:k2]
                     galimage[j1:j2, i1:i2] += stamp_to_add
+
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
 
@@ -4346,15 +4347,16 @@ class Catalog_seed():
 
         return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
-    def calc_x_position_angle(self, position_angle):
+    def calc_x_position_angle(self, galaxy_entry):
         """For Sersic2D galaxies, calcuate the position angle of the source
         relative to the x axis of the detector given the user-input position
         angle (degrees east of north).
 
         Parameters
         ----------
-        position_angle : float
-            Position angle of source in degrees east of north
+        galaxy_entry : astropy.table.Row
+            Row of galaxy info from astropy Table of entries.
+            e.g. output from readGalaxyFile
 
         Returns
         -------
@@ -4362,14 +4364,18 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-        x_posang = 0. - (self.siaf.V3SciXAngle + self.local_roll + position_angle)
-
-        # If we are using a Grism Time series aperture, then we need to use the intermediate
-        # aperture to determine the correct rotation. Currently, we should never be in
-        # here since grism TSO observations only support the use of point sources.
-        if self.use_intermediate_aperture:
-            x_posang = 0. - (self.intermediate_siaf.V3SciXAngle + self.intermediate_local_roll + position_angle)
-        return x_posang
+        # Note that this method also works for cases that make use of
+        # an intermediate aperture (e.g. grism time series, although
+        # grism time series obs at the moment only support point sources
+        # currently.)
+        ra_center = galaxy_entry["RA_degrees"]
+        dec_center = galaxy_entry["Dec_degrees"]
+        center = SkyCoord(ra_center, dec_center, unit=u.deg)
+        offset = center.directional_offset_by(galaxy_entry['pos_angle'] * u.deg, 1. * u.arcsec)
+        offset_x, offset_y = self.RADecToXY_astrometric(offset.ra, offset.dec)
+        dx = offset_x - galaxy_entry['pixelx']
+        dy = offset_y - galaxy_entry['pixely']
+        return np.degrees(np.arctan2(dy, dx))
 
     def calc_x_position_angle_extended(self, position_angle):
         """For extended sources from fits files with no WCS, calcuate the position
