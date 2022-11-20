@@ -1,15 +1,23 @@
-(Unreleased)
-============
+2.3.0
+=====
+
+APT
+---
+
+Bugfix in the APT xml reader for MOS programs with no dithers. (#806)
+
 
 CRDS Reference Files
 --------------------
 
 Remove references to the pixel area map from code and documentation, as this is no longer used. (#790)
 
+
 Packaging
 ---------
 
 Update dependency list. Drop support for python 3.7. (#783)
+
 Remove python 3.6 environment file. (#784)
 
 
@@ -32,11 +40,25 @@ Moving Targets
 
 Updated the MOVING_TARGET_POSITION table from detector -> sci. (#757)
 
+Fix a bug that was resulting in moving target sources that were brighter than they should have been. (#807)
+
 
 Galaxy and Extended Source Position Angles
 ------------------------------------------
 
 Fixed a bug that was causing incorrect position angles of galaxy and extended sources when PAV3 was non-zero. (#767)
+
+Fix galaxy/extended source rotation test (#778)
+
+
+NIRISS SOSS
+-----------
+
+Stores the input star and planet data (including the orbital parameters) to the output FITS files so users can make direct comparisons. The data is stored in a new 'STAR' and (when applicable) 'PLANET' extensions with the units and orbital params saved as header keywords. (#773)
+
+Moves hardcoded max_frames variable into SossSim.create keyword args so users can adjust memory allocation. (#775)
+
+Allow a user to generate a custom wavelength solution before generating SOSS simulations (#787)
 
 
 WFSS
