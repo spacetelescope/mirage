@@ -50,7 +50,6 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  ipc_: crds                 #File containing IPC kernel to apply
 	  invertIPC_: True           #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
 	  occult_: None              #Occulting spots correction image
-	  pixelAreaMap_: crds        #Pixel area map for the detector. Used to introduce distortion into the output ramp.
 	  transmission_: crds        # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov
 	  subarray_defs_:   config   #File that contains a list of all possible subarray names and coordinates
 	  readpattdefs_:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
@@ -112,13 +111,6 @@ Below is an example yaml input file for *Mirage*. The yaml file used as the prim
 	  dec_: -27.8                   #Dec of simulated pointing
 	  rotation_: 0.0                #y axis rotation (degrees E of N)
 	  tracking_: sidereal           #sidereal or non-sidereal
-
-	newRamp_:
-	  dq_configfile_: config          #config file used by JWST pipeline
-	  sat_configfile_: config         #config file used by JWST pipeline
-	  superbias_configfile_: config   #config file used by JWST pipeline
-	  refpix_configfile_: config      #config file used by JWST pipeline
-	  linear_configfile_: config      #config file used by JWST pipeline
 
 	Output_:
 	  file_: jw42424024002_01101_00001_nrcb5_uncal.fits   # Output filename
@@ -469,18 +461,6 @@ Occulting spot image
 *Reffiles:occult*
 
 This feature is not yet supported and should be set to **None**.
-
-.. _pixelAreaMap:
-
-Pixel area map
-++++++++++++++
-
-*Reffiles:pixelAreaMap*
-
-Fits file containing the pixel area map for the detector to be simulated. If provided, the pixel area map is multiplied into the seed image at a point when the seed image contains only extended sources. Point sources have the pixel area map applied to them at the time the PSF libraries were created via `webbpsf <https://webbpsf.readthedocs.io/en/stable/>`_. The pixel area map file must be in the format of the `JWST pixel area map reference file <https://jwst-pipeline.readthedocs.io/en/stable/jwst/photom/reference_files.html#area-reference-file>`_.
-
-.. hint::
-	Setting this entry equal to 'crds' will cause Mirage to query the Calibration Reference Database System (CRDS) for the appropriate file, and download that file if it is not already present in your CRDS cache.
 
 .. _transmission:
 
@@ -1047,67 +1027,6 @@ Telescope tracking
 
 Either 'sidereal' or 'non-sidereal' depending on the type of exposure. If it is set to non-sidereal then the exposure will be created as if JWST is
 tracking on the source in the :ref:`movingTargetToTrack <movingTargetToTrack>` catalog. Sources in the :ref:`pointsource <pointsource>`, :ref:`galaxyListFile <galaxyListFile>`, and :ref:`extended <extended>` catalogs will trail across the field of view over the course of the exposure.
-
-.. _newRamp:
-
-newRamp section
----------------
-
-This section of the input file lists JWST calibration pipeline-style configuration files that may be needed when preparing the simulated data. Copies of all of these configuration files are included in the ‘config’ subdirectory of the MIRAGE repository. Therefore, unless you wish to use your own set of configuration files, you can set these fields all to 'config'. This is the default behavior when creating yaml files via the :ref:`yaml generator <yaml_generator>`.
-
-.. hint::
-	In order to create your own set of pipeline configuration files, use the shell command:
-
-	> collect_pipeline_cfg /your/destination/directory
-
-.. _dq_configfile:
-
-DQ step configuration file
-++++++++++++++++++++++++++
-
-*newRamp:dq_configfile*
-
-Name of the JWST calibration pipeline configuration file to be used in the dq_init step when it is run on the raw dark current integration.
-
-
-.. _sat_configfile:
-
-Saturation step configuration file
-++++++++++++++++++++++++++++++++++
-
-*newRamp:sat_configfile*
-
-Name of the JWST calibration pipeline configuration file to be used in the saturation step when it is run on the raw dark current integration.
-
-.. _superbias_configfile:
-
-Superbias step configuration file
-+++++++++++++++++++++++++++++++++
-
-*newRamp:superbias_configfile*
-
-Name of the JWST calibration pipeline configuration file to be used in the superbias step when it is run on the raw dark current integration.
-
-.. _refpix_configfile:
-
-Reference pixel subtraction configuration file
-++++++++++++++++++++++++++++++++++++++++++++++
-
-*newRamp:refpix_configfile*
-
-Name of the JWST calibration pipeline configuration file to be used in the reference pixel subtraction step when it is run on the raw dark current integration.
-
-.. hint::
-    If you choose to use your own reference pixel correction configuration file, we recommend setting the **odd_even_rows** entry to False, as this correction is not typically performed on NIRCam, NISISS, or FGS data.
-
-.. _linear_configfile:
-
-Linearity step configuration file
-+++++++++++++++++++++++++++++++++
-
-*newRamp:linear_configfile*
-
-Name of the JWST calibration pipeline configuration file to be used in the linearity correction step when it is run on the raw dark current integration.
 
 .. _output:
 

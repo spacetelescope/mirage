@@ -4,6 +4,7 @@ A module to generate simulated 2D time-series SOSS data
 Authors: Joe Filippazzo
 """
 
+from copy import copy
 import os
 from pkg_resources import resource_filename
 import multiprocessing
@@ -34,7 +35,7 @@ def calculate_psf_tilts():
     using all binned pixels in the given wavelength calibration file
     for both orders and save to file
     """
-    for order in [1, 2]:
+    for order in [1, 2, 3]:
 
         # Get the file
         psf_file = os.path.join(PSF_DIR, 'SOSS_PSF_tilt_order{}.npy'.format(order))
@@ -194,8 +195,12 @@ def generate_SOSS_psfs(filt):
         The filter to use, ['CLEAR', 'F277W']
     """
     try:
-
         import webbpsf
+
+    except ImportError:
+        raise ("Could not import `webbpsf` package. Functionality limited. Generating dummy file.")
+
+    try:
 
         # Get the file
         file = os.path.join(PSF_DIR, 'SOSS_{}_PSF.fits'.format(filt))
@@ -228,9 +233,10 @@ def generate_SOSS_psfs(filt):
         hdulist.writeto(file, overwrite=True)
         hdulist.close()
 
-    except (ImportError, OSError, IOError):
+    except NameError:
 
-        print("Could not import `webbpsf` package. Functionality limited. Generating dummy file.")
+        print("Something went wrong.")
+
 
 def get_angle(pf, p0=np.array([0, 0]), pi=None):
     """Compute angle (in degrees) for pf-p0-pi corner
@@ -413,16 +419,13 @@ def psf_tilts(order):
     Parameters
     ----------
     order: int
-        The order to use, [1, 2]
+        The order to use, [1, 2, 3]
 
     Returns
     -------
     np.ndarray
         The angle from the vertical of the psf in each of the 2048 columns
     """
-    if order not in [1, 2]:
-        raise ValueError('Only orders 1 and 2 are supported.')
-
     # Get the file
     psf_file = os.path.join(PSF_DIR, 'SOSS_PSF_tilt_order{}.npy'.format(order))
 
@@ -469,7 +472,7 @@ def put_psf_on_subarray(psf, y, frame_height=256):
     return frame
 
 
-def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False, mprocessing=True):
+def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False, mprocessing=True, wave_sol=None, dirname='default'):
     """
     Generate/retrieve a data cube of shape (3, 2048, 76, 76) which is a
     76x76 pixel psf for 2048 wavelengths for each trace order. The PSFs
@@ -488,18 +491,39 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
         Generate a new cube
     mprocessing: bool
         Use multiprocessing
+    wave_sol: sequence (optional)
+        The user provided wavelength solutions for orders 1, 2, and 3
+    dirname: str (optional)
+        The target subdirectory name for the PSFs that use a custom wavelength solution
 
     Returns
     -------
     np.ndarray
         An array of the SOSS psf at 2048 wavelengths for each order
     """
+    # Check if it's a custom wavelength solution
+    psf_loc = copy(PSF_DIR)
+    if dirname != 'default':
+        dirpath = os.path.join(PSF_DIR, dirname)
+        if not os.path.exists(dirpath):
+            os.system('mkdir {}'.format(dirpath))
+        psf_loc = psf_loc.replace('soss_psfs', 'soss_psfs/{}'.format(dirname))
+
     if generate:
 
-        print('Coffee time! This takes about 5 minutes.')
+        print('This takes about 2 minutes.')
 
-        # Get the wavelengths
-        wavelengths = np.mean(utils.wave_solutions(subarray), axis=1)[:2 if filt == 'CLEAR' else 1]
+        # Default wavelengths
+        if wave_sol is None:
+            wavelengths = np.mean(utils.wave_solutions(subarray), axis=1)[:3 if filt == 'CLEAR' else 1]
+
+        # Or user provided
+        else:
+            if wave_sol.shape != (3, 2048):
+                raise TypeError("'wave_sol' input must be an array of shape (3, 2048)")
+            wavelengths = wave_sol
+
+        # Get trace polynomial coefficients
         coeffs = locate_trace.trace_polynomial(subarray)
 
         # Get the file
@@ -519,8 +543,8 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
             # Evaluate the trace polynomial in each column to get the y-position of the trace center
             trace_centers = np.polyval(coeffs[n], trace_cols)
 
-            # Don't calculate order2 for F277W or order 3 for either
-            if (n == 1 and filt.lower() == 'f277w') or n == 2:
+            # Don't calculate order2 or order 3 for F277W
+            if n > 0 and filt.lower() == 'f277w':
                 pass
 
             else:
@@ -599,7 +623,7 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
                     print('Finished in {} seconds.'.format(time.time()-start))
 
                     # Get the filepath
-                    file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
+                    file = os.path.join(psf_loc, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, n+1, N+1))
 
                     # Delete the file if it exists
                     if os.path.isfile(file):
@@ -619,10 +643,12 @@ def SOSS_psf_cube(filt='CLEAR', order=1, subarray='SUBSTRIP256', generate=False,
 
         else:
 
+            print("Using SOSS PSF files located at {}".format(psf_loc))
+
             # Get the chunked data and concatenate
             full_data = []
             for chunk in [1, 2, 3, 4]:
-                file = os.path.join(PSF_DIR, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
+                file = os.path.join(psf_loc, 'SOSS_{}_PSF_order{}_{}.npy'.format(filt, order, chunk))
                 full_data.append(np.load(file))
 
             return np.concatenate(full_data, axis=0)

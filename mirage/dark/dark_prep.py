@@ -145,37 +145,11 @@ class DarkPrep():
         # indicating the step should be skipped. Create a dictionary of steps
         # and populate with True or False
         self.runStep = {}
-        # self.runStep['linearity'] = self.check_run_step(self.params['Reffiles']['linearity'])
         self.runStep['badpixmask'] = self.check_run_step(self.params['Reffiles']['badpixmask'])
         self.runStep['linearized_darkfile'] = self.check_run_step(self.params['Reffiles']['linearized_darkfile'])
         self.runStep['saturation_lin_limit'] = self.check_run_step(self.params['Reffiles']['saturation'])
         self.runStep['superbias'] = self.check_run_step(self.params['Reffiles']['superbias'])
         self.runStep['linearity'] = self.check_run_step(self.params['Reffiles']['linearity'])
-
-        # If the pipeline is going to be used to create
-        # the linearized dark current ramp, make sure the
-        # specified configuration files are present.
-        if not self.runStep['linearized_darkfile']:
-            dqcheck = self.check_run_step(self.params['newRamp']['dq_configfile'])
-            if not dqcheck:
-                raise FileNotFoundError(("WARNING: DQ pipeline step configuration file not provided. "
-                                         "This file is needed to run the pipeline."))
-            satcheck = self.check_run_step(self.params['newRamp']['sat_configfile'])
-            if not satcheck:
-                raise FileNotFoundError(("WARNING: Saturation pipeline step configuration file not provided. "
-                                         "This file is needed to run the pipeline."))
-            sbcheck = self.check_run_step(self.params['newRamp']['superbias_configfile'])
-            if not sbcheck:
-                raise FileNotFoundError(("WARNING: Superbias pipeline step configuration file not provided. "
-                                        "This file is needed to run the pipeline."))
-            refpixcheck = self.check_run_step(self.params['newRamp']['refpix_configfile'])
-            if not refpixcheck:
-                raise FileNotFoundError(("WARNING: Refpix pipeline step configuration file not provided. "
-                                         "This file is needed to run the pipeline."))
-            lincheck = self.check_run_step(self.params['newRamp']['linear_configfile'])
-            if not lincheck:
-                raise FileNotFoundError(("WARNING: Linearity pipeline step configuration file not provided. "
-                                         "This file is needed to run the pipeline."))
 
     def check_run_step(self, filename):
         """Check to see if a filename exists in the parameter file
@@ -585,33 +559,24 @@ class DarkPrep():
 
         # Run the DQ_Init step
         if self.runStep['badpixmask']:
-            linDark = DQInitStep.call(dark,
-                                      config_file=self.params['newRamp']['dq_configfile'],
-                                      override_mask=self.params['Reffiles']['badpixmask'])
+            linDark = DQInitStep.call(dark, override_mask=self.params['Reffiles']['badpixmask'])
         else:
-            linDark = DQInitStep.call(dark, config_file=self.params['newRamp']['dq_configfile'])
+            linDark = DQInitStep.call(dark)
 
         # If the saturation map is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['saturation_lin_limit']:
-            linDark = SaturationStep.call(linDark,
-                                          config_file=self.params['newRamp']['sat_configfile'],
-                                          override_saturation=self.params['Reffiles']['saturation'])
+            linDark = SaturationStep.call(linDark, override_saturation=self.params['Reffiles']['saturation'])
         else:
-            linDark = SaturationStep.call(linDark,
-                                          config_file=self.params['newRamp']['sat_configfile'])
+            linDark = SaturationStep.call(linDark)
 
         # If the superbias file is provided, use it. If not, default to whatever is in CRDS
         if self.runStep['superbias']:
-            linDark = SuperBiasStep.call(linDark,
-                                         config_file=self.params['newRamp']['superbias_configfile'],
-                                         override_superbias=self.params['Reffiles']['superbias'])
+            linDark = SuperBiasStep.call(linDark, override_superbias=self.params['Reffiles']['superbias'])
         else:
-            linDark = SuperBiasStep.call(linDark,
-                                         config_file=self.params['newRamp']['superbias_configfile'])
+            linDark = SuperBiasStep.call(linDark)
 
         # Reference pixel correction
-        linDark = RefPixStep.call(linDark,
-                                  config_file=self.params['newRamp']['refpix_configfile'])
+        linDark = RefPixStep.call(linDark)
 
         # Save a copy of the superbias- and reference pixel-subtracted
         # dark. This will be used later to add these effects back in
@@ -625,12 +590,9 @@ class DarkPrep():
         base_name = self.params['Output']['file'].split('/')[-1]
         linearoutfile = base_name[0:-5] + '_linearized_dark_current_ramp.fits'
         if self.runStep['linearity']:
-            linDark = LinearityStep.call(linDark,
-                                         config_file=self.params['newRamp']['linear_configfile'],
-                                         override_linearity=self.params['Reffiles']['linearity'])
+            linDark = LinearityStep.call(linDark, override_linearity=self.params['Reffiles']['linearity'])
         else:
-            linDark = LinearityStep.call(linDark,
-                                         config_file=self.params['newRamp']['linear_configfile'])
+            linDark = LinearityStep.call(linDark)
 
         # Now we need to put the data back into a read_fits object
         linDarkobj = read_fits.Read_fits()
@@ -1016,7 +978,7 @@ class DarkPrep():
                 objname = self.basename + '_linear_dark_prep_object.fits'
             objname = os.path.join(self.params['Output']['directory'], objname)
             hl.writeto(objname, overwrite=True)
-            self.logger.info(("Linearized dark frame plus superbias and reference"
+            self.logger.info(("Linearized dark frame plus superbias and reference "
                               "pixel signals, as well as zeroframe, saved to {}. "
                               "This can be used as input to the observation "
                               "generator.".format(objname)))

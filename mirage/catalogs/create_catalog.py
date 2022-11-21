@@ -20,7 +20,7 @@ from astropy.io import ascii
 from astropy.table import Table, join
 import astropy.units as u
 from astroquery.gaia import Gaia
-from astroquery.irsa import Irsa
+from astroquery.ipac.irsa import Irsa
 from pysiaf.utils.projection import deproject_from_tangent_plane
 
 from mirage.apt.apt_inputs import get_filters, ra_dec_update
@@ -270,7 +270,7 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         for_obs_str = for_obs_str[0:-1]
         xml_base = os.path.basename(xml_filename).split('.xml')[0]
         if out_dir is None:
-            out_dir = os.path.dirname(xml_filename)
+            out_dir = os.path.dirname(os.path.abspath(xml_filename))
 
         starting_index = 1
 
@@ -313,36 +313,43 @@ def for_proposal(xml_filename, pointing_filename, point_source=True, extragalact
         if extragalactic:
             galaxy_cat = None
             for i, instrument in enumerate(instrument_filter_dict):
-                logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
-                filter_list = list(set(instrument_filter_dict[instrument]))
-                tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
-                                                      filter_list, boxflag=False, brightlimit=14.0,
-                                                      seed=galaxy_seed, starting_index=starting_index)
+                if instrument.lower() in ['nircam', 'niriss', 'fgs']:
+                    logger.info('\n--- Creating {} extragalactic catalog ---'.format(instrument))
+                    filter_list = list(set(instrument_filter_dict[instrument]))
+                    tmp_cat, tmp_seed = galaxy_background(mean_ra, mean_dec, 0., full_width, instrument,
+                                                          filter_list, boxflag=False, brightlimit=14.0,
+                                                          seed=galaxy_seed, starting_index=starting_index)
 
-                if galaxy_cat is None:
-                    galaxy_cat = copy.deepcopy(tmp_cat)
-                elif galaxy_cat is not None and tmp_cat is not None:
-                    galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
+                    if galaxy_cat is None:
+                        galaxy_cat = copy.deepcopy(tmp_cat)
+                    elif galaxy_cat is not None and tmp_cat is not None:
+                        galaxy_cat = combine_catalogs(galaxy_cat, tmp_cat, starting_index=starting_index)
 
-            starting_index += len(galaxy_cat)
+            # Protect against cases where the sky area is too large and the background galaxy
+            # search says that it will not proceed
+            if galaxy_cat is not None:
+                starting_index += len(galaxy_cat)
 
-            if save_catalogs:
-                gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
+                if save_catalogs:
+                    gal_catalog_name = 'galaxies_for_{}_observations_{}.cat'.format(xml_base, for_obs_str)
 
-                # Populate dictionary listing galaxy catalog name associated with each
-                # observation number
-                galaxy_catalog_mapping[str(observation)] = gal_catalog_name
-                for value in for_obs:
-                    galaxy_catalog_mapping[str(value)] = gal_catalog_name
+                    # Populate dictionary listing galaxy catalog name associated with each
+                    # observation number
+                    galaxy_catalog_mapping[str(observation)] = gal_catalog_name
+                    for value in for_obs:
+                        galaxy_catalog_mapping[str(value)] = gal_catalog_name
 
-                full_catalog_path = os.path.join(out_dir, gal_catalog_name)
-                galaxy_cat.save(full_catalog_path)
-                logger.info('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
-                galaxy_catalog_names.append(full_catalog_path)
+                    full_catalog_path = os.path.join(out_dir, gal_catalog_name)
+                    galaxy_cat.save(full_catalog_path)
+                    logger.info('\nGALAXY CATALOG SAVED: {}'.format(full_catalog_path))
+                    galaxy_catalog_names.append(full_catalog_path)
 
-            galaxy_catalog_list.append(galaxy_cat)
+                galaxy_catalog_list.append(galaxy_cat)
         else:
             galaxy_cat = None
+
+    logger.info((f'Catalog creation complete. Created point source catalogs: {ptsrc_catalog_names} ',
+                 f'and galaxy catalogs: {galaxy_catalog_names}'))
 
     return (ptsrc_catalog_list, galaxy_catalog_list, ptsrc_catalog_names, galaxy_catalog_names,
             ptsrc_catalog_mapping, galaxy_catalog_mapping)
@@ -1126,7 +1133,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
     twomassflag = [True] * n2mass2
     for n1 in range(n2mass2):
         for loop in range(len(gaia_2mass['ra'])):
-            if gaia_2mass['designation'][loop] == twomass_cat['designation'][n1]:
+            if gaia_2mass['DESIGNATION'][loop] == twomass_cat['designation'][n1]:
                 if ngaia2masscr[n1] >= 0:
                     twomassflag[n1] = False
     matchwise, gaiawiseinds, twomasswiseinds = wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_cat)
@@ -1251,6 +1258,7 @@ def combine_and_interpolate(gaia_cat, gaia_2mass, gaia_2mass_crossref, gaia_wise
         outcat.add_magnitude_column(np.squeeze(out_magnitudes[:, n1]), column_name=column_value,
                                     magnitude_system='vegamag')
         n1 = n1+1
+
     return outcat
 
 
@@ -1281,9 +1289,9 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                     GAIA source in the main GAIA table, or a value of -10
                     where there is no match
     """
-    ntable1 = len(gaia_cat['designation'])
+    ntable1 = len(gaia_cat['ra'])
     ntable2 = len(gaia_2mass['ra'])
-    ntable3 = len(gaia_2mass_crossref['designation'])
+    ntable3 = len(gaia_2mass_crossref['ra'])
     ntable4 = len(twomass_cat['ra'])
     ngaia2mass = np.zeros((ntable2), dtype=np.int16) - 10
     ngaia2masscr = np.zeros((ntable4), dtype=np.int16) - 10
@@ -1293,7 +1301,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
         namematch = []
         match1 = []
         for l1 in range(ntable3):
-            if gaia_2mass['designation'][loop] == gaia_2mass_crossref['designation_2'][l1]:
+            if gaia_2mass['DESIGNATION'][loop] == gaia_2mass_crossref['DESIGNATION'][l1]:
                 nmatch = nmatch + 1
                 namematch.append(gaia_2mass_crossref['designation'][l1])
                 match1.append(loop)
@@ -1308,7 +1316,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
                 for l2 in range(ntable1):
                     gmag = 0.
                     irmag = -10000.0
-                    if gaia_cat['designation'][l2] == namematch[l1]:
+                    if gaia_cat['DESIGNATION'][l2] == namematch[l1]:
                         ra1 = gaia_cat['ra'][l2]
                         dec1 = gaia_cat['dec'][l2]
                         ra2 = gaia_2mass['ra'][match1[l1]]
@@ -1349,7 +1357,7 @@ def twomass_crossmatch(gaia_cat, gaia_2mass, gaia_2mass_crossref, twomass_cat):
     # index values.
     for loop in range(ntable4):
         for n1 in range(ntable2):
-            if twomass_cat['designation'][loop] == gaia_2mass['designation'][n1]:
+            if twomass_cat['designation'][loop] == gaia_2mass['DESIGNATION'][n1]:
                 ngaia2masscr[loop] = ngaia2mass[n1]
     return ngaia2masscr, ngaia2mass
 
@@ -1424,7 +1432,7 @@ def wise_crossmatch(gaia_cat, gaia_wise, gaia_wise_crossref, wise_cat, twomass_c
         if (d2d[loop].arcsec) < 0.4:
             matchwise[idx[loop]] = True
             for n2 in range(num_gaia):
-                if gaia_cat['designation'][n2] == gaia_wise_crossref['designation'][loop]:
+                if gaia_cat['DESIGNATION'][n2] == gaia_wise_crossref['DESIGNATION'][loop]:
                     gaiawiseinds[idx[loop]] = n2
                     break
     return matchwise, gaiawiseinds, twomasswiseinds
@@ -1938,7 +1946,7 @@ def query_GAIA_ptsrc_catalog(ra, dec, box_width):
     outvalues = {}
     logger.info('Searching the GAIA DR2 catalog')
     for key in data.keys():
-        job = Gaia.launch_job_async(data[key]['query'], dump_to_file=False)
+        job = Gaia.launch_job(data[key]['query'], dump_to_file=False)
         table = job.get_results()
         outvalues[key] = table
         logger.info('Retrieved {} sources for catalog {}'.format(len(table), key))

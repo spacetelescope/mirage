@@ -91,6 +91,7 @@ class Observation():
         self.offline = offline
         self.paramfile = 'None'
         self.params = None
+        self.output_files = []
 
         # self.coord_adjust contains the factor by which the
         # nominal output array size needs to be increased
@@ -435,8 +436,6 @@ class Observation():
         hdulist[0].header['DISTORTN'] = (self.params['Reffiles']['astrometric'],
                                          'Distortion reffile used by Mirage')
         hdulist[0].header['IPC'] = (self.params['Reffiles']['ipc'], 'IPC kernel used by Mirage')
-        hdulist[0].header['PIXARMAP'] = (self.params['Reffiles']['pixelAreaMap'],
-                                         'Pixel area map used by Mirage')
         hdulist[0].header['CROSSTLK'] = (self.params['Reffiles']['crosstalk'],
                                          'Crosstalk file used by Mirage')
         hdulist[0].header['FLUX_CAL'] = (self.params['Reffiles']['flux_cal'],
@@ -474,36 +473,6 @@ class Observation():
         hdulist[0].header['CRSEED'] = (self.params['cosmicRay']['seed'],
                                        'Random number generator seed for cosmic rays in Mirage')
         return hdulist
-
-    def add_pam(self, signalramp):
-        """ Apply Pixel Area Map to exposure
-
-        Paramters:
-        ----------
-        signalramp : numpy.ndarray
-            Array containing exposure
-
-        Returns
-        --------
-        signalramp : numpy.ndarary
-            Array after multiplying by the pixel area map
-        """
-        pixAreaMap = self.simple_get_image(self.params['Reffiles']['pixelAreaMap'])
-
-        # If we are making a grism direct image, we need to embed the true pixel area
-        # map in an array of the appropriate dimension, where any pixels outside the
-        # actual aperture are set to 1.0
-        if self.params['Output']['grism_source_image']:
-            mapshape = pixAreaMap.shape
-            g, yd, xd = signalramp.shape
-            pam = np.ones((yd, xd))
-            ys = self.coord_adjust['yoffset']
-            xs = self.coord_adjust['xoffset']
-            pam[ys:ys+mapshape[0], xs:xs+mapshape[1]] = np.copy(pixAreaMap)
-            pixAreaMap = pam
-
-        signalramp *= pixAreaMap
-        return signalramp
 
     def add_superbias_and_refpix(self, ramp, sbref):
         """Add superbias and reference pixel-associated
@@ -775,7 +744,6 @@ class Observation():
         self.runStep['fwpw'] = self.check_run_step(self.params['Reffiles']['filtpupilcombo'])
         self.runStep['linearized_darkfile'] = self.check_run_step(self.params['Reffiles']['linearized_darkfile'])
         self.runStep['badpixfile'] = self.check_run_step(self.params['Reffiles']['badpixmask'])
-        self.runStep['pixelAreaMap'] = self.check_run_step(self.params['Reffiles']['pixelAreaMap'])
 
         # NON-LINEARITY
         # Make sure the input accuracy is a float with reasonable bounds
@@ -1051,10 +1019,14 @@ class Observation():
         return crhits, crs_perframe
 
     @logging_functions.log_fail
-    def create(self):
+    def create(self, override_refs=None):
         """MAIN FUNCTION"""
         # Read in the parameter file
         self.read_parameter_file()
+
+        # Override reference files
+        if override_refs is not None:
+            self.params['Reffiles'].update(override_refs)
 
         # Get the log caught up on what's already happened
         self.logger.info('\n\nRunning observation generator....\n')
@@ -1772,7 +1744,7 @@ class Observation():
         newimage = np.random.poisson(signalgain, signalgain.shape).astype(np.float64)
 
         if np.nanmin(signalgain) < 0.:
-            newimage[neg] = negatives[neg]
+            newimage[neg] = negatives[neg].astype(np.float64)
 
         newimage /= self.gain
 
@@ -1805,7 +1777,6 @@ class Observation():
                  ['Reffiles', 'linearity'],
                  ['Reffiles', 'saturation'],
                  ['Reffiles', 'ipc'],
-                 ['Reffiles', 'pixelAreaMap'],
                  ['Reffiles', 'gain']]
         plist = [['cosmicRay', 'path']]
         for ref in rlist:
@@ -3083,6 +3054,9 @@ class Observation():
         # Save the datamodel
         outModel.save(filename)
 
+        # Save list of output files
+        self.output_files.append(filename)
+
         # Now we need to adjust the datamodl header keyword
         # If we leave it as Level1bModel, the pipeline doesn't
         # work properly
@@ -3372,6 +3346,10 @@ class Observation():
             outModel[groupextnum].data = self.populate_group_table(ct, outModel[0].header['TGROUP'], self.rampexptime,
                                                                    n_int, n_group, n_y, n_x)
         outModel.writeto(filename, overwrite=True)
+
+        # Save list of output files
+        self.output_files.append(filename)
+
         return filename
 
     def resets_before_exp(self):

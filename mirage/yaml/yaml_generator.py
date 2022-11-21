@@ -434,7 +434,6 @@ class SimInput:
         photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
         ipc_invert = np.array([True] * len(self.info['Instrument']))
-        pixelAreaMap_arr = deepcopy(empty_col)
         transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
@@ -488,8 +487,6 @@ class SimInput:
                             crds_key = 'flat'
                         elif key == 'astrometric':
                             crds_key = 'distortion'
-                        elif key == 'pixelAreaMap':
-                            crds_key = 'area'
                         else:
                             crds_key = key
                         reffiles[crds_key] = manual_reffiles[key]
@@ -521,7 +518,6 @@ class SimInput:
             photom_arr[match] = reffiles['photom']
             ipc_arr[match] = reffiles['ipc']
             ipc_invert[match] = reffiles['invert_ipc']
-            pixelAreaMap_arr[match] = reffiles['area']
             transmission_arr[match] = reffiles['transmission']
             badpixmask_arr[match] = reffiles['mask']
             pixelflat_arr[match] = reffiles['flat']
@@ -534,7 +530,6 @@ class SimInput:
         self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
         self.info['invert_ipc'] = list(ipc_invert)
-        self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
@@ -558,7 +553,6 @@ class SimInput:
         distortion_arr = deepcopy(empty_col)
         photom_arr = deepcopy(empty_col)
         ipc_arr = deepcopy(empty_col)
-        pixelAreaMap_arr = deepcopy(empty_col)
         transmission_arr = deepcopy(empty_col)
         badpixmask_arr = deepcopy(empty_col)
         pixelflat_arr = deepcopy(empty_col)
@@ -592,7 +586,6 @@ class SimInput:
             distortion_arr[match] = manual_reffiles['distortion']
             photom_arr[match] = manual_reffiles['photom']
             ipc_arr[match] = manual_reffiles['ipc']
-            pixelAreaMap_arr[match] = manual_reffiles['area']
             transmission_arr[match] = manual_reffiles['transmission']
             badpixmask_arr[match] = manual_reffiles['badpixmask']
             pixelflat_arr[match] = manual_reffiles['pixelflat']
@@ -604,7 +597,6 @@ class SimInput:
         self.info['astrometric'] = list(distortion_arr)
         self.info['photom'] = list(photom_arr)
         self.info['ipc'] = list(ipc_arr)
-        self.info['pixelAreaMap'] = list(pixelAreaMap_arr)
         self.info['transmission'] = list(transmission_arr)
         self.info['badpixmask'] = list(badpixmask_arr)
         self.info['pixelflat'] = list(pixelflat_arr)
@@ -717,7 +709,6 @@ class SimInput:
             self.info['photom'] = column_data
             self.info['ipc'] = column_data
             self.info['invert_ipc'] = np.array([True] * len(self.info['Instrument']))
-            self.info['pixelAreaMap'] = column_data
             self.info['transmission'] = column_data
             self.info['badpixmask'] = column_data
             self.info['pixelflat'] = column_data
@@ -1539,23 +1530,8 @@ class SimInput:
         ensure_dir_exists(self.output_dir)
         ensure_dir_exists(self.simdata_output_dir)
 
-        # self.subarray_def_file = self.set_config(self.subarray_def_file, 'subarray_def_file')
-        # self.readpatt_def_file = self.set_config(self.readpatt_def_file, 'readpatt_def_file')
-        # self.filtpupil_pairs = self.set_config(self.filtpupil_pairs, 'filtpupil_pairs')
-        # self.fluxcal = self.set_config(self.fluxcal, 'fluxcal')
-        # self.filter_throughput = self.set_config(self.filter_throughput, 'filter_throughput')
-        # self.dq_init_config = self.set_config(self.dq_init_config, 'dq_init_config')
-        # self.refpix_config = self.set_config(self.refpix_config, 'refpix_config')
-        # self.saturation_config = self.set_config(self.saturation_config, 'saturation_config')
-        # self.superbias_config = self.set_config(self.superbias_config, 'superbias_config')
-        # self.linearity_config = self.set_config(self.linearity_config, 'linearity_config')
-
         if self.observation_list_file is not None:
             self.observation_list_file = os.path.abspath(os.path.expandvars(self.observation_list_file))
-        # if self.crosstalk not in [None, 'config']:
-        #     self.crosstalk = os.path.abspath(os.path.expandvars(self.crosstalk))
-        # elif self.crosstalk == 'config':
-        #     self.crosstalk = os.path.join(self.modpath, 'config', self.configfiles['crosstalk'])
 
     def reffile_setup(self):
         """Create lists of reference files associate with each detector.
@@ -1590,11 +1566,6 @@ class SimInput:
                 self.psfpixfrac[instrument] = 0.1
 
             # Set global file paths
-            self.configfiles[instrument]['dq_init_config'] = os.path.join(self.modpath, 'config', 'dq_init.cfg')
-            self.configfiles[instrument]['saturation_config'] = os.path.join(self.modpath, 'config', 'saturation.cfg')
-            self.configfiles[instrument]['superbias_config'] = os.path.join(self.modpath, 'config', 'superbias.cfg')
-            self.configfiles[instrument]['refpix_config'] = os.path.join(self.modpath, 'config', 'refpix.cfg')
-            self.configfiles[instrument]['linearity_config'] = os.path.join(self.modpath, 'config', 'linearity.cfg')
             self.configfiles[instrument]['filter_throughput'] = os.path.join(self.modpath, 'config', 'placeholder.txt')
 
         for instrument in 'miri nirspec'.split():
@@ -1843,17 +1814,6 @@ class SimInput:
         except KeyError:
             files['ipc'] = 'none'
 
-        # pixel area map
-        try:
-            if instrument == 'nircam':
-                files['area'] = self.reffile_overrides[instrument]['area'][detector][filtername][pupilname][exptype]
-            elif instrument == 'niriss':
-                files['area'] = self.reffile_overrides[instrument]['area'][filtername][pupilname][exptype]
-            elif instrument == 'fgs':
-                files['area'] = self.reffile_overrides[instrument]['area'][detector]
-        except KeyError:
-            files['area'] = 'none'
-
         # transmission image
         try:
             if instrument == 'nircam':
@@ -2029,8 +1989,6 @@ class SimInput:
             f.write(('  invertIPC: {}      # Invert the IPC kernel before the convolution. True or False. Use True if the kernel is '
                      'designed for the removal of IPC effects, like the JWST reference files are.\n'.format(input['invert_ipc'])))
             f.write('  occult: None                                    # Occulting spots correction image\n')
-            f.write(('  pixelAreaMap: {}      # Pixel area map for the detector. Used to introduce distortion into the output ramp.\n'
-                     .format(input['pixelAreaMap'])))
             f.write(('  transmission: {}      # Transmission image containing fractional throughput map. (e.g. to imprint occulters into fov\n'
                      .format(input['transmission'])))
             f.write(('  subarray_defs: {} # File that contains a list of all possible subarray names and coordinates\n'
@@ -2163,13 +2121,6 @@ class SimInput:
                 pav3_value = input['PAV3']
             f.write('  rotation: {}                    # PA_V3 in degrees, i.e. the position angle of the V3 axis at V1 (V2=0, V3=0) measured from N to E.\n'.format(pav3_value))
             f.write('  tracking: {}   #Telescope tracking. Can be sidereal or non-sidereal\n'.format(input['Tracking']))
-            f.write('\n')
-            f.write('newRamp:\n')
-            f.write('  dq_configfile: {}\n'.format(self.configfiles[instrument.lower()]['dq_init_config']))
-            f.write('  sat_configfile: {}\n'.format(self.configfiles[instrument.lower()]['saturation_config']))
-            f.write('  superbias_configfile: {}\n'.format(self.configfiles[instrument.lower()]['superbias_config']))
-            f.write('  refpix_configfile: {}\n'.format(self.configfiles[instrument.lower()]['refpix_config']))
-            f.write('  linear_configfile: {}\n'.format(self.configfiles[instrument.lower()]['linearity_config']))
             f.write('\n')
             f.write('Output:\n')
             # f.write('  use_stsci_output_name: {} # Output filename should follow STScI naming conventions (True/False)\n'.format(outtf))

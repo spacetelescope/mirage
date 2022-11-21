@@ -19,12 +19,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Unit tests Python 3.7
-            os: ubuntu-latest
-            python-version: 3.7
-            extras: test
-            test-command: pytest
-
           - name: Unit tests Python 3.8
             os: ubuntu-latest
             python-version: 3.8
@@ -39,7 +33,7 @@ jobs:
 
           - name: Build docs
             os: ubuntu-latest
-            python-version: 3.8
+            python-version: 3.9
             extras: docs
             test-command: sphinx-build docs docs/_build
 

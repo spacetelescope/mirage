@@ -31,7 +31,6 @@ For a given pointing, `jwst_backgrounds` will calculate the total expected backg
 
 Users can also provide a custom background through the use of an input fits file referenced in the "zodiacal" entry of the input yaml file. In this case, the contents of the file are read in and added to the seed image.
 
-Finally, `Mirage` uses the pixel area map to mimic the effects of distortion on the simulated sources. While the locations of the simulated sources within the seed image accurately account for distortion, the brightness of the sources are not affected. The seed image (minus any point sources) is multiplied by the pixel area map in order to adjust the extended sources’ brightness to account for the relative differences in pixel areas across the detector.
 
 .. _mosaic_input:
 

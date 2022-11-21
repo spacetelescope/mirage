@@ -14,6 +14,7 @@ import glob
 import logging
 import os
 import copy
+import pickle
 import re
 import shutil
 from yaml.scanner import ScannerError
@@ -53,7 +54,8 @@ from ..utils import siaf_interface, file_io
 from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
-                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES
+                              NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES, \
+                              DISPERSED_MODES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
@@ -945,7 +947,6 @@ class Catalog_seed():
         kw['GAINFILE'] = self.params['Reffiles']['gain']
         kw['DISTORTN'] = self.params['Reffiles']['astrometric']
         kw['IPC'] = self.params['Reffiles']['ipc']
-        kw['PIXARMAP'] = self.params['Reffiles']['pixelAreaMap']
         kw['CROSSTLK'] = self.params['Reffiles']['crosstalk']
         kw['FLUX_CAL'] = self.params['Reffiles']['flux_cal']
         kw['FTHRUPUT'] = self.params['Reffiles']['filter_throughput']
@@ -1639,7 +1640,7 @@ class Catalog_seed():
             elif input_type == 'extended':
                 stamp, header = self.basic_get_image(entry['filename'])
                 # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
-                stamp = self.rotate_extended_image(stamp, entry['pos_angle'], ra, dec)
+                stamp = self.rotate_extended_image(stamp, entry['pos_angle'])
 
                 # If no magnitude is given, use the extended image as-is
                 if rate != 1.0:
@@ -1662,12 +1663,7 @@ class Catalog_seed():
                     stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
 
             elif input_type == 'galaxies':
-                if not self.use_intermediate_aperture:
-                    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, ra, dec)
-                else:
-                    pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, ra, dec)
-
-                xposang = self.calc_x_position_angle(pixelv2, pixelv3, entry['pos_angle'])
+                xposang = self.calc_x_position_angle(entry)
 
                 # First create the galaxy
                 stamp = self.create_galaxy(entry['radius'], entry['ellipticity'], entry['sersic_index'],
@@ -2961,6 +2957,9 @@ class Catalog_seed():
         # Create the empty image
         psfimage = np.zeros(self.output_dims)
 
+        # Create empty seed cube for possible WFSS dispersion
+        seed_cube = {}
+
         if ptsrc_segmap is None:
             # Create empty segmentation map
             ptsrc_segmap = segmap.SegMap()
@@ -3020,12 +3019,21 @@ class Catalog_seed():
                 self.timer.stop()
                 continue
 
+            self.logger.info("******************************* %s" % (self.basename))
+
             try:
                 psf_to_add = scaled_psf[l1:l2, k1:k2]
                 psfimage[j1:j2, i1:i2] += psf_to_add
 
                 # Add source to segmentation map
                 ptsrc_segmap.add_object_threshold(psf_to_add, j1, i1, entry['index'], self.segmentation_threshold)
+
+                if self.params['Inst']['mode'] in DISPERSED_MODES:
+                    # Add source to seed cube file
+                    stamp = np.zeros(psf_to_add.shape)
+                    flag = psf_to_add >= self.segmentation_threshold
+                    stamp[flag] = entry['index']
+                    seed_cube[entry['index']] = [i1, j1, psf_to_add*1, stamp*1]
             except IndexError:
                 # In here we catch sources that are off the edge
                 # of the detector. These may not necessarily be caught in
@@ -3046,6 +3054,10 @@ class Catalog_seed():
                     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=time_remaining)
                     self.logger.info(('Working on source #{}. Estimated time remaining to add all point sources to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(i, time_remaining, finish_time)))
+
+        if self.params['Inst']['mode'] in DISPERSED_MODES:
+            # Save the seed cube file of point sources
+            pickle.dump(seed_cube, open("%s_star_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         return psfimage, ptsrc_segmap
 
@@ -4054,8 +4066,8 @@ class Catalog_seed():
 
         # Using the position angle, calculate the size of the source in the
         # x and y directions
-        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
         num_pix = x_full_length * y_full_length
 
@@ -4073,8 +4085,8 @@ class Catalog_seed():
 
             # Using the position angle, calculate the size of the source in the
             # x and y directions
-            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
             num_pix = x_full_length * y_full_length
 
@@ -4093,7 +4105,7 @@ class Catalog_seed():
         # Mirage has been using is that the PA is degrees east of north of the
         # semi-major axis
         mod = Sersic2D(amplitude=amplitude, r_eff=r_Sersic, n=sersic_index, x_0=subpixx, y_0=subpixy,
-                       ellip=ellipticity, theta=position_angle+np.pi/2)
+                       ellip=ellipticity, theta=position_angle)
 
         x_half_length = x_full_length // 2
         xmin = int(0 - x_half_length)
@@ -4204,6 +4216,9 @@ class Catalog_seed():
         # final output image
         yd, xd = self.output_dims
 
+        # Seed cube for disperser
+        seed_cube = {}
+
         # create the final galaxy countrate image
         galimage = np.zeros((yd, xd))
 
@@ -4229,8 +4244,7 @@ class Catalog_seed():
             # is just V3SciYAngle in the SIAF (I think???)
             # v3SciYAng is measured in degrees, from V3 towards the Y axis,
             # measured from V3 towards V2.
-            xposang = self.calc_x_position_angle(entry['V2'], entry['V3'], entry['pos_angle'])
-
+            xposang = self.calc_x_position_angle(entry)
             sub_x = 0.
             sub_y = 0.
 
@@ -4298,8 +4312,16 @@ class Catalog_seed():
                 if ((j2 > j1) and (i2 > i1) and (l2 > l1) and (k2 > k1) and (j1 < yd) and (i1 < xd)):
                     stamp_to_add = stamp[l1:l2, k1:k2]
                     galimage[j1:j2, i1:i2] += stamp_to_add
+
                     # Add source to segmentation map
                     segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'], self.segmentation_threshold)
+
+                    if self.params['Inst']['mode'] in DISPERSED_MODES:
+                        # Add source to the seed cube
+                        stamp = np.zeros(stamp_to_add.shape)
+                        flag = stamp_to_add >= self.segmentation_threshold
+                        stamp[flag] = entry['index']
+                        seed_cube[entry['index']] = [i1, j1, stamp_to_add*1, stamp*1]
 
                 else:
                     pass
@@ -4319,21 +4341,49 @@ class Catalog_seed():
                     self.logger.info(('Working on galaxy #{}. Estimated time remaining to add all galaxies to the stamp image: {} minutes. '
                                       'Projected finish time: {}'.format(entry_index, time_remaining, finish_time)))
 
+        if self.params['Inst']['mode'] in DISPERSED_MODES:
+            # Save the seed cube file of galaxy sources
+            pickle.dump(seed_cube, open("%s_galaxy_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
+
         return galimage, segmentation.segmap, ghost_sources_from_galaxies
 
-    def calc_x_position_angle(self, v2_value, v3_value, position_angle):
-        """Calcuate the position angle of the source relative to the x
-        axis of the detector given the source's v2, v3 location and the
-        user-input position angle (degrees east of north).
+    def calc_x_position_angle(self, galaxy_entry):
+        """For Sersic2D galaxies, calcuate the position angle of the source
+        relative to the x axis of the detector given the user-input position
+        angle (degrees east of north).
 
         Parameters
         ----------
-        v2_value : float
-            V2 location of source in units of arcseconds
+        galaxy_entry : astropy.table.Row
+            Row of galaxy info from astropy Table of entries.
+            e.g. output from readGalaxyFile
 
-        v3_value : float
-            V3 location of source in units of arcseconds
+        Returns
+        -------
+        x_posang : float
+            Position angle of source relative to detector x
+            axis, in units of degrees
+        """
+        # Note that this method also works for cases that make use of
+        # an intermediate aperture (e.g. grism time series, although
+        # grism time series obs at the moment only support point sources
+        # currently.)
+        ra_center = galaxy_entry["RA_degrees"]
+        dec_center = galaxy_entry["Dec_degrees"]
+        center = SkyCoord(ra_center, dec_center, unit=u.deg)
+        offset = center.directional_offset_by(galaxy_entry['pos_angle'] * u.deg, 1. * u.arcsec)
+        offset_x, offset_y = self.RADecToXY_astrometric(offset.ra, offset.dec)
+        dx = offset_x - galaxy_entry['pixelx']
+        dy = offset_y - galaxy_entry['pixely']
+        return np.degrees(np.arctan2(dy, dx))
 
+    def calc_x_position_angle_extended(self, position_angle):
+        """For extended sources from fits files with no WCS, calcuate the position
+        angle of the source relative to the x axis of the detector given the source's
+        v2, v3 location and the user-input position angle (degrees east of north).
+
+        Parameters
+        ----------
         position_angle : float
             Position angle of source in degrees east of north
 
@@ -4343,9 +4393,13 @@ class Catalog_seed():
             Position angle of source relative to detector x
             axis, in units of degrees
         """
-        north_to_east_V3ang = rotations.posangle(self.attitude_matrix, v2_value, v3_value)
-        x_posang = 0. - (self.siaf.V3SciXAngle - north_to_east_V3ang + self.local_roll - position_angle
-                         + 90. - self.params['Telescope']['rotation'])
+        x_posang = self.local_roll + position_angle
+
+        # If we are using a Grism Time series aperture, then we need to use the intermediate
+        # aperture to determine the correct rotation. Currently, we should never be in
+        # here since grism TSO observations only support the use of point sources.
+        if self.use_intermediate_aperture:
+            x_posang = self.intermediate_local_roll + position_angle
         return x_posang
 
     def locate_ghost(self, pixel_x, pixel_y, count_rate, magnitude_system, source_row, obj_type, log_skipped_filters=True):
@@ -4604,7 +4658,7 @@ class Catalog_seed():
             # print('extended source size:', ext_stamp.shape)
 
             # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
-            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'], ra, dec)
+            ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'])
 
             eshape = np.array(ext_stamp.shape)
             if len(eshape) == 2:
@@ -4735,7 +4789,7 @@ class Catalog_seed():
 
         return extSourceList, all_stamps, ghost_catalog_file
 
-    def rotate_extended_image(self, stamp_image, pos_angle, right_ascention, declination):
+    def rotate_extended_image(self, stamp_image, pos_angle):
         """Given the user-input position angle for the extended source
         image, calculate the appropriate angle of the stamp image
         relative to the detector x axis, and rotate the stamp image.
@@ -4752,12 +4806,6 @@ class Catalog_seed():
             or string 'None' will result in no rotation, i.e. the input stamp is returned
             without modification.
 
-        right_ascention : float
-            RA of source, in decimal degrees
-
-        declination : float
-            Dec of source, in decimal degrees
-
         Returns
         -------
         rotated : numpy.ndarray
@@ -4770,12 +4818,8 @@ class Catalog_seed():
             return stamp_image
 
         # Add later: check for WCS and use that
-        # if no WCS:
-        if not self.use_intermediate_aperture:
-            pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, right_ascention, declination)
-        else:
-            pixelv2, pixelv3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, right_ascention, declination)
-        x_pos_ang = self.calc_x_position_angle(pixelv2, pixelv3, pos_angle)
+        x_pos_ang = self.calc_x_position_angle_extended(pos_angle)
+
         rotated = rotate(stamp_image, x_pos_ang, mode='constant', cval=0.)
         return rotated
 
@@ -4783,6 +4827,9 @@ class Catalog_seed():
         # Create the empty image
         yd, xd = self.output_dims
         extimage = np.zeros(self.output_dims)
+
+        # Prepare seed cube for extended sources
+        seed_cube = {}
 
         # Create corresponding segmentation map
         segmentation = segmap.SegMap()
@@ -4876,7 +4923,19 @@ class Catalog_seed():
                 # Add source to segmentation map
                 segmentation.add_object_threshold(stamp_to_add, j1, i1, entry['index'],
                                                   self.segmentation_threshold)
+
+                if self.params['Inst']['mode'] in DISPERSED_MODES:
+                    # Add source to seed cube
+                    stamp = np.zeros(stamp_to_add.shape)
+                    flag = stamp_to_add >= self.segmentation_threshold
+                    stamp[flag] = entry['index']
+                    seed_cube[entry['index']] = [i1, j1, stamp_to_add*1, stamp*1]
+
                 self.n_extend += 1
+
+        if self.params['Inst']['mode'] in DISPERSED_MODES:
+            # Save the seed cube
+            pickle.dump(seed_cube, open("%s_extended_seed_cube.pickle" % (self.basename), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
         if self.n_extend == 0:
             self.logger.info("No extended sources present within the aperture.")
@@ -5056,7 +5115,6 @@ class Catalog_seed():
         self.runStep['zodiacal'] = self.checkRunStep(self.params['simSignals']['zodiacal'])
         self.runStep['scattered'] = self.checkRunStep(self.params['simSignals']['scattered'])
         # self.runStep['fwpw'] = self.checkRunStep(self.params['Reffiles']['filtpupilcombo'])
-        self.runStep['pixelAreaMap'] = self.checkRunStep(self.params['Reffiles']['pixelAreaMap'])
 
         # Notify user if no catalogs are provided
         if self.params['simSignals']['pointsource'] == 'None':
@@ -5502,63 +5560,6 @@ class Catalog_seed():
         # else:
         #    coord_transform = self.simple_coord_transform()
         return coord_transform
-
-    """
-    def calculate_background(self, ra, dec, ffile, back_wave=None, back_sig=None, level='medium'):
-        '''Use the JWST background calculator to come up with
-        an appropriate background level for the observation.
-        Options for level include low, medium, high'''
-        from jwst_backgrounds import jbt
-        from astropy import units as u
-        from astropy.units.equivalencies import si, cgs
-
-        # Read in filter throughput file
-        filt_wav, filt_thru = file_io.read_filter_throughput(ffile)
-
-        # If the user wants a background signal from a particular day,
-        # then extract that array here
-        if self.params['simSignals']['use_dateobs_for_background']:
-            # Interpolate background to match filter wavelength grid
-            bkgd_interp = np.interp(filt_wav, back_wave, back_sig)
-
-            # Combine
-            filt_bkgd = bkgd_interp * filt_thru
-
-            # Integrate over the filter bandpass
-            filt_integ = np.trapz(filt_thru, x=filt_wav)
-
-            # Integrate
-            bval = np.trapz(filt_bkgd, x=filt_wav) / filt_integ * u.MJy / u.steradian
-
-        else:
-            # If the user has requested background in terms of low/medium/high,
-            # then we need to examine all the background arrays.
-            # Loop over each day (in the background)
-            # info, convolve the background curve with the filter
-            # throughput curve, and then integrate. THEN, we can
-            # calculate the low/medium/high values.
-            bval = backgrounds.low_medium_high_background_value(ra, dec, level, filt_wav, filt_thru)
-            bval = bval * u.MJy / u.steradian
-
-        # Convert from MJy/str to ADU/sec
-        # then divide by area of pixel
-        flambda = cgs.erg / si.angstrom / si.cm ** 2 / si.s
-        # fnu = cgs.erg / si.Hz / si.cm ** 2 / si.s
-        photflam = self.photflam * flambda
-        # photnu = self.photfnu * fnu
-        pivot = self.pivot * u.micron
-        mjy = photflam.to(u.MJy, u.spectral_density(pivot))
-
-        # Divide by pixel area in steradians to get
-        # MJy/str per ADU/s
-        pixel_area = self.siaf.XSciScale * u.arcsec * self.siaf.YSciScale * u.arcsec
-        mjy_str = mjy / pixel_area.to(u.steradian)
-
-        # Convert the background signal from MJy/str
-        # to ADU/sec
-        bval /= mjy_str
-        return bval.value
-        """
 
     def saveSingleFits(self, image, name, key_dict=None, image2=None, image2type=None):
         # Save an array into the first extension of a fits file
