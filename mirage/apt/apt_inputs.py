@@ -833,6 +833,10 @@ class AptInput:
                 elif (len(line) > 1):
                     elements = line.split()
 
+                    # If we hit the Glossary at the end, we can stop
+                    if elements[0] == 'Glossary':
+                        break
+
                     # Look for lines that give visit/observation numbers
                     if line[0:2] == '* ':
                         paren = line.rfind('(')
