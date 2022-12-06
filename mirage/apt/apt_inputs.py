@@ -833,6 +833,10 @@ class AptInput:
                 elif (len(line) > 1):
                     elements = line.split()
 
+                    # If we hit the Glossary at the end, we can stop
+                    if elements[0] == 'Glossary':
+                        break
+
                     # Look for lines that give visit/observation numbers
                     if line[0:2] == '* ':
                         paren = line.rfind('(')
@@ -865,8 +869,6 @@ class AptInput:
 
                         # The exception to this rule is TA images.
                         # These have Exp values of 0. Sigh.
-
-
                         if ((int(elements[1]) > 0) & ('NRC' in elements[4]
                                                          or 'NIS' in elements[4]
                                                          or 'FGS' in elements[4]
@@ -934,7 +936,7 @@ class AptInput:
                             observation_id.append("V{}P{}{}{}{}".format(vid, '00000000', vgrp, seq, act))
                             # act_counter += 1
 
-                    except ValueError as e:
+                    except (ValueError, IndexError) as e:
                         if verbose:
                             self.logger.info('Skipping line:\n{}\nproducing error:\n{}'.format(line, e))
                         pass
