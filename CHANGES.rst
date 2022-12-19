@@ -1,3 +1,24 @@
+2.4.0
+=====
+
+APT
+---
+
+Modify APT pointing file reader to ignore the new Glossary section in the pointing file (#815)
+
+
+Dependencies
+------------
+
+Update to use pysiaf version 0.19.0 (#809)
+
+
+Source Brightness
+-----------------
+
+Update the filter throughput files and zeropoints for NIRCam to use values derived from in-flight measurements. (#809)
+
+
 2.3.0
 =====
 

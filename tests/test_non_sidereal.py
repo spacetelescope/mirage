@@ -140,7 +140,7 @@ def test_specific_low_medium_high_background_value():
     """Test specific cases of this function and compare to ETC outputs
     """
     # etc = {'low': 0.24, 'medium': 0.26, 'high': 0.27}  # MJy/sr from webform
-    etc = {'low': 1.246, 'medium': 1.352, 'high': 1.402}  # e-/sec/pixel measured from output image
+    etc = {'low': 1.185, 'medium': 1.281, 'high': 1.336}  # e-/sec/pixel measured from output image
 
     # Use the NIRISS Focus Field
     ra = 85.22458

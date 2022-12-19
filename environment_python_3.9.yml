@@ -26,7 +26,7 @@ dependencies:
     - nircam_gsim==1.60
     - numpy==1.23.4
     - photutils>=1.5.0
-    - pysiaf==0.18.0
+    - pysiaf==0.19.0
     - pytest==7.2.0
     - scipy==1.9.3
     - sphinx==5.3.0
