@@ -106,7 +106,7 @@ setup(
         'lxml>=4.9.1',
         'matplotlib>=3.6.2',
         'nircam_gsim',
-        'numpy==1.23.4',
+        'numpy==1.24.2',
         'photutils>=1.5.0',
         'pysiaf==0.19.0',
         'scipy>=1.9.3',
