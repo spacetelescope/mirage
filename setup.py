@@ -98,7 +98,7 @@ setup(
         'grismconf',
         'gwcs>=0.18.1',
         'h5py>=3.7.0',
-        'hotsoss==0.1.7',
+        'hotsoss==0.1.8',
         'ipython',
         'jupyter',
         'jwst',
