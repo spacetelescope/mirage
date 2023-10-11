@@ -77,6 +77,7 @@ The example below creates a galaxy catalog. The main difference compared to the 
     ellipticity = np.random.random(10) * 0.75
     sersic_index = np.random.random(10) * 4.
     position_angle = np.random.random(10) * 359.
+    radius_list = np.random.random(10)
 
     nrc_f200w_mag = np.random.random(10) + 16.
     nrc_f212n_mag = np.random.random(10) + 19.
@@ -84,7 +85,7 @@ The example below creates a galaxy catalog. The main difference compared to the 
 
     gal = catalog_generator.GalaxyCatalog(ra=ra_list, dec=dec_list, ellipticity=ellipticity,
                                           sersic_index=sersic_index, position_angle=position_angle,
-                                          starting_index=11)
+                                          radius=radius_list, starting_index=11)
     gal.add_magnitude_column(nrc_f200w_mag, instrument='nircam', filter_name='F200W', magnitude_system='abmag')
     gal.add_magnitude_column(nrc_f212n_mag, instrument='nircam', filter_name='F212N', magnitude_system='abmag')
     gal.add_magnitude_column(nis_f090w_mag, instrument='niriss', filter_name='F090W', magnitude_system='abmag')
