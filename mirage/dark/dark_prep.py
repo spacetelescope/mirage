@@ -494,7 +494,7 @@ class DarkPrep():
         None
         """
 
-        ncopies = np.int((req - darkint) / darkint)
+        ncopies = int((req - darkint) / darkint)
         extras = (req - darkint) % darkint
 
         # Full copies of the dark exposure (all integrations)

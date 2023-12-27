@@ -383,7 +383,7 @@ class GrismTSO():
         background_dispersed = utils.crop_to_subarray(background_dispersed, tso_direct.subarray_bounds)
 
         # Create a reference pixel mask, and crop to the requeted aperture
-        full_maskimage = np.zeros((tso_direct.ffsize, tso_direct.ffsize), dtype=np.int)
+        full_maskimage = np.zeros((tso_direct.ffsize, tso_direct.ffsize), dtype=int)
         full_maskimage[4:tso_direct.ffsize-4, 4:tso_direct.ffsize-4] = 1.
         refpix_mask = self.crop_to_aperture(orig_parameters, tso_direct.subarray_bounds, full_maskimage)
 

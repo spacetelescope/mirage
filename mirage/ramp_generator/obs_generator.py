@@ -2229,7 +2229,7 @@ class Observation():
         zero : numpy.ndarray
             Zeroth frame data with reference pixels zeroed out
         """
-        maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+        maskimage = np.zeros((self.ffsize, self.ffsize), dtype=int)
         maskimage[4:self.ffsize - 4, 4:self.ffsize - 4] = 1.
 
         # Crop the mask to match the requested output array
@@ -3280,7 +3280,7 @@ class Observation():
 
         num_primary_dithers = self.params['Output']['total_primary_dither_positions']
         if isinstance(self.params['Output']['total_primary_dither_positions'], str):
-            num_primary_dithers = np.int(self.params['Output']['total_primary_dither_positions'][0])
+            num_primary_dithers = int(self.params['Output']['total_primary_dither_positions'][0])
 
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']
