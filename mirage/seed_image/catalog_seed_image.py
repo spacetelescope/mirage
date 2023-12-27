@@ -326,9 +326,9 @@ class Catalog_seed():
         # edge row or column in the evaluated array. So we do this to be
         # sure that we are evaluating the library with a slightly smaller
         # array than the array in the library.
-        self.psf_library_core_x_dim = np.int(self.psf_library_core_x_dim / self.psf_library_oversamp) - \
+        self.psf_library_core_x_dim = int(self.psf_library_core_x_dim / self.psf_library_oversamp) - \
             self.params['simSignals']['gridded_psf_library_row_padding']
-        self.psf_library_core_y_dim = np.int(self.psf_library_core_y_dim / self.psf_library_oversamp) - \
+        self.psf_library_core_y_dim = int(self.psf_library_core_y_dim / self.psf_library_oversamp) - \
             self.params['simSignals']['gridded_psf_library_row_padding']
 
         if self.add_psf_wings is True:
@@ -404,7 +404,7 @@ class Catalog_seed():
         # Keep the mask image equal to the true subarray size, since this
         # won't be used to make a requested grism source image
         if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
-            self.maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+            self.maskimage = np.zeros((self.ffsize, self.ffsize), dtype=int)
             self.maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
 
             # crop the mask to match the requested output array
@@ -850,14 +850,14 @@ class Catalog_seed():
         Padded seed image and segmentation map
         """
         seeddim = seed.shape
-        nx = np.int(2048 * self.grism_direct_factor_x)
-        ny = np.int(2048 * self.grism_direct_factor_y)
-        ffextrax = np.int((nx - 2048) / 2)
-        ffextray = np.int((ny - 2048) / 2)
+        nx = int(2048 * self.grism_direct_factor_x)
+        ny = int(2048 * self.grism_direct_factor_y)
+        ffextrax = int((nx - 2048) / 2)
+        ffextray = int((ny - 2048) / 2)
         bounds = np.array(self.subarray_bounds)
 
-        subextrax = np.int((seeddim[-1] - bounds[2]) / 2)
-        subextray = np.int((seeddim[-2] - bounds[3]) / 2)
+        subextrax = int((seeddim[-1] - bounds[2]) / 2)
+        subextray = int((seeddim[-2] - bounds[3]) / 2)
 
         extradiffy = ffextray - subextray
         extradiffx = ffextrax - subextrax
@@ -866,12 +866,12 @@ class Catalog_seed():
         if len(seeddim) == 2:
             padded_seed = np.zeros((ny, nx))
             padded_seed[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
-            padded_seg = np.zeros((ny, nx), dtype=np.int)
+            padded_seg = np.zeros((ny, nx), dtype=int)
             padded_seg[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
         elif len(seeddim) == 4:
             padded_seed = np.zeros((seeddim[0], seeddim[1], ny, nx))
             padded_seed[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
-            padded_seg = np.zeros((seeddim[0], seeddim[1], ny, nx), dtype=np.int)
+            padded_seg = np.zeros((seeddim[0], seeddim[1], ny, nx), dtype=int)
             padded_seg[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
         else:
             raise ValueError("Seed image is not 2D or 4D. It should be.")
@@ -937,10 +937,10 @@ class Catalog_seed():
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
         kw['NOMXDIM'] = self.nominal_dims[1]
         kw['NOMYDIM'] = self.nominal_dims[0]
-        kw['NOMXSTRT'] = np.int(self.coord_adjust['xoffset'] + 1)
-        kw['NOMXEND'] = np.int(self.nominal_dims[1] + self.coord_adjust['xoffset'])
-        kw['NOMYSTRT'] = np.int(self.coord_adjust['yoffset'] + 1)
-        kw['NOMYEND'] = np.int(self.nominal_dims[0] + self.coord_adjust['yoffset'])
+        kw['NOMXSTRT'] = int(self.coord_adjust['xoffset'] + 1)
+        kw['NOMXEND'] = int(self.nominal_dims[1] + self.coord_adjust['xoffset'])
+        kw['NOMYSTRT'] = int(self.coord_adjust['yoffset'] + 1)
+        kw['NOMYEND'] = int(self.nominal_dims[0] + self.coord_adjust['yoffset'])
 
         # Files/inputs used during seed image production
         kw['YAMLFILE'] = self.paramfile
@@ -1397,8 +1397,8 @@ class Catalog_seed():
 
         # output image dimensions
         dims = self.nominal_dims
-        newdimsx = np.int(dims[1] * self.coord_adjust['x'])
-        newdimsy = np.int(dims[0] * self.coord_adjust['y'])
+        newdimsx = int(dims[1] * self.coord_adjust['x'])
+        newdimsy = int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
         #mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
@@ -2697,8 +2697,8 @@ class Catalog_seed():
                 ghost_i += 1
 
             psf_len = self.find_psf_size(countrate)
-            edgex = np.int(psf_len // 2)
-            edgey = np.int(psf_len // 2)
+            edgex = int(psf_len // 2)
+            edgey = int(psf_len // 2)
 
             if pixely > (miny-edgey) and pixely < (maxy+edgey) and pixelx > (minx-edgex) and pixelx < (maxx+edgex):
                 # set up an entry for the output table
@@ -3116,10 +3116,10 @@ class Catalog_seed():
         # Translation needed to go from PSF core (self.psf_library)
         # coordinate system to the PSF wing coordinate system (i.e.
         # center the PSF core in the wing image)
-        psf_wing_half_width_x = np.int(psf_dim_x // 2)
-        psf_wing_half_width_y = np.int(psf_dim_y // 2)
-        psf_core_half_width_x = np.int(self.psf_library_core_x_dim // 2)
-        psf_core_half_width_y = np.int(self.psf_library_core_y_dim // 2)
+        psf_wing_half_width_x = int(psf_dim_x // 2)
+        psf_wing_half_width_y = int(psf_dim_y // 2)
+        psf_core_half_width_x = int(self.psf_library_core_x_dim // 2)
+        psf_core_half_width_y = int(self.psf_library_core_y_dim // 2)
         delta_core_to_wing_x = psf_wing_half_width_x - psf_core_half_width_x
         delta_core_to_wing_y = psf_wing_half_width_y - psf_core_half_width_y
 
@@ -3178,8 +3178,8 @@ class Catalog_seed():
             # Get the psf wings array - first the nominal size
             # Later we may crop if the source is only partially on the detector
             full_wing_y_dim, full_wing_x_dim = self.psf_wings.shape
-            offset_x = np.int((full_wing_x_dim - psf_dim_x) / 2)
-            offset_y = np.int((full_wing_y_dim - psf_dim_y) / 2)
+            offset_x = int((full_wing_x_dim - psf_dim_x) / 2)
+            offset_y = int((full_wing_y_dim - psf_dim_y) / 2)
 
             full_psf = copy.deepcopy(self.psf_wings[offset_y:offset_y+psf_dim_y, offset_x:offset_x+psf_dim_x])
 
@@ -3378,10 +3378,10 @@ class Catalog_seed():
             y_dim -= 1
         x_half_width = x_dim // 2
         y_half_width = y_dim // 2
-        x_min = np.int(x_center) - x_half_width
-        x_max = np.int(x_center) + x_half_width + 1
-        y_min = np.int(y_center) - y_half_width
-        y_max = np.int(y_center) + y_half_width + 1
+        x_min = int(x_center) - x_half_width
+        x_max = int(x_center) + x_half_width + 1
+        y_min = int(y_center) - y_half_width
+        y_max = int(y_center) + y_half_width + 1
         return x_min, x_max, y_min, y_max
 
     def cropped_coords(self, aperture_x, aperture_y, aperture_dims, stamp_x, stamp_y, stamp_dims,
@@ -3859,15 +3859,15 @@ class Catalog_seed():
         # Expand the limits if a grism direct image is being made
         if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             """
-            extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor_y - 1.))
+            extrapixy = int((maxy + 1)/2 * (self.grism_direct_factor_y - 1.))
             miny -= extrapixy
             maxy += extrapixy
-            extrapixx = np.int((maxx + 1)/2 * (self.grism_direct_factor_x - 1.))
+            extrapixx = int((maxx + 1)/2 * (self.grism_direct_factor_x - 1.))
             minx -= extrapixx
             maxx += extrapixx
 
-            nx = np.int(nx * self.grism_direct_factor_x)
-            ny = np.int(ny * self.grism_direct_factor_y)
+            nx = int(nx * self.grism_direct_factor_x)
+            ny = int(ny * self.grism_direct_factor_y)
 
             this needs to change to be the entire POM.
             don't multiply by grism_direct_factor. that's too small.
@@ -4066,8 +4066,8 @@ class Catalog_seed():
 
         # Using the position angle, calculate the size of the source in the
         # x and y directions
-        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        y_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
         num_pix = x_full_length * y_full_length
 
@@ -4085,8 +4085,8 @@ class Catalog_seed():
 
             # Using the position angle, calculate the size of the source in the
             # x and y directions
-            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            y_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
             num_pix = x_full_length * y_full_length
 
@@ -4162,7 +4162,7 @@ class Catalog_seed():
         if totsignal == 0.:
             return stamp
         yd, xd = stamp.shape
-        mid = np.int(xd / 2)
+        mid = int(xd / 2)
         for rad in range(mid):
             signal = np.sum(stamp[mid - rad:mid + rad + 1, mid - rad:mid + rad + 1]) / totsignal
             if signal >= threshold:
@@ -4265,7 +4265,7 @@ class Catalog_seed():
             # sizes of the photometry aperture versus the extended source.
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
             psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
-                                 self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
+                                 self.params['simSignals']['gridded_psf_library_row_padding']).astype(int)
 
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 stamp = self.enlarge_stamp(stamp, psf_shape)
@@ -4858,7 +4858,7 @@ class Catalog_seed():
                 # produce an output that includes the wings of the PSF
                 psf_dimensions = np.array(self.psf_library.data.shape[-2:])
                 psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
-                                     self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
+                                     self.params['simSignals']['gridded_psf_library_row_padding']).astype(int)
                 if ((stamp_dims[0] < psf_shape[0]) or (stamp_dims[1] < psf_shape[1])):
                     stamp = self.enlarge_stamp(stamp, psf_shape)
                     stamp_dims = stamp.shape
@@ -4971,7 +4971,7 @@ class Catalog_seed():
             if dim_x % 2 != image_size_x % 2:
                 dim_x += 1
             dx = dim_x - image_size_x
-            dx = np.int(dx / 2)
+            dx = int(dx / 2)
         else:
             dx = 0
             dim_x = image_size_x
@@ -4980,7 +4980,7 @@ class Catalog_seed():
             if dim_y % 2 != image_size_y % 2:
                 dim_y += 1
             dy = dim_y - image_size_y
-            dy = np.int(dy / 2)
+            dy = int(dy / 2)
         else:
             dy = 0
             dim_y = image_size_y

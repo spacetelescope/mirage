@@ -538,12 +538,12 @@ class ImgSeed:
         # Normal imaging with grism image requested
         self.coords['x'] = self.grism_direct_factor
         self.coords['y'] = self.grism_direct_factor
-        self.coords['xoffset'] = np.int((self.grism_direct_factor - 1.)
-                                        * (self.subarr_bounds['xend'] -
-                                           self.subarr_bounds['xstart'] + 1) / 2.)
-        self.coords['yoffset'] = np.int((self.grism_direct_factor - 1.)
-                                        * (self.subarr_bounds['yend'] -
-                                           self.subarr_bounds['ystart']+1) / 2.)
+        self.coords['xoffset'] = int((self.grism_direct_factor - 1.)
+                                     * (self.subarr_bounds['xend'] -
+                                        self.subarr_bounds['xstart'] + 1) / 2.)
+        self.coords['yoffset'] = int((self.grism_direct_factor - 1.)
+                                     * (self.subarr_bounds['yend'] -
+                                        self.subarr_bounds['ystart']+1) / 2.)
 
     def make_segmap(self, model):
         """Create a segmentation map of the input image

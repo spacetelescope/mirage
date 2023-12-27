@@ -77,8 +77,8 @@ class MovingTarget():
         """
 
         # Make sure subsampling factor is an integer
-        self.subsampx = np.int(self.subsampx)
-        self.subsampy = np.int(self.subsampy)
+        self.subsampx = int(self.subsampx)
+        self.subsampy = int(self.subsampy)
 
         # Quick fix for the case where xinit,yinit are integers
         xinit = np.float(xframes[1])
@@ -103,15 +103,15 @@ class MovingTarget():
         # Create the initial output frame
         ystamplen, xstamplen = stamp.shape
         #minx = np.min([np.floor(xinit) - np.ceil(xstamplen/2.),np.floor(xframes[-1])-np.ceil(xstamplen/2.)])
-        minx = np.int(np.min([np.floor(xframes[0]) - np.ceil(xstamplen/2.),\
-                              np.floor(xframes[-1])-np.ceil(xstamplen/2.)]))
-        maxx = np.int(np.max([np.floor(xframes[-1] + xstamplen/2.),\
-                              np.floor(xframes[0]+xstamplen/2.)]))
+        minx = int(np.min([np.floor(xframes[0]) - np.ceil(xstamplen/2.),\
+                           np.floor(xframes[-1])-np.ceil(xstamplen/2.)]))
+        maxx = int(np.max([np.floor(xframes[-1] + xstamplen/2.),\
+                           np.floor(xframes[0]+xstamplen/2.)]))
         #miny = np.min([np.floor(yinit) - np.ceil(ystamplen/2.),np.floor(yframes[-1])-np.ceil(ystamplen/2.)])
-        miny = np.int(np.min([np.floor(yframes[0]) - np.ceil(ystamplen/2.),\
-                              np.floor(yframes[-1])-np.ceil(ystamplen/2.)]))
-        maxy = np.int(np.max([np.floor(yframes[-1] + ystamplen/2.),\
-                              np.floor(yframes[0]+ystamplen/2.)]))
+        miny = int(np.min([np.floor(yframes[0]) - np.ceil(ystamplen/2.),\
+                           np.floor(yframes[-1])-np.ceil(ystamplen/2.)]))
+        maxy = int(np.max([np.floor(yframes[-1] + ystamplen/2.),\
+                           np.floor(yframes[0]+ystamplen/2.)]))
 
         # Don't let stamps fall off the edges of the output array
         mnx = minx
@@ -121,19 +121,19 @@ class MovingTarget():
         if minx < 0:
             mnx = 0
         if maxx > outx:
-            mxx = np.int(outx-1)
+            mxx = int(outx-1)
         if miny < 0:
             mny = 0
         if maxy > outy:
-            mxy = np.int(outy-1)
+            mxy = int(outy-1)
 
         # Subsample the output frame
         totxpoints = np.min([outx,mxx-mnx+1])
         totypoints = np.min([outy,mxy-mny+1])
-        outputframe0 = np.zeros((np.int(totypoints*self.subsampy),\
-                                 np.int(totxpoints*self.subsampx)))
-        outputframe1 = np.zeros((np.int(totypoints*self.subsampy),\
-                                 np.int(totxpoints*self.subsampx)))
+        outputframe0 = np.zeros((int(totypoints*self.subsampy),\
+                                 int(totxpoints*self.subsampx)))
+        outputframe1 = np.zeros((int(totypoints*self.subsampy),\
+                                 int(totxpoints*self.subsampx)))
         outfull = np.zeros((numframes, outy, outx))
         outsubshape = outputframe0.shape
 
@@ -214,7 +214,7 @@ class MovingTarget():
         resampled image
         """
         framey, framex = frame.shape
-        newframe = np.zeros((np.int(framey/sampy), np.int(framex/sampx)))
+        newframe = np.zeros((int(framey/sampy), int(framex/sampx)))
         newframey, newframex = newframe.shape
 
         for j in range(newframey):
@@ -275,10 +275,10 @@ class MovingTarget():
 
         indexes = [outxmin, outxmax, stampxmin, stampxmax]
         if np.all(np.isfinite(indexes)):
-            ioutxmin = np.int(outxmin)
-            ioutxmax = np.int(outxmax)
-            istampxmin = np.int(stampxmin)
-            istampxmax = np.int(stampxmax)
+            ioutxmin = int(outxmin)
+            ioutxmax = int(outxmax)
+            istampxmin = int(stampxmin)
+            istampxmax = int(stampxmax)
             dout = ioutxmax - ioutxmin
             dstamp = istampxmax - istampxmin
 
