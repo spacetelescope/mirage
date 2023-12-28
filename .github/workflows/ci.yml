@@ -38,7 +38,7 @@ jobs:
           cache-env: true
           cache-downloads: true
 
-      - run: pip install -e .[test]
+      - run: pip install -e .
 
       - run: conda env export
 
