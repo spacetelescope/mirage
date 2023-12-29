@@ -309,7 +309,8 @@ class Catalog_seed():
 
             # Versions of photutils prior to 1.10.0 use an integer for the oversampling factor, while
             # newer versions use a numpy array with one value for each of the x and y dimensions.
-            # Make sure we can handle both of these options.
+            # Make sure we can handle both of these options. For the moment, Mirage assumes that the
+            # oversampling factor is the same in both dimensions.
             if isinstance(self.psf_library.oversampling, int):
                 self.psf_library_oversamp = self.psf_library.oversampling
             elif isinstance(self.psf_library.oversampling, list) or isinstance(oversamp, np.ndarray):
