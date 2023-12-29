@@ -306,7 +306,15 @@ class Catalog_seed():
                 self.params['simSignals']['psfwfegroup'],
                 self.params['simSignals']['psfpath'])
             self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library.data.shape[-2:]
-            self.psf_library_oversamp = self.psf_library.oversampling
+
+            # Versions of photutils prior to 1.10.0 use an integer for the oversampling factor, while
+            # newer versions use a numpy array with one value for each of the x and y dimensions.
+            # Make sure we can handle both of these options. For the moment, Mirage assumes that the
+            # oversampling factor is the same in both dimensions.
+            if isinstance(self.psf_library.oversampling, int):
+                self.psf_library_oversamp = self.psf_library.oversampling
+            elif isinstance(self.psf_library.oversampling, list) or isinstance(oversamp, np.ndarray):
+                self.psf_library_oversamp = self.psf_library.oversampling[0]
 
         # If reading in segment PSFs, use get_gridded_segment_psf_library_list
         # to get a list of photutils.griddedPSFModel objects
