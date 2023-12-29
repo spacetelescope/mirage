@@ -307,7 +307,7 @@ class Catalog_seed():
                 self.params['simSignals']['psfpath'])
             self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library.data.shape[-2:]
 
-            # Older versions of webbpsf use an integer for the oversampling factor, while
+            # Versions of photutils prior to 1.10.0 use an integer for the oversampling factor, while
             # newer versions use a numpy array with one value for each of the x and y dimensions.
             # Make sure we can handle both of these options.
             if isinstance(self.psf_library.oversampling, int):
