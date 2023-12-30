@@ -313,7 +313,7 @@ class Catalog_seed():
             # oversampling factor is the same in both dimensions.
             if isinstance(self.psf_library.oversampling, int):
                 self.psf_library_oversamp = self.psf_library.oversampling
-            elif isinstance(self.psf_library.oversampling, list) or isinstance(oversamp, np.ndarray):
+            elif isinstance(self.psf_library.oversampling, list) or isinstance(self.psf_library.oversampling, np.ndarray):
                 self.psf_library_oversamp = self.psf_library.oversampling[0]
 
         # If reading in segment PSFs, use get_gridded_segment_psf_library_list
