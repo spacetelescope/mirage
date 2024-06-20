@@ -221,6 +221,13 @@ def source_mags_to_ghost_mags(row, flux_cal_file, magnitude_system, gap_summary_
         else:
             raise ValueError('Unsupported magnitude column name for ghost conversion: {}'.format(mag_col))
 
+        # Also skip columns for NIRISS filters that are not supported by
+        # the ghost gap file
+        tab_gap = ascii.read(gap_summary_file)
+        match = np.where((tab_gap['filt'] == filt.upper()) | (tab_gap['pupil'] == filt.upper()))
+        if len(match[0]) == 0:
+            continue
+
         wave = int(filt[1:4])
         if wave > 200:
             filter_value = filt
