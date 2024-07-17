@@ -424,6 +424,22 @@ def expand_environment_variable(variable_name, offline=False):
     return variable_directory
 
 
+def flatten_nested_list(nested_list):
+    """Flatten a list of lists. Works only for 2 levels.
+
+    Parameters
+    ----------
+    nested_list : list
+        List of lists
+
+    Returns
+    -------
+    list: list
+        Single, flattened list
+    """
+    return [x for xs in nested_list for x in xs]
+
+
 def full_paths(params, module_path, crds_dictionary, offline=False):
     """Expand the relevant input paths from the input yaml file to be full
     paths.
