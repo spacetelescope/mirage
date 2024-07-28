@@ -243,13 +243,6 @@ class Catalog_seed():
                                                                                                     self.params['Readout']['nint'],
                                                                                                     force_delta_int=forced_ints_per_file)
 
-
-                #print('\nOutputs:')
-                #print(split_seed, group_segment_indexes, integration_segment_indexes)
-                #print(split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes)
-                #print(self.file_segment_indexes)
-                #print('')
-
                 # In order to avoid the case of having a single integration
                 # in the final file, which leads to rate rather than rateints
                 # files in the pipeline, check to be sure that the integration
@@ -1531,10 +1524,6 @@ class Catalog_seed():
                         # and then spread the remaining times evenly throughout the frame time
                         frame_start_dt = datetime.datetime.fromtimestamp(all_times[i], tz=datetime.timezone.utc)
                         frame_end_dt = datetime.datetime.fromtimestamp(frame_time, tz=datetime.timezone.utc)
-
-
-                        #frame_start_dt = datetime.utcfromtimestamp(all_times[i])
-                        #frame_end_dt = datetime.utcfromtimestamp(frame_time)
                         subframe_delta_time = (frame_end_dt - frame_start_dt) / (num_sub_frame_points - 1)
                         sub_frame_times = [ephemeris_tools.to_timestamp(frame_start_dt + subframe_delta_time * n) for n in range(num_sub_frame_points)]
                     elif num_sub_frame_points == 0:
@@ -1782,7 +1771,7 @@ class Catalog_seed():
                 # last frame of the set, except for the final integration, where the
                 # reset frame is not present
                 framestart = integ * frames_per_integration + integ
-                frameend = framestart + frames_per_integration # + 1
+                frameend = framestart + frames_per_integration
 
                 # Now check to see if the stamp image overlaps the output
                 # aperture for this integration only. Above we removed sources
@@ -1881,8 +1870,6 @@ class Catalog_seed():
                 x, y, ra, dec, ra_str, dec_str = self.get_positions(in_ra, in_dec, False, 4096)
                 x_list.append(x)
                 y_list.append(y)
-        #x_list = np.array(x_list)
-        #y_list = np.array(y_list)
         return x_list, y_list
 
     def xy_list_to_radec_list(self, x_list, y_list):
@@ -3264,25 +3251,13 @@ class Catalog_seed():
             i1 = i1c
             j1 = j1c
 
-            print(f'\nEVALUATE PSF (no wings):')
-            print(np.min(xpts_core), np.max(xpts_core), np.min(ypts_core), np.max(ypts_core))
-            print(xc_core, yc_core)
-
-            maxloc = np.where(full_psf == np.max(full_psf))
-            print(f'Location of highet signal pixel: {maxloc}\n')
-
-
-            #print(f'In create_psf_stamp, with no psf wing addition, k1 and l1 are the same as k1c, l1c, and are {k1}, {l1}')
-            #print(f'The size of the PSF array (prior to cropping) is {full_psf.shape}')
-
         else:
             add_wings = True
             # If the source subpixel location is beyond 0.5 (i.e. the edge
             # of the pixel), then we shift the wing->core offset by 1.
             # We also need to shift the location of the wing array on the
             # detector by 1
-
-            print('THIS IS NOT CORRECT')
+            raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames. Not sure if this works or not.')
             x_phase = np.modf(x_location)[0]
             y_phase = np.modf(y_location)[0]
             x_location_delta = int(x_phase > 0.5)
@@ -3303,8 +3278,6 @@ class Catalog_seed():
             offset_y = int((full_wing_y_dim - psf_dim_y) / 2)
 
             full_psf = copy.deepcopy(self.psf_wings[offset_y:offset_y+psf_dim_y, offset_x:offset_x+psf_dim_x])
-
-            print(f'When adding wings, full_psf initial size is {full_psf.shape}')
 
             # Get coordinates describing overlap between PSF image and the
             # full frame of the detector
@@ -3341,21 +3314,8 @@ class Catalog_seed():
                     return None, None, None, False
 
                 # Step 4
-
-                print(f'\nEVALUATE PSF:')
-                print(np.min(xpts_core), np.max(xpts_core), np.min(ypts_core), np.max(ypts_core))
-                print(xc_core, yc_core)
-
-
-
                 psf = self.psf_library.evaluate(x=xpts_core, y=ypts_core, flux=1.,
                                                 x_0=xc_core, y_0=yc_core)
-
-                maxloc = np.where(psf == np.max(psf))
-                print(f'Location of highet signal pixel: {maxloc}\n')
-
-                #print(f'The psf created from the gridded library has a size of {psf.shape}')
-
 
                 # Step 5
                 wing_start_x = k1c + delta_core_to_wing_x
@@ -3365,15 +3325,9 @@ class Catalog_seed():
 
                 full_psf[wing_start_y:wing_end_y, wing_start_x:wing_end_x] = psf
 
-                #print(f'In create_psf_stamp, with psf wing addition, k1 and l1 are {k1}, {l1} and k1c, l1c, and are {k1c}, {l1c}')
-                #print(f'The size of the PSF array prior to cropping is {full_psf.shape}')
-
-
             # Whether or not the core is on the detector, crop the PSF
             # to the proper shape based on how much is on the detector
             full_psf = full_psf[l1:l2, k1:k2]
-
-        #print(f'The size of the PSF array being returned is {full_psf.shape}')
 
         return full_psf, i1, j1, k1, l1, add_wings
 
@@ -4467,7 +4421,6 @@ class Catalog_seed():
 
                 else:
                     pass
-                    # print("Source located entirely outside the field of view. Skipping.")
             else:
                 pass
 
@@ -4795,9 +4748,6 @@ class Catalog_seed():
             ext_stamp = fits.getdata(values['filename'])
             if len(ext_stamp.shape) != 2:
                 ext_stamp = fits.getdata(values['filename'], 1)
-
-            # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
-            # print('extended source size:', ext_stamp.shape)
 
             # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
             ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'])
