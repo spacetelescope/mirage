@@ -79,7 +79,7 @@ def to_timestamp(date):
     cal : calendar.timegm
         Calendar timestamp corresponding to the input datetime
     """
-    return calendar.timegm(date.timetuple())
+    return  date.timestamp()
 
 
 def read_ephemeris_file(filename):
@@ -123,9 +123,6 @@ def read_ephemeris_file(filename):
 
             if (('*****' in line) and (i > (start_line+2))):
                 use_line = False
-
-    print(len(time), len(ra), len(dec))
-
 
     ephemeris = Table()
     ephemeris['Time'] = time
