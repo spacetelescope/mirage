@@ -3294,14 +3294,14 @@ class ReadAPTXML():
         number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
 
         # Check if there is a direct image
-        direct_imaging = template.find(ns + 'DirectImaging').text
+        #direct_imaging = template.find(ns + 'DirectImaging').text
 
-        if direct_imaging.upper() == 'TRUE':
-            image_dithers = template.find(ns + 'ImageDithers').text
-            if image_dithers.upper() != 'NONE':
-                number_of_direct_dithers = int(image_dithers)
-            else:
-                number_of_direct_dithers = 1
+        #if direct_imaging.upper() == 'TRUE':
+        image_dithers = template.find(ns + 'ImageDithers').text
+        #    if image_dithers.upper() != 'NONE':
+        #        number_of_direct_dithers = int(image_dithers)
+        #    else:
+        #        number_of_direct_dithers = 1
 
         # Get information about any TA exposures
         ta_targ = template.find(ns + 'AcqTarget').text
@@ -3370,19 +3370,24 @@ class ReadAPTXML():
                     exposure_dict[dither_key_name] = int(number_of_dithers)
                     exposure_dict['number_of_dithers'] = exposure_dict[dither_key_name]
 
-                    if direct_imaging.upper() == 'TRUE':
-                        direct_dict[dither_key_name] = int(number_of_direct_dithers)
-                        direct_dict['number_of_dithers'] = direct_dict[dither_key_name]
-
                     # Store all entries in exposure_dict as lists, so that everything
                     # is consistent regardless of whether there is a direct image
                     for exposure_parameter in exposure:
                         parameter_tag_stripped = exposure_parameter.tag.split(ns)[1]
                         exposure_dict[parameter_tag_stripped] = exposure_parameter.text
 
-                    # If direct images are requested, we need to add a separate
-                    # entry in the exposure dictionary for them.
+                    direct_imaging = exposure_dict['DirectImaging']
                     if direct_imaging.upper() == 'TRUE':
+                        if image_dithers.upper() != 'NONE':
+                            number_of_direct_dithers = int(image_dithers)
+                        else:
+                            number_of_direct_dithers = 1
+
+                        direct_dict[dither_key_name] = int(number_of_direct_dithers)
+                        direct_dict['number_of_dithers'] = direct_dict[dither_key_name]
+
+                        # If direct images are requested, we need to add a separate
+                        # entry in the exposure dictionary for them.
                         direct_dict['Filter'] = exposure_dict['Filter']
                         direct_dict['ReadoutPattern'] = exposure_dict['DirectReadoutPattern']
                         direct_dict['Groups'] = exposure_dict['DirectGroups']
