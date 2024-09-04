@@ -3294,14 +3294,10 @@ class ReadAPTXML():
         number_of_dithers = str(number_of_primary_dithers * number_of_subpixel_dithers)
 
         # Check if there is a direct image
-        #direct_imaging = template.find(ns + 'DirectImaging').text
-
-        #if direct_imaging.upper() == 'TRUE':
-        image_dithers = template.find(ns + 'ImageDithers').text
-        #    if image_dithers.upper() != 'NONE':
-        #        number_of_direct_dithers = int(image_dithers)
-        #    else:
-        #        number_of_direct_dithers = 1
+        try:
+            image_dithers = template.find(ns + 'ImageDithers').text
+        except AttributeError:
+            image_dithers = 'NONE'
 
         # Get information about any TA exposures
         ta_targ = template.find(ns + 'AcqTarget').text
