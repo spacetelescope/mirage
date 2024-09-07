@@ -2379,6 +2379,9 @@ class Observation():
 
         # Now remove the top garbage row from the table
         grouptable = grouptable[1:]
+
+        # Remove the second dimension
+        grouptable = grouptable[:, 0]
         return grouptable
 
     def read_cal_file(self, filename):
