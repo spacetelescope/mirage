@@ -1175,6 +1175,14 @@ class Observation():
             if i > 0:
                 self.linear_dark = self.read_dark_file(self.linDark[i])
 
+                ####### TEMP - DO NOT MERGE ##########
+                self.linear_dark.data *= 0.
+                self.linear_dark.sbAndRefpix *= 0.
+                self.linear_dark.zeroframe *= 0.
+                self.linear_dark.zero_sbAndRefpix *= 0.
+                ####### TEMP - DO NOT MERGE ##########
+
+
             # Find how many integrations are held in the dark. The same
             # number of integrations should be produced from the seed image.
             # In the case where the same seed image is matched to multiple
@@ -1634,6 +1642,15 @@ class Observation():
 
             self.linear_dark = self.read_dark_file(self.linDark[0])
 
+
+        ####### TEMP - DO NOT MERGE ##########
+        self.linear_dark.data *= 0.
+        self.linear_dark.sbAndRefpix *= 0.
+        self.linear_dark.zeroframe *= 0.
+        self.linear_dark.zero_sbAndRefpix *= 0.
+        ####### TEMP - DO NOT MERGE ##########
+
+
     def do_cosmic_rays(self, image, ngroup, iframe, ncr, seedval):
         """Add cosmic rays to input data
 
@@ -1908,7 +1925,13 @@ class Observation():
                 # Create the frame by adding the delta signal
                 # and poisson noise associated with the delta signal
                 # to the previous frame
-                framesignal = previoussignal + poissonsignal
+                #framesignal = previoussignal + poissonsignal
+
+
+                ########### TEMP: DO NOT MERGE- UNCOMMENT LINE ABOVE TO GO BACL TO NORMAL############
+                framesignal = previoussignal + deltaframe
+                ########### TEMP: DO NOT MERGE ############
+
 
                 # Add cosmic rays
                 if self.runStep['cosmicray']:

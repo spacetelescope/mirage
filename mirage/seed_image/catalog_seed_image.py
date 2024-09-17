@@ -3068,7 +3068,7 @@ class Catalog_seed():
             # Assume same PSF size in x and y
             psf_y_dim = psf_x_dim
 
-            scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(
+            scaled_psf, _, _, min_x, min_y, wings_added = self.create_psf_stamp(
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
                 segment_number=segment_number, ignore_detector=True
             )
