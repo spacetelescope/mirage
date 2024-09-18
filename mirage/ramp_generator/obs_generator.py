@@ -1842,7 +1842,7 @@ class Observation():
         if ndim == 3:
             data = np.vstack((np.zeros((1, yd, xd)), data))
 
-        outramp = np.zeros((self.params['Readout']['ngroup'], yd, xd), dtype=np.float)
+        outramp = np.zeros((self.params['Readout']['ngroup'], yd, xd), dtype=float)
 
         # Set up functions to apply cosmic rays later
         # Need the total number of active pixels in the
