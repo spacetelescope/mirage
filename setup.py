@@ -103,6 +103,7 @@ setup(
         'jupyter',
         'jwst',
         'jwst-backgrounds>=1.3.0',
+        'jwst_gtvt>=1.0.1',
         'lxml>=5.3.0',
         'matplotlib>=3.9.2',
         'nircam_gsim',

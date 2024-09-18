@@ -2253,27 +2253,38 @@ def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
     pa_v3 : float
         V3PA in degrees
     """
-    import jwst_gtvt.find_tgt_info
+    from jwst_gtvt.jwst_tvt import Ephemeris
 
     if date is None:
         start_date_obj = datetime.date.today()
         start_date = start_date_obj.isoformat()
+        start_date = Time(start_date)
     else:
         start_date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
         start_date = start_date_obj.isoformat().split('T')[0]
+        start_date = Time(start_date)
 
-    # note, get_table requires distinct start and end dates, different by at least 1 day
+    # The gtvt seems to return NaN for the first row of the resulting
+    # dataframe no matter what. So let's move the starting date back
+    # one day so that we can get good values for the day of interest
+    start_date = start_date - TimeDelta(1, format='jd')
+
+    # jwst_gtvt.get_fixed_target_positions often returns NaN for the first entry in
+    # the table, so make sure we have an end date that is later than the start date
     end_date_obj = start_date_obj + datetime.timedelta(days=1)
     end_date = end_date_obj.isoformat().split('T')[0]
+    end_date = Time(end_date)
 
-    tbl = jwst_gtvt.find_tgt_info.get_table(ra=ra, dec=dec, instrument='NIRCam',
-                                            start_date=start_date, end_date=end_date,
-                                            verbose=False)
-    row = tbl[0]
+    ephem = Ephemeris(start_date=start_date, end_date=end_date)
+    ephem_df = ephem.get_fixed_target_positions(ra, dec)
+
+    nominal_pa = ephem.dataframe['V3PA_nominal_angle'].iloc[1]
+    min_pa = ephem.dataframe['V3PA_min_pa_angle'].iloc[1]
+    max_pa = ephem.dataframe['V3PA_max_pa_angle'].iloc[1]
 
     if return_range:
-        return row['V3PA'], row['V3PA min'], row['V3PA max']
-    return row['V3PA']
+        return nominal_pa, min_pa, max_pa
+    return nominal_pa
 
 
 def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=False, pointing_table=None):
