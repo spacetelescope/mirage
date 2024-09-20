@@ -8,7 +8,8 @@ This module contains functions that work with JPL Horizons ephemeris files
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 import calendar
-from datetime import datetime
+from datetime import datetime, timezone
+import numpy as np
 from scipy.interpolate import interp1d
 
 
@@ -81,8 +82,8 @@ def calculate_nested_positions(x_or_ra_frames, y_or_dec_frames, times_list, spat
 
         if position_units == 'angular':
             # If inputs are in RA, Dec (which are in degrees), translate to arcseconds
-            delta_ra = (ra_frame - ra_frames[i]) * 3600.
-            delta_dec = (dec_frame - dec_frames[i]) * 3600.
+            delta_ra = (ra_frame - x_or_ra_frames[i]) * 3600.
+            delta_dec = (dec_frame - y_or_dec_frames[i]) * 3600.
         elif position_units == 'pixels':
             # If input positions are in units of pixels, there's no need to translate
             pass
@@ -103,8 +104,8 @@ def calculate_nested_positions(x_or_ra_frames, y_or_dec_frames, times_list, spat
         elif num_sub_frame_points > 2:
             # Here we need to evaluate the PSF three or more times. Use the frame start and end time,
             # and then spread the remaining times evenly throughout the frame time
-            frame_start_dt = datetime.datetime.fromtimestamp(times_list[i], tz=datetime.timezone.utc)
-            frame_end_dt = datetime.datetime.fromtimestamp(frame_time, tz=datetime.timezone.utc)
+            frame_start_dt = datetime.fromtimestamp(times_list[i], tz=timezone.utc)
+            frame_end_dt = datetime.fromtimestamp(frame_time, tz=timezone.utc)
             subframe_delta_time = (frame_end_dt - frame_start_dt) / (num_sub_frame_points - 1)
             sub_frame_times = [to_timestamp(frame_start_dt + subframe_delta_time * n) for n in range(num_sub_frame_points)]
         elif num_sub_frame_points == 0:

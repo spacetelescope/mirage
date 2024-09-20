@@ -122,6 +122,15 @@ class Catalog_seed():
         # array will not sit centered in the expanded output image.
         self.coord_adjust = {'x': 1., 'xoffset': 0, 'y': 1., 'yoffset': 0}
 
+        # Set the spatial frequency, in pixel units, for moving source
+        # simulations. This value controls how often a PSF or stamp
+        # image is placed into the scene when building the trail of a
+        # moving target. e.g. 0.3 means that the PSF is placed into the
+        # scene each time the source moves by 0.3 pixels. Testing has
+        # shown a value of 0.3 seems to produce realistic results without
+        # taking too long to create the scene
+        self.source_spatial_frequency_pix = 0.3  # Units are pixels
+
         # NIRCam rough noise values. Used to make educated guesses when
         # creating segmentation maps
         self.single_ron = 6.  # e-/read
@@ -1472,6 +1481,7 @@ class Catalog_seed():
         times = []
         obj_counter = 0
         time_reported = False
+        source_spatial_frequency_angular = self.source_spatial_frequency_pix * self.siaf.XSciScale # arcsec
         for index, entry in zip(indexes, mtlist):
             start_time = time.time()
 
@@ -1492,9 +1502,6 @@ class Catalog_seed():
                 # Create list of positions for all frames
                 ra_frames = ra_eph(all_times)
                 dec_frames = dec_eph(all_times)
-
-                source_spatial_frequency_pix = 0.3  # pixels
-                source_spatial_frequency_angular = source_spatial_frequency_pix * self.siaf.XSciScale # arcsec
 
                 """
                 subframe_times_nested = []
@@ -1590,9 +1597,9 @@ class Catalog_seed():
                                                                                                                              position_units='angular')
                 elif x_frames is not None:
                     x_frames_nested, y_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(x_frames, y_frames, all_times,
-                                                                                                                             source_spatial_frequency_pix,
-                                                                                                                             ra_ephemeris=None, dec_ephemeris=None,
-                                                                                                                             position_units='pixels')
+                                                                                                                          self.source_spatial_frequency_pix,
+                                                                                                                          ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                          position_units='pixels')
 
 
 
@@ -1628,7 +1635,7 @@ class Catalog_seed():
 
                     # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
                     x_frames_nested, y_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(x_frames, y_frames, all_times,
-                                                                                                                          source_spatial_frequency_pix,
+                                                                                                                          self.source_spatial_frequency_pix,
                                                                                                                           ra_ephemeris=None, dec_ephemeris=None,
                                                                                                                           position_units='pixels')
 
@@ -1712,24 +1719,46 @@ class Catalog_seed():
             # determine the ghosts' locations here. Note that ghost locations do not
             # move in the same magnitude/direction as the actual sources, so we need
             # to determine source locations from the real source's location in each
-            # frame individually.
+            # frame individually. It also does not make sense to convolve the ghost
+            # stamp image with the same subpixel centered PSFs used for the real source,
+            # so we'll just convolve with the same PSF for all ghost positions.
             if add_ghosts:
+                ghost_x_frames_nested = []
+                ghost_y_frames_nested = []
+                ghost_stamp_nested = []
                 raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
-                ghost_x_frames, ghost_y_frames, ghost_mags, ghost_countrate, ghost_file = self.locate_ghost(x_frames, y_frames, rate,
-                                                                                                            magsys, entry, input_type,
-                                                                                                            log_skipped_filters=False)
+                for tmp_x_frames, tmp_y_frames in zip(x_frames_nested, y_frames_nested):
+                    ghost_x_frames, ghost_y_frames, ghost_mags, ghost_countrate, ghost_file = self.locate_ghost(tmp_x_frames, tmp_y_frames, rate,
+                                                                                                                magsys, entry, input_type,
+                                                                                                                log_skipped_filters=False)
+                    ghost_x_frames_nested.append(ghost_x_frames)
+                    ghost_y_frames_nested.append(ghost_y_frames)
+
                 if ghost_file is not None:
                     ghost_stamp, ghost_header = self.basic_get_image(ghost_file)
 
                     # Normalize the ghost stamp image to match ghost_countrate
                     ghost_stamp = ghost_stamp / np.sum(ghost_stamp) * ghost_countrate
 
+                    # Create a nested list of stamp images, to match the nested lists of x and y positions
+                    ghost_stamp_nested = []
+                    for sublist in ghost_x_frames_nested:
+                        tmp = [ghost_stamp] * len(sublist)
+                        ghost_stamp_nested.append(tmp)
+
                     # Convolve with PSF if requested
                     if self.params['simSignals']['PSFConvolveExtended']:
                         # eval_psf should be close to 1.0, but not exactly. For the purposes
                         # of convolution, we want the total signal to be exactly 1.0
                         conv_psf = eval_psf / np.sum(eval_psf)
-                        ghost_stamp = s1.fftconvolve(ghost_stamp, conv_psf, mode='same')
+                        convolved_ghost_stamp = s1.fftconvolve(ghost_stamp, conv_psf, mode='same')
+
+                        convolved_ghost_stamp_nested = []
+                        for sublist in ghost_stamp_nested:
+                            tmp = [convolved_ghost_stamp] * len(sublist)
+                            convolved_ghost_stamp_nested.append(tmp)
+
+                        ghost_stamp_nested = convolved_ghost_stamp_nested
 
             if input_type == 'point_source':
                 # Multiply the nested PSFs by the signal rate per second for the source
@@ -1832,11 +1861,8 @@ class Catalog_seed():
                 if status == 'off':
                     continue
 
-                mt = moving_targets.MovingTarget()
-                mt.subsampx = 3
-                mt.subsampy = 3
-
                 # Now create the moving target ramp for this source
+                mt = moving_targets.MovingTarget()
                 mt_source = mt.create(stamp_nested[framestart:frameend], x_frames_nested[framestart:frameend],
                                       y_frames_nested[framestart:frameend], aper_x_min_of_stamp_nested[framestart:frameend],
                                       aper_y_min_of_stamp_nested[framestart:frameend], subframe_times_nested[framestart:frameend],
@@ -1848,20 +1874,18 @@ class Catalog_seed():
                 moving_segmap.add_object_threshold(mt_source[-1, :, :], 0, 0, index, self.segmentation_threshold)
 
                 if add_ghosts and ghost_file is not None:
-                    raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
                     # Check if the ghost lands on the detector
-                    ghost_status = self.on_detector(ghost_x_frames[framestart:frameend],
-                                                    ghost_y_frames[framestart:frameend],
+                    ghost_status = self.on_detector(ghost_x_frames_nested[integ][0],
+                                                    ghost_y_frames_nested[integ][0],
                                                     ghost_stamp.shape, (newdimsx, newdimsy))
+
                     if ghost_status == 'off':
                         continue
 
                     mt = moving_targets.MovingTarget()
-                    mt.subsampx = 3
-                    mt.subsampy = 3
-                    mt_ghost_source = mt.create(ghost_stamp, ghost_x_frames[framestart:frameend],
-                                          ghost_y_frames[framestart:frameend],
-                                          self.frametime, newdimsx, newdimsy)
+                    mt_ghost_source = mt.create(ghost_stamp_nested[framestart:frameend], ghost_x_frames_nested[framestart:frameend],
+                                                ghost_y_frames_nested[framestart:frameend],
+                                                self.frametime, newdimsx, newdimsy)
 
                     mt_integration[integ, :, :, :] += mt_ghost_source
 
@@ -3303,7 +3327,6 @@ class Catalog_seed():
             # of the pixel), then we shift the wing->core offset by 1.
             # We also need to shift the location of the wing array on the
             # detector by 1
-            raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames. Not sure if this works or not.')
             x_phase = np.modf(x_location)[0]
             y_phase = np.modf(y_location)[0]
             x_location_delta = int(x_phase > 0.5)

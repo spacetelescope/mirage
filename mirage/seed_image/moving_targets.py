@@ -51,8 +51,6 @@ class MovingTarget():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.verbose = False
-        self.subsampx = 3
-        self.subsampy = 3
 
     def create(self, stamps_nested, xframes_nested, yframes_nested, xmin_of_stamp, ymin_of_stamp, frametimes_nested, total_frame_frametime, outx, outy):
         """
@@ -555,12 +553,23 @@ class MovingTarget():
             if np.all(np.isfinite(outcoords)):
 
                 if ((stamp_minx_list[i] != outxmin) | (stamp_miny_list[i] != outymin)):
-                    self.logging.info('InputMotion:')
-                    self.logging.info(f'Stamp min x and y lists: {stamp_minx_list[i]}, {stamp_miny_list[i]}')
-                    self.logging.info(f'outxmin, outymin, outxmax, outymax: {outxmin}, {outymin}, {outxmax}, {outymax}')
-                    self.logging.info(f'xpos, ypos: {xpos}, {ypos}')
-                    self.logging.info(f'stampxmin, stampymin, stampxmax, stampymax: {stampxmin}, {stampymin}, {stampxmax}, {stampymax}')
-                    self.logging.info(f'srcxlen and srcylen: {srcxlen}, {srcylen}')
+                    self.logger.info('InputMotion:')
+                    self.logger.info(f'Stamp min x and y lists: {stamp_minx_list[i]}, {stamp_miny_list[i]}')
+                    self.logger.info(f'outxmin, outymin, outxmax, outymax: {outxmin}, {outymin}, {outxmax}, {outymax}')
+                    self.logger.info(f'xpos, ypos: {xpos}, {ypos}')
+                    self.logger.info(f'stampxmin, stampymin, stampxmax, stampymax: {stampxmin}, {stampymin}, {stampxmax}, {stampymax}')
+                    self.logger.info(f'srcxlen and srcylen: {srcxlen}, {srcylen}')
+
+
+                    print(stamp_minx_list[i])
+                    print(srcxlen)
+                    print(framexlen)
+                    print('')
+                    print(stamp_miny_list[i])
+                    print(srcylen)
+                    print(frameylen)
+
+
                     raise ValueError('Mis-matched coordinates in moving_targets.inputMotion')
 
                 scale = total_frametime / len(xlist)
