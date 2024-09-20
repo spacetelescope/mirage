@@ -3347,6 +3347,11 @@ class Observation():
 
         outModel[0].header['DURATION'] = self.get_duration()
 
+        # Set the visit start time. Make sure the seconds is high precision. 7 decimal points.
+        seconds_low_precision = self.params['Output']['time_obs'].split(':')[-1]
+        seconds_high_precision = "{:.7f}".format(float(self.params['Output']['time_obs'].split(':')[-1]))
+        outModel[0].header['VSTSTART'] = start_time_string.replace(seconds_low_precision, seconds_high_precision).replace('T', ' ')
+
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
         with warnings.catch_warnings():
