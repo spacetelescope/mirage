@@ -2918,6 +2918,11 @@ class Observation():
         else:
             outModel.meta.visit.tsovisit = True
 
+        # Set the visit start time. Make sure the seconds is high precision. 7 decimal points.
+        seconds_low_precision = self.params['Output']['time_obs'].split(':')[-1]
+        seconds_high_precision = "{:.7f}".format(float(self.params['Output']['time_obs'].split(':')[-1]))
+        outModel.meta.visit.start_time = start_time_string.replace(seconds_low_precision, seconds_high_precision)
+
         num_primary_dithers = self.params['Output']['total_primary_dither_positions']
         if isinstance(self.params['Output']['total_primary_dither_positions'], str):
             num_primary_dithers = int(self.params['Output']['total_primary_dither_positions'][0])
