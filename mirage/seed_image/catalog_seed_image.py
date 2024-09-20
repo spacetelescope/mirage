@@ -1420,17 +1420,16 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(mtlist, filename)
 
-        # If any ephemeris file will be used, get the calendar dates associated
-        # with each frame
-        if 'ephemeris_file' in mtlist.colnames or non_sidereal_ra_interp_function is not None:
-            ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+        # Get the calendar dates associated with each frame
+        #if 'ephemeris_file' in mtlist.colnames or non_sidereal_ra_interp_function is not None:
+        ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
 
-            # Allow time_obs to have an integer or fractional number of seconds
-            try:
-                start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
-            except ValueError:
-                start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f')
-            all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
+        # Allow time_obs to have an integer or fractional number of seconds
+        try:
+            start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
+        except ValueError:
+            start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f')
+        all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
 
         # If the ephemeris_file column is not present, add it and populate it with
         # 'none' for all entries. This will make for fewer possibilities when looping
@@ -1494,8 +1493,10 @@ class Catalog_seed():
                 ra_frames = ra_eph(all_times)
                 dec_frames = dec_eph(all_times)
 
-                source_spatial_frequency = 0.3  # pixels
-                source_spatial_frequency *= self.siaf.XSciScale # arcsec
+                source_spatial_frequency_pix = 0.3  # pixels
+                source_spatial_frequency_angular = source_spatial_frequency_pix * self.siaf.XSciScale # arcsec
+
+                """
                 subframe_times_nested = []
                 ra_frames_nested = []
                 dec_frames_nested = []
@@ -1510,7 +1511,7 @@ class Catalog_seed():
                     delta_pos = np.sqrt(delta_ra**2 + delta_dec**2)
 
                     # How many points do we need to follow the given spatial scale?
-                    num_sub_frame_points = int(np.ceil(delta_pos / source_spatial_frequency))
+                    num_sub_frame_points = int(np.ceil(delta_pos / source_spatial_frequency_angular))
                     if num_sub_frame_points == 1:
                         # If the source moves less than the spatial frequency limit, then we'll only need to evaluate
                         # the PSF once, using the end time of the frame
@@ -1535,11 +1536,16 @@ class Catalog_seed():
                     ra_frames_nested.append(subframe_ra)
                     dec_frames_nested.append(subframe_dec)
                     subframe_times_nested.append(sub_frame_times)
+                """
+
+                # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
+                                                                                                                         source_spatial_frequency_angular,
+                                                                                                                         ra_ephemeris=ra_eph, dec_ephemeris=dec_eph,
+                                                                                                                         position_units='angular')
 
             else:
                 self.logger.info(("Using provided velocities to find the location of source #{} in {}.".format(index, filename)))
-                self.logger.warning("Non-ephemeris moving targets have not yet been updated to work with PSF evaluations at subframe positions")
-                raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
                 if pixvelflag:
                     delta_x_frames = (entry['x_or_RA_velocity'] / 3600.) * frameexptimes
                     delta_y_frames = (entry['y_or_Dec_velocity'] / 3600.) * frameexptimes
@@ -1576,6 +1582,26 @@ class Catalog_seed():
                         ra_frames = entry['x_or_RA'] + delta_ra_frames
                         dec_frames = entry['y_or_Dec'] + delta_dec_frames
 
+                # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                if ra_frames is not None:
+                    ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
+                                                                                                                             source_spatial_frequency_angular,
+                                                                                                                             ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                             position_units='angular')
+                elif x_frames is not None:
+                    x_frames_nested, y_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(x_frames, y_frames, all_times,
+                                                                                                                             source_spatial_frequency_pix,
+                                                                                                                             ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                             position_units='pixels')
+
+
+
+
+
+
+
+
+
             # Non-sidereal observation: in this case, if we are working with RA, Dec
             # values, the coordinate sytem flips such that the non-sidereal target
             # that is being tracked will stay at the same RA', Dec' for the duration
@@ -1583,9 +1609,8 @@ class Catalog_seed():
             # change frame-to-frame. If working in x, y pixel units, the same applies
             # with the background targets changing position with time
             if MT_tracking:
-                raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
 
-                self.logger.info("Updating source #{} location based on non-sidereal source motion.".format(index))
+                self.logger.info(f"Updating source #{index} location based on non-sidereal source motion.")
                 if delta_non_sidereal_ra is None:
                     # Here the non-sidereal target's offsets are in units of pixels
                     if ra_frames is not None:
@@ -1601,6 +1626,12 @@ class Catalog_seed():
                     x_frames -= delta_non_sidereal_x
                     y_frames -= delta_non_sidereal_y
 
+                    # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                    x_frames_nested, y_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(x_frames, y_frames, all_times,
+                                                                                                                          source_spatial_frequency_pix,
+                                                                                                                          ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                          position_units='pixels')
+
                 else:
                     # Here the non-sidereal target's offsets are in units of RA, Dec
                     if x_frames is not None:
@@ -1614,6 +1645,12 @@ class Catalog_seed():
                     # units of RA, Dec, add the non-sidereal offsets
                     ra_frames -= delta_non_sidereal_ra
                     dec_frames -= delta_non_sidereal_dec
+
+                    # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                    ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
+                                                                                                                             source_spatial_frequency_angular,
+                                                                                                                             ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                             position_units='angular')
 
             # Make sure that ra_frames and x_frames are both populated
             if x_frames is None:
@@ -1704,7 +1741,6 @@ class Catalog_seed():
                     stamp_nested.append(stamp_sublist)
 
             elif input_type == 'extended':
-                raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
                 stamp, header = self.basic_get_image(entry['filename'])
                 # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
                 stamp = self.rotate_extended_image(stamp, entry['pos_angle'])
@@ -1727,10 +1763,15 @@ class Catalog_seed():
                         stamp_dims = stamp.shape
 
                     # Convolve stamp with PSF
-                    stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
+                    stamp_nested = []
+                    for psf_sublist in psf_frames_nested:
+                        stamp_sublist = []
+                        for psf_entry in psf_sublist:
+                            stamp_sublist.append(s1.fftconvolve(stamp, psf_entry, mode='same'))
+                        stamp_nested.append(stamp_sublist)
+
 
             elif input_type == 'galaxies':
-                raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
                 xposang = self.calc_x_position_angle(entry)
 
                 # First create the galaxy
@@ -1748,14 +1789,19 @@ class Catalog_seed():
                     galdims = stamp.shape
 
                 # Convolve the galaxy with the instrument PSF
-                stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
+                stamp_nested = []
+                for psf_sublist in psf_frames_nested:
+                    stamp_sublist = []
+                    for psf_entry in psf_sublist:
+                        stamp_sublist.append(s1.fftconvolve(stamp, psf_entry, mode='same'))
+                    stamp_nested.append(stamp_sublist)
 
             # Now that we have stamp images for galaxies and extended
             # sources, check to see if they overlap the detector or not.
             # NOTE: this will only catch sources that never overlap the
             # detector for any of their positions.
             if input_type != 'point_source':
-                status = self.on_detector(x_frames, y_frames, stamp.shape,
+                status = self.on_detector(x_frames, y_frames, stamp_nested[0][0].shape,
                                           (newdimsx, newdimsy))
             if status == 'off':
                 continue
