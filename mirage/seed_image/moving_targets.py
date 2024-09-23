@@ -552,24 +552,14 @@ class MovingTarget():
             # the output frame and it shouldn't be added
             if np.all(np.isfinite(outcoords)):
 
-                if ((stamp_minx_list[i] != outxmin) | (stamp_miny_list[i] != outymin)):
+                #if ((stamp_minx_list[i] != outxmin) | (stamp_miny_list[i] != outymin)):
+                if inframe[outymin:outymax, outxmin:outxmax].shape != source[stampymin:stampymax, stampxmin:stampxmax].shape:
                     self.logger.info('InputMotion:')
                     self.logger.info(f'Stamp min x and y lists: {stamp_minx_list[i]}, {stamp_miny_list[i]}')
                     self.logger.info(f'outxmin, outymin, outxmax, outymax: {outxmin}, {outymin}, {outxmax}, {outymax}')
                     self.logger.info(f'xpos, ypos: {xpos}, {ypos}')
                     self.logger.info(f'stampxmin, stampymin, stampxmax, stampymax: {stampxmin}, {stampymin}, {stampxmax}, {stampymax}')
                     self.logger.info(f'srcxlen and srcylen: {srcxlen}, {srcylen}')
-
-
-                    print(stamp_minx_list[i])
-                    print(srcxlen)
-                    print(framexlen)
-                    print('')
-                    print(stamp_miny_list[i])
-                    print(srcylen)
-                    print(frameylen)
-
-
                     raise ValueError('Mis-matched coordinates in moving_targets.inputMotion')
 
                 scale = total_frametime / len(xlist)

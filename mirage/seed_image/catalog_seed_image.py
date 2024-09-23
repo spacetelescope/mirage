@@ -1863,6 +1863,18 @@ class Catalog_seed():
 
                 # Now create the moving target ramp for this source
                 mt = moving_targets.MovingTarget()
+
+                print('INTEG, FRAMESTART, FRAMEEND')
+                print(integ, framestart, frameend, frames_per_integration)
+                print(len(stamp_nested), len(stamp_nested[0]))
+                print(stamp_nested[framestart:frameend])
+                print(len(x_frames_nested), len(x_frames_nested[0]))
+                test= x_frames_nested[framestart:frameend]
+                print(x_frames_nested[framestart:frameend])
+                print('TEST', test[0])
+                print(test[0][0])
+                #stop
+
                 mt_source = mt.create(stamp_nested[framestart:frameend], x_frames_nested[framestart:frameend],
                                       y_frames_nested[framestart:frameend], aper_x_min_of_stamp_nested[framestart:frameend],
                                       aper_y_min_of_stamp_nested[framestart:frameend], subframe_times_nested[framestart:frameend],
@@ -2380,7 +2392,7 @@ class Catalog_seed():
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
-            signalimage = np.zeros(self.output_dims, dtype=np.float)
+            signalimage = np.zeros(self.output_dims, dtype=float)
             segmentation_map = np.zeros(self.output_dims)
 
 

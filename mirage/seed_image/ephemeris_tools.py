@@ -7,9 +7,11 @@ This module contains functions that work with JPL Horizons ephemeris files
 
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
+from astropy.time import Time
 import calendar
 from datetime import datetime, timezone
 import numpy as np
+import pysiaf
 from scipy.interpolate import interp1d
 
 
@@ -125,7 +127,8 @@ def calculate_nested_positions(x_or_ra_frames, y_or_dec_frames, times_list, spat
         ra_frames_nested.append(subframe_ra)
         dec_frames_nested.append(subframe_dec)
         subframe_times_nested.append(sub_frame_times)
-        return ra_frames_nested, dec_frames_nested, subframe_times_nested
+
+    return ra_frames_nested, dec_frames_nested, subframe_times_nested
 
 
 def create_interpol_function(ephemeris):
@@ -147,6 +150,88 @@ def create_interpol_function(ephemeris):
                          bounds_error=True, kind='quadratic')
     dec_interp = interp1d(time, ephemeris['Dec'].data,
                           bounds_error=True, kind='quadratic')
+    return ra_interp, dec_interp
+
+def ephemeris_from_catalog(nonsidereal_cat, pixel_flag, velocity_flag, start_time, coord_transform, attitude_matrix):
+    """Generate ephemeris interpolation functions based on the information in the
+    moving target to track catalog. This should only be used in cases where an
+    ephemeris file is not provided
+
+    Parameters
+    ----------
+    nonsidereal_cat : astropy.table.Table
+        Table from the catalog file
+
+    pixel_flag : bool
+        If True, positions are assumed to be in units of pixels. IF False,
+        then RA, and Dec in degrees
+
+    vel_flag : bool
+        If True, the source velocities are assumed to be in units of pixels/hour.
+        If False, then arcsec per hour in RA, and Dec.
+
+    start_time : float
+        MJD of the start time of the exposure
+
+    coord_transform : dict
+        Coordinate transformation as read in from the distortion reference file
+
+    attitude_matrix :  matrix
+        Attitude matrix used to relate RA, Dec, local roll angle to V2, V3
+
+    Returns
+    -------
+    ra_interp : scipy.interpolate.interp1d
+        1D interpolation function for RA
+
+    dec_interp : scipy.interpolate.interp1d
+        1D interpolation function for Dec
+    """
+    starttime_datetime = obstime_to_datetime(start_time)
+    starttime_calstamp = to_timestamp(starttime_datetime)
+    end_time = start_time + (1. / 24.)  # 1 hour later
+    endtime_datetime = obstime_to_datetime(start_time)
+    endtime_calstamp = to_timestamp(starttime_datetime)
+
+    if not pixel_flag:
+        # Location given in RA, Dec
+        ra_start = nonsidereal_cat['x_or_RA'][0]
+        dec_start = nonsidereal_cat['y_or_Dec'][0]
+
+        if not velocity_flag:
+            # Poitions and velocities given in angular units. RA, Dec, and motion in
+            # arcsec per hour
+            ra_end = ra_start + nonsidereal_cat['x_or_RA_velocity'][0] / 3600.
+            dec_end = dec_start + nonsidereal_cat['y_or_Dec_velocity'][0] / 3600.
+        else:
+            # Postions in RA, Dec, but velocities in pixels/hour
+            loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(attitude_matrix, ra_start, dec_start)
+            x_start, y_start = coord_transform.inverse(loc_v2, loc_v3)
+            x_end = x_start + nonsidereal_cat['x_or_RA_velocity'].data[0]
+            y_end = y_start + nonsidereal_cat['y_or_Dec_velocity'].data[0]
+            loc_v2, loc_v3 = coord_transform(x_end, y_end)
+            ra_end, dec_end = pysiaf.utils.rotations.pointing(attitude_matrix, loc_v2, loc_v3)
+    else:
+        # Location given in pixels
+        x_start = nonsidereal_cat['x_or_RA'].data[0]
+        y_start = nonsidereal_cat['y_or_Dec'].data[0]
+        loc_v2, loc_v3 = coord_transform(x_start, y_start)
+        ra_start, dec_start = pysiaf.utils.rotations.pointing(attitude_matrix, loc_v2, loc_v3)
+
+        if not velocity_flag:
+            # Velocities given in RA, Dec arcsec/hour
+            ra_end = ra_start + nonsidereal_cat['x_or_RA_velocity'][0] / 3600.
+            dec_end = dec_start + nonsidereal_cat['y_or_Dec_velocity'][0] / 3600.
+        else:
+            # Velocities given in pixels per hour
+            x_end = x_start + nonsidereal_cat['x_or_RA_velocity'].data[0]
+            y_end = y_start + nonsidereal_cat['y_or_Dec_velocity'].data[0]
+            loc_v2, loc_v3 = coord_transform(x_end, y_end)
+            ra_end, dec_end = pysiaf.utils.rotations.pointing(attitude_matrix, loc_v2, loc_v3)
+
+
+    ra_interp = interp1d([starttime_calstamp, endtime_calstamp], [ra_start, ra_end], bounds_error=False, kind='linear', fill_value="extrapolate")
+    dec_interp = interp1d([starttime_calstamp, endtime_calstamp], [dec_start, dec_end], bounds_error=False, kind='linear', fill_value="extrapolate")
     return ra_interp, dec_interp
 
 
@@ -180,6 +265,32 @@ def get_ephemeris(method):
 
     ephemeris = create_interpol_function(ephem)
     return ephemeris
+
+
+def obstime_to_datetime(obstime):
+    """Convert the observation time (from the datamodel instance) into a
+    datetime (which can be used by the ephemeris interpolation function)
+
+    Parameters
+    ----------
+    obstime : float
+        Observation time in MJD. If populating the MT_RA, MT_DEC keywords,
+        this will be the mid-time of the exposure.
+
+    Returns
+    -------
+    time_datetime : datetime.datetime
+        Datetime associated with ```obstime```
+    """
+    mid_time_astropy = Time(obstime, format='mjd')
+    isot = mid_time_astropy.isot
+    date_val, time_val = isot.split('T')
+    time_val_parts = time_val.split(':')
+    fullsec = float(time_val.split(':')[2])
+    microsec = '{}'.format(int((fullsec - int(fullsec)) * 1e6))
+    new_time_val = '{}:{}:{}:{}'.format(time_val_parts[0], time_val_parts[1], int(fullsec), microsec)
+    time_datetime = datetime.strptime("{} {}".format(date_val, new_time_val), "%Y-%m-%d %H:%M:%S:%f")
+    return time_datetime
 
 
 def to_timestamp(date):
