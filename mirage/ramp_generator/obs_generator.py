@@ -2379,6 +2379,9 @@ class Observation():
 
         # Now remove the top garbage row from the table
         grouptable = grouptable[1:]
+
+        # Remove the second dimension
+        grouptable = grouptable[:, 0]
         return grouptable
 
     def read_cal_file(self, filename):
@@ -2915,6 +2918,11 @@ class Observation():
         else:
             outModel.meta.visit.tsovisit = True
 
+        # Set the visit start time. Make sure the seconds is high precision. 7 decimal points.
+        seconds_low_precision = self.params['Output']['time_obs'].split(':')[-1]
+        seconds_high_precision = "{:.7f}".format(float(self.params['Output']['time_obs'].split(':')[-1]))
+        outModel.meta.visit.start_time = start_time_string.replace(seconds_low_precision, seconds_high_precision)
+
         num_primary_dithers = self.params['Output']['total_primary_dither_positions']
         if isinstance(self.params['Output']['total_primary_dither_positions'], str):
             num_primary_dithers = int(self.params['Output']['total_primary_dither_positions'][0])
@@ -3338,6 +3346,11 @@ class Observation():
         outModel[0].header['EXPMID'] = ct.mjd + outModel[0].header['EFFEXPTM']/3600./24./2.
 
         outModel[0].header['DURATION'] = self.get_duration()
+
+        # Set the visit start time. Make sure the seconds is high precision. 7 decimal points.
+        seconds_low_precision = self.params['Output']['time_obs'].split(':')[-1]
+        seconds_high_precision = "{:.7f}".format(float(self.params['Output']['time_obs'].split(':')[-1]))
+        outModel[0].header['VSTSTART'] = start_time_string.replace(seconds_low_precision, seconds_high_precision).replace('T', ' ')
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape
