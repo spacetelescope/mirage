@@ -306,7 +306,7 @@ def to_timestamp(date):
     cal : calendar.timegm
         Calendar timestamp corresponding to the input datetime
     """
-    return  date.timestamp()
+    return date.timestamp()
 
 
 def read_ephemeris_file(filename):

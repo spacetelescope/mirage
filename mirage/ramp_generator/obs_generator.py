@@ -1176,14 +1176,6 @@ class Observation():
             if i > 0:
                 self.linear_dark = self.read_dark_file(self.linDark[i])
 
-                ####### TEMP - DO NOT MERGE ##########
-                #self.linear_dark.data *= 0.
-                #self.linear_dark.sbAndRefpix *= 0.
-                #self.linear_dark.zeroframe *= 0.
-                #self.linear_dark.zero_sbAndRefpix *= 0.
-                ####### TEMP - DO NOT MERGE ##########
-
-
             # Find how many integrations are held in the dark. The same
             # number of integrations should be produced from the seed image.
             # In the case where the same seed image is matched to multiple
@@ -1644,14 +1636,6 @@ class Observation():
             self.linear_dark = self.read_dark_file(self.linDark[0])
 
 
-        ####### TEMP - DO NOT MERGE ##########
-        #self.linear_dark.data *= 0.
-        #self.linear_dark.sbAndRefpix *= 0.
-        #self.linear_dark.zeroframe *= 0.
-        #self.linear_dark.zero_sbAndRefpix *= 0.
-        ####### TEMP - DO NOT MERGE ##########
-
-
     def do_cosmic_rays(self, image, ngroup, iframe, ncr, seedval):
         """Add cosmic rays to input data
 
@@ -1926,13 +1910,7 @@ class Observation():
                 # Create the frame by adding the delta signal
                 # and poisson noise associated with the delta signal
                 # to the previous frame
-                #framesignal = previoussignal + poissonsignal
-
-
-                ########### TEMP: DO NOT MERGE- UNCOMMENT LINE ABOVE TO GO BACL TO NORMAL############
-                framesignal = previoussignal + deltaframe
-                ########### TEMP: DO NOT MERGE ############
-
+                framesignal = previoussignal + poissonsignal
 
                 # Add cosmic rays
                 if self.runStep['cosmicray']:
@@ -3087,7 +3065,7 @@ class Observation():
             if not np.isfinite(mt_x) or not np.isfinite(mt_y):
                 mt_x = 1024.5
                 mt_y = 1024.5
-                self.logger.info('NaN values in the group table entry set to zero!!')
+                self.logger.info('NaN values in the group table entry set to the center of the detector!!')
 
             outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
                                                                                                mt_x, mt_y, self.params['Telescope']['ra'],

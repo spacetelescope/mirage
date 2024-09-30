@@ -1503,48 +1503,6 @@ class Catalog_seed():
                 ra_frames = ra_eph(all_times)
                 dec_frames = dec_eph(all_times)
 
-                """
-                subframe_times_nested = []
-                ra_frames_nested = []
-                dec_frames_nested = []
-
-                # Here we are looping over all frames in the entire exposure.
-                for i, (ra_frame, dec_frame, frame_time) in enumerate(zip(ra_frames[1:], dec_frames[1:], all_times[1:])):
-                    # Note that within this loop, i starts at 0, but is pointing to the first (not zeroth)
-                    # elements of ra_frames, dec_frames, all_times.
-
-                    delta_ra = (ra_frame - ra_frames[i]) * 3600.
-                    delta_dec = (dec_frame - dec_frames[i]) * 3600.
-                    delta_pos = np.sqrt(delta_ra**2 + delta_dec**2)
-
-                    # How many points do we need to follow the given spatial scale?
-                    num_sub_frame_points = int(np.ceil(delta_pos / source_spatial_frequency_angular))
-                    if num_sub_frame_points == 1:
-                        # If the source moves less than the spatial frequency limit, then we'll only need to evaluate
-                        # the PSF once, using the end time of the frame
-                        sub_frame_times = [frame_time]
-                    elif num_sub_frame_points == 2:
-                        # If the source moves just over the spatial frequency limit, then we'll need to evaluate the
-                        # PSF twice. Use the start and end time of the frame
-                        sub_frame_times = [all_times[i], frame_time]
-                    elif num_sub_frame_points > 2:
-                        # Here we need to evaluate the PSF three or more times. Use the frame start and end time,
-                        # and then spread the remaining times evenly throughout the frame time
-                        frame_start_dt = datetime.datetime.fromtimestamp(all_times[i], tz=datetime.timezone.utc)
-                        frame_end_dt = datetime.datetime.fromtimestamp(frame_time, tz=datetime.timezone.utc)
-                        subframe_delta_time = (frame_end_dt - frame_start_dt) / (num_sub_frame_points - 1)
-                        sub_frame_times = [ephemeris_tools.to_timestamp(frame_start_dt + subframe_delta_time * n) for n in range(num_sub_frame_points)]
-                    elif num_sub_frame_points == 0:
-                        # In this case the source didn't move at all. Not even a fraction of a pixel.
-                        sub_frame_times = [frame_time]
-
-                    subframe_ra = ra_eph(sub_frame_times)
-                    subframe_dec = dec_eph(sub_frame_times)
-                    ra_frames_nested.append(subframe_ra)
-                    dec_frames_nested.append(subframe_dec)
-                    subframe_times_nested.append(sub_frame_times)
-                """
-
                 # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
                 ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
                                                                                                                          source_spatial_frequency_angular,
@@ -1600,15 +1558,6 @@ class Catalog_seed():
                                                                                                                           self.source_spatial_frequency_pix,
                                                                                                                           ra_ephemeris=None, dec_ephemeris=None,
                                                                                                                           position_units='pixels')
-
-
-
-
-
-
-
-
-
             # Non-sidereal observation: in this case, if we are working with RA, Dec
             # values, the coordinate sytem flips such that the non-sidereal target
             # that is being tracked will stay at the same RA', Dec' for the duration
@@ -1865,21 +1814,6 @@ class Catalog_seed():
 
                 # Now create the moving target ramp for this source
                 mt = moving_targets.MovingTarget()
-
-
-                if input_type == 'extended':
-                    print('EXTENDED SOURCE:')
-                    print('INTEG, FRAMESTART, FRAMEEND')
-                    print(integ, framestart, frameend, frames_per_integration)
-                    print(len(stamp_nested), len(stamp_nested[0]))
-                    print(stamp_nested[framestart:frameend])
-                    print(len(x_frames_nested), len(x_frames_nested[0]))
-                    test= x_frames_nested[framestart:frameend]
-                    print(x_frames_nested[framestart:frameend])
-                    print('TEST', test[0])
-                    print(test[0][0])
-                    stop
-
 
                 mt_source = mt.create(stamp_nested[framestart:frameend], x_frames_nested[framestart:frameend],
                                       y_frames_nested[framestart:frameend], aper_x_min_of_stamp_nested[framestart:frameend],
