@@ -255,16 +255,6 @@ def populate_moving_target_table(grouptable, ephem_interp_func, movtarg_x, movta
         if not np.isfinite(interp_dec):
             interp_dec = 0.0
 
-
-        print('LOOK FOR INF')
-        print(line[0][5])
-        print(movtarg_x, movtarg_y, refpix_ra, refpix_dec)
-        print(interp_ra, interp_dec, mt_x_helio, mt_y_helio, mt_z_helio, jwst_x_helio)
-        print(jwst_y_helio, jwst_z_helio, mt_x_jwst, mt_y_jwst, mt_z_jwst, mt_jwst_distance)
-        print(mt_sun_distance, phase_angle)
-
-
-
         entry = create_mt_pos_entry(line[0][5], movtarg_x, movtarg_y, refpix_ra, refpix_dec,
                         interp_ra, interp_dec, mt_x_helio, mt_y_helio, mt_z_helio, jwst_x_helio,
                         jwst_y_helio, jwst_z_helio, mt_x_jwst, mt_y_jwst, mt_z_jwst, mt_jwst_distance,
