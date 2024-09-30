@@ -119,7 +119,7 @@ class MovingTarget():
                 outputframe1 = self.inputMotion(outputframe1, stamps_nested[i], xframes_nested[i], yframes_nested[i], xmin_of_stamp[i], ymin_of_stamp[i], total_frame_frametime)
 
             outputframe0 = np.copy(outputframe1)
-            self.logger.info(f'Total signal in outputframe1 divided by frametime is: {np.sum(outputframe1) / total_frame_frametime}')
+            #self.logger.info(f'Total signal in outputframe1 divided by frametime is: {np.sum(outputframe1) / total_frame_frametime}')
 
             outfull[i, :, :] = outputframe1
         return outfull

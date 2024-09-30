@@ -1177,10 +1177,10 @@ class Observation():
                 self.linear_dark = self.read_dark_file(self.linDark[i])
 
                 ####### TEMP - DO NOT MERGE ##########
-                self.linear_dark.data *= 0.
-                self.linear_dark.sbAndRefpix *= 0.
-                self.linear_dark.zeroframe *= 0.
-                self.linear_dark.zero_sbAndRefpix *= 0.
+                #self.linear_dark.data *= 0.
+                #self.linear_dark.sbAndRefpix *= 0.
+                #self.linear_dark.zeroframe *= 0.
+                #self.linear_dark.zero_sbAndRefpix *= 0.
                 ####### TEMP - DO NOT MERGE ##########
 
 
@@ -1645,10 +1645,10 @@ class Observation():
 
 
         ####### TEMP - DO NOT MERGE ##########
-        self.linear_dark.data *= 0.
-        self.linear_dark.sbAndRefpix *= 0.
-        self.linear_dark.zeroframe *= 0.
-        self.linear_dark.zero_sbAndRefpix *= 0.
+        #self.linear_dark.data *= 0.
+        #self.linear_dark.sbAndRefpix *= 0.
+        #self.linear_dark.zeroframe *= 0.
+        #self.linear_dark.zero_sbAndRefpix *= 0.
         ####### TEMP - DO NOT MERGE ##########
 
 
@@ -2403,6 +2403,9 @@ class Observation():
 
         # Now remove the top garbage row from the table
         grouptable = grouptable[1:]
+
+        # Remove the second dimension
+        grouptable = grouptable[:, 0]
         return grouptable
 
     def read_cal_file(self, filename):
@@ -3089,12 +3092,6 @@ class Observation():
             outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
                                                                                                mt_x, mt_y, self.params['Telescope']['ra'],
                                                                                                self.params['Telescope']['dec'])
-
-
-        print('CHECK FOR INF')
-        print(outModel.meta.instance)
-
-
 
         # Save the datamodel
         outModel.save(filename)

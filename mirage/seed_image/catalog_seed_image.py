@@ -1770,6 +1770,7 @@ class Catalog_seed():
                     stamp_nested.append(stamp_sublist)
 
             elif input_type == 'extended':
+                raise NotImplementedError('Moving extended objects not yet supported.')
                 stamp, header = self.basic_get_image(entry['filename'])
                 # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
                 stamp = self.rotate_extended_image(stamp, entry['pos_angle'])
@@ -1801,6 +1802,7 @@ class Catalog_seed():
 
 
             elif input_type == 'galaxies':
+                raise NotImplementedError('Moving 2D sersic objects not yet supported.')
                 xposang = self.calc_x_position_angle(entry)
 
                 # First create the galaxy
@@ -1864,16 +1866,20 @@ class Catalog_seed():
                 # Now create the moving target ramp for this source
                 mt = moving_targets.MovingTarget()
 
-                print('INTEG, FRAMESTART, FRAMEEND')
-                print(integ, framestart, frameend, frames_per_integration)
-                print(len(stamp_nested), len(stamp_nested[0]))
-                print(stamp_nested[framestart:frameend])
-                print(len(x_frames_nested), len(x_frames_nested[0]))
-                test= x_frames_nested[framestart:frameend]
-                print(x_frames_nested[framestart:frameend])
-                print('TEST', test[0])
-                print(test[0][0])
-                #stop
+
+                if input_type == 'extended':
+                    print('EXTENDED SOURCE:')
+                    print('INTEG, FRAMESTART, FRAMEEND')
+                    print(integ, framestart, frameend, frames_per_integration)
+                    print(len(stamp_nested), len(stamp_nested[0]))
+                    print(stamp_nested[framestart:frameend])
+                    print(len(x_frames_nested), len(x_frames_nested[0]))
+                    test= x_frames_nested[framestart:frameend]
+                    print(x_frames_nested[framestart:frameend])
+                    print('TEST', test[0])
+                    print(test[0][0])
+                    stop
+
 
                 mt_source = mt.create(stamp_nested[framestart:frameend], x_frames_nested[framestart:frameend],
                                       y_frames_nested[framestart:frameend], aper_x_min_of_stamp_nested[framestart:frameend],
