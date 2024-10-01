@@ -1412,7 +1412,6 @@ class Catalog_seed():
         newdimsy = int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
-        #mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
         mt_integration = np.zeros((numints, frames_per_integration, newdimsy, newdimsx))
 
         # Corresponding (2D) segmentation map
@@ -1430,7 +1429,6 @@ class Catalog_seed():
         mag_column = self.select_magnitude_column(mtlist, filename)
 
         # Get the calendar dates associated with each frame
-        #if 'ephemeris_file' in mtlist.colnames or non_sidereal_ra_interp_function is not None:
         ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
 
         # Allow time_obs to have an integer or fractional number of seconds
