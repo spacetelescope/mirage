@@ -2227,7 +2227,7 @@ class Catalog_seed():
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
-            signalimage = np.zeros(self.output_dims, dtype=np.float)
+            signalimage = np.zeros(self.output_dims, dtype=float)
             segmentation_map = np.zeros(self.output_dims)
 
 
