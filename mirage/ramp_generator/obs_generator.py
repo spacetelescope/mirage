@@ -38,6 +38,7 @@ import warnings
 import argparse
 import shutil
 
+import asdf
 import yaml
 import pkg_resources
 import numpy as np
@@ -1634,6 +1635,7 @@ class Observation():
 
             self.linear_dark = self.read_dark_file(self.linDark[0])
 
+
     def do_cosmic_rays(self, image, ngroup, iframe, ncr, seedval):
         """Add cosmic rays to input data
 
@@ -3038,7 +3040,11 @@ class Observation():
                 ra_interp_function, dec_interp_function = ephemeris_tools.get_ephemeris(nonsidereal_cat['ephemeris_file'].data[0])
             else:
                 # No ephemeris file
-                raise ValueError("Moving target table with no ephemeris not yet supported.")
+                with asdf.open(self.params['Reffiles']['astrometric']) as dist_file:
+                    coord_transform = dist_file.tree['model']
+                ra_interp_function, dec_interp_function = ephemeris_tools.ephemeris_from_catalog(nonsidereal_cat, pixFlag, velFlag,
+                                                                                                 outModel.meta.exposure.start_time,
+                                                                                                 coord_transform, self.attitude_matrix)
 
             # We need to populate the MT_RA and MT_DEC keywords, which list the target RA and Dec at the
             # mid-time of the exposure.
@@ -3046,6 +3052,11 @@ class Observation():
             mid_time_calstamp = ephemeris_tools.to_timestamp(mid_time_datetime)
             outModel.meta.wcsinfo.mt_ra = ra_interp_function([mid_time_calstamp])[0]
             outModel.meta.wcsinfo.mt_dec = dec_interp_function([mid_time_calstamp])[0]
+
+            if not np.isfinite(outModel.meta.wcsinfo.mt_ra):
+                outModel.meta.wcsinfo.mt_ra = self.ra
+            if not np.isfinite(outModel.meta.wcsinfo.mt_dec):
+                outModel.meta.wcsinfo.mt_dec = self.dec
 
             # Now populate the moving_target_position table, which will be in a separate extension
             ephem_interp_function = (ra_interp_function, dec_interp_function)
@@ -3055,6 +3066,12 @@ class Observation():
             mt_start_dec = dec_interp_function([starttime_calstamp])[0]
             mt_v2, mt_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, mt_start_ra, mt_start_dec)
             mt_x, mt_y = self.siaf.tel_to_sci(mt_v2, mt_v3)
+
+            if not np.isfinite(mt_x) or not np.isfinite(mt_y):
+                mt_x = 1024.5
+                mt_y = 1024.5
+                self.logger.info('NaN values in the group table entry set to the center of the detector!!')
+
             outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
                                                                                                mt_x, mt_y, self.params['Telescope']['ra'],
                                                                                                self.params['Telescope']['dec'])
