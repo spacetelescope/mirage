@@ -1,3 +1,42 @@
+2.5.0
+=====
+
+AMI
+---
+
+Update the xml reader for AMI mode simulations due to a change in the format of the APT output file. (#838)
+
+
+Documentation
+-------------
+
+Add a list of radii to the call to the galaxy catalog generator on the catalog creation page. (#830)
+
+
+Environment
+-----------
+
+Update dependencies to support a python 3.11 environment. Remove python 3.8 and 3.9 environment files in favor of a new python 3.11 file. (#839)
+
+
+General
+-------
+
+Replace np.int instances in the code with int, to support recent numpy releases (#833)
+
+
+Moving Targets
+--------------
+
+Correct a location jumpiness at the sub-pixel level for cases where moving targets are being added to the seed image. With these changes, Mirage now evaluates the PSF gridded library at every frame and subframe source location. Previously, a single PSF from the library was constructed, and Mirage would subsample the array, shift it, and return to nominal pixel scale. (#837)
+
+
+Seed Image
+----------
+
+Allow WebbPSF oversampling to be either an integer, or a list of one integer per dimension. (#835)
+
+
 2.4.0
 =====
 
