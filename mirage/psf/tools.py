@@ -69,7 +69,7 @@ def get_HST_PSF(fwhm_pixels):
 
     """
     # Set the dimensions of the PSF array to be +/- 50 * FWHM
-    dim = np.int(np.round(100 * fwhm_pixels))
+    dim = int(np.round(100 * fwhm_pixels))
 
     # Make sure the array has an odd number of rows and columns
     if dim % 2 == 0:

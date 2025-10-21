@@ -4,13 +4,7 @@ There are two aspects to Mirage installation. First, the software itself must be
 must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`, as this is the latest stable version of the software.
 
 .. tip::
-    Mirage currently supports python 3.8 and 3.9. Support for 3.6 and 3.7 has been removed, as the `jwst <https://github.com/spacetelescope/jwst>`_ package, which contains the JWST calibration pipeline, no longer supports python < 3.8.
-
-.. attention::
-    **For those running Mac OSX 10.14:**
-
-    Some users have reported errors when installing Mirage on their machines running Mac OSX 10.14. If you see installation failures for the synphot or batman packages, they are most likely related to the OpenMP library. See the section below on :ref:`Troubleshooting for Mac OSX 10.14 installtion <osx1014>`.
-
+    Mirage currently supports python 3.11 and 3.12.
 
 .. _pypi:
 
@@ -22,16 +16,9 @@ a conda environment called "mirage" and then install the software into that envi
 
 ::
 
-    conda create -n mirage python=3.9 -y
+    conda create -n mirage python=3.11 -y
     conda activate mirage
     pip install mirage
-
-.. tip::
-    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
-    works for MacOSX 10.13 (High Sierra) and 1.14.0 works for MacOSX 10.15 (Catalina). If the version of healpy above does not work for your system, you may need to install a different version.
-
-.. tip::
-    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you, however conda installation is currrently only supported for python 3.7 and below.
 
 
 Install the Development Version
@@ -43,16 +30,9 @@ The installation procedure is nearly identical to the case of installing from Py
 
 ::
 
-    conda create -n mirage python=3.9 -y
+    conda create -n mirage python=3.11 -y
     conda activate mirage
     pip install git+https://github.com/spacetelescope/mirage
-
-.. tip::
-    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
-    works for MacOSX 10.13 (High Sierra) and 1.14.0 works for MacOSX 10.15 (Catalina). If the version of healpy above does not work for your system, you may need to install a different version.
-
-.. tip::
-    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you, however conda installation is currrently only supported for python 3.7 and below.
 
 
 Installation for Developers
@@ -71,17 +51,10 @@ Installation can then be done via pip, which uses setup.py, or using the conda e
 To install using pip and setup.py:
 Create and activate a new environment. In this example we call the environment "mirage". Then move into the mirage directory, and install Mirage into the new environment::
 
-    conda create -n mirage python=3.9 -y
+    conda create -n mirage python=3.11 -y
     conda activate mirage
     cd mirage
     pip install .
-
-.. tip::
-    Some of Mirage's dependencies rely on `Healpy <https://healpy.readthedocs.io/en/latest/>`_,. Healpy has released different wheels for different versions of Mac OSX. For example, healpy version 1.12.5
-    works for MacOSX 10.13 (High Sierra) and 1.14.0 works for MacOSX 10.15 (Catalina). If the version of healpy above does not work for your system, you may need to install a different version.
-
-.. tip::
-    This method installs `webbpsf <https://webbpsf.readthedocs.io/en/latest/>`_ via pip. In this case, you must also `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_ If you install webbpsf via conda, the data files are downloaded and installed for you, however conda installation is currrently only supported for python 3.7 and below.
 
 .. _env_file_install:
 
@@ -90,43 +63,42 @@ Install via Environment File
 
 The Mirage repository also contains environment files, which can be used to create an environment with proper versions of all of Mirage's dependencies. After cloning the Mirage repository, the environment file (located within the top-level directory) can be used via the following commands. The *name* keyword is used to specify that the name of the environment. You can name the environment anything you like.
 
-Create a python 3.8 environment using the environment file, activate the environment, and install mirage::
+Create a python 3.11 environment using the environment file, activate the environment, and install mirage::
 
     cd mirage
-    conda env create -f environment_python_3.8.yml
-    conda activate mirage_py3.8
+    conda env create -f environment_python_3.11.yml
+    conda activate mirage_py3.11
     pip install .
 
 
-There is also an environment file that can be used to create python 3.9 environment::
+There is also an environment file that can be used to create python 3.12 environment::
 
     cd mirage
-    conda env create -f environment_python_3.9.yml
-    conda activate mirage_py3.9
+    conda env create -f environment_python_3.12.yml
+    conda activate mirage_py3.12
     pip install .
 
 
+.. _batman
 
-.. tip::
-    For the python 3.8 and 3.9 cases most packages, including webbpsf, are installed via pip (astroconda does not yet support python 3.8 and beyond). In this case you must `manually download the collection of webbpsf data files <https://webbpsf.readthedocs.io/en/latest/installation.html#installing-the-required-data-files>`_.
+Batman versions
+---------------
+
+Python 3.12
++++++++++++
+
+As of October 2025, the Batman package does not work when using python 3.12. If you require the Batman package (used to create Time Series data), you should use a python 3.11 environment.
 
 
-.. _osx1014:
+Intel-based Mac installation
+++++++++++++++++++++++++++++
 
-Troubleshooting for Mac OSX 10.14 installtion
----------------------------------------------
+As of Oct 2025, the most recent version of the Batman package is 2.5.3. However, this version does not have a wheel that works for Intel-based Macs. It is possible to revert back to version 2.5.2, however this version requires numpy < 2.0, which conflicts with several other dependencies, including the jwst pipeline. Therefore, for those on Intel-based Macs, we recommend omitting the Batman package when creating the environment. If you are on an Intel-based Mac and require the Batman package, you can either create your environment using the environment file for python 3.11 and then manually downgrade numpy, jwst, and Batman, or use the environment_python_3.11_intel_mac.yml to create the environment.
 
-If you have installation errors on your machine running 10.14 (Mojave), try these solutions.
+Build failure
++++++++++++++
 
-Synphot
-+++++++
-
-If the synphot package fails to build, try installing via conda using the conda-forge channel. Do this before installing Mirage, using the command:
-
-    - conda install synphot -c conda-forge
-
-Batman
-++++++
+This is an issue from previous versions of Mac OXS and may not longer be relevent. We keep it here just in case it is still an issue for anyone.
 
 If the `Batman <https://github.com/lkreidberg/batman>`_ package fails to build, the work-around is more complex. Mirage uses the Batman package when simulating imaging and grism Time Series Observations (TSO).
 
@@ -140,8 +112,8 @@ The installation errors are related to supporting Batman's ability to run calcul
     ::
 
         cd mirage
-        conda env create -f environment_python_3.9.yml
-        conda activate mirage
+        conda env create -f environment_python_3.11.yml
+        conda activate mirage-py3.11
         pip install .
         cd ../batman
         pip install .

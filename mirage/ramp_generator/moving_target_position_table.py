@@ -244,13 +244,18 @@ def populate_moving_target_table(grouptable, ephem_interp_func, movtarg_x, movta
     phase_angle = 9.77
 
     for line in grouptable:
-        line_day = Time(line[0][5])
+        line_day = Time(line[5])
         line_day_datetime = obstime_to_datetime(line_day.mjd)
         line_day_calstamp = to_timestamp(line_day_datetime)
         interp_ra = ra_func(line_day_calstamp)
         interp_dec = dec_func(line_day_calstamp)
 
-        entry = create_mt_pos_entry(line[0][5], movtarg_x, movtarg_y, refpix_ra, refpix_dec,
+        if not np.isfinite(interp_ra):
+            interp_ra = 0.0
+        if not np.isfinite(interp_dec):
+            interp_dec = 0.0
+
+        entry = create_mt_pos_entry(line[5], movtarg_x, movtarg_y, refpix_ra, refpix_dec,
                         interp_ra, interp_dec, mt_x_helio, mt_y_helio, mt_z_helio, jwst_x_helio,
                         jwst_y_helio, jwst_z_helio, mt_x_jwst, mt_y_jwst, mt_z_jwst, mt_jwst_distance,
                         mt_sun_distance, phase_angle)

@@ -22,13 +22,12 @@ from yaml.scanner import ScannerError
 import math
 import yaml
 import time
-import pkg_resources
 import asdf
 import scipy.signal as s1
 import scipy.special as sp
 from scipy.ndimage import rotate
 import numpy as np
-from photutils import detect_sources
+from photutils.segmentation import detect_sources
 from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.table import Table, Column, vstack
@@ -51,13 +50,14 @@ from ..utils import backgrounds
 from ..utils import rotations, polynomial, read_siaf_table, utils
 from ..utils import set_telescope_pointing_separated as set_telescope_pointing
 from ..utils import siaf_interface, file_io
-from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, SERSIC_FRACTIONAL_SIGNAL, \
+from ..utils.constants import CRDS_FILE_TYPES, MEAN_GAIN_VALUES, MODULE_PATH, SERSIC_FRACTIONAL_SIGNAL, \
                               SEGMENTATION_MIN_SIGNAL_RATE, SUPPORTED_SEGMENTATION_THRESHOLD_UNITS, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME, TSO_MODES, NIRISS_GHOST_GAP_FILE, \
                               NIRISS_GHOST_GAP_URL, NIRCAM_SW_GRISMTS_APERTURES, NIRCAM_LW_GRISMTS_APERTURES, \
                               DISPERSED_MODES
 from ..utils.flux_cal import fluxcal_info, sersic_fractional_radius, sersic_total_signal
 from ..utils.timer import Timer
+from ..utils.utils import flatten_nested_list
 from ..psf.psf_selection import get_gridded_psf_library, get_psf_wings
 from mirage.utils.file_splitting import find_file_splits, SplitFileMetaData
 from ..psf.segment_psfs import (get_gridded_segment_psf_library_list,
@@ -99,10 +99,6 @@ class Catalog_seed():
 
         self.offline = offline
 
-        # Locate the module files, so that we know where to look
-        # for config subdirectory
-        self.modpath = pkg_resources.resource_filename('mirage', '')
-
         # Get the location of the MIRAGE_DATA environment
         # variable, so we know where to look for darks, CR,
         # PSF files, etc later
@@ -120,6 +116,15 @@ class Catalog_seed():
         # mostly for WFSS observations, where the nominal output
         # array will not sit centered in the expanded output image.
         self.coord_adjust = {'x': 1., 'xoffset': 0, 'y': 1., 'yoffset': 0}
+
+        # Set the spatial frequency, in pixel units, for moving source
+        # simulations. This value controls how often a PSF or stamp
+        # image is placed into the scene when building the trail of a
+        # moving target. e.g. 0.3 means that the PSF is placed into the
+        # scene each time the source moves by 0.3 pixels. Testing has
+        # shown a value of 0.3 seems to produce realistic results without
+        # taking too long to create the scene
+        self.source_spatial_frequency_pix = 0.3  # Units are pixels
 
         # NIRCam rough noise values. Used to make educated guesses when
         # creating segmentation maps
@@ -176,7 +181,7 @@ class Catalog_seed():
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
         # Expand param entries to full paths where appropriate
-        self.params = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
+        self.params = utils.full_paths(self.params, MODULE_PATH, self.crds_dict, offline=self.offline)
         self.filecheck()
         self.basename = os.path.join(self.params['Output']['directory'],
                                      self.params['Output']['file'][0:-5].split('/')[-1])
@@ -242,13 +247,6 @@ class Catalog_seed():
                                                                                                     self.params['Readout']['nint'],
                                                                                                     force_delta_int=forced_ints_per_file)
 
-
-                #print('\nOutputs:')
-                #print(split_seed, group_segment_indexes, integration_segment_indexes)
-                #print(split_seed_g, self.group_segment_indexes_g, self.file_segment_indexes)
-                #print(self.file_segment_indexes)
-                #print('')
-
                 # In order to avoid the case of having a single integration
                 # in the final file, which leads to rate rather than rateints
                 # files in the pipeline, check to be sure that the integration
@@ -306,7 +304,15 @@ class Catalog_seed():
                 self.params['simSignals']['psfwfegroup'],
                 self.params['simSignals']['psfpath'])
             self.psf_library_core_y_dim, self.psf_library_core_x_dim = self.psf_library.data.shape[-2:]
-            self.psf_library_oversamp = self.psf_library.oversampling
+
+            # Versions of photutils prior to 1.10.0 use an integer for the oversampling factor, while
+            # newer versions use a numpy array with one value for each of the x and y dimensions.
+            # Make sure we can handle both of these options. For the moment, Mirage assumes that the
+            # oversampling factor is the same in both dimensions.
+            if isinstance(self.psf_library.oversampling, int):
+                self.psf_library_oversamp = self.psf_library.oversampling
+            elif isinstance(self.psf_library.oversampling, list) or isinstance(self.psf_library.oversampling, np.ndarray):
+                self.psf_library_oversamp = self.psf_library.oversampling[0]
 
         # If reading in segment PSFs, use get_gridded_segment_psf_library_list
         # to get a list of photutils.griddedPSFModel objects
@@ -326,9 +332,9 @@ class Catalog_seed():
         # edge row or column in the evaluated array. So we do this to be
         # sure that we are evaluating the library with a slightly smaller
         # array than the array in the library.
-        self.psf_library_core_x_dim = np.int(self.psf_library_core_x_dim / self.psf_library_oversamp) - \
+        self.psf_library_core_x_dim = int(self.psf_library_core_x_dim / self.psf_library_oversamp) - \
             self.params['simSignals']['gridded_psf_library_row_padding']
-        self.psf_library_core_y_dim = np.int(self.psf_library_core_y_dim / self.psf_library_oversamp) - \
+        self.psf_library_core_y_dim = int(self.psf_library_core_y_dim / self.psf_library_oversamp) - \
             self.params['simSignals']['gridded_psf_library_row_padding']
 
         if self.add_psf_wings is True:
@@ -404,7 +410,7 @@ class Catalog_seed():
         # Keep the mask image equal to the true subarray size, since this
         # won't be used to make a requested grism source image
         if self.params['Inst']['mode'] not in ['wfss', 'ts_grism']:
-            self.maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+            self.maskimage = np.zeros((self.ffsize, self.ffsize), dtype=int)
             self.maskimage[4:self.ffsize-4, 4:self.ffsize-4] = 1.
 
             # crop the mask to match the requested output array
@@ -850,14 +856,14 @@ class Catalog_seed():
         Padded seed image and segmentation map
         """
         seeddim = seed.shape
-        nx = np.int(2048 * self.grism_direct_factor_x)
-        ny = np.int(2048 * self.grism_direct_factor_y)
-        ffextrax = np.int((nx - 2048) / 2)
-        ffextray = np.int((ny - 2048) / 2)
+        nx = int(2048 * self.grism_direct_factor_x)
+        ny = int(2048 * self.grism_direct_factor_y)
+        ffextrax = int((nx - 2048) / 2)
+        ffextray = int((ny - 2048) / 2)
         bounds = np.array(self.subarray_bounds)
 
-        subextrax = np.int((seeddim[-1] - bounds[2]) / 2)
-        subextray = np.int((seeddim[-2] - bounds[3]) / 2)
+        subextrax = int((seeddim[-1] - bounds[2]) / 2)
+        subextray = int((seeddim[-2] - bounds[3]) / 2)
 
         extradiffy = ffextray - subextray
         extradiffx = ffextrax - subextrax
@@ -866,12 +872,12 @@ class Catalog_seed():
         if len(seeddim) == 2:
             padded_seed = np.zeros((ny, nx))
             padded_seed[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
-            padded_seg = np.zeros((ny, nx), dtype=np.int)
+            padded_seg = np.zeros((ny, nx), dtype=int)
             padded_seg[exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
         elif len(seeddim) == 4:
             padded_seed = np.zeros((seeddim[0], seeddim[1], ny, nx))
             padded_seed[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seed
-            padded_seg = np.zeros((seeddim[0], seeddim[1], ny, nx), dtype=np.int)
+            padded_seg = np.zeros((seeddim[0], seeddim[1], ny, nx), dtype=int)
             padded_seg[:, :, exbounds[1]:exbounds[3] + 1, exbounds[0]:exbounds[2] + 1] = seg
         else:
             raise ValueError("Seed image is not 2D or 4D. It should be.")
@@ -937,10 +943,10 @@ class Catalog_seed():
         kw['PHOTPLAM'] = self.pivot * 1.e4  # put into angstroms
         kw['NOMXDIM'] = self.nominal_dims[1]
         kw['NOMYDIM'] = self.nominal_dims[0]
-        kw['NOMXSTRT'] = np.int(self.coord_adjust['xoffset'] + 1)
-        kw['NOMXEND'] = np.int(self.nominal_dims[1] + self.coord_adjust['xoffset'])
-        kw['NOMYSTRT'] = np.int(self.coord_adjust['yoffset'] + 1)
-        kw['NOMYEND'] = np.int(self.nominal_dims[0] + self.coord_adjust['yoffset'])
+        kw['NOMXSTRT'] = int(self.coord_adjust['xoffset'] + 1)
+        kw['NOMXEND'] = int(self.nominal_dims[1] + self.coord_adjust['xoffset'])
+        kw['NOMYSTRT'] = int(self.coord_adjust['yoffset'] + 1)
+        kw['NOMYEND'] = int(self.nominal_dims[0] + self.coord_adjust['yoffset'])
 
         # Files/inputs used during seed image production
         kw['YAMLFILE'] = self.paramfile
@@ -1391,17 +1397,16 @@ class Catalog_seed():
         if numints > 1:
             # Frames for all integrations
             total_frames *= numints
-            # Add the resets for all but the first and last integrations
+            # Add the resets for all but the last integrations
             total_frames += (numresets * (numints - 1))
         frameexptimes = self.frametime * np.arange(-1, total_frames)
 
         # output image dimensions
         dims = self.nominal_dims
-        newdimsx = np.int(dims[1] * self.coord_adjust['x'])
-        newdimsy = np.int(dims[0] * self.coord_adjust['y'])
+        newdimsx = int(dims[1] * self.coord_adjust['x'])
+        newdimsy = int(dims[0] * self.coord_adjust['y'])
 
         # Set up seed integration
-        #mt_integration = np.zeros((numints, total_frames, newdimsy, newdimsx))
         mt_integration = np.zeros((numints, frames_per_integration, newdimsy, newdimsx))
 
         # Corresponding (2D) segmentation map
@@ -1418,17 +1423,15 @@ class Catalog_seed():
         # Determine the name of the column to use for source magnitudes
         mag_column = self.select_magnitude_column(mtlist, filename)
 
-        # If any ephemeris file will be used, get the calendar dates associated
-        # with each frame
-        if 'ephemeris_file' in mtlist.colnames or non_sidereal_ra_interp_function is not None:
-            ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
+        # Get the calendar dates associated with each frame
+        ob_time = '{}T{}'.format(self.params['Output']['date_obs'], self.params['Output']['time_obs'])
 
-            # Allow time_obs to have an integer or fractional number of seconds
-            try:
-                start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
-            except ValueError:
-                start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f')
-            all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
+        # Allow time_obs to have an integer or fractional number of seconds
+        try:
+            start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S')
+        except ValueError:
+            start_date = datetime.datetime.strptime(ob_time, '%Y-%m-%dT%H:%M:%S.%f')
+        all_times = [ephemeris_tools.to_timestamp(start_date + datetime.timedelta(seconds=elem)) for elem in frameexptimes]
 
         # If the ephemeris_file column is not present, add it and populate it with
         # 'none' for all entries. This will make for fewer possibilities when looping
@@ -1471,6 +1474,7 @@ class Catalog_seed():
         times = []
         obj_counter = 0
         time_reported = False
+        source_spatial_frequency_angular = self.source_spatial_frequency_pix * self.siaf.XSciScale # arcsec
         for index, entry in zip(indexes, mtlist):
             start_time = time.time()
 
@@ -1491,6 +1495,13 @@ class Catalog_seed():
                 # Create list of positions for all frames
                 ra_frames = ra_eph(all_times)
                 dec_frames = dec_eph(all_times)
+
+                # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
+                                                                                                                         source_spatial_frequency_angular,
+                                                                                                                         ra_ephemeris=ra_eph, dec_ephemeris=dec_eph,
+                                                                                                                         position_units='angular')
+
             else:
                 self.logger.info(("Using provided velocities to find the location of source #{} in {}.".format(index, filename)))
                 if pixvelflag:
@@ -1529,6 +1540,17 @@ class Catalog_seed():
                         ra_frames = entry['x_or_RA'] + delta_ra_frames
                         dec_frames = entry['y_or_Dec'] + delta_dec_frames
 
+                # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                if ra_frames is not None:
+                    ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
+                                                                                                                             source_spatial_frequency_angular,
+                                                                                                                             ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                             position_units='angular')
+                elif x_frames is not None:
+                    x_frames_nested, y_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(x_frames, y_frames, all_times,
+                                                                                                                          self.source_spatial_frequency_pix,
+                                                                                                                          ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                          position_units='pixels')
             # Non-sidereal observation: in this case, if we are working with RA, Dec
             # values, the coordinate sytem flips such that the non-sidereal target
             # that is being tracked will stay at the same RA', Dec' for the duration
@@ -1536,7 +1558,8 @@ class Catalog_seed():
             # change frame-to-frame. If working in x, y pixel units, the same applies
             # with the background targets changing position with time
             if MT_tracking:
-                self.logger.info("Updating source #{} location based on non-sidereal source motion.".format(index))
+
+                self.logger.info(f"Updating source #{index} location based on non-sidereal source motion.")
                 if delta_non_sidereal_ra is None:
                     # Here the non-sidereal target's offsets are in units of pixels
                     if ra_frames is not None:
@@ -1552,6 +1575,12 @@ class Catalog_seed():
                     x_frames -= delta_non_sidereal_x
                     y_frames -= delta_non_sidereal_y
 
+                    # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                    x_frames_nested, y_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(x_frames, y_frames, all_times,
+                                                                                                                          self.source_spatial_frequency_pix,
+                                                                                                                          ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                          position_units='pixels')
+
                 else:
                     # Here the non-sidereal target's offsets are in units of RA, Dec
                     if x_frames is not None:
@@ -1566,17 +1595,20 @@ class Catalog_seed():
                     ra_frames -= delta_non_sidereal_ra
                     dec_frames -= delta_non_sidereal_dec
 
+                    # Calculate the source locations at sub-frametimes, based on the requested spatial frequency
+                    ra_frames_nested, dec_frames_nested, subframe_times_nested =  ephemeris_tools.calculate_nested_positions(ra_frames, dec_frames, all_times,
+                                                                                                                             source_spatial_frequency_angular,
+                                                                                                                             ra_ephemeris=None, dec_ephemeris=None,
+                                                                                                                             position_units='angular')
+
             # Make sure that ra_frames and x_frames are both populated
             if x_frames is None:
                 x_frames, y_frames = self.radec_list_to_xy_list(ra_frames, dec_frames)
+                x_frames_nested, y_frames_nested = self.radec_list_to_xy_list(ra_frames_nested, dec_frames_nested)
+
             if ra_frames is None:
                 ra_frames, dec_frames = self.xy_list_to_radec_list(x_frames, y_frames)
-
-            # Use the initial location to determine the PSF to use
-            pixelx = x_frames[1]
-            pixely = y_frames[1]
-            ra = ra_frames[1]
-            dec = dec_frames[1]
+                ra_frames_nested, dec_frames_nested = self.xy_list_to_radec_list(x_frames_nested, y_frames_nested)
 
             # Get countrate and PSF size info
             if entry[mag_column] is not None:
@@ -1598,46 +1630,89 @@ class Catalog_seed():
             status = 'on'
             if input_type == 'point_source':
 
-                status = self.on_detector(x_frames, y_frames, psf_dimensions,
+                status = self.on_detector(np.array(x_frames), np.array(y_frames), psf_dimensions,
                                           (newdimsx, newdimsy))
             if status == 'off':
                 continue
 
-            # Create the PSF
-            eval_psf, minx, miny, wings_added = self.create_psf_stamp(pixelx, pixely, psf_x_dim, psf_x_dim,
-                                                                      ignore_detector=True)
+            # Create a nested list of PSFs to go along with the nested position lists
+            psf_frames_nested = []
+            aper_x_min_of_stamp_nested = []
+            aper_y_min_of_stamp_nested = []
+            for x_fr, y_fr in zip(x_frames_nested, y_frames_nested):
+                psf_subframe = []
+                aper_x_min_subframe = []
+                aper_y_min_subframe = []
+                for x_subframe, y_subframe in zip(x_fr, y_fr):
+                    eval_psf, aperxmin, aperymin, minx, miny, wings_added = self.create_psf_stamp(x_subframe, y_subframe, psf_x_dim, psf_x_dim,
+                                                                                                  ignore_detector=True)
+                    psf_subframe.append(eval_psf)
+                    aper_x_min_subframe.append(aperxmin)
+                    aper_y_min_subframe.append(aperymin)
 
-            # Skip sources that fall completely off the detector
-            if eval_psf is None:
+                psf_frames_nested.append(psf_subframe)
+                aper_x_min_of_stamp_nested.append(aper_x_min_subframe)
+                aper_y_min_of_stamp_nested.append(aper_y_min_subframe)
+
+            if psf_frames_nested[0][0] is None:
                 continue
 
             # If we want to keep track of ghosts associated with the input sources,
             # determine the ghosts' locations here. Note that ghost locations do not
             # move in the same magnitude/direction as the actual sources, so we need
             # to determine source locations from the real source's location in each
-            # frame individually.
+            # frame individually. It also does not make sense to convolve the ghost
+            # stamp image with the same subpixel centered PSFs used for the real source,
+            # so we'll just convolve with the same PSF for all ghost positions.
             if add_ghosts:
-                ghost_x_frames, ghost_y_frames, ghost_mags, ghost_countrate, ghost_file = self.locate_ghost(x_frames, y_frames, rate,
-                                                                                                            magsys, entry, input_type,
-                                                                                                            log_skipped_filters=False)
+                ghost_x_frames_nested = []
+                ghost_y_frames_nested = []
+                ghost_stamp_nested = []
+                raise NotImplementedError('Need to update to work with gridded PSF evaluations and nested ra_frames, dec_frames.')
+                for tmp_x_frames, tmp_y_frames in zip(x_frames_nested, y_frames_nested):
+                    ghost_x_frames, ghost_y_frames, ghost_mags, ghost_countrate, ghost_file = self.locate_ghost(tmp_x_frames, tmp_y_frames, rate,
+                                                                                                                magsys, entry, input_type,
+                                                                                                                log_skipped_filters=False)
+                    ghost_x_frames_nested.append(ghost_x_frames)
+                    ghost_y_frames_nested.append(ghost_y_frames)
+
                 if ghost_file is not None:
                     ghost_stamp, ghost_header = self.basic_get_image(ghost_file)
 
                     # Normalize the ghost stamp image to match ghost_countrate
                     ghost_stamp = ghost_stamp / np.sum(ghost_stamp) * ghost_countrate
 
+                    # Create a nested list of stamp images, to match the nested lists of x and y positions
+                    ghost_stamp_nested = []
+                    for sublist in ghost_x_frames_nested:
+                        tmp = [ghost_stamp] * len(sublist)
+                        ghost_stamp_nested.append(tmp)
+
                     # Convolve with PSF if requested
                     if self.params['simSignals']['PSFConvolveExtended']:
                         # eval_psf should be close to 1.0, but not exactly. For the purposes
                         # of convolution, we want the total signal to be exactly 1.0
                         conv_psf = eval_psf / np.sum(eval_psf)
-                        ghost_stamp = s1.fftconvolve(ghost_stamp, conv_psf, mode='same')
+                        convolved_ghost_stamp = s1.fftconvolve(ghost_stamp, conv_psf, mode='same')
+
+                        convolved_ghost_stamp_nested = []
+                        for sublist in ghost_stamp_nested:
+                            tmp = [convolved_ghost_stamp] * len(sublist)
+                            convolved_ghost_stamp_nested.append(tmp)
+
+                        ghost_stamp_nested = convolved_ghost_stamp_nested
 
             if input_type == 'point_source':
-                stamp = eval_psf
-                stamp *= rate
+                # Multiply the nested PSFs by the signal rate per second for the source
+                stamp_nested = []
+                for psf_sublist in psf_frames_nested:
+                    stamp_sublist = []
+                    for psf_entry in psf_sublist:
+                        stamp_sublist.append(psf_entry * rate)
+                    stamp_nested.append(stamp_sublist)
 
             elif input_type == 'extended':
+                raise NotImplementedError('Moving extended objects not yet supported.')
                 stamp, header = self.basic_get_image(entry['filename'])
                 # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
                 stamp = self.rotate_extended_image(stamp, entry['pos_angle'])
@@ -1660,9 +1735,16 @@ class Catalog_seed():
                         stamp_dims = stamp.shape
 
                     # Convolve stamp with PSF
-                    stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
+                    stamp_nested = []
+                    for psf_sublist in psf_frames_nested:
+                        stamp_sublist = []
+                        for psf_entry in psf_sublist:
+                            stamp_sublist.append(s1.fftconvolve(stamp, psf_entry, mode='same'))
+                        stamp_nested.append(stamp_sublist)
+
 
             elif input_type == 'galaxies':
+                raise NotImplementedError('Moving 2D sersic objects not yet supported.')
                 xposang = self.calc_x_position_angle(entry)
 
                 # First create the galaxy
@@ -1680,30 +1762,35 @@ class Catalog_seed():
                     galdims = stamp.shape
 
                 # Convolve the galaxy with the instrument PSF
-                stamp = s1.fftconvolve(stamp, eval_psf, mode='same')
+                stamp_nested = []
+                for psf_sublist in psf_frames_nested:
+                    stamp_sublist = []
+                    for psf_entry in psf_sublist:
+                        stamp_sublist.append(s1.fftconvolve(stamp, psf_entry, mode='same'))
+                    stamp_nested.append(stamp_sublist)
 
             # Now that we have stamp images for galaxies and extended
             # sources, check to see if they overlap the detector or not.
             # NOTE: this will only catch sources that never overlap the
             # detector for any of their positions.
             if input_type != 'point_source':
-                status = self.on_detector(x_frames, y_frames, stamp.shape,
+                status = self.on_detector(x_frames, y_frames, stamp_nested[0][0].shape,
                                           (newdimsx, newdimsy))
             if status == 'off':
                 continue
-
-            # Each entry will have stamp image as array, ra_init, dec_init,
-            # ra_velocity, dec_velocity, frametime, numframes, subsample_factor,
-            # outputarrayxsize, outputarrayysize
-            # (maybe without the values that will be the same to each entry.
 
             # Need to feed info into moving_targets one integration at a time.
             # No need to feed in the reset frames, but they are necessary
             # before this point in order to get the timing and positions
             # correct.
             for integ in range(numints):
+
+                # We add integ to framestart to account for the reset frame that occurs
+                # between each integration. This means that the reset frame is the
+                # last frame of the set, except for the final integration, where the
+                # reset frame is not present
                 framestart = integ * frames_per_integration + integ
-                frameend = framestart + frames_per_integration + 1
+                frameend = framestart + frames_per_integration
 
                 # Now check to see if the stamp image overlaps the output
                 # aperture for this integration only. Above we removed sources
@@ -1711,17 +1798,19 @@ class Catalog_seed():
                 # of sources that overlap the detector in some integrations,
                 # but not this particular integration
                 status = 'on'
-                status = self.on_detector(x_frames[framestart:frameend],
-                                          y_frames[framestart:frameend],
-                                          stamp.shape, (newdimsx, newdimsy))
+                status = self.on_detector(x_frames[integ],
+                                          y_frames[integ],
+                                          stamp_nested[0][0].shape, (newdimsx, newdimsy))
+
                 if status == 'off':
                     continue
 
+                # Now create the moving target ramp for this source
                 mt = moving_targets.MovingTarget()
-                mt.subsampx = 3
-                mt.subsampy = 3
-                mt_source = mt.create(stamp, x_frames[framestart:frameend],
-                                      y_frames[framestart:frameend],
+
+                mt_source = mt.create(stamp_nested[framestart:frameend], x_frames_nested[framestart:frameend],
+                                      y_frames_nested[framestart:frameend], aper_x_min_of_stamp_nested[framestart:frameend],
+                                      aper_y_min_of_stamp_nested[framestart:frameend], subframe_times_nested[framestart:frameend],
                                       self.frametime, newdimsx, newdimsy)
 
                 mt_integration[integ, :, :, :] += mt_source
@@ -1731,18 +1820,17 @@ class Catalog_seed():
 
                 if add_ghosts and ghost_file is not None:
                     # Check if the ghost lands on the detector
-                    ghost_status = self.on_detector(ghost_x_frames[framestart:frameend],
-                                                    ghost_y_frames[framestart:frameend],
+                    ghost_status = self.on_detector(ghost_x_frames_nested[integ][0],
+                                                    ghost_y_frames_nested[integ][0],
                                                     ghost_stamp.shape, (newdimsx, newdimsy))
+
                     if ghost_status == 'off':
                         continue
 
                     mt = moving_targets.MovingTarget()
-                    mt.subsampx = 3
-                    mt.subsampy = 3
-                    mt_ghost_source = mt.create(ghost_stamp, ghost_x_frames[framestart:frameend],
-                                          ghost_y_frames[framestart:frameend],
-                                          self.frametime, newdimsx, newdimsy)
+                    mt_ghost_source = mt.create(ghost_stamp_nested[framestart:frameend], ghost_x_frames_nested[framestart:frameend],
+                                                ghost_y_frames_nested[framestart:frameend],
+                                                self.frametime, newdimsx, newdimsy)
 
                     mt_integration[integ, :, :, :] += mt_ghost_source
 
@@ -1783,12 +1871,20 @@ class Catalog_seed():
         x_list = []
         y_list = []
         for in_ra, in_dec in zip(ra_list, dec_list):
-            # Calculate the x,y position at each frame
-            x, y, ra, dec, ra_str, dec_str = self.get_positions(in_ra, in_dec, False, 4096)
-            x_list.append(x)
-            y_list.append(y)
-        x_list = np.array(x_list)
-        y_list = np.array(y_list)
+            if isinstance(in_ra, np.ndarray):
+                inner_x_list = []
+                inner_y_list = []
+                for inner_ra, inner_dec in zip(in_ra, in_dec):
+                    x, y, ra, dec, ra_str, dec_str = self.get_positions(inner_ra, inner_dec, False, 4096)
+                    inner_x_list.append(x)
+                    inner_y_list.append(y)
+                x_list.append(inner_x_list)
+                y_list.append(inner_y_list)
+            else:
+                # Calculate the x,y position at each frame
+                x, y, ra, dec, ra_str, dec_str = self.get_positions(in_ra, in_dec, False, 4096)
+                x_list.append(x)
+                y_list.append(y)
         return x_list, y_list
 
     def xy_list_to_radec_list(self, x_list, y_list):
@@ -1813,11 +1909,21 @@ class Catalog_seed():
         ra_list = []
         dec_list = []
         for in_x, in_y in zip(x_list, y_list):
-            x, y, ra, dec, ra_str, dec_str = self.get_positions(in_x, in_y, True, 4096)
-            ra_list.append(ra)
-            dec_list.append(dec)
-        ra_list = np.array(ra_list)
-        dec_list = np.array(dec_list)
+            if isinstance(in_x, np.ndarray):
+                inner_ra_list = []
+                inner_dec_list = []
+                for inner_x, inner_y in zip(in_x, in_y):
+                    x, y, ra, dec, ra_str, dec_str = self.get_positions(inner_x, inner_y, True, 4096)
+                    inner_ra_list.append(ra)
+                    inner_dec_list.append(dec)
+                ra_list.append(inner_ra_list)
+                dec_list.append(inner_dec_list)
+            else:
+                x, y, ra, dec, ra_str, dec_str = self.get_positions(in_x, in_y, True, 4096)
+                ra_list.append(ra)
+                dec_list.append(dec)
+        #ra_list = np.array(ra_list)
+        #dec_list = np.array(dec_list)
         return ra_list, dec_list
 
     def on_detector(self, xloc, yloc, stampdim, finaldim):
@@ -2219,7 +2325,7 @@ class Catalog_seed():
             signalimage = np.zeros(self.nominal_dims)
             segmentation_map = np.zeros(self.nominal_dims)
         else:
-            signalimage = np.zeros(self.output_dims, dtype=np.float)
+            signalimage = np.zeros(self.output_dims, dtype=float)
             segmentation_map = np.zeros(self.output_dims)
 
 
@@ -2697,8 +2803,8 @@ class Catalog_seed():
                 ghost_i += 1
 
             psf_len = self.find_psf_size(countrate)
-            edgex = np.int(psf_len // 2)
-            edgey = np.int(psf_len // 2)
+            edgex = int(psf_len // 2)
+            edgey = int(psf_len // 2)
 
             if pixely > (miny-edgey) and pixely < (maxy+edgey) and pixelx > (minx-edgex) and pixelx < (maxx+edgex):
                 # set up an entry for the output table
@@ -2977,7 +3083,7 @@ class Catalog_seed():
             # Assume same PSF size in x and y
             psf_y_dim = psf_x_dim
 
-            scaled_psf, min_x, min_y, wings_added = self.create_psf_stamp(
+            scaled_psf, _, _, min_x, min_y, wings_added = self.create_psf_stamp(
                 entry['pixelx'], entry['pixely'], psf_x_dim, psf_y_dim,
                 segment_number=segment_number, ignore_detector=True
             )
@@ -3099,12 +3205,12 @@ class Catalog_seed():
             Array will be cropped based on how much falls on or off the detector
 
         k1 : int
-            Row number on the PSF/stamp image corresponding to the bottom-most
-            row that overlaps the detector/aperture
-
-        l1 : int
             Column number on the PSF/stamp image corresponding to the left-most
             column that overlaps the detector/aperture
+
+        l1 : int
+            row number on the PSF/stamp image corresponding to the bottom-most
+            row that overlaps the detector/aperture
 
         add_wings : bool
             Whether or not PSF wings are to be added to the PSF core
@@ -3116,10 +3222,10 @@ class Catalog_seed():
         # Translation needed to go from PSF core (self.psf_library)
         # coordinate system to the PSF wing coordinate system (i.e.
         # center the PSF core in the wing image)
-        psf_wing_half_width_x = np.int(psf_dim_x // 2)
-        psf_wing_half_width_y = np.int(psf_dim_y // 2)
-        psf_core_half_width_x = np.int(self.psf_library_core_x_dim // 2)
-        psf_core_half_width_y = np.int(self.psf_library_core_y_dim // 2)
+        psf_wing_half_width_x = int(psf_dim_x // 2)
+        psf_wing_half_width_y = int(psf_dim_y // 2)
+        psf_core_half_width_x = int(self.psf_library_core_x_dim // 2)
+        psf_core_half_width_y = int(self.psf_library_core_y_dim // 2)
         delta_core_to_wing_x = psf_wing_half_width_x - psf_core_half_width_x
         delta_core_to_wing_y = psf_wing_half_width_y - psf_core_half_width_y
 
@@ -3139,6 +3245,7 @@ class Catalog_seed():
             # the xpts_core and ypts_core from this in order to know how
             # to evaluate the library
             # Note that we don't care about the pixel phase here.
+
             psf_core_dims = (self.psf_library_core_y_dim, self.psf_library_core_x_dim)
             xc_core, yc_core, xpts_core, ypts_core, (i1c, i2c), (j1c, j2c), (k1c, k2c), \
                 (l1c, l2c) = self.create_psf_stamp_coords(x_location, y_location, psf_core_dims,
@@ -3155,6 +3262,9 @@ class Catalog_seed():
                                         x_0=xc_core, y_0=yc_core)
             k1 = k1c
             l1 = l1c
+
+            i1 = i1c
+            j1 = j1c
 
         else:
             add_wings = True
@@ -3178,8 +3288,8 @@ class Catalog_seed():
             # Get the psf wings array - first the nominal size
             # Later we may crop if the source is only partially on the detector
             full_wing_y_dim, full_wing_x_dim = self.psf_wings.shape
-            offset_x = np.int((full_wing_x_dim - psf_dim_x) / 2)
-            offset_y = np.int((full_wing_y_dim - psf_dim_y) / 2)
+            offset_x = int((full_wing_x_dim - psf_dim_x) / 2)
+            offset_y = int((full_wing_y_dim - psf_dim_y) / 2)
 
             full_psf = copy.deepcopy(self.psf_wings[offset_y:offset_y+psf_dim_y, offset_x:offset_x+psf_dim_x])
 
@@ -3233,7 +3343,7 @@ class Catalog_seed():
             # to the proper shape based on how much is on the detector
             full_psf = full_psf[l1:l2, k1:k2]
 
-        return full_psf, k1, l1, add_wings
+        return full_psf, i1, j1, k1, l1, add_wings
 
     def create_psf_stamp_coords(self, aperture_x, aperture_y, stamp_dims, stamp_x, stamp_y,
                                 coord_sys='full_frame', ignore_detector=False):
@@ -3378,10 +3488,10 @@ class Catalog_seed():
             y_dim -= 1
         x_half_width = x_dim // 2
         y_half_width = y_dim // 2
-        x_min = np.int(x_center) - x_half_width
-        x_max = np.int(x_center) + x_half_width + 1
-        y_min = np.int(y_center) - y_half_width
-        y_max = np.int(y_center) + y_half_width + 1
+        x_min = int(x_center) - x_half_width
+        x_max = int(x_center) + x_half_width + 1
+        y_min = int(y_center) - y_half_width
+        y_max = int(y_center) + y_half_width + 1
         return x_min, x_max, y_min, y_max
 
     def cropped_coords(self, aperture_x, aperture_y, aperture_dims, stamp_x, stamp_y, stamp_dims,
@@ -3859,15 +3969,15 @@ class Catalog_seed():
         # Expand the limits if a grism direct image is being made
         if (self.params['Output']['grism_source_image'] == True) or (self.params['Inst']['mode'] in ["pom", "wfss"]):
             """
-            extrapixy = np.int((maxy + 1)/2 * (self.grism_direct_factor_y - 1.))
+            extrapixy = int((maxy + 1)/2 * (self.grism_direct_factor_y - 1.))
             miny -= extrapixy
             maxy += extrapixy
-            extrapixx = np.int((maxx + 1)/2 * (self.grism_direct_factor_x - 1.))
+            extrapixx = int((maxx + 1)/2 * (self.grism_direct_factor_x - 1.))
             minx -= extrapixx
             maxx += extrapixx
 
-            nx = np.int(nx * self.grism_direct_factor_x)
-            ny = np.int(ny * self.grism_direct_factor_y)
+            nx = int(nx * self.grism_direct_factor_x)
+            ny = int(ny * self.grism_direct_factor_y)
 
             this needs to change to be the entire POM.
             don't multiply by grism_direct_factor. that's too small.
@@ -4066,8 +4176,8 @@ class Catalog_seed():
 
         # Using the position angle, calculate the size of the source in the
         # x and y directions
-        x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-        y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+        x_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+        y_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
         num_pix = x_full_length * y_full_length
 
@@ -4085,8 +4195,8 @@ class Catalog_seed():
 
             # Using the position angle, calculate the size of the source in the
             # x and y directions
-            x_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
-            y_full_length = np.int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
+            x_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.cos(position_angle)), 2 * semi_minor_axis])))
+            y_full_length = int(np.ceil(np.max([2 * semi_major_axis * np.absolute(np.sin(position_angle)), 2 * semi_minor_axis])))
 
             num_pix = x_full_length * y_full_length
 
@@ -4162,7 +4272,7 @@ class Catalog_seed():
         if totsignal == 0.:
             return stamp
         yd, xd = stamp.shape
-        mid = np.int(xd / 2)
+        mid = int(xd / 2)
         for rad in range(mid):
             signal = np.sum(stamp[mid - rad:mid + rad + 1, mid - rad:mid + rad + 1]) / totsignal
             if signal >= threshold:
@@ -4265,7 +4375,7 @@ class Catalog_seed():
             # sizes of the photometry aperture versus the extended source.
             psf_dimensions = np.array(self.psf_library.data.shape[-2:])
             psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
-                                 self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
+                                 self.params['simSignals']['gridded_psf_library_row_padding']).astype(int)
 
             if ((galdims[0] < psf_shape[0]) or (galdims[1] < psf_shape[1])):
                 stamp = self.enlarge_stamp(stamp, psf_shape)
@@ -4273,8 +4383,8 @@ class Catalog_seed():
 
             # Get the PSF which will be convolved with the galaxy profile
             # The PSF should be centered in the pixel containing the galaxy center
-            psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'], psf_shape[1], psf_shape[0],
-                                                                         ignore_detector=True)
+            psf_image, _, _, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'], psf_shape[1], psf_shape[0],
+                                                                               ignore_detector=True)
 
             # Skip sources that fall completely off the detector
             if psf_image is None:
@@ -4325,7 +4435,6 @@ class Catalog_seed():
 
                 else:
                     pass
-                    # print("Source located entirely outside the field of view. Skipping.")
             else:
                 pass
 
@@ -4654,9 +4763,6 @@ class Catalog_seed():
             if len(ext_stamp.shape) != 2:
                 ext_stamp = fits.getdata(values['filename'], 1)
 
-            # print('Extended source location, x, y, ra, dec:', pixelx, pixely, ra, dec)
-            # print('extended source size:', ext_stamp.shape)
-
             # Rotate the stamp image if requested, but don't do so if the specified pos angle is None
             ext_stamp = self.rotate_extended_image(ext_stamp, values['pos_angle'])
 
@@ -4858,7 +4964,7 @@ class Catalog_seed():
                 # produce an output that includes the wings of the PSF
                 psf_dimensions = np.array(self.psf_library.data.shape[-2:])
                 psf_shape = np.array((psf_dimensions / self.psf_library_oversamp) -
-                                     self.params['simSignals']['gridded_psf_library_row_padding']).astype(np.int)
+                                     self.params['simSignals']['gridded_psf_library_row_padding']).astype(int)
                 if ((stamp_dims[0] < psf_shape[0]) or (stamp_dims[1] < psf_shape[1])):
                     stamp = self.enlarge_stamp(stamp, psf_shape)
                     stamp_dims = stamp.shape
@@ -4869,8 +4975,8 @@ class Catalog_seed():
                 # approach that uses the full convolution including the wings.
                 # Whether this is a problem or not will depend on the relative
                 # sizes of the photometry aperture versus the extended source.
-                psf_image, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
-                                                                             psf_shape[1], psf_shape[0], ignore_detector=True)
+                psf_image, _, _, min_x, min_y, wings_added = self.create_psf_stamp(entry['pixelx'], entry['pixely'],
+                                                                                   psf_shape[1], psf_shape[0], ignore_detector=True)
 
                 # Skip sources that fall completely off the detector
                 if psf_image is None:
@@ -4971,7 +5077,7 @@ class Catalog_seed():
             if dim_x % 2 != image_size_x % 2:
                 dim_x += 1
             dx = dim_x - image_size_x
-            dx = np.int(dx / 2)
+            dx = int(dx / 2)
         else:
             dx = 0
             dim_x = image_size_x
@@ -4980,7 +5086,7 @@ class Catalog_seed():
             if dim_y % 2 != image_size_y % 2:
                 dim_y += 1
             dy = dim_y - image_size_y
-            dy = np.int(dy / 2)
+            dy = int(dy / 2)
         else:
             dy = 0
             dim_y = image_size_y

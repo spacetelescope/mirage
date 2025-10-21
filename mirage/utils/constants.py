@@ -6,8 +6,8 @@ Use
         from mirage.utils import constants
         inst_abb = constants.instrument_abbreviations
 """
+import importlib.resources as resources
 import os
-import pkg_resources
 
 from astropy.time import Time
 import astropy.units as u
@@ -167,7 +167,7 @@ LOG_CONFIG_FILENAME = 'logging_config.yaml'
 STANDARD_LOGFILE_NAME = 'mirage_latest.log'
 
 # Default stamp image to use for ghost sources resulting from point sources
-MODULE_PATH = pkg_resources.resource_filename('mirage', '')
+MODULE_PATH = str(resources.files('mirage'))
 CONFIG_DIR = os.path.join(MODULE_PATH, 'config')
 NIRISS_GHOST_GAP_FILE = os.path.join(CONFIG_DIR, 'niriss_ghost_gap_summary.txt')
 NIRISS_GHOST_GAP_URL = 'https://raw.githubusercontent.com/spacetelescope/niriss_ghost/main/niriss_ghost/niriss_ghost_gap_summary.txt'

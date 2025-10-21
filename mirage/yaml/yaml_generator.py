@@ -103,7 +103,6 @@ from astropy.time import Time, TimeDelta
 from astropy.table import Table
 from astropy.io import ascii, fits
 import numpy as np
-import pkg_resources
 import pysiaf
 
 from ..apt import apt_inputs
@@ -117,7 +116,7 @@ from ..utils.siaf_interface import aperture_xy_to_radec
 from ..utils.utils import calc_frame_time, ensure_dir_exists, expand_environment_variable, parse_RA_Dec
 from .generate_observationlist import get_observation_dict
 from ..constants import NIRISS_PUPIL_WHEEL_ELEMENTS, NIRISS_FILTER_WHEEL_ELEMENTS
-from ..utils.constants import CRDS_FILE_TYPES, SEGMENTATION_MIN_SIGNAL_RATE, \
+from ..utils.constants import CRDS_FILE_TYPES, MODULE_PATH, SEGMENTATION_MIN_SIGNAL_RATE, \
                               LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
 from ..utils import siaf_interface, utils
 
@@ -330,9 +329,6 @@ class SimInput:
 
         # Check that CRDS-related environment variables are set correctly
         self.crds_datadir = crds_tools.env_variables()
-
-        # Get the path to the 'MIRAGE' package
-        self.modpath = pkg_resources.resource_filename('mirage', '')
 
         self.config_information = utils.organize_config_files(offline=self.offline)
 
@@ -1431,15 +1427,15 @@ class SimInput:
                 psf_wing_threshold_file = 'N/A'
                 psfpath = 'N/A'
             if instrument in 'niriss fgs nircam'.split():
-                self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(self.modpath, 'config', subarray_def_file))
-                self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(self.modpath, 'config', readout_pattern_file))
-            self.global_subarray_definition_files[instrument] = os.path.join(self.modpath, 'config', subarray_def_file)
-            self.global_readout_pattern_files[instrument] = os.path.join(self.modpath, 'config', readout_pattern_file)
-            self.global_crosstalk_files[instrument] = os.path.join(self.modpath, 'config', crosstalk_file)
-            self.global_filtpupilcombo_files[instrument] = os.path.join(self.modpath, 'config', filtpupilcombo_file)
-            self.global_filter_position_files[instrument] = os.path.join(self.modpath, 'config', filter_position_file)
-            self.global_flux_cal_files[instrument] = os.path.join(self.modpath, 'config', flux_cal_file)
-            self.global_psf_wing_threshold_file[instrument] = os.path.join(self.modpath, 'config', psf_wing_threshold_file)
+                self.global_subarray_definitions[instrument] = self.get_subarray_defs(filename=os.path.join(MODULE_PATH, 'config', subarray_def_file))
+                self.global_readout_patterns[instrument] = self.get_readpattern_defs(filename=os.path.join(MODULE_PATH, 'config', readout_pattern_file))
+            self.global_subarray_definition_files[instrument] = os.path.join(MODULE_PATH, 'config', subarray_def_file)
+            self.global_readout_pattern_files[instrument] = os.path.join(MODULE_PATH, 'config', readout_pattern_file)
+            self.global_crosstalk_files[instrument] = os.path.join(MODULE_PATH, 'config', crosstalk_file)
+            self.global_filtpupilcombo_files[instrument] = os.path.join(MODULE_PATH, 'config', filtpupilcombo_file)
+            self.global_filter_position_files[instrument] = os.path.join(MODULE_PATH, 'config', filter_position_file)
+            self.global_flux_cal_files[instrument] = os.path.join(MODULE_PATH, 'config', flux_cal_file)
+            self.global_psf_wing_threshold_file[instrument] = os.path.join(MODULE_PATH, 'config', psf_wing_threshold_file)
             self.global_psfpath[instrument] = psfpath
 
     def lowercase_dict_keys(self):
@@ -1566,7 +1562,7 @@ class SimInput:
                 self.psfpixfrac[instrument] = 0.1
 
             # Set global file paths
-            self.configfiles[instrument]['filter_throughput'] = os.path.join(self.modpath, 'config', 'placeholder.txt')
+            self.configfiles[instrument]['filter_throughput'] = os.path.join(MODULE_PATH, 'config', 'placeholder.txt')
 
         for instrument in 'miri nirspec'.split():
             self.configfiles[instrument] = {}
@@ -1653,7 +1649,7 @@ class SimInput:
         if file.lower() not in ['config']:
             file = os.path.abspath(file)
         elif file.lower() == 'config':
-            file = os.path.join(self.modpath, 'config', self.configfiles[prop])
+            file = os.path.join(MODULE_PATH, 'config', self.configfiles[prop])
         return file
 
     def get_psf_path(self):
@@ -2253,27 +2249,38 @@ def _gtvt_v3pa_on_date(ra, dec, date=None, return_range=False):
     pa_v3 : float
         V3PA in degrees
     """
-    import jwst_gtvt.find_tgt_info
+    from jwst_gtvt.jwst_tvt import Ephemeris
 
     if date is None:
         start_date_obj = datetime.date.today()
         start_date = start_date_obj.isoformat()
+        start_date = Time(start_date)
     else:
         start_date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
         start_date = start_date_obj.isoformat().split('T')[0]
+        start_date = Time(start_date)
 
-    # note, get_table requires distinct start and end dates, different by at least 1 day
+    # The gtvt seems to return NaN for the first row of the resulting
+    # dataframe no matter what. So let's move the starting date back
+    # one day so that we can get good values for the day of interest
+    start_date = start_date - TimeDelta(1, format='jd')
+
+    # jwst_gtvt.get_fixed_target_positions often returns NaN for the first entry in
+    # the table, so make sure we have an end date that is later than the start date
     end_date_obj = start_date_obj + datetime.timedelta(days=1)
     end_date = end_date_obj.isoformat().split('T')[0]
+    end_date = Time(end_date)
 
-    tbl = jwst_gtvt.find_tgt_info.get_table(ra=ra, dec=dec, instrument='NIRCam',
-                                            start_date=start_date, end_date=end_date,
-                                            verbose=False)
-    row = tbl[0]
+    ephem = Ephemeris(start_date=start_date, end_date=end_date)
+    ephem_df = ephem.get_fixed_target_positions(ra, dec)
+
+    nominal_pa = ephem.dataframe['V3PA_nominal_angle'].iloc[1]
+    min_pa = ephem.dataframe['V3PA_min_pa_angle'].iloc[1]
+    max_pa = ephem.dataframe['V3PA_max_pa_angle'].iloc[1]
 
     if return_range:
-        return row['V3PA'], row['V3PA min'], row['V3PA max']
-    return row['V3PA']
+        return nominal_pa, min_pa, max_pa
+    return nominal_pa
 
 
 def default_obs_v3pa_on_date(pointing_filename, obs_num, date=None, verbose=False, pointing_table=None):

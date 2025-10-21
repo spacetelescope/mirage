@@ -12,15 +12,15 @@ Use
 """
 
 import datetime
+import importlib.resources as resources
 import numpy as np
 import os
-import pkg_resources
 
 from mirage.seed_image import ephemeris_tools
+from mirage.utils.constants import MODULE_PATH
 
-package_path = pkg_resources.resource_filename('mirage', '')
 data_dir = os.path.join( os.path.dirname(__file__), 'test_data/ephemeris/')
-CONFIG_DIR = os.path.join(package_path, 'config')
+CONFIG_DIR = os.path.join(MODULE_PATH, 'config')
 
 
 def test_create_interpol_function():

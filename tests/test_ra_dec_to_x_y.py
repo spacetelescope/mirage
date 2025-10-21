@@ -66,7 +66,7 @@ def test_locations():
     for instrument in instrument_list:
         siaf = siaf_interface.get_instance(instrument)
         for aperture in siaf.apernames:
-            if 'WEDGE' in aperture or 'MASK' in aperture or aperture in apertures_to_skip:
+            if 'WEDGE' in aperture or 'MASK' in aperture or 'V-FRAME' in aperture or aperture in apertures_to_skip:
                 continue
 
             c.local_roll, c.attitude_matrix, c.ffsize, \

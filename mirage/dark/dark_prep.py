@@ -33,7 +33,6 @@ from glob import glob
 import shutil
 
 import yaml
-import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 import astropy.units as u
@@ -42,7 +41,7 @@ import mirage
 from mirage.logging import logging_functions
 from mirage.utils import read_fits, utils, siaf_interface
 from mirage.utils.constants import FGS1_DARK_SEARCH_STRING, FGS2_DARK_SEARCH_STRING, \
-                                   LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
+                                   LOG_CONFIG_FILENAME, MODULE_PATH, STANDARD_LOGFILE_NAME
 from mirage.utils.file_splitting import find_file_splits
 from mirage.utils.timer import Timer
 from mirage.reference_files import crds_tools
@@ -79,10 +78,6 @@ class DarkPrep():
 
         self.offline = offline
         self.file_splitting = file_splitting
-
-        # Locate the module files, so that we know where to look
-        # for config subdirectory
-        self.modpath = pkg_resources.resource_filename('mirage', '')
 
         # Get the location of the MIRAGE_DATA environment
         # variable, so we know where to look for darks, CR,
@@ -494,7 +489,7 @@ class DarkPrep():
         None
         """
 
-        ncopies = np.int((req - darkint) / darkint)
+        ncopies = int((req - darkint) / darkint)
         extras = (req - darkint) % darkint
 
         # Full copies of the dark exposure (all integrations)
@@ -630,7 +625,7 @@ class DarkPrep():
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
         # Expand param entries to full paths where appropriate
-        self.params = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
+        self.params = utils.full_paths(self.params, MODULE_PATH, self.crds_dict, offline=self.offline)
         self.filecheck()
 
         # Base name for output files
@@ -1123,7 +1118,7 @@ class DarkPrep():
             because averaging for non-RAPID readout patterns will destroy the frame
         """
         if self.params['Reffiles']['linearized_darkfile']:
-            datatype = np.float
+            datatype = np.float32
         else:
             datatype = np.int32
 
@@ -1174,7 +1169,7 @@ class DarkPrep():
             accumimage = np.zeros_like(outdark[0, 0, :, :], dtype=datatype)
 
             if dark.sbAndRefpix is not None:
-                zeroaccumimage = np.zeros_like(outdark[0, 0, :, :], dtype=np.float)
+                zeroaccumimage = np.zeros_like(outdark[0, 0, :, :], dtype=np.float32)
 
             # Loop over integrations
             #for integ in range(self.params['Readout']['nint']):

@@ -22,7 +22,6 @@ import copy
 import json
 import os
 import logging
-import pkg_resources
 import re
 import yaml
 
@@ -32,7 +31,7 @@ from scipy.stats import sigmaclip
 
 from mirage.reference_files.utils import get_transmission_file
 from mirage.logging import logging_functions
-from mirage.utils.constants import CRDS_FILE_TYPES, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
+from mirage.utils.constants import CRDS_FILE_TYPES, MODULE_PATH, NIRISS_FILTER_WHEEL_FILTERS, NIRISS_PUPIL_WHEEL_FILTERS, \
                                    NIRCAM_PUPIL_WHEEL_FILTERS, NIRCAM_2_FILTER_CROSSES, NIRCAM_WL8_CROSSING_FILTERS, \
                                    NIRCAM_CLEAR_CROSSING_FILTERS, NIRCAM_GO_PW_FILTER_PAIRINGS, NIRCAM_FILTERS, \
                                    NIRISS_FILTERS, FGS_FILTERS, LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME
@@ -424,6 +423,22 @@ def expand_environment_variable(variable_name, offline=False):
     return variable_directory
 
 
+def flatten_nested_list(nested_list):
+    """Flatten a list of lists. Works only for 2 levels.
+
+    Parameters
+    ----------
+    nested_list : list
+        List of lists
+
+    Returns
+    -------
+    list: list
+        Single, flattened list
+    """
+    return [x for xs in nested_list for x in xs]
+
+
 def full_paths(params, module_path, crds_dictionary, offline=False):
     """Expand the relevant input paths from the input yaml file to be full
     paths.
@@ -729,8 +744,7 @@ def get_filter_throughput_file(instrument, filter_name, pupil_name, nircam_modul
     throughput_file : str
         Name of ascii file containing the filter throughput curve
     """
-    modpath = pkg_resources.resource_filename('mirage', '')
-    config_path = os.path.join(modpath, 'config')
+    config_path = os.path.join(MODULE_PATH, 'config')
 
     instrument = instrument.lower()
     if instrument == 'nircam':
@@ -1005,7 +1019,6 @@ def organize_config_files(offline=False):
         Mirage reference data. Used primarily for testing.
     """
     data_dir = expand_environment_variable('MIRAGE_DATA', offline=offline)
-    modpath = pkg_resources.resource_filename('mirage', '')
 
     config_info = {}
 
@@ -1059,15 +1072,15 @@ def organize_config_files(offline=False):
             psf_wing_threshold_file = 'N/A'
             psfpath = 'N/A'
         if instrument in 'niriss fgs nircam'.split():
-            config_info['global_subarray_definitions'][instrument] = asc.read(os.path.join(modpath, 'config', subarray_def_file))
-            config_info['global_readout_patterns'][instrument] = asc.read(os.path.join(modpath, 'config', readout_pattern_file))
-        config_info['global_subarray_definition_files'][instrument] = os.path.join(modpath, 'config', subarray_def_file)
-        config_info['global_readout_pattern_files'][instrument] = os.path.join(modpath, 'config', readout_pattern_file)
-        config_info['global_crosstalk_files'][instrument] = os.path.join(modpath, 'config', crosstalk_file)
-        config_info['global_filtpupilcombo_files'][instrument] = os.path.join(modpath, 'config', filtpupilcombo_file)
-        config_info['global_filter_position_files'][instrument] = os.path.join(modpath, 'config', filter_position_file)
-        config_info['global_flux_cal_files'][instrument] = os.path.join(modpath, 'config', flux_cal_file)
-        config_info['global_psf_wing_threshold_file'][instrument] = os.path.join(modpath, 'config', psf_wing_threshold_file)
+            config_info['global_subarray_definitions'][instrument] = asc.read(os.path.join(MODULE_PATH, 'config', subarray_def_file))
+            config_info['global_readout_patterns'][instrument] = asc.read(os.path.join(MODULE_PATH, 'config', readout_pattern_file))
+        config_info['global_subarray_definition_files'][instrument] = os.path.join(MODULE_PATH, 'config', subarray_def_file)
+        config_info['global_readout_pattern_files'][instrument] = os.path.join(MODULE_PATH, 'config', readout_pattern_file)
+        config_info['global_crosstalk_files'][instrument] = os.path.join(MODULE_PATH, 'config', crosstalk_file)
+        config_info['global_filtpupilcombo_files'][instrument] = os.path.join(MODULE_PATH, 'config', filtpupilcombo_file)
+        config_info['global_filter_position_files'][instrument] = os.path.join(MODULE_PATH, 'config', filter_position_file)
+        config_info['global_flux_cal_files'][instrument] = os.path.join(MODULE_PATH, 'config', flux_cal_file)
+        config_info['global_psf_wing_threshold_file'][instrument] = os.path.join(MODULE_PATH, 'config', psf_wing_threshold_file)
         config_info['global_psfpath'][instrument] = psfpath
     return config_info
 

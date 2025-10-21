@@ -8,14 +8,15 @@ Authors: Joe Filippazzo, Kevin Volk, Nestor Espinoza, Jonathan Fraine, Michael W
 
 from copy import copy
 from functools import partial, wraps
+from importlib.resources import files, as_file
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
-from pkg_resources import resource_filename
 import logging
 import time
 import warnings
 import os
 import datetime
+from pathlib import Path
 import yaml
 
 import astropy.units as q
@@ -796,7 +797,14 @@ class SossSim():
         if pfile is None:
 
             # Read template file
-            pfile = resource_filename('mirage', 'tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml').replace('mirage/mirage', 'mirage')
+            relative_path = 'tests/test_data/NIRISS/niriss_soss_substrip256_clear.yaml'
+
+            # Get a proper Path to the file
+            base_path = Path(files('mirage'))
+            parent_path = base_path.parent
+            with as_file(parent_path.joinpath(relative_path)) as p:
+                pfile = str(p)
+
             self._read_parameter_file(pfile)
 
             # Populate params dict

@@ -39,16 +39,10 @@ SUCCESS_GENERATE_SEGMENT_PSF = None
 # Determine if tests are being run on Github Actions CI
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
-# Determine the version of python used. For python 3.8 and above
-# webbpsf is installed via pip, which means the data files will not
-# be accessible and any test that relies on webbpsf should be skipped
-python_version = sys.version[0:3]
-testable_versions = ['3.6', '3.7']
-skip_versions = ['3.8', '3.9']
-if python_version in skip_versions:
-    SKIP_WEBBPSF = True
-else:
-    SKIP_WEBBPSF = False
+# For python 3.8 and above webbpsf is installed via pip, which means
+# the data files will not be accessible and any test that relies on
+# webbpsf should be skipped
+SKIP_WEBBPSF = True
 
 # Define default inputs
 INSTRUMENT = 'NIRCam'
@@ -270,11 +264,11 @@ def test_get_gridded_segment_psf_library_list_remote():
                                          library_path)
     assert len(libraries) == 18, 'Did not find all 18 segment libraries'
     for i, lib_model in enumerate(libraries):
-        assert isinstance(lib_model, photutils.psf.models.GriddedPSFModel), \
+        assert isinstance(lib_model, photutils.psf.GriddedPSFModel), \
             'Segment PSF library not created correctly'
-        assert lib_model.grid_xypos == [(1023.5, 1023.5)], \
+        assert np.all(lib_model.grid_xypos == [(1023.5, 1023.5)]), \
             'Segment PSF library not created correctly'
-        assert lib_model.oversampling == 1, \
+        assert np.all(lib_model.oversampling == [1, 1]), \
             'Segment PSF library not created correctly'
         for k in ['segid', 'segname', 'xtilt', 'ytilt']:
             assert k in list(lib_model.meta.keys()), \
@@ -299,11 +293,11 @@ def test_get_gridded_segment_psf_library_list_local():
                                          library_path)
     assert len(libraries) == 18, 'Did not find all 18 segment libraries'
     for i, lib_model in enumerate(libraries):
-        assert isinstance(lib_model, photutils.psf.models.GriddedPSFModel), \
+        assert isinstance(lib_model, photutils.psf.GriddedPSFModel), \
             'Segment PSF library not created correctly'
-        assert lib_model.grid_xypos == [(1023.0, 1023.0)], \
+        assert np.all(lib_model.grid_xypos == [(1023.0, 1023.0)]), \
             'Segment PSF library not created correctly'
-        assert lib_model.oversampling == 1, \
+        assert np.all(lib_model.oversampling == [1, 1]), \
             'Segment PSF library not created correctly'
         for k in ['segid', 'segname', 'xtilt', 'ytilt']:
             assert k in list(lib_model.meta.keys()), \
@@ -324,11 +318,11 @@ def test_to_gridded_psfmodel(test_library_file):
     with fits.open(test_library_file) as hdulist:
         lib_model = to_griddedpsfmodel(hdulist)
 
-    assert isinstance(lib_model, photutils.psf.models.GriddedPSFModel), \
+    assert isinstance(lib_model, photutils.psf.GriddedPSFModel), \
         'Segment PSF library not created correctly'
-    assert lib_model.grid_xypos == [(1023.5, 1023.5)], \
+    assert np.all(lib_model.grid_xypos == [(1023.5, 1023.5)]), \
         'Segment PSF library not created correctly'
-    assert lib_model.oversampling == 1, \
+    assert np.all(lib_model.oversampling == [1, 1]), \
         'Segment PSF library not created correctly'
     for k in ['segid', 'segname', 'xtilt', 'ytilt']:
         assert k in list(lib_model.meta.keys()), \

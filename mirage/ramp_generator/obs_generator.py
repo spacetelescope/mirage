@@ -38,8 +38,8 @@ import warnings
 import argparse
 import shutil
 
+import asdf
 import yaml
-import pkg_resources
 import numpy as np
 from astropy.io import fits, ascii
 from astropy.table import Table
@@ -56,7 +56,7 @@ from mirage.utils import file_io, read_fits, utils, siaf_interface
 from mirage.utils import set_telescope_pointing_separated as stp
 from mirage.utils.constants import EXPTYPES, MEAN_GAIN_VALUES, LOG_CONFIG_FILENAME, \
                                    STANDARD_LOGFILE_NAME, NUM_RESETS_BEFORE_EXP, NUM_RESETS_BEFORE_INT, \
-                                   TABLE_BASETIME
+                                   MODULE_PATH, TABLE_BASETIME
 from mirage.utils.timer import Timer
 
 
@@ -98,10 +98,6 @@ class Observation():
         # (used for WFSS mode), as well as the coordinate
         # offset between the nominal output array coordinates.
         self.coord_adjust = {'x': 1., 'xoffset': 0., 'y': 1., 'yoffset': 0.}
-
-        # Locate the module files, so that we know where to look
-        # for config subdirectory
-        self.modpath = pkg_resources.resource_filename('mirage', '')
 
         # Get the location of the MIRAGE_DATA environment
         # variable, so we know where to look for darks, CR,
@@ -1041,7 +1037,7 @@ class Observation():
         self.crds_dict = crds_tools.dict_from_yaml(self.params)
 
         # Expand param entries to full paths where appropriate
-        self.params = utils.full_paths(self.params, self.modpath, self.crds_dict, offline=self.offline)
+        self.params = utils.full_paths(self.params, MODULE_PATH, self.crds_dict, offline=self.offline)
         self.file_check()
 
         #print('self.linDark:', self.linDark)
@@ -1634,6 +1630,7 @@ class Observation():
 
             self.linear_dark = self.read_dark_file(self.linDark[0])
 
+
     def do_cosmic_rays(self, image, ngroup, iframe, ncr, seedval):
         """Add cosmic rays to input data
 
@@ -1842,7 +1839,7 @@ class Observation():
         if ndim == 3:
             data = np.vstack((np.zeros((1, yd, xd)), data))
 
-        outramp = np.zeros((self.params['Readout']['ngroup'], yd, xd), dtype=np.float)
+        outramp = np.zeros((self.params['Readout']['ngroup'], yd, xd), dtype=float)
 
         # Set up functions to apply cosmic rays later
         # Need the total number of active pixels in the
@@ -2229,7 +2226,7 @@ class Observation():
         zero : numpy.ndarray
             Zeroth frame data with reference pixels zeroed out
         """
-        maskimage = np.zeros((self.ffsize, self.ffsize), dtype=np.int)
+        maskimage = np.zeros((self.ffsize, self.ffsize), dtype=int)
         maskimage[4:self.ffsize - 4, 4:self.ffsize - 4] = 1.
 
         # Crop the mask to match the requested output array
@@ -2379,6 +2376,9 @@ class Observation():
 
         # Now remove the top garbage row from the table
         grouptable = grouptable[1:]
+
+        # Remove the second dimension
+        grouptable = grouptable[:, 0]
         return grouptable
 
     def read_cal_file(self, filename):
@@ -2915,6 +2915,11 @@ class Observation():
         else:
             outModel.meta.visit.tsovisit = True
 
+        # Set the visit start time. Make sure the seconds is high precision. 7 decimal points.
+        seconds_low_precision = self.params['Output']['time_obs'].split(':')[-1]
+        seconds_high_precision = "{:.7f}".format(float(self.params['Output']['time_obs'].split(':')[-1]))
+        outModel.meta.visit.start_time = start_time_string.replace(seconds_low_precision, seconds_high_precision)
+
         num_primary_dithers = self.params['Output']['total_primary_dither_positions']
         if isinstance(self.params['Output']['total_primary_dither_positions'], str):
             num_primary_dithers = int(self.params['Output']['total_primary_dither_positions'][0])
@@ -3030,7 +3035,11 @@ class Observation():
                 ra_interp_function, dec_interp_function = ephemeris_tools.get_ephemeris(nonsidereal_cat['ephemeris_file'].data[0])
             else:
                 # No ephemeris file
-                raise ValueError("Moving target table with no ephemeris not yet supported.")
+                with asdf.open(self.params['Reffiles']['astrometric']) as dist_file:
+                    coord_transform = dist_file.tree['model']
+                ra_interp_function, dec_interp_function = ephemeris_tools.ephemeris_from_catalog(nonsidereal_cat, pixFlag, velFlag,
+                                                                                                 outModel.meta.exposure.start_time,
+                                                                                                 coord_transform, self.attitude_matrix)
 
             # We need to populate the MT_RA and MT_DEC keywords, which list the target RA and Dec at the
             # mid-time of the exposure.
@@ -3038,6 +3047,11 @@ class Observation():
             mid_time_calstamp = ephemeris_tools.to_timestamp(mid_time_datetime)
             outModel.meta.wcsinfo.mt_ra = ra_interp_function([mid_time_calstamp])[0]
             outModel.meta.wcsinfo.mt_dec = dec_interp_function([mid_time_calstamp])[0]
+
+            if not np.isfinite(outModel.meta.wcsinfo.mt_ra):
+                outModel.meta.wcsinfo.mt_ra = self.ra
+            if not np.isfinite(outModel.meta.wcsinfo.mt_dec):
+                outModel.meta.wcsinfo.mt_dec = self.dec
 
             # Now populate the moving_target_position table, which will be in a separate extension
             ephem_interp_function = (ra_interp_function, dec_interp_function)
@@ -3047,6 +3061,12 @@ class Observation():
             mt_start_dec = dec_interp_function([starttime_calstamp])[0]
             mt_v2, mt_v3 = pysiaf.utils.rotations.getv2v3(self.attitude_matrix, mt_start_ra, mt_start_dec)
             mt_x, mt_y = self.siaf.tel_to_sci(mt_v2, mt_v3)
+
+            if not np.isfinite(mt_x) or not np.isfinite(mt_y):
+                mt_x = 1024.5
+                mt_y = 1024.5
+                self.logger.info('NaN values in the group table entry set to the center of the detector!!')
+
             outModel.moving_target = moving_target_position_table.populate_moving_target_table(outModel.group, ephem_interp_function,
                                                                                                mt_x, mt_y, self.params['Telescope']['ra'],
                                                                                                self.params['Telescope']['dec'])
@@ -3280,7 +3300,7 @@ class Observation():
 
         num_primary_dithers = self.params['Output']['total_primary_dither_positions']
         if isinstance(self.params['Output']['total_primary_dither_positions'], str):
-            num_primary_dithers = np.int(self.params['Output']['total_primary_dither_positions'][0])
+            num_primary_dithers = int(self.params['Output']['total_primary_dither_positions'][0])
 
         outModel[0].header['PATTTYPE'] = self.params['Output']['primary_dither_type']
         outModel[0].header['PATT_NUM'] = self.params['Output']['primary_dither_position']
@@ -3338,6 +3358,11 @@ class Observation():
         outModel[0].header['EXPMID'] = ct.mjd + outModel[0].header['EFFEXPTM']/3600./24./2.
 
         outModel[0].header['DURATION'] = self.get_duration()
+
+        # Set the visit start time. Make sure the seconds is high precision. 7 decimal points.
+        seconds_low_precision = self.params['Output']['time_obs'].split(':')[-1]
+        seconds_high_precision = "{:.7f}".format(float(self.params['Output']['time_obs'].split(':')[-1]))
+        outModel[0].header['VSTSTART'] = start_time_string.replace(seconds_low_precision, seconds_high_precision).replace('T', ' ')
 
         # populate the GROUP extension table
         n_int, n_group, n_y, n_x = outModel[1].data.shape

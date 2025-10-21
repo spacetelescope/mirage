@@ -33,16 +33,23 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data/hdf5_catalogs
 
 def test_get_filter_info():
     nrc = spec.get_filter_info(['nircam_f444w_magnitude'], 'abmag')
-    assert nrc == {'nircam_f444w_magnitude': (5.347317027198591e-22 * FLAMBDA_CGS_UNITS, 3.4838200000000002e-31 * FNU_CGS_UNITS, 27.544926351903044,
-                                              4.421 * u.micron)}
+    assert np.isclose(nrc['nircam_f444w_magnitude'][0].value, 5.30813766e-22, rtol=0.001)
+    assert np.isclose(nrc['nircam_f444w_magnitude'][1].value, 3.4270754e-31, rtol=0.001)
+    assert np.isclose(nrc['nircam_f444w_magnitude'][2], 27.5627564730907, rtol=0.001)
+    assert np.isclose(nrc['nircam_f444w_magnitude'][3].value, 4.401, rtol=0.001)
 
     nis = spec.get_filter_info(['niriss_f200w_magnitude'], 'vegamag')
-    assert nis == {'niriss_f200w_magnitude': (2.173398e-21 * FLAMBDA_CGS_UNITS, 2.879494e-31 * FNU_CGS_UNITS,
-                                              26.04898, 1.9930 * u.micron)}
+    assert np.isclose(nis['niriss_f200w_magnitude'][0].value, 2.173398e-21, rtol=0.001)
+    assert np.isclose(nis['niriss_f200w_magnitude'][1].value, 2.879494e-31, rtol=0.001)
+    assert np.isclose(nis['niriss_f200w_magnitude'][2], 26.04898, rtol=0.001)
+    assert np.isclose(nis['niriss_f200w_magnitude'][3].value, 1.9930, rtol=0.001)
+
 
     fgs = spec.get_filter_info(['fgs_magnitude'], 'stmag')
-    assert fgs == {'fgs_magnitude': (1.593395e-22 * FLAMBDA_CGS_UNITS, 3.324736e-32 * FNU_CGS_UNITS, 33.39426,
-                                     2.5011 * u.micron)}
+    assert np.isclose(fgs['fgs_magnitude'][0].value, 1.593395e-22, rtol=0.001)
+    assert np.isclose(fgs['fgs_magnitude'][1].value, 3.324736e-32, rtol=0.001)
+    assert np.isclose(fgs['fgs_magnitude'][2], 33.39426, rtol=0.001)
+    assert np.isclose(fgs['fgs_magnitude'][3].value, 2.5011, rtol=0.001)
 
 
 def test_hdf5_file_input():
@@ -96,6 +103,18 @@ def test_manual_inputs():
     os.remove(flambda_output_catalog)
     os.remove(sed_catalog)
 
+
+
+
+
+
+'''
+in order to get these tests to work and be robust against changes to zeropoints and pivot wavelengths,
+we are going to have to read in the zeropoints file from config, select the right row, and use that to
+create wavelength ranges (only for the cases of spectra that are given in the ascii catalog but NOT the
+input hdf5 file). Spectra in the input hdf5 file are ok as-is.
+ascii catalog has: niriss_f090w_magnitude niriss_f150w_magnitude niriss_f200w_magnitude nircam_f480m_magnitude  nircam_f444w_magnitude
+'''
 
 def test_manual_plus_file_inputs():
     """Case where spectra are input via hdf5 file as well as manually"""

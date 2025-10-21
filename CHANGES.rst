@@ -1,3 +1,42 @@
+2.4.1
+=====
+
+AMI
+---
+
+Update the xml reader for AMI mode simulations due to a change in the format of the APT output file. (#838)
+
+
+Documentation
+-------------
+
+Add a list of radii to the call to the galaxy catalog generator on the catalog creation page. (#830)
+
+
+Environment
+-----------
+
+Update dependencies to support python 3.11 and 3.12 environments. Remove python 3.8 and 3.9 environment files in favor of a new python 3.11 and 3.12 files. Add a new environment file, environment_python_3.11_intel_mac.yml, for users who are working on a Mac with Intel chip and who want to simulate Time Series data. This is due to the Batman dependency not yet functioning in python 3.12, and not producing a MacOS wheel for its latest version (2.5.3). (#839, #848)
+
+
+General
+-------
+
+Replace np.int instances in the code with int, to support recent numpy releases (#833)
+
+
+Moving Targets
+--------------
+
+Correct a location jumpiness at the sub-pixel level for cases where moving targets are being added to the seed image. With these changes, Mirage now evaluates the PSF gridded library at every frame and subframe source location. Previously, a single PSF from the library was constructed, and Mirage would subsample the array, shift it, and return to nominal pixel scale. (#837)
+
+
+Seed Image
+----------
+
+Allow WebbPSF oversampling to be either an integer, or a list of one integer per dimension. (#835)
+
+
 2.4.0
 =====
 

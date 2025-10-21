@@ -7,11 +7,11 @@ Author: Nestor Espinoza
 
 import numpy as np
 import os
-from pkg_resources import resource_filename
+
 from scipy import interpolate, ndimage
 import shutil
 import urllib.request as request
-
+from importlib.resources import files, as_file
 import astropy.units as q
 from astropy.io import fits
 from contextlib import closing
@@ -136,7 +136,12 @@ def get_vega():
     astropy.units.quantity.Quantity
         Flux in erg/s/cm2/A of Vega spectrum.
     """
-    data = fits.getdata(resource_filename('mirage', 'reference_files/alpha_lyr_stis_009.fits'), header=False)
+    relative_path = 'reference_files/alpha_lyr_stis_009.fits'
+
+    # Get a proper Path to the file
+    with as_file(files('mirage').joinpath(relative_path)) as p:
+        pfile = str(p)
+    data = fits.getdata(pfile, header=False)
 
     # Wavelength is in Angstroms, convert to microns to match the get_phoenix_model function.
     # Flux is in Flambda (same as Phoenix; i.e., erg/s/cm2/A):
@@ -208,9 +213,12 @@ def get_phoenix_model(feh, alpha, teff, logg):
     phoenix_met_and_alpha = url_folder.split('/')[-2][1:]
 
     # Define folders where we will save (1) all stellar model data and (2) all phoenix models:
-    stellarmodels_folder_path = resource_filename('mirage', 'reference_files/stellarmodels/')
-    phoenix_folder_path = resource_filename('mirage', 'reference_files/stellarmodels/phoenix/')
-    model_folder_path = resource_filename('mirage', 'reference_files/stellarmodels/phoenix/' + phoenix_met_and_alpha + '/')
+    with as_file(files('mirage').joinpath('reference_files/stellarmodels/')) as p:
+        stellarmodels_folder_path = str(p)
+    with as_file(files('mirage').joinpath('reference_files/stellarmodels/phoenix/')) as p:
+        phoenix_folder_path = str(p)
+    with as_file(files('mirage').joinpath('reference_files/stellarmodels/phoenix/' + phoenix_met_and_alpha + '/')) as p:
+        model_folder_path = str(p)
 
     # Check if we even have stellarmodels folder created. Create it if not:
     if not os.path.exists(stellarmodels_folder_path):
@@ -318,9 +326,12 @@ def get_atlas_model(feh, teff, logg):
     atlas_met = url_folder.split('/')[-2]
 
     # Define folders where we will save (1) all stellar model data and (2) all atlas models:
-    stellarmodels_folder_path = resource_filename('mirage', 'reference_files/stellarmodels/')
-    atlas_folder_path = resource_filename('mirage', 'reference_files/stellarmodels/atlas/')
-    model_folder_path = resource_filename('mirage', 'reference_files/stellarmodels/atlas/' + atlas_met + '/')
+    with as_file(files('mirage').joinpath('reference_files/stellarmodels/')) as p:
+        stellarmodels_folder_path = str(p)
+    with as_file(files('mirage').joinpath('reference_files/stellarmodels/atlas/')) as p:
+        atlas_folder_path = str(p)
+    with as_file(files('mirage').joinpath('reference_files/stellarmodels/atlas/' + atlas_met + '/')) as p:
+        model_folder_path = str(p)
 
     # Check if we even have stellarmodels folder created. Create it if not:
     if not os.path.exists(stellarmodels_folder_path):
@@ -485,7 +496,9 @@ def scale_spectrum(w, f, jmag):
         Rescaled spectrum at wavelength w.
     """
     # Get filter response (note wT is in microns):
-    wT, TT = np.loadtxt(resource_filename('mirage', 'reference_files/jband_transmission.dat'), unpack=True, usecols=(0, 1))
+    with as_file(files('mirage').joinpath('reference_files/jband_transmission.dat')) as p:
+        jband_file = str(p)
+    wT, TT = np.loadtxt(jband_file, unpack=True, usecols=(0, 1))
 
     # Get spectrum of vega:
     w_vega, f_vega = get_vega()

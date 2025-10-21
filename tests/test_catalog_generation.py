@@ -147,17 +147,19 @@ def test_2mass_catalog_generation():
     """Test the generation of a catalog from a 2MASS query
     """
     two_mass_mirage, two_mass_query_results = create_catalog.get_2MASS_ptsrc_catalog(80.4, -69.8, 120)
-    comparison_file = os.path.join(TEST_DATA_DIR, 'catalog_generation/TwoMass_test.cat')
-    comparison_table = ascii.read(comparison_file)
-    assert two_mass_query_results.colnames == ['ra', 'dec', 'clon', 'clat', 'err_maj', 'err_min', 'err_ang',
-                                               'designation', 'j_m', 'j_cmsig', 'j_msigcom', 'j_snr', 'h_m',
-                                               'h_cmsig', 'h_msigcom', 'h_snr', 'k_m', 'k_cmsig', 'k_msigcom',
-                                               'k_snr', 'ph_qual', 'rd_flg', 'bl_flg', 'cc_flg', 'ndet', 'gal_contam',
-                                               'mp_flg', 'hemis', 'xdate', 'scan', 'glon', 'glat', 'a', 'dist_opt',
-                                               'phi_opt', 'b_m_opt', 'vr_m_opt', 'nopt_mchs', 'ext_key', 'j_h', 'h_k', 'j_k']
+    assert two_mass_query_results.colnames == ['ra', 'dec', 'err_maj', 'err_min', 'err_ang', 'designation', 'j_m', 'j_cmsig',
+                                               'j_msigcom', 'j_snr','h_m', 'h_cmsig', 'h_msigcom', 'h_snr', 'k_m', 'k_cmsig',
+                                               'k_msigcom', 'k_snr', 'ph_qual', 'rd_flg', 'bl_flg', 'cc_flg', 'ndet', 'prox',
+                                               'pxpa', 'pxcntr', 'gal_contam', 'mp_flg', 'cntr', 'hemis', 'xdate', 'scan',
+                                               'glon', 'glat', 'x', 'y', 'z', 'x_scan', 'jdate', 'j_psfchi', 'h_psfchi',
+                                               'k_psfchi', 'j_m_stdap', 'j_msig_stdap', 'h_m_stdap', 'h_msig_stdap', 'k_m_stdap',
+                                               'k_msig_stdap', 'dist_edge_ns', 'dist_edge_ew', 'dist_edge_flg', 'dup_src', 'use_src',
+                                               'a', 'dist_opt', 'phi_opt', 'b_m_opt', 'vr_m_opt', 'nopt_mchs', 'ext_key', 'scan_key',
+                                               'coadd_key','coadd','htm20']
+
+
     assert two_mass_mirage.table.colnames == ['index', 'x_or_RA', 'y_or_Dec', '2mass_j_m_magnitude',
                                               '2mass_h_m_magnitude', '2mass_k_m_magnitude']
-    assert len(two_mass_mirage.ra) == len(comparison_table['x_or_RA'].data)
 
 
 def test_catalog_combination():

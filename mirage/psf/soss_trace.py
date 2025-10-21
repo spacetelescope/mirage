@@ -6,7 +6,6 @@ Authors: Joe Filippazzo
 
 from copy import copy
 import os
-from pkg_resources import resource_filename
 import multiprocessing
 import time
 from functools import partial

@@ -9,14 +9,16 @@ Use
     >>> pytest test_yaml_generator.py
 """
 import os
+# Define directory and file locations
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+os.environ["MIRAGE_DATA"] = __location__
+os.environ["CRDS_PATH"] = os.path.join(__location__, "temp")
+os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
 
 import numpy as np
 import pytest
 
 from mirage.yaml.yaml_generator import SimInput
-
-# Define directory and file locations
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 # Reset the MIRAGE_DATA env variable to be a real location so yaml_generator
 # doesn't croak
@@ -25,9 +27,6 @@ ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
 if not ON_GITHUB:
     orig_mirage_data = os.environ['MIRAGE_DATA']
-
-os.environ["MIRAGE_DATA"] = __location__
-os.environ["CRDS_PATH"] = os.path.join(__location__, "temp")
 
 
 def call_with_assorted_user_inputs(catalogs, crs, dates, backgrounds, roll_angles):
@@ -395,6 +394,7 @@ def test_reffile_crds():
     os.system('rm -r {}'.format(temp_output_dir))
 
 
+@pytest.mark.skipif(ON_GITHUB, reason='CRDS server URL unknown')
 def test_reffile_crds_full_name():
     """Test that the correct values for reference files are found
     """

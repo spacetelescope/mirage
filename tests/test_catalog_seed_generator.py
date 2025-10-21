@@ -29,16 +29,10 @@ from mirage.catalogs.catalog_generator import PointSourceCatalog
 # Determine if tests are being run on Github Actions CI
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
-# Determine the version of python used. For python 3.8 and above
-# webbpsf is installed via pip, which means the data files will not
-# be accessible and any test that relies on webbpsf should be skipped
-python_version = sys.version[0:3]
-testable_versions = ['3.6', '3.7']
-skip_versions = ['3.8', '3.9']
-if python_version in skip_versions:
-    SKIP_WEBBPSF = True
-else:
-    SKIP_WEBBPSF = False
+# For python 3.8 and above webbpsf is installed via pip, which means the
+# data files will not be accessible and any test that relies on webbpsf
+# should be skipped
+SKIP_WEBBPSF = True
 
 
 def create_dummy_psf_grid():

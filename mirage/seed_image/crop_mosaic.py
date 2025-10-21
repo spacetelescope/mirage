@@ -125,8 +125,8 @@ class Extraction():
 
         # Determine the dimensions of the mosaic aperture to be cropped in
         # units of mosaic pixels
-        nx = np.absolute(np.int(xlen * self.jwst_pixel_scale / self.mosaic_scale_x))
-        ny = np.absolute(np.int(ylen * self.jwst_pixel_scale / self.mosaic_scale_y))
+        nx = np.absolute(int(xlen * self.jwst_pixel_scale / self.mosaic_scale_x))
+        ny = np.absolute(int(ylen * self.jwst_pixel_scale / self.mosaic_scale_y))
 
         # Set the CRPIX values that will define the WCS in the output
         self.crpix1 = nx / 2 + 0.5
@@ -136,10 +136,10 @@ class Extraction():
         half_height = ny // 2 + 1
         half_width = nx // 2 + 1
 
-        miny = np.int(mosaic_center_y - half_height)
-        maxy = np.int(mosaic_center_y + half_height + 1)
-        minx = np.int(mosaic_center_x - half_width)
-        maxx = np.int(mosaic_center_x + half_width + 1)
+        miny = int(mosaic_center_y - half_height)
+        maxy = int(mosaic_center_y + half_height + 1)
+        minx = int(mosaic_center_x - half_width)
+        maxx = int(mosaic_center_x + half_width + 1)
 
         # If the cropped area falls off the edge of the mosaic, adjust
         # the extraction coordinates and the crpix values accordingly
