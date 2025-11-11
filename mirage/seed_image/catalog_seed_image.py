@@ -2806,6 +2806,15 @@ class Catalog_seed():
             edgex = int(psf_len // 2)
             edgey = int(psf_len // 2)
 
+
+
+            print(f'\n\n\n\nPTSRC: {pixelx},{pixely}')
+            print(values['x_or_RA'], values['y_or_Dec'])
+            print(ra, dec)
+            print(countrate)
+
+
+
             if pixely > (miny-edgey) and pixely < (maxy+edgey) and pixelx > (minx-edgex) and pixelx < (maxx+edgex):
                 # set up an entry for the output table
                 entry = [index, pixelx, pixely, ra_str, dec_str, ra, dec, mag]
@@ -3816,17 +3825,42 @@ class Catalog_seed():
         else:
             loc_v2, loc_v3 = pysiaf.utils.rotations.getv2v3(self.intermediate_attitude_matrix, ra, dec)
 
+
+
+
+        self.coord_transform = None # FOR TESTING. DELETE THIS LINE!
+
+
+
+
         if self.coord_transform is not None:
             # Use the distortion reference file to translate from V2, V3 to RA, Dec
             pixelx, pixely = self.coord_transform.inverse(loc_v2, loc_v3)
+
+
+
+
+            print(self.coord_transform.inverse(75.81985, -493.079205))
+            print('should be 863.5, 1031.5 (OSS coords) or (1185, 1031) DMS coords')
+
+
+            print(f'before acct for subarray: {pixelx},{pixely}')
+
             pixelx -= self.subarray_bounds[0]
             pixely -= self.subarray_bounds[1]
+
+            print(f'after: {pixelx}, {pixely}')
+            print(f'subarray_bounds: {self.subarray_bounds}')
         else:
             self.logger.debug('SIAF: using {} to transform from tel to sci'.format(self.siaf.AperName))
             pixelx, pixely = self.siaf.tel_to_sci(loc_v2, loc_v3)
             # Subtract 1 from SAIF-derived results since SIAF works in a 1-indexed coord system
             pixelx -= 1
             pixely -= 1
+
+
+        print(f'V2, V3: {loc_v2}, {loc_v3}')
+        print(f'pixelx,y: {pixelx}, {pixely}')
 
         return pixelx, pixely
 

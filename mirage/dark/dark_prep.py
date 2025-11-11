@@ -323,6 +323,64 @@ class DarkPrep():
             div = floor((ngroup * (nskip + nframe)) / inputframes)
             mod = (ngroup * (nskip + nframe)) % inputframes
 
+
+
+
+
+
+
+            # Faster calculation of the extra frames. The motivation behind this comes
+            # from creating test TA data for OSS, where we are working with subarrays, but need
+            # lots of frames. This method is faster, and probably makes a better output than
+            # the usual case of making copies of the dark groups and stacking them
+            xc, yc = siaf_interface.sci_subarray_corners('nircam', 'NRCA5_TADHSTS32', siaf=None, verbose=False)
+            num_frames = (ngroup * (nskip + nframe))
+            #sb_file = '/grp/crds/jwst/references/jwst/jwst_nircam_superbias_0220.fits'
+            #sb = fits.getdata(sb_file)
+            #sb = sb[yc[0]:yc[1]+1, xc[0]:xc[1]+1]
+            lindarkfile = '/ifs/jwst/wit/nircam/isim_cv3_files_for_calibrations/linearized_darks/BLONG/Linearized_Dark_and_SBRefpix_NRCNRCBLONG-DARK-60081800081_1_490_SE_2016-01-08T18h34m21_uncal.fits'
+            sb = fits.getdata(lindarkfile, 2)
+            sb = sb[0, :, yc[0]:yc[1]+1, xc[0]:xc[1]+1]
+            rng = np.random.default_rng()
+            refpix = rng.standard_normal((num_frames, 32, 32)) * 11.  # assume 11DN readnoise
+
+            obj.sbAndRefpix = obj.sbAndRefpix[:, :, yc[0]:yc[1]+1, xc[0]:xc[1]+1]
+            for ints in range(div - 1):
+                if obj.sbAndRefpix is not None:
+                    extra_sb = np.expand_dims(sb, 0)
+                    obj.sbAndRefpix = np.hstack((obj.sbAndRefpix, extra_sb))
+
+            if obj.sbAndRefpix is not None:
+                extra_sb = np.copy(obj.sbAndRefpix[:, 1:mod + 1, :, :]) - obj.sbAndRefpix[:, 0, :, :]
+                obj.sbAndRefpix = np.hstack((obj.sbAndRefpix, extra_sb + obj.sbAndRefpix[:, -1, :, :]))
+
+            # Now add repix to superbias
+            obj.sbAndRefpix = obj.sbAndRefpix + refpix
+
+            dark_file = '/ifs/jwst/wit/nircam/commissioning/01453/obsnum19/jw01453019001_03301_00001_nrcalong_nodarksub_0_ramp_fit.fits'
+            dark_rates = fits.getdata(dark_file)
+            dark_rates = dark_rates[yc[0]:yc[1]+1, xc[0]:xc[1]+1]
+            frametime = utils.calc_frame_time('nircam', 'SUB32TA_DHS', 32, 32, 1)
+            frametimes = np.arange(num_frames) * frametime
+            dark_signal = np.multiply.outer(frametimes, dark_rates)
+
+            print(f'\n\n\n\n\n\n\n\n\n\ndark signal shape is {dark_signal.shape}\n\n\n\n\n\n\n\n\n')
+            rng = np.random.default_rng()
+            readnoise = rng.standard_normal((num_frames, 32, 32)) * 11.  # assume 11DN readnoise
+            dark_signal = dark_signal + readnoise
+            #sbandrefpix = sb + refpix
+            obj.data = np.expand_dims(dark_signal, 0)
+            #obj.sbAndRefpix = np.expand_dims(sbandrefpix, 0)
+            obj.zeroframe = obj.data[:, 0, :, :]
+
+
+
+
+
+
+
+            """
+
             # If more frames are needed than there are frames
             # in the original dark, then make copies of the
             # entire thing as many times as necessary, adding
@@ -342,6 +400,9 @@ class DarkPrep():
             if obj.sbAndRefpix is not None:
                 extra_sb = np.copy(obj.sbAndRefpix[:, 1:mod + 1, :, :]) - obj.sbAndRefpix[:, 0, :, :]
                 obj.sbAndRefpix = np.hstack((obj.sbAndRefpix, extra_sb + obj.sbAndRefpix[:, -1, :, :]))
+
+            """
+
 
         elif ngroup * (nskip + nframe) < inputframes:
             # If there are more frames in the dark than we'll need,
@@ -900,9 +961,14 @@ class DarkPrep():
                     # THIS WILL CROP self.dark AS WELL SINCE
                     # self.linDark IS JUST A REFERENCE IN THE NON
                     # PIPELINE CASE!!
-                    self.linDark = self.crop_dark(self.linDark)
-                    if self.zeroModel.data is not None:
-                        self.zeroModel = self.crop_dark(self.zeroModel)
+
+
+                    # Comment out just for the case of making TA files, where we create
+                    # a "fake" dark that is already subarray sized
+                    print('SKIP CROPPING BECAUSE WE HAVE CREATED A FAKE DARK THAT IS ALREADY SUBARRAY SIZED')
+                    #self.linDark = self.crop_dark(self.linDark)
+                    #if self.zeroModel.data is not None:
+                    #    self.zeroModel = self.crop_dark(self.zeroModel)
                 else:
                     raise NotImplementedError(("Mode not yet supported! Must use either: use_JWST_pipeline "
                                                "= True and a raw or linearized dark or supply a linearized dark. "
@@ -937,6 +1003,11 @@ class DarkPrep():
 
                     final_zerodata[frames, :, :] = self.zeroModel.data
                     final_zero_sbandrefpix[frames, :, :] = self.zeroModel.sbAndRefpix
+
+
+
+
+
 
             # Save the linearized dark
             # if self.params['Output']['save_intermediates']:
