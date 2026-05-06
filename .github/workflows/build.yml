@@ -24,6 +24,9 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     name: build frozen environment for Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
+    defaults:
+      run:
+        shell: bash -leo pipefail {0}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -43,7 +46,7 @@ jobs:
         name: retrieve package version
         run: echo version=$(python -c "import mirage; print(mirage.__version__)") >> $GITHUB_OUTPUT
       - id: filename
-        run: echo "filename=mirage_${{ steps.version.outputs.version }}_conda_${{ runner.runs-on }}_${{ runner.arch }}_py${{ matrix.python-version }}.yml" >> $GITHUB_OUTPUT
+        run: echo "filename=mirage_${{ steps.version.outputs.version }}_conda_${{ runner.os }}_${{ runner.arch }}_py${{ matrix.python-version }}.yml" >> $GITHUB_OUTPUT
       - run: micromamba env export --no-build | grep -v "name:" | grep -v "prefix:" > ${{ steps.filename.outputs.filename }}
       - run: cat ${{ steps.filename.outputs.filename }}
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
