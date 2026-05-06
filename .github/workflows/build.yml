@@ -18,9 +18,9 @@ jobs:
           - ubuntu-latest
           - macos-latest
         python-version:
+          - "3.11"
           - "3.12"
           - "3.13"
-          - "3.14"
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     name: build frozen environment for Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
