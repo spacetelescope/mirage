@@ -1,0 +1,95 @@
+name: build
+
+on:
+  pull_request:
+  release:
+    types: [ released ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freeze:
+    strategy:
+      matrix:
+        runs-on:
+          - ubuntu-latest
+          - macos-latest
+        python-version:
+          - "3.12"
+          - "3.13"
+          - "3.14"
+      fail-fast: false
+    runs-on: ${{ matrix.runs-on }}
+    name: build frozen environment for Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-tags: true
+          persist-credentials: false
+      - uses: mamba-org/setup-micromamba@d7c9bd84e824b79d2af72a2d4196c7f4300d3476  # v3.0.0
+        with:
+          environment-name: mirage-${{ runner.runs-on }}-py${{ matrix.python-version }}
+          create-args: >-
+            python=${{ matrix.python-version }}
+          init-shell: bash
+          generate-run-shell: false
+          post-cleanup: none
+      - run: pip install .
+      - run: pip list
+      - id: version
+        name: retrieve package version
+        run: echo version=$(python -c "import mirage; print(mirage.__version__)") >> $GITHUB_OUTPUT
+      - id: filename
+        run: echo "filename=mirage_${{ steps.version.outputs.version }}_conda_${{ runner.runs-on }}_${{ runner.arch }}_py${{ matrix.python-version }}.yml" >> $GITHUB_OUTPUT
+      - run: micromamba env export --no-build | grep -v "name:" | grep -v "prefix:" > ${{ steps.filename.outputs.filename }}
+      - run: cat ${{ steps.filename.outputs.filename }}
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.filename.outputs.filename }}
+          path: ${{ steps.filename.outputs.filename }}
+      - if: (github.event_name == 'release' && github.event.action == 'released')
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # v2.11.5
+        with:
+          file: ${{ steps.filename.outputs.filename }}
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-tags: true
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3"
+      - run: pip install build
+      - run: python -m build --sdist --wheel
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: dist
+          path: ./dist/
+  publish:
+    if: (github.event_name == 'release') && (github.event.action == 'released')
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    # Requires environment protection rules in GitHub Settings:
+    # Settings > Environments > pypi > Add required reviewers
+    environment:
+      name: pypi
+      url: https://pypi.org/p/{{ cookiecutter.package_name }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: dist*
+          path: dist/
+          merge-multiple: true
+      - uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: "dist/*"
+      # To upload to PyPI without a token, add this workflow file as a Trusted Publisher in the project settings on the PyPI website
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
