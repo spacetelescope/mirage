@@ -1,0 +1,48 @@
+name: tests
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: ["ubuntu-latest"]
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+        coverage: [false]
+    name: run tests (Python ${{ matrix.python-version }}, ${{ matrix.runs-on }})
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install ".[test]" ${{ matrix.coverage && 'coverage pytest-cov' || '' }}
+      - run: pytest ${{ matrix.coverage && '--cov' || '' }} 
+      - if: matrix.coverage
+        name: report coverage to summary
+        run: |
+          coverage combine
+          echo '## Coverage Report' >> $GITHUB_STEP_SUMMARY
+          coverage report -i -m --format=markdown | tee -a $GITHUB_STEP_SUMMARY
