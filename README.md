@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/spacetelescope/mirage/actions/workflows/build.yml/badge.svg)](https://github.com/spacetelescope/mirage/actions/workflows/build.yml)
 [![License](https://img.shields.io/pypi/l/Django.svg)](https://github.com/spacetelescope/mirage/blob/master/LICENSE.txt)
-[![Python](https://img.shields.io/badge/Python-3.6-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![STScI](https://img.shields.io/badge/powered%20by-STScI-blue.svg?colorA=707170&colorB=3e8ddd&style=flat)](http://www.stsci.edu)
 [![DOI](https://zenodo.org/badge/109982775.svg)](https://doi.org/10.5281/zenodo.3519261)
 
