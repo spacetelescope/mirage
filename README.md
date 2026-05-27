@@ -1,10 +1,10 @@
 # MIRaGe = Multi Instrument Ramp Generator
 
-[![Build Status](https://github.com/spacetelescope/mirage/workflows/CI/badge.svg)](https://github.com/spacetelescope/mirage/actions)
+[![Build Status](https://github.com/spacetelescope/mirage/actions/workflows/build.yml/badge.svg)](https://github.com/spacetelescope/mirage/actions/workflows/build.yml)
 [![License](https://img.shields.io/pypi/l/Django.svg)](https://github.com/spacetelescope/mirage/blob/master/LICENSE.txt)
 [![Python](https://img.shields.io/badge/Python-3.6-blue.svg)](https://www.python.org/)
 [![STScI](https://img.shields.io/badge/powered%20by-STScI-blue.svg?colorA=707170&colorB=3e8ddd&style=flat)](http://www.stsci.edu)
-[![DOI](https://zenodo.org/badge/109982775.svg)](https://zenodo.org/badge/latestdoi/109982775)
+[![DOI](https://zenodo.org/badge/109982775.svg)](https://doi.org/10.5281/zenodo.3519261)
 
 
 This repository contains code that can be used to generate
@@ -57,9 +57,6 @@ For any questions about the `mirage` project or its software or documentation, p
 - Bryan Hilbert [@bhilbert4](https://github.com/bhilbert4)
 - Joe Filippazzo [@hover2pi](https://github.com/hover2pi)
 - Nor Pirzkal [@NorPirzkal](https://github.com/npirzkal)
-- Kevin Volk [@KevinVolkSTScI](https://github.com/KevinVolkSTScI)
-- Shannon Osborne [@shanosborne](https://github.com/shanosborne)
-- Marshall Perrin [@mperrin](https://github.com/mperrin)
 
 
 ## Acknowledgments:
