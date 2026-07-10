@@ -14,13 +14,13 @@ Use
 import os
 import pytest
 
-from mirage import soss_simulator as ss
-
 os.environ['TEST_NIRISS_DATA'] = os.path.join(os.path.dirname(__file__), 'test_data/NIRISS')
 
 # Determine if tests are being run on Github Actions CI
 ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
+if not ON_GITHUB:
+    from mirage import soss_simulator as ss
 
 @pytest.mark.skipif(ON_GITHUB, reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_niriss_soss_substrip256_clear():
