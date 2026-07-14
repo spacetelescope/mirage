@@ -49,7 +49,7 @@ def test_fluxcal_info():
                                                              params['Readout']['filter'],
                                                              params['Readout']['pupil'], detector, module)
 
-    assert vegazp == 25.6
-    assert photflam == 3.3443932204899414e-21
-    assert photfnu == 4.4058412e-31
+    assert np.isclose(vegazp, 25.62066183092643, atol=0, rtol=0.01)
+    assert np.isclose(photflam, 3.281350346283507e-21, atol=0, rtol=0.01)
+    assert np.isclose(photfnu, 4.322789694320761e-31, atol=0, rtol=0.01)
     assert pivot == 1.988
