@@ -4,7 +4,7 @@ There are two aspects to Mirage installation. First, the software itself must be
 must be downloaded. The preferred installation method is via :ref:`Pypi <pypi>`, as this is the latest stable version of the software.
 
 .. tip::
-    Mirage currently supports python 3.11 and 3.12.
+    Mirage currently supports python 3.11, 3.12, and 3.13.
 
 .. _pypi:
 
@@ -61,21 +61,15 @@ Create and activate a new environment. In this example we call the environment "
 Install via Environment File
 ----------------------------
 
-The Mirage repository also contains environment files, which can be used to create an environment with proper versions of all of Mirage's dependencies. After cloning the Mirage repository, the environment file (located within the top-level directory) can be used via the following commands. The *name* keyword is used to specify that the name of the environment. You can name the environment anything you like.
+The Mirage repository also contains environment files, which can be used to create an environment with proper versions of all of Mirage's dependencies. For each new release of Mirage, updated environment files are created. These can be found by clicking on the current release on the right side of the `repository page on GitHub <https://github.com/spacetelescope/mirage>`_, and then looking in the "Assets" section. Download the appropriate environment file for your operating system and python version.
+
+The following commands can then be used to create an environment. The *name* keyword is used to specify the name of the environment. You can name the environment anything you like.
 
 Create a python 3.11 environment using the environment file, activate the environment, and install mirage::
 
     cd mirage
-    conda env create -f environment_python_3.11.yml
+    conda env create --name mirage_py3.11 -f jwql_2.4.2_conda_macOS_ARM64_py3.11.yml
     conda activate mirage_py3.11
-    pip install .
-
-
-There is also an environment file that can be used to create python 3.12 environment::
-
-    cd mirage
-    conda env create -f environment_python_3.12.yml
-    conda activate mirage_py3.12
     pip install .
 
 
@@ -112,7 +106,7 @@ The installation errors are related to supporting Batman's ability to run calcul
     ::
 
         cd mirage
-        conda env create -f environment_python_3.11.yml
+        conda env create --name mirage-py3.11 -f jwql_2.4.2_conda_macOS_ARM64_py3.11.yml
         conda activate mirage-py3.11
         pip install .
         cd ../batman
