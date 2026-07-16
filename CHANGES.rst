@@ -1,3 +1,34 @@
+2.5.0
+=====
+
+Documentation
+-------------
+
+Update installation instructions given the packaging changes in #858. Add a note that batman package does
+not work in python >= 3.12. (#862)
+
+
+Flux calibration
+----------------
+
+Update NIRCam zeropoints file using data from the most recent photom reference file delivery. (#862)
+
+
+Packaging
+---------
+
+Modernize packaging strategy. Use pyproject.toml for environment definition. Save environment files at the
+time of a release, rather than manually maintaining env files. (#858)
+
+Simplify test workflow. Run tests on python 3.11-3.13. (#859)
+
+Remove requirements.txt file. (#260)
+
+Comment out batman package from pyproject.toml. batman requires distutils, which has been removed from
+python >=3.12. Users creating TSO exposures will have to use a python 3.11 environment, and manually install
+batman. (#862)
+
+
 2.4.1
 =====
 
