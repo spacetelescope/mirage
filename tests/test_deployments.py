@@ -15,7 +15,7 @@ import sys
 
 import numpy as np
 import pytest
-import webbpsf
+import stpsf as webbpsf
 
 from .utils import parametrized_data
 from mirage.psf.deployments import generate_random_ote_deployment, load_ote_from_deployment_yaml

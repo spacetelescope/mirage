@@ -302,7 +302,7 @@ def low_medium_high_background_value(ra, dec, background_level, filter_waves, fi
         # Convert from MJy/sr to e-/sec/pixel
         pixelarea = siaf_info.XSciScale * u.arcsec * siaf_info.YSciScale * u.arcsec
         photon_total = PRIMARY_MIRROR_AREA * (filt_bkgd * u.MJy / u.sr) * (1. / PLANCK) * 1.e-20 * pixelarea.to(u.sr) / (filter_waves * u.micron)
-        bsigs[i] = np.trapz(photon_total.value, x=filter_waves)
+        bsigs[i] = np.trapezoid(photon_total.value, x=filter_waves)
 
     # Now sort and determine the low/medium/high levels
     low, medium, high = find_low_med_high(bsigs)

@@ -37,7 +37,7 @@ import pdb
 
 from astropy.io import fits
 import numpy as np
-from webbpsf.utils import to_griddedpsfmodel
+from stpsf.utils import to_griddedpsfmodel
 
 from mirage.logging import logging_functions
 from mirage.utils.constants import NIRISS_PUPIL_WHEEL_FILTERS, NIRCAM_PUPIL_WHEEL_FILTERS, \

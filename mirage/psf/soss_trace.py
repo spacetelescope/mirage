@@ -194,7 +194,7 @@ def generate_SOSS_psfs(filt):
         The filter to use, ['CLEAR', 'F277W']
     """
     try:
-        import webbpsf
+        import stpsf as webbpsf
 
     except ImportError:
         raise ("Could not import `webbpsf` package. Functionality limited. Generating dummy file.")

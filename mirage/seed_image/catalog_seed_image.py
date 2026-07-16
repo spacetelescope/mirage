@@ -4572,7 +4572,7 @@ class Catalog_seed():
                                                                 NIRISS_GHOST_GAP_FILE,
                                                                 log_skipped_filters=log_skipped_filters
                                                                 )
-        if isinstance(ghost_pixelx, np.float):
+        if isinstance(ghost_pixelx, float):
             if not np.isfinite(ghost_pixelx):
                 return np.nan, np.nan, np.nan, np.nan, np.nan
 

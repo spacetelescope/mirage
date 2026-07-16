@@ -20,7 +20,7 @@ import yaml
 
 from astropy.io import fits
 import numpy as np
-import webbpsf
+import stpsf as webbpsf
 
 from mirage.logging import logging_functions
 from mirage.utils.constants import LOG_CONFIG_FILENAME, STANDARD_LOGFILE_NAME

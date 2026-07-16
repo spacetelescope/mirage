@@ -33,7 +33,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
-  filter_wheel_positions: /Users/hilbert/python_repos/mirage/mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
+  filter_wheel_positions: ..//mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
 
@@ -51,7 +51,7 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: $TEST_NIRISS_DATA/niriss_point_sources_mod.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: test_data/niriss/niriss_point_sources_mod.list #File containing a list of point sources to add (x,y locations and magnitudes)
   gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
   psf_wing_threshold_file: config   # File defining PSF sizes versus magnitude
   add_psf_wings: False  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
@@ -80,6 +80,10 @@ simSignals:
   pymethod: True                            #Use double Poisson simulation for photon yield
   expand_catalog_for_segments: False                     # Expand catalog for 18 segments and use distinct PSFs
   use_dateobs_for_background: False          # Use date_obs below to deternine background. If False, bkgdrate is used.
+  signal_low_limit_for_segmap: 0.031         # Lower signal limit to include pix in segmentation map. See below for units.
+  signal_low_limit_for_segmap_units: ADU/sec  # Units of signal_low_limit_for_segmap. Can be: [ADU/sec, e/sec, MJy/sr, ergs/cm2/a, ergs/cm2/hz]
+  add_ghosts: True            # Add ghosts to the image based on source location
+  PSFConvolveGhosts: False  # Convolve the ghost sources with the instrument PSF
 
 Telescope:
   ra: 80.48113382123029 #RA of simulated pointing

@@ -33,7 +33,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
-  filter_wheel_positions: /Users/hilbert/python_repos/mirage/mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
+  filter_wheel_positions: ../mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
 
@@ -51,7 +51,7 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: $TEST_FGS_DATA/fgs_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: test_data/fgs/fgs_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
   gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
   psf_wing_threshold_file: config   # File defining PSF sizes versus magnitude
   add_psf_wings: False  # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding.
@@ -60,7 +60,7 @@ simSignals:
   psfpixfrac: 0.1                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted   #PSF WFE value. Can be predicted or requirements
   psfwfegroup: 0      #WFE realization group (0 to 4)
-  galaxyListFile: $TEST_FGS_DATA/seed_im_from_catalog_test_galaxies_catalog.list
+  galaxyListFile: test_data/fgs/seed_im_from_catalog_test_galaxies_catalog.list
   extended: None          #Extended emission count rate image file name
   extendedscale: 1.0         #Scaling factor for extended emission image
   extendedCenter: 1024,1024  #x,y pixel location at which to place the extended image if it is smaller than the output array size

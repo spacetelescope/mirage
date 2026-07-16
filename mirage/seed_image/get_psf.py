@@ -3,7 +3,7 @@
 *** NOT CURRENTLY IN USE ****
 '''
 
-import webbpsf
+import stpsf as webbpsf
 
 
 def create_commissioning_psf(params):

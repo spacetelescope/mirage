@@ -1,5 +1,98 @@
-# pyproject.toml
+[project]
+name = "mirage"
+description = "Create simulated JWST data"
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
+authors = [
+  { name = "Bryan Hilbert", email = "hilbert@stsci.edu" },
+  { name = "Kevin Volk" },
+  { name = "Lauren Chambers" },
+  { name = "Johannes Sahlmann" },
+  { name = "Nor Pirzkal" },
+  { name = "Joe Filippazzo" },
+  { name = "Shannon Osborne" },
+  { name = "Marshall Perrin" },
+  { name = "Charles-Phillipe Lajoie" },
+  { name = "Mees Fix" },
+  { name = "Deepashri Thatte" },
+  { name = "Zachary Burnett" },
+  { name = "Pey-Lian Lim" },
+  { name = "Everett Schlawin" },
+  { name = "Jo Taylor" },
+  { name = "Erik Tollerud" },
+  { name = "Nadia Dencheva" },
+  { name = "Yanu Khusanova" },
+  { name = "Juan Luis Cano Rodriguez" },
+  { name = "Chris Tava" },
+]
+keywords = ["astronomy", "python"]
+classifiers = ["Programming Language :: Python"]
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    'asdf>=3.4.0',
+    'astropy>=6.1.3',
+    'astroquery>=0.4.7',
+    'bokeh>=3.5.2',
+    #'batman-package',
+    'crds>=11.18.4',
+    'grismconf',
+    'gwcs>=0.21.0',
+    'h5py>=3.11.0',
+    'hotsoss>=0.1.10',
+    'ipython',
+    'jupyter',
+    'jwst',
+    'jwst-backgrounds>=1.3.0',
+    'jwst_gtvt>=1.0.1',
+    'lxml>=5.3.0',
+    'matplotlib>=3.9.2',
+    'nircam_gsim>=1.71',
+    'numpy',
+    'photutils>=1.13.0',
+    'pysiaf>=0.24.1',
+    'scipy>=1.14.1',
+    'synphot>=1.4.0',
+    'stpsf>=2.2.0',
+    'pyyaml>=6.0.2'
+]
+
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-cov",
+]
+docs = [
+  "nbsphinx",
+  "sphinx",
+  "sphinx-automodapi",
+  "sphinx_rtd_theme",
+  "stsci_rtd_theme",
+  "extension-helpers"
+]
+
 [build-system]
-requires = ["setuptools>=73.0.1",
-			"wheel",
-			"setuptools_scm"]
+requires = ["setuptools == 81.0.0",
+            "setuptools_scm[toml]>=7.1",
+            "wheel"]
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mirage*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"mirage" = ["config/*",
+			"reference_files/stellarmodels/phoenix/-0.0/*"]
+"mirage.logging" = ["*.yaml"]
+
+[tool.setuptools_scm]
+
+[tool.pytest]
+junit_family = "xunit2"

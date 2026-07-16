@@ -10,7 +10,7 @@ from astropy.modeling import models, fitting
 from astropy.modeling.models import Gaussian2D
 import numpy as np
 from photutils.datasets import load_irac_psf
-import webbpsf
+import stpsf as webbpsf
 
 from mirage.psf.psf_selection import get_psf_wings
 from mirage.utils.siaf_interface import get_instance

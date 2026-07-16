@@ -21,7 +21,7 @@ import numpy as np
 import os
 import pytest
 import sys
-import webbpsf
+import stpsf as webbpsf
 
 from mirage.seed_image import catalog_seed_image
 from mirage.catalogs.catalog_generator import PointSourceCatalog
@@ -149,9 +149,9 @@ def test_overlap_coordinates_full_frame():
     seed.psf_library_oversamp = 1
 
     for index in range(5):
-        psf, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
-                                                             stamp_dims[1], stamp_dims[0],
-                                                             ignore_detector=False)
+        psf, _, _, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
+                                                                   stamp_dims[1], stamp_dims[0],
+                                                                   ignore_detector=False)
         stamp_x_loc = 301 // 2 - min_x
         stamp_y_loc = 301 // 2 - min_y
         updated_psf_dimensions = psf.shape
@@ -230,9 +230,9 @@ def test_overlap_coordinates_subarray():
                      (200, 400, 200, 400, 0, 200, 0, 200),
                      (0, 150, 0, 150, 151, 301, 151, 301)]
     for index in range(5):
-        psf, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
-                                                             stamp_dims[1], stamp_dims[0],
-                                                             ignore_detector=False)
+        psf, _, _, min_x, min_y, add_wings = seed.create_psf_stamp(tab[index]['pixelx'], tab[index]['pixely'],
+                                                                   stamp_dims[1], stamp_dims[0],
+                                                                   ignore_detector=False)
         stamp_x_loc = 301 // 2 - min_x
         stamp_y_loc = 301 // 2 - min_y
         updated_psf_dimensions = psf.shape

@@ -23,7 +23,7 @@ ON_GITHUB = '/home/runner' in os.path.expanduser('~')
 
 
 @pytest.mark.skipif(ON_GITHUB,
-                    reason="Cannot access mirage data in the central storage directory from Githun Actions CI.")
+                    reason="Cannot access mirage data in the central storage directory from Github Actions CI.")
 def test_fgs_imaging():
     m = im.ImgSim(offline=True)
     m.paramfile = os.path.join(os.path.dirname(__file__), 'test_data/FGS/fgs_imaging_example.yaml')

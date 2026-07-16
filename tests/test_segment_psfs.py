@@ -18,7 +18,7 @@ from astropy.io import fits
 import numpy as np
 import photutils
 import pytest
-from webbpsf.utils import to_griddedpsfmodel
+from stpsf.utils import to_griddedpsfmodel
 
 from .utils import parametrized_data
 from mirage.psf.deployments import generate_random_ote_deployment

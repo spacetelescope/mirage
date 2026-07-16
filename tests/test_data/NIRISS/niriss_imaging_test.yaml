@@ -31,7 +31,7 @@ Reffiles:                                 #Set to None or leave blank if you wis
   readpattdefs:    config   #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
   crosstalk:       config   #File containing crosstalk coefficients
   filtpupilcombo:  config   #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
-  filter_wheel_positions: /Users/hilbert/python_repos/mirage/mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
+  filter_wheel_positions: ../mirage/config/niriss_filter_and_pupil_wheel_positions.txt  # File containing resolver wheel positions for each filter/pupil
   flux_cal:        config   #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
 
@@ -49,7 +49,7 @@ cosmicRay:
   seed: 2956411739      #Seed for random number generator
 
 simSignals:
-  pointsource: $TEST_DATA/niriss_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
+  pointsource: test_data/NIRISS/niriss_point_sources.list #File containing a list of point sources to add (x,y locations and magnitudes)
   psfpath: $MIRAGE_DATA/niriss/gridded_psf_library/  #Path to PSF library
   gridded_psf_library_row_padding: 4  # Number of outer rows and columns to avoid when evaluating library. RECOMMEND 4.
   add_psf_wings: True   # Whether or not to place the core of the psf from the gridded library into an image of the wings before adding

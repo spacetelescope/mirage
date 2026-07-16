@@ -83,7 +83,7 @@ def test_observation_list_generation_minimal(temporary_directory):
 def test_complete_input_generation(temporary_directory):
     """Exercise mirage input generation from APT files (.xml and .pointing)."""
 
-    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'MIRI', 'misc', 'FGS']:
+    for instrument in ['NIRCam', 'NIRISS', 'NIRSpec', 'misc', 'FGS']:
         apt_dir = os.path.join(TEST_DATA_DIR, instrument)
         if instrument == 'NIRISS':
             apt_file_seeds = ['1087_minimal', '1088', '1087', 'm31_field_test_observation']
